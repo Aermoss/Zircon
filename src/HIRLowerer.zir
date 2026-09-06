@@ -384,24 +384,6 @@ class HIRLowerer {
             }
         }
 
-        for constructor in function->constructors {
-            let _type = this.LowerType((constructor->expression as *ASTPathExpression)->path);
-            if _type == null { continue; }
-
-            if !_type->IsClass() {
-                Logger::Log("Constructor target must be a class.", constructor as *ASTExpression, LogSeverity::Error);
-                continue;
-            }
-
-            let mut values = Vector<*HIRExpression>();
-
-            for argument in constructor->arguments {
-                let value = this.LowerExpression(argument);
-                if value == null { continue; }
-                values.PushBack(value);
-            }
-        }
-
         declaration->body = this.LowerBlockStatement(function->body);
         this.scope_manager.PopScope();
     }
@@ -554,6 +536,55 @@ class HIRLowerer {
         }
     }
 
+    pub fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, fields: &Vector<*HIRFieldDeclaration>) {
+        if function->body == null { return; }
+        this.builder.SetCurrentFunction(declaration);
+        this.scope_manager.PushScope(function->name, false);
+
+        for parameter in declaration->parameters {
+            let declaration = parameter as *HIRDeclaration;
+            this.scope_manager.current->Set(declaration->name, parameter, false, function as *ASTDeclaration);
+
+            if declaration->_type->IsClass() {
+                this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
+            }
+        }
+
+        let block = this.builder.BuildBlockStatement();
+        this.builder.SetCurrentBlock(block);
+        declaration->body = block;
+
+        for constructor in function->constructors {
+            let _type = this.LowerType((constructor->expression as *ASTPathExpression)->path);
+            if _type == null { continue; }
+
+            if !_type->IsClass() {
+                Logger::Log("Constructor target must be a class.", constructor as *ASTExpression, LogSeverity::Error);
+                continue;
+            }
+
+            let mut values = Vector<*HIRExpression>();
+
+            for argument in constructor->arguments {
+                let value = this.LowerExpression(argument);
+                if value == null { continue; }
+                values.PushBack(value);
+            }
+        }
+
+        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
+        let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+        let this_dereferenced = this.builder.Dereference(this_reference);
+        this.LowerFieldConstructors(this_dereferenced, fields);
+
+        for statement in function->body->statements {
+            this.LowerStatement(statement);
+        }
+
+        this.BuildDestructors(this.scope_manager.current, null);
+        this.scope_manager.PopScope();
+    }
+
     pub fn LowerFieldDestructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
         for i in 0..fields.Size() {
             let field: *HIRFieldDeclaration = fields[i];
@@ -571,20 +602,60 @@ class HIRLowerer {
         }
     }
 
+    pub fn LowerDestructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, fields: &Vector<*HIRFieldDeclaration>) {
+        if function->body == null { return; }
+        this.builder.SetCurrentFunction(declaration);
+        this.scope_manager.PushScope(function->name, false);
+
+        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
+        let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+        let this_dereferenced = this.builder.Dereference(this_reference);
+
+        for i in 0..fields.Size() {
+            let field: *HIRFieldDeclaration = fields[i];
+            let field_type = (field as *HIRDeclaration)->_type;
+            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
+
+            if field_type->IsClass() {
+                this.scope_manager.current->instances.PushBack(this_field);
+            }
+        }
+
+        for parameter in declaration->parameters {
+            let declaration = parameter as *HIRDeclaration;
+            this.scope_manager.current->Set(declaration->name, parameter, false, function as *ASTDeclaration);
+
+            if declaration->_type->IsClass() {
+                this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
+            }
+        }
+
+        let block = this.builder.BuildBlockStatement();
+        this.builder.SetCurrentBlock(block);
+        declaration->body = block;
+
+        for statement in function->body->statements {
+            this.LowerStatement(statement);
+        }
+
+        this.BuildDestructors(this.scope_manager.current, null);
+        this.scope_manager.PopScope();
+    }
+
     pub fn LowerClassDeclarationFourthPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
         let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
         (this.current_class, this.scope_manager.current) = (_type, scope);
+        let fields = (_type as *HIRClassType)->declaration->fields;
 
         for i in 0.._class->constructors.Size() {
-            this.LowerFunctionDeclarationSecondPass(declaration->constructors[i], _class->constructors[i]);
+            this.LowerConstructorDeclaration(declaration->constructors[i], _class->constructors[i], fields);
         }
 
         if _class->destructor != null {
-            this.LowerFunctionDeclarationSecondPass(declaration->destructor, _class->destructor);
+            this.LowerDestructorDeclaration(declaration->destructor, _class->destructor, fields);
         } else {
             let function = declaration->destructor;
-            let fields = (_type as *HIRClassType)->declaration->fields;
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.BuildBlockStatement();
@@ -616,7 +687,6 @@ class HIRLowerer {
         }
 
         if _class->constructors.Empty() {
-            let fields = (_type as *HIRClassType)->declaration->fields;
             let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
@@ -630,7 +700,6 @@ class HIRLowerer {
             this.LowerFieldConstructors(this_dereferenced, fields);
             this.scope_manager.PopScope();
         } else if _class->constructors.Size() < declaration->constructors.Size() {
-            let fields = (_type as *HIRClassType)->declaration->fields;
             let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
@@ -671,7 +740,6 @@ class HIRLowerer {
         }
 
         if !has_copy_assign {
-            let fields = (_type as *HIRClassType)->declaration->fields;
             let function: *mut HIRFunctionDeclaration = declaration->methods.Back();
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
