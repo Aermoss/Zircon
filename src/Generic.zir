@@ -42,7 +42,7 @@ class GenericDeclaration {
     pub types: Vector<String>;
 
     GenericDeclaration(&mut this, declaration: *ASTDeclaration) {
-        (this.declaration, this.scope, this._class) = (declaration, hir_lowerer->scope_manager.current, hir_lowerer->current_class);
+        (this.declaration, this.scope, this._class) = (declaration, hir_lowerer->scope_manager.current, hir_lowerer->current_type);
 
         if declaration->kind == ASTDeclarationKind::Class {
             let _class = declaration as *ASTClassDeclaration;
@@ -71,7 +71,7 @@ class GenericDeclaration {
     }
 
     pub fn LowerInstance(&mut this, instance: *mut GenericInstance) {
-        let (prev_unsafe, prev_class) = (hir_lowerer->_unsafe, hir_lowerer->current_class);
+        let (prev_unsafe, prev_class) = (hir_lowerer->_unsafe, hir_lowerer->current_type);
         let (prev_scope, prev_generic) = (hir_lowerer->scope_manager.current, hir_lowerer->current_generic);
         let prev_function = hir_lowerer->builder.GetCurrentFunction();
         let prev_block = hir_lowerer->builder.GetCurrentBlock();
@@ -79,7 +79,7 @@ class GenericDeclaration {
         hir_lowerer->builder.SetCurrentBlock(null);
         hir_lowerer->builder.SetCurrentFunction(null);
         (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (this.scope, this);
-        (hir_lowerer->_unsafe, hir_lowerer->current_class) = (false, this._class);
+        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (false, this._class);
         hir_lowerer->scope_manager.PushScope("<generic>".ToString(), true);
 
         for i in 0..this.types.Size() {
@@ -163,7 +163,7 @@ class GenericDeclaration {
         hir_lowerer->builder.SetCurrentBlock(prev_block);
         hir_lowerer->builder.SetCurrentFunction(prev_function);
         (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (prev_scope, prev_generic);
-        (hir_lowerer->_unsafe, hir_lowerer->current_class) = (prev_unsafe, prev_class);
+        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (prev_unsafe, prev_class);
     }
 
     pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {

@@ -92,6 +92,8 @@ class MIRLowerer {
             this.LowerClassDeclarationThirdPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationThirdPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Extend {
+            this.LowerExtendDeclarationFirstPass(declaration as *HIRExtendDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Function {
             this.LowerFunctionDeclarationFirstPass(declaration as *HIRFunctionDeclaration);
         }
@@ -110,6 +112,8 @@ class MIRLowerer {
             this.LowerClassDeclarationFourthPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationFourthPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Extend {
+            this.LowerExtendDeclarationSecondPass(declaration as *HIRExtendDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Function {
             this.LowerFunctionDeclarationSecondPass(declaration as *HIRFunctionDeclaration);
         }
@@ -337,6 +341,22 @@ class MIRLowerer {
 
     fn LowerStructureDeclarationFourthPass(&mut this, structure: *HIRStructureDeclaration) {
         for method in structure->methods {
+            this.LowerFunctionDeclarationSecondPass(method);
+        }
+    }
+
+    fn LowerExtendDeclarationFirstPass(&mut this, _extend: *HIRExtendDeclaration) {
+        this.namespaces.PushBack((_extend as *HIRDeclaration)->name);
+
+        for method in _extend->methods {
+            this.LowerFunctionDeclarationFirstPass(method);
+        }
+
+        this.namespaces.PopBack();
+    }
+
+    fn LowerExtendDeclarationSecondPass(&mut this, _extend: *HIRExtendDeclaration) {
+        for method in _extend->methods {
             this.LowerFunctionDeclarationSecondPass(method);
         }
     }

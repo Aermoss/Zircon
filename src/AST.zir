@@ -22,7 +22,7 @@ enum ASTNodeKind: i32 {
 
 #[if EXTEND]
 extend ASTNodeKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTNodeKind::Path { return "Path".ToString(); }
         else if this == ASTNodeKind::Declaration { return "Declaration".ToString(); }
         else if this == ASTNodeKind::Statement { return "Statement".ToString(); }
@@ -108,7 +108,7 @@ enum ASTTypeKind: u8 {
 
 #[if EXTEND]
 extend ASTTypeKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTTypeKind::Path { return "Path".ToString(); }
         else if this == ASTTypeKind::Pointer { return "Pointer".ToString(); }
         else if this == ASTTypeKind::Reference { return "Reference".ToString(); }
@@ -239,7 +239,7 @@ enum ASTExpressionKind: u8 {
 
 #[if EXTEND]
 extend ASTExpressionKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTExpressionKind::Literal { return "Literal".ToString(); }
         else if this == ASTExpressionKind::Path { return "Path".ToString(); }
         else if this == ASTExpressionKind::Unary { return "Unary".ToString(); }
@@ -333,7 +333,7 @@ enum ASTLiteralKind: u8 {
 
 #[if EXTEND]
 extend ASTLiteralKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTLiteralKind::Boolean { return "Boolean".ToString(); }
         else if this == ASTLiteralKind::Character { return "Character".ToString(); }
         else if this == ASTLiteralKind::Integer { return "Integer".ToString(); }
@@ -512,7 +512,7 @@ enum ASTUnaryKind: u8 {
 
 #[if EXTEND]
 extend ASTUnaryKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTUnaryKind::AddressOf { return '&'.ToString(); }
         else if this == ASTUnaryKind::Dereference { return '*'.ToString(); }
         else if this == ASTUnaryKind::Negate { return '-'.ToString(); }
@@ -551,6 +551,31 @@ enum ASTBinaryKind: u8 {
     LeftShift, RightShift
 }
 
+#[if EXTEND]
+extend ASTBinaryKind {
+    pub fn ToString(this) -> String {
+        if this == ASTBinaryKind::Add { return '+'.ToString(); }
+        else if this == ASTBinaryKind::Subtract { return '-'.ToString(); }
+        else if this == ASTBinaryKind::Multiply { return '*'.ToString(); }
+        else if this == ASTBinaryKind::Divide { return '/'.ToString(); }
+        else if this == ASTBinaryKind::Modulo { return '%'.ToString(); }
+        else if this == ASTBinaryKind::Equal { return "==".ToString(); }
+        else if this == ASTBinaryKind::NotEqual { return "!=".ToString(); }
+        else if this == ASTBinaryKind::Less { return '<'.ToString(); }
+        else if this == ASTBinaryKind::LessEqual { return "<=".ToString(); }
+        else if this == ASTBinaryKind::Greater { return '>'.ToString(); }
+        else if this == ASTBinaryKind::GreaterEqual { return ">=".ToString(); }
+        else if this == ASTBinaryKind::LogicalAnd { return "&&".ToString(); }
+        else if this == ASTBinaryKind::LogicalOr { return "||".ToString(); }
+        else if this == ASTBinaryKind::BitwiseAnd { return '&'.ToString(); }
+        else if this == ASTBinaryKind::BitwiseOr { return '|'.ToString(); }
+        else if this == ASTBinaryKind::BitwiseXor { return '^'.ToString(); }
+        else if this == ASTBinaryKind::LeftShift { return "<<".ToString(); }
+        else if this == ASTBinaryKind::RightShift { return ">>".ToString(); }
+        else { return "<invalid binary>".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTBinaryKind) -> String {
     if kind == ASTBinaryKind::Add { return '+'.ToString(); }
     else if kind == ASTBinaryKind::Subtract { return '-'.ToString(); }
@@ -572,6 +597,7 @@ fn ToString(kind: ASTBinaryKind) -> String {
     else if kind == ASTBinaryKind::RightShift { return ">>".ToString(); }
     else { return "<invalid binary>".ToString(); }
 }
+#[endif]
 
 class ASTBinaryExpression : ASTExpression {
     pub kind: ASTBinaryKind,
@@ -719,7 +745,7 @@ enum ASTAssignmentKind: u8 {
 
 #[if EXTEND]
 extend ASTAssignmentKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTAssignmentKind::Assign { return '='.ToString(); }
         else if this == ASTAssignmentKind::AddAssign { return "+=".ToString(); }
         else if this == ASTAssignmentKind::SubtractAssign { return "-=".ToString(); }
@@ -833,7 +859,7 @@ enum ASTStatementKind: u8 {
 
 #[if EXTEND]
 extend ASTStatementKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTStatementKind::Variable { return "Variable".ToString(); }
         else if this == ASTStatementKind::Expression { return "Expression".ToString(); }
         else if this == ASTStatementKind::If { return "If".ToString(); }
@@ -978,7 +1004,7 @@ enum ASTDeclarationKind: u8 {
 
 #[if EXTEND]
 extend ASTDeclarationKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == ASTDeclarationKind::Parameter { return "Parameter".ToString(); }
         else if this == ASTDeclarationKind::Function { return "Function".ToString(); }
         else if this == ASTDeclarationKind::Field { return "Field".ToString(); }

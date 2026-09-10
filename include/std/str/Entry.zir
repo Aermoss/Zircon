@@ -912,29 +912,29 @@ class String {
 
 #[if EXTEND]
 extend i8 {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         return String(this);
     }
 
-    fn operator+(this, string: &String) -> String {
+    pub fn operator+(this, string: &String) -> String {
         return String(this) + string;
     }
 
-    fn operator*(this, count: usize) -> String {
+    pub fn operator*(this, count: usize) -> String {
         return String(this) * count;
     }
 }
 
 extend *i8 {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         return String(this);
     }
 
-    fn operator+(this, string: &String) -> String {
+    pub fn operator+(this, string: &String) -> String {
         return String(this) + string;
     }
 
-    fn operator*(this, count: usize) -> String {
+    pub fn operator*(this, count: usize) -> String {
         return String(this) * count;
     }
 }

@@ -365,16 +365,16 @@ class HIRType {
                 continue;
             }
 
-            if method->public || (hir_lowerer->current_class != null && *hir_lowerer->current_class == this) {
+            if method->public || (hir_lowerer->current_type != null && *hir_lowerer->current_type == this) {
                 result.PushBack(method);
             } found = true;
         }
 
         if result.Empty() && !test {
             if found {
-                Logger::Log("Function '" + name + "' is not accessible.", node, LogSeverity::Error);
+                Logger::Log("Method '" + name + "' is not accessible.", node, LogSeverity::Error);
             } else {
-                Logger::Log("Invalid arguments for: '" + name + "'.", node, LogSeverity::Error);
+                Logger::Log("Invalid arguments for method: '" + name + "'.", node, LogSeverity::Error);
             }
         } return result;
     }
@@ -949,7 +949,7 @@ enum HIRUnaryKind: u8 {
 
 #[if EXTEND]
 extend HIRUnaryKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == HIRUnaryKind::AddressOf { return '&'.ToString(); }
         else if this == HIRUnaryKind::Dereference { return '*'.ToString(); }
         else if this == HIRUnaryKind::Negate { return '-'.ToString(); }
@@ -999,7 +999,7 @@ enum HIRBinaryKind: u8 {
 
 #[if EXTEND]
 extend HIRBinaryKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == HIRBinaryKind::Add { return '+'.ToString(); }
         else if this == HIRBinaryKind::Subtract { return '-'.ToString(); }
         else if this == HIRBinaryKind::Multiply { return '*'.ToString(); }
@@ -1297,7 +1297,7 @@ enum HIRIntrinsicKind: u8 {
 
 #[if EXTEND]
 extend HIRIntrinsicKind {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == HIRIntrinsicKind::SizeOf { return "sizeof".ToString(); }
         else if this == HIRIntrinsicKind::AlignOf { return "alignof".ToString(); }
         else { return "<invalid intrinsic>".ToString(); }
@@ -1533,7 +1533,7 @@ class HIRForStatement : HIRStatement {
 }
 
 enum HIRDeclarationKind: u8 {
-    Parameter, Function, Field, Class, Structure, Member, Enumeration, Constant, Static
+    Parameter, Function, Field, Class, Structure, Member, Enumeration, Extend, Constant, Static
 }
 
 enum HIRDeclarationABI: u8 {
@@ -1578,6 +1578,8 @@ class HIRDeclaration {
             return (this as *HIRMemberDeclaration)->ToString();
         } else if this->kind == HIRDeclarationKind::Enumeration {
             return (this as *HIREnumerationDeclaration)->ToString();
+        } else if this->kind == HIRDeclarationKind::Extend {
+            return (this as *HIRExtendDeclaration)->ToString();
         } else if this->kind == HIRDeclarationKind::Constant {
             return (this as *HIRConstantDeclaration)->ToString();
         } else if this->kind == HIRDeclarationKind::Static {
@@ -1752,6 +1754,60 @@ class HIREnumerationDeclaration : HIRDeclaration {
                 result += "    " + member->ToString();
             } result += '\n';
         } return result + '}';
+    }
+}
+
+class HIRExtendDeclaration : HIRDeclaration {
+    pub methods: Vector<*mut HIRFunctionDeclaration>;
+
+    HIRExtendDeclaration(&mut this, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Extend, _type->ToString(), _type) {}
+
+    pub fn ToString(&this) -> String {
+        let declaration = this as *HIRDeclaration;
+        let mut result = "extend " + declaration->name + " {";
+
+        for method in this.methods {
+            result += "\n    " + method->ToString(1) + '\n';
+        } return result + '}';
+    }
+}
+
+class HIRExtensionRegistry {
+    pub extensions: Vector<*HIRExtendDeclaration>;
+
+    HIRExtensionRegistry(&mut this) {}
+
+    pub fn Register(&mut this, extension: *HIRExtendDeclaration) {
+        this.extensions.PushBack(extension);
+    }
+
+    pub fn GetCandidates(&this, _type: *HIRType, name: &String, node: *ASTNode, test: bool) -> Vector<*HIRFunctionDeclaration> {
+        let mut result = Vector<*HIRFunctionDeclaration>();
+        let mut found = false;
+
+        for extension in this.extensions {
+            if *(extension as *HIRDeclaration)->_type != *_type {
+                continue;
+            }
+
+            for method in extension->methods {
+                if (method as *HIRDeclaration)->name != name {
+                    continue;
+                }
+
+                if method->public || (hir_lowerer->current_type != null && *hir_lowerer->current_type == *_type) {
+                    result.PushBack(method);
+                } found = true;
+            }
+        }
+
+        if result.Empty() && !test {
+            if found {
+                Logger::Log("Method '" + name + "' is not accessible.", node, LogSeverity::Error);
+            } else {
+                Logger::Log("Invalid arguments for method: '" + name + "'.", node, LogSeverity::Error);
+            }
+        } return result;
     }
 }
 
@@ -2110,6 +2166,12 @@ class HIRBuilder {
 
     pub fn BuildEnumerationDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIREnumerationDeclaration {
         let declaration = this.context->arena.New<HIREnumerationDeclaration>(name, _type);
+        this.module->declarations.PushBack(declaration);
+        return declaration;
+    }
+
+    pub fn BuildExtendDeclaration(&mut this, _type: *HIRType) -> *mut HIRExtendDeclaration {
+        let declaration = this.context->arena.New<HIRExtendDeclaration>(_type);
         this.module->declarations.PushBack(declaration);
         return declaration;
     }

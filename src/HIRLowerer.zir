@@ -26,11 +26,13 @@ class HIRLowerer {
     context: HIRContext,
     module: *mut HIRModule = null,
     pub builder: HIRBuilder,
+    pub extension_registry: HIRExtensionRegistry,
     pub scope_manager: ScopeManager,
 
     pub current_pass: HIRLoweringPass = HIRLoweringPass::None,
     class_data: Map<*ASTNode, Pair<*mut HIRClassDeclaration, *mut Scope>>,
     structure_data: Map<*ASTNode, Pair<*mut HIRStructureDeclaration, *mut Scope>>,
+    extend_data: Map<*ASTNode, Pair<*mut HIRExtendDeclaration, *mut Scope>>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
     temporaries: Vector<*HIRExpression>,
@@ -42,7 +44,7 @@ class HIRLowerer {
 
     pub generics: Vector<*mut GenericDeclaration>,
     pub current_generic: *mut GenericDeclaration = null,
-    pub current_class: *HIRType = null;
+    pub current_type: *HIRType = null;
 
     HIRLowerer(&mut this) {
         if hir_lowerer != null {
@@ -89,6 +91,7 @@ class HIRLowerer {
 
         this.class_data.Clear();
         this.structure_data.Clear();
+        this.extend_data.Clear();
         this.function_data.Clear();
 
         for generic in this.generics {
@@ -175,6 +178,12 @@ class HIRLowerer {
                 let cache = this.structure_data[declaration];
                 this.LowerStructureDeclarationThirdPass(cache.left, structure, cache.right);
             }
+        } else if declaration->kind == ASTDeclarationKind::Extend {
+            let pair = this.LowerExtendDeclarationFirstPass(declaration as *ASTExtendDeclaration);
+
+            if pair.left != null && pair.right != null {
+                this.extend_data[declaration] = pair;
+            }
         } else if declaration->kind == ASTDeclarationKind::Extern {
             this.LowerExternDeclarationFirstPass(declaration as *ASTExternDeclaration);
         } else if declaration->kind == ASTDeclarationKind::Assembly {
@@ -205,6 +214,9 @@ class HIRLowerer {
                 let cache = this.structure_data[declaration];
                 this.LowerStructureDeclarationFourthPass(cache.left, structure, cache.right);
             }
+        } else if declaration->kind == ASTDeclarationKind::Extend {
+            let cache = this.extend_data[declaration];
+            this.LowerExtendDeclarationSecondPass(cache.left, declaration as *ASTExtendDeclaration, cache.right);
         } else if declaration->kind == ASTDeclarationKind::Extern {
             this.LowerExternDeclarationSecondPass(declaration as *ASTExternDeclaration);
         } else {
@@ -334,7 +346,7 @@ class HIRLowerer {
             return null;
         }
 
-        if this.current_class == null && !function->constructors.Empty() {
+        if (this.current_type == null || !this.current_type->IsClass()) && !function->constructors.Empty() {
             Logger::Log("Constructors can only be declared inside classes.", function as *ASTDeclaration, LogSeverity::Error);
             return null;
         }
@@ -343,15 +355,15 @@ class HIRLowerer {
         let mut parameters = Vector<*HIRParameterDeclaration>();
 
         if function->instance_kind != ASTInstanceKind::None {
-            if this.current_class == null {
-                Logger::Log("Instance parameters are only allowed in class, structure, and variant methods.", function as *ASTDeclaration, LogSeverity::Error);
+            if this.current_type == null {
+                Logger::Log("Recievers are only allowed in methods.", function as *ASTDeclaration, LogSeverity::Error);
                 return null;
             }
 
-            let mut _type = this.current_class;
+            let mut _type = this.current_type;
 
             if function->instance_kind != ASTInstanceKind::Copy {
-                _type = this.context.ReferenceType(this.current_class, function->instance_kind == ASTInstanceKind::MutRef);
+                _type = this.context.ReferenceType(this.current_type, function->instance_kind == ASTInstanceKind::MutRef);
             }
 
             parameters.PushBack(this.builder.BuildParameterDeclaration("this".ToString(), _type, false));
@@ -417,8 +429,8 @@ class HIRLowerer {
 
     pub fn LowerClassDeclarationSecondPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
 
         for parent in _class->parents {
             let parent_type = this.LowerType(parent);
@@ -433,7 +445,7 @@ class HIRLowerer {
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, field->initializer, field->public));
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     pub fn LowerImplicitDeclaration(&mut this, name: String, _type: *HIRType, _return: *HIRType, other: bool, _class: *ASTClassDeclaration) -> *mut HIRFunctionDeclaration {
@@ -458,8 +470,8 @@ class HIRLowerer {
     pub fn LowerClassDeclarationThirdPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
         let name = (declaration as *HIRDeclaration)->name;
 
         for constructor in _class->constructors {
@@ -518,7 +530,7 @@ class HIRLowerer {
             declaration->methods.PushBack(this.LowerImplicitDeclaration("operator=".ToString(), _type, this.context.ReferenceType(_type, false), true, _class));
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     pub fn LowerFieldConstructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
@@ -659,8 +671,8 @@ class HIRLowerer {
     pub fn LowerClassDeclarationFourthPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
         let fields = (_type as *HIRClassType)->declaration->fields;
 
         for i in 0.._class->constructors.Size() {
@@ -805,7 +817,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     pub fn LowerStructureDeclarationFirstPass(&mut this, structure: *ASTStructureDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRStructureDeclaration, *mut Scope> {
@@ -833,8 +845,8 @@ class HIRLowerer {
 
     pub fn LowerStructureDeclarationSecondPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
 
         for field in structure->fields {
             let field_type = this.LowerType(field->_type);
@@ -842,13 +854,13 @@ class HIRLowerer {
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, field->initializer, field->public));
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     pub fn LowerStructureDeclarationThirdPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
 
         for method in structure->methods {
             let function = this.LowerFunctionDeclarationFirstPass(method, null);
@@ -858,19 +870,19 @@ class HIRLowerer {
             }
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     pub fn LowerStructureDeclarationFourthPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
-        let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
-        (this.current_class, this.scope_manager.current) = (_type, scope);
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
 
         for i in 0..structure->methods.Size() {
             this.LowerFunctionDeclarationSecondPass(declaration->methods[i], structure->methods[i]);
         }
 
-        (this.current_class, this.scope_manager.current) = (prev_class, prev_scope);
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     fn LowerEnumerationDeclaration(&mut this, enumeration: *ASTEnumerationDeclaration) {
@@ -912,6 +924,40 @@ class HIRLowerer {
         }
 
         this.scope_manager.PopScope();
+    }
+
+    fn LowerExtendDeclarationFirstPass(&mut this, _extend: *ASTExtendDeclaration) -> Pair<*mut HIRExtendDeclaration, *mut Scope> {
+        let _type = this.LowerType(_extend->_type);
+        let declaration = this.builder.BuildExtendDeclaration(_type);
+        this.extension_registry.Register(declaration);
+        this.scope_manager.PushScope(_type->ToString(), true);
+        let scope = this.scope_manager.current;
+        let previous_type = this.current_type;
+        this.current_type = _type;
+
+        for method in _extend->methods {
+            let function = this.LowerFunctionDeclarationFirstPass(method, null);
+
+            if function != null {
+                declaration->methods.PushBack(function);
+            }
+        }
+
+        this.current_type = previous_type;
+        this.scope_manager.PopScope();
+        return Pair<*mut HIRExtendDeclaration, *mut Scope>(declaration, scope);
+    }
+
+    fn LowerExtendDeclarationSecondPass(&mut this, declaration: *mut HIRExtendDeclaration, _extend: *ASTExtendDeclaration, scope: *mut Scope) {
+        let _type = (declaration as *HIRDeclaration)->_type;
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (_type, scope);
+
+        for i in 0.._extend->methods.Size() {
+            this.LowerFunctionDeclarationSecondPass(declaration->methods[i], _extend->methods[i]);
+        }
+
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     fn LowerExternDeclarationFirstPass(&mut this, _extern: *ASTExternDeclaration) {
@@ -1761,7 +1807,7 @@ class HIRLowerer {
 
             if !instance->_type->HasFields() && !instance->_type->HasMethods() {
                 values.Insert(0, this.ImplicitAddressOf(instance));
-                let candidates = this.scope_manager.ResolveCandidates(member_access->member, call as *ASTExpression, false);
+                let candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call as *ASTExpression, false);
                 if candidates.Empty() { return null; }
                 return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
             } else {
@@ -1770,7 +1816,7 @@ class HIRLowerer {
                 if index != -1 {
                     let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
 
-                    if !field->public && (this.current_class != null && *this.current_class != *instance->_type) {
+                    if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
                         Logger::Log("Field '" + member_access->member + "' is private.", call as *ASTExpression, LogSeverity::Error);
                         return null;
                     }
@@ -2216,7 +2262,7 @@ class HIRLowerer {
         if index != -1 {
             let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
 
-            if !field->public && (this.current_class != null && *this.current_class != *instance->_type) {
+            if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
                 Logger::Log("Field '" + member_access->member + "' is private.", member_access as *ASTExpression, LogSeverity::Error);
                 return null;
             }
@@ -2237,7 +2283,7 @@ class HIRLowerer {
         values.PushBack(this.ImplicitAddressOf(value));
 
         let name = "operator" + unary->kind.ToString();
-        let candidates = this.scope_manager.ResolveCandidates(name, unary as *ASTExpression, true);
+        let candidates = this.extension_registry.GetCandidates(value->_type, name, unary as *ASTExpression, true);
         let function = this.ResolveOverload(candidates, values, unary as *ASTExpression, true);
 
         if function != null {
@@ -2395,7 +2441,7 @@ class HIRLowerer {
         values.PushBack(right);
 
         let name = "operator" + kind.ToString();
-        let candidates = this.scope_manager.ResolveCandidates(name, node, true);
+        let candidates = this.extension_registry.GetCandidates(left->_type, name, node, true);
         let function = this.ResolveOverload(candidates, values, node, true);
 
         if function != null {

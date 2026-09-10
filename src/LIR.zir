@@ -156,7 +156,7 @@ enum LIROpcode: u16 {
 
 #[if EXTEND]
 extend LIROpcode {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == LIROpcode::Nop { return "nop".ToString(); }
         else if this == LIROpcode::Lb { return "lb".ToString(); }
         else if this == LIROpcode::Lbu { return "lbu".ToString(); }

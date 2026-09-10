@@ -43,7 +43,7 @@ enum TokenType: i32 {
 
 #[if EXTEND]
 extend TokenType {
-    fn ToString(this) -> String {
+    pub fn ToString(this) -> String {
         if this == TokenType::EOF { return "EOF".ToString(); }
         else if this == TokenType::IDENTIFIER { return "IDENTIFIER".ToString(); }
         else if this == TokenType::INTEGER { return "INTEGER".ToString(); }
