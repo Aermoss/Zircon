@@ -20,6 +20,18 @@ enum ASTNodeKind: i32 {
     Path, Declaration, Statement, Expression, Type
 }
 
+#[if EXTEND]
+extend ASTNodeKind {
+    fn ToString(this) -> String {
+        if this == ASTNodeKind::Path { return "Path".ToString(); }
+        else if this == ASTNodeKind::Declaration { return "Declaration".ToString(); }
+        else if this == ASTNodeKind::Statement { return "Statement".ToString(); }
+        else if this == ASTNodeKind::Expression { return "Expression".ToString(); }
+        else if this == ASTNodeKind::Type { return "Type".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTNodeKind) -> String {
     if kind == ASTNodeKind::Path { return "Path".ToString(); }
     else if kind == ASTNodeKind::Declaration { return "Declaration".ToString(); }
@@ -28,6 +40,7 @@ fn ToString(kind: ASTNodeKind) -> String {
     else if kind == ASTNodeKind::Type { return "Type".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTNode {
     pub kind: ASTNodeKind,
@@ -93,6 +106,18 @@ enum ASTTypeKind: u8 {
     Path, Pointer, Reference, Array, Function
 }
 
+#[if EXTEND]
+extend ASTTypeKind {
+    fn ToString(this) -> String {
+        if this == ASTTypeKind::Path { return "Path".ToString(); }
+        else if this == ASTTypeKind::Pointer { return "Pointer".ToString(); }
+        else if this == ASTTypeKind::Reference { return "Reference".ToString(); }
+        else if this == ASTTypeKind::Array { return "Array".ToString(); }
+        else if this == ASTTypeKind::Function { return "Function".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTTypeKind) -> String {
     if kind == ASTTypeKind::Path { return "Path".ToString(); }
     else if kind == ASTTypeKind::Pointer { return "Pointer".ToString(); }
@@ -101,6 +126,7 @@ fn ToString(kind: ASTTypeKind) -> String {
     else if kind == ASTTypeKind::Function { return "Function".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTType : ASTNode {
     pub kind: ASTTypeKind;
@@ -211,6 +237,29 @@ enum ASTExpressionKind: u8 {
     Assignment, Await, Tuple, Range
 }
 
+#[if EXTEND]
+extend ASTExpressionKind {
+    fn ToString(this) -> String {
+        if this == ASTExpressionKind::Literal { return "Literal".ToString(); }
+        else if this == ASTExpressionKind::Path { return "Path".ToString(); }
+        else if this == ASTExpressionKind::Unary { return "Unary".ToString(); }
+        else if this == ASTExpressionKind::Binary { return "Binary".ToString(); }
+        else if this == ASTExpressionKind::Ternary { return "Ternary".ToString(); }
+        else if this == ASTExpressionKind::Call { return "Call".ToString(); }
+        else if this == ASTExpressionKind::PackSplat { return "PackSplat".ToString(); }
+        else if this == ASTExpressionKind::MemberAccess { return "MemberAccess".ToString(); }
+        else if this == ASTExpressionKind::IndexAccess { return "IndexAccess".ToString(); }
+        else if this == ASTExpressionKind::Cast { return "Cast".ToString(); }
+        else if this == ASTExpressionKind::New { return "New".ToString(); }
+        else if this == ASTExpressionKind::Delete { return "Delete".ToString(); }
+        else if this == ASTExpressionKind::Assignment { return "Assignment".ToString(); }
+        else if this == ASTExpressionKind::Await { return "Await".ToString(); }
+        else if this == ASTExpressionKind::Tuple { return "Tuple".ToString(); }
+        else if this == ASTExpressionKind::Range { return "Range".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTExpressionKind) -> String {
     if kind == ASTExpressionKind::Literal { return "Literal".ToString(); }
     else if kind == ASTExpressionKind::Path { return "Path".ToString(); }
@@ -230,6 +279,7 @@ fn ToString(kind: ASTExpressionKind) -> String {
     else if kind == ASTExpressionKind::Range { return "Range".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTExpression : ASTNode {
     pub kind: ASTExpressionKind;
@@ -281,6 +331,21 @@ enum ASTLiteralKind: u8 {
     Boolean, Character, Integer, Float, String, Array, Structure, Null
 }
 
+#[if EXTEND]
+extend ASTLiteralKind {
+    fn ToString(this) -> String {
+        if this == ASTLiteralKind::Boolean { return "Boolean".ToString(); }
+        else if this == ASTLiteralKind::Character { return "Character".ToString(); }
+        else if this == ASTLiteralKind::Integer { return "Integer".ToString(); }
+        else if this == ASTLiteralKind::Float { return "Float".ToString(); }
+        else if this == ASTLiteralKind::String { return "String".ToString(); }
+        else if this == ASTLiteralKind::Array { return "Array".ToString(); }
+        else if this == ASTLiteralKind::Structure { return "Structure".ToString(); }
+        else if this == ASTLiteralKind::Null { return "Null".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTLiteralKind) -> String {
     if kind == ASTLiteralKind::Boolean { return "Boolean".ToString(); }
     else if kind == ASTLiteralKind::Character { return "Character".ToString(); }
@@ -292,6 +357,7 @@ fn ToString(kind: ASTLiteralKind) -> String {
     else if kind == ASTLiteralKind::Null { return "Null".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTLiteral : ASTExpression {
     pub kind: ASTLiteralKind;
@@ -444,6 +510,17 @@ enum ASTUnaryKind: u8 {
     AddressOf, Dereference, Negate, Not
 }
 
+#[if EXTEND]
+extend ASTUnaryKind {
+    fn ToString(this) -> String {
+        if this == ASTUnaryKind::AddressOf { return '&'.ToString(); }
+        else if this == ASTUnaryKind::Dereference { return '*'.ToString(); }
+        else if this == ASTUnaryKind::Negate { return '-'.ToString(); }
+        else if this == ASTUnaryKind::Not { return '!'.ToString(); }
+        else { return "<invalid unary>".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTUnaryKind) -> String {
     if kind == ASTUnaryKind::AddressOf { return '&'.ToString(); }
     else if kind == ASTUnaryKind::Dereference { return '*'.ToString(); }
@@ -451,6 +528,7 @@ fn ToString(kind: ASTUnaryKind) -> String {
     else if kind == ASTUnaryKind::Not { return '!'.ToString(); }
     else { return "<invalid unary>".ToString(); }
 }
+#[endif]
 
 class ASTUnaryExpression : ASTExpression {
     pub kind: ASTUnaryKind,
@@ -639,6 +717,24 @@ enum ASTAssignmentKind: u8 {
     AndAssign, OrAssign, XorAssign, LeftShiftAssign, RightShiftAssign
 }
 
+#[if EXTEND]
+extend ASTAssignmentKind {
+    fn ToString(this) -> String {
+        if this == ASTAssignmentKind::Assign { return '='.ToString(); }
+        else if this == ASTAssignmentKind::AddAssign { return "+=".ToString(); }
+        else if this == ASTAssignmentKind::SubtractAssign { return "-=".ToString(); }
+        else if this == ASTAssignmentKind::MultiplyAssign { return "*=".ToString(); }
+        else if this == ASTAssignmentKind::DivideAssign { return "/=".ToString(); }
+        else if this == ASTAssignmentKind::ModuloAssign { return "%=".ToString(); }
+        else if this == ASTAssignmentKind::LeftShiftAssign { return "<<=".ToString(); }
+        else if this == ASTAssignmentKind::RightShiftAssign { return ">>=".ToString(); }
+        else if this == ASTAssignmentKind::AndAssign { return "&=".ToString(); }
+        else if this == ASTAssignmentKind::OrAssign { return "|=".ToString(); }
+        else if this == ASTAssignmentKind::XorAssign { return "^=".ToString(); }
+        else { return "<invalid assignment>".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTAssignmentKind) -> String {
     if kind == ASTAssignmentKind::Assign { return '='.ToString(); }
     else if kind == ASTAssignmentKind::AddAssign { return "+=".ToString(); }
@@ -653,6 +749,7 @@ fn ToString(kind: ASTAssignmentKind) -> String {
     else if kind == ASTAssignmentKind::XorAssign { return "^=".ToString(); }
     else { return "<invalid assignment>".ToString(); }
 }
+#[endif]
 
 class ASTAssignmentExpression : ASTExpression {
     pub kind: ASTAssignmentKind,
@@ -734,6 +831,25 @@ enum ASTStatementKind: u8 {
     Variable, Expression, If, While, Loop, For, Return, Break, Continue, Block, Unsafe, Assembly
 }
 
+#[if EXTEND]
+extend ASTStatementKind {
+    fn ToString(this) -> String {
+        if this == ASTStatementKind::Variable { return "Variable".ToString(); }
+        else if this == ASTStatementKind::Expression { return "Expression".ToString(); }
+        else if this == ASTStatementKind::If { return "If".ToString(); }
+        else if this == ASTStatementKind::While { return "While".ToString(); }
+        else if this == ASTStatementKind::Loop { return "Loop".ToString(); }
+        else if this == ASTStatementKind::For { return "For".ToString(); }
+        else if this == ASTStatementKind::Return { return "Return".ToString(); }
+        else if this == ASTStatementKind::Break { return "Break".ToString(); }
+        else if this == ASTStatementKind::Continue { return "Continue".ToString(); }
+        else if this == ASTStatementKind::Block { return "Block".ToString(); }
+        else if this == ASTStatementKind::Unsafe { return "Unsafe".ToString(); }
+        else if this == ASTStatementKind::Assembly { return "Assembly".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTStatementKind) -> String {
     if kind == ASTStatementKind::Variable { return "Variable".ToString(); }
     else if kind == ASTStatementKind::Expression { return "Expression".ToString(); }
@@ -749,6 +865,7 @@ fn ToString(kind: ASTStatementKind) -> String {
     else if kind == ASTStatementKind::Assembly { return "Assembly".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTStatement : ASTNode {
     pub kind: ASTStatementKind;
@@ -856,9 +973,29 @@ class ASTAssemblyStatement : ASTStatement {
 }
 
 enum ASTDeclarationKind: u8 {
-    Parameter, Function, Field, Class, Structure, Member, Enumeration, Constant, Static, Type, Extern, Assembly
+    Parameter, Function, Field, Class, Structure, Member, Enumeration, Constant, Static, Extend, Type, Extern, Assembly
 }
 
+#[if EXTEND]
+extend ASTDeclarationKind {
+    fn ToString(this) -> String {
+        if this == ASTDeclarationKind::Parameter { return "Parameter".ToString(); }
+        else if this == ASTDeclarationKind::Function { return "Function".ToString(); }
+        else if this == ASTDeclarationKind::Field { return "Field".ToString(); }
+        else if this == ASTDeclarationKind::Class { return "Class".ToString(); }
+        else if this == ASTDeclarationKind::Structure { return "Structure".ToString(); }
+        else if this == ASTDeclarationKind::Member { return "Member".ToString(); }
+        else if this == ASTDeclarationKind::Enumeration { return "Enumeration".ToString(); }
+        else if this == ASTDeclarationKind::Constant { return "Constant".ToString(); }
+        else if this == ASTDeclarationKind::Static { return "Static".ToString(); }
+        else if this == ASTDeclarationKind::Extend { return "Extend".ToString(); }
+        else if this == ASTDeclarationKind::Type { return "Type".ToString(); }
+        else if this == ASTDeclarationKind::Extern { return "Extern".ToString(); }
+        else if this == ASTDeclarationKind::Assembly { return "Assembly".ToString(); }
+        else { return "Unknown".ToString(); }
+    }
+}
+#[else]
 fn ToString(kind: ASTDeclarationKind) -> String {
     if kind == ASTDeclarationKind::Parameter { return "Parameter".ToString(); }
     else if kind == ASTDeclarationKind::Function { return "Function".ToString(); }
@@ -869,11 +1006,13 @@ fn ToString(kind: ASTDeclarationKind) -> String {
     else if kind == ASTDeclarationKind::Enumeration { return "Enumeration".ToString(); }
     else if kind == ASTDeclarationKind::Constant { return "Constant".ToString(); }
     else if kind == ASTDeclarationKind::Static { return "Static".ToString(); }
+    else if kind == ASTDeclarationKind::Extend { return "Extend".ToString(); }
     else if kind == ASTDeclarationKind::Type { return "Type".ToString(); }
     else if kind == ASTDeclarationKind::Extern { return "Extern".ToString(); }
     else if kind == ASTDeclarationKind::Assembly { return "Assembly".ToString(); }
     else { return "Unknown".ToString(); }
 }
+#[endif]
 
 class ASTDeclaration : ASTNode {
     pub kind: ASTDeclarationKind;
@@ -883,37 +1022,6 @@ class ASTDeclaration : ASTNode {
     }
 }
 
-class ASTConstantDeclaration : ASTDeclaration {
-    pub name: String,
-    pub _type: *ASTType,
-    pub initializer: *ASTExpression;
-
-    ASTConstantDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Constant, start) {
-        (this.name, this._type, this.initializer) = (name, _type, initializer);
-    }
-}
-
-class ASTStaticDeclaration : ASTDeclaration {
-    pub name: String,
-    pub _type: *ASTType,
-    pub mutable: bool,
-    pub initializer: *ASTExpression = null,
-    pub alignment: *ASTExpression,
-    pub zero_initializer: bool = false;
-
-    ASTStaticDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, alignment: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Static, start) {
-        (this.name, this._type, this.mutable, this.alignment) = (name, _type, mutable, alignment);
-    }
-}
-
-class ASTTypeDeclaration : ASTDeclaration {
-    pub name: String,
-    pub _type: *ASTType;
-
-    ASTTypeDeclaration(&mut this, name: String, _type: *ASTType, start: Token) : ASTDeclaration(ASTDeclarationKind::Type, start) {
-        (this.name, this._type) = (name, _type);
-    }
-}
 
 class ASTParameterDeclaration : ASTDeclaration {
     pub name: String,
@@ -1003,6 +1111,47 @@ class ASTEnumerationDeclaration : ASTDeclaration {
 
     ASTEnumerationDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Enumeration, start) {
         this.name = name;
+    }
+}
+
+class ASTConstantDeclaration : ASTDeclaration {
+    pub name: String,
+    pub _type: *ASTType,
+    pub initializer: *ASTExpression;
+
+    ASTConstantDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Constant, start) {
+        (this.name, this._type, this.initializer) = (name, _type, initializer);
+    }
+}
+
+class ASTStaticDeclaration : ASTDeclaration {
+    pub name: String,
+    pub _type: *ASTType,
+    pub mutable: bool,
+    pub initializer: *ASTExpression = null,
+    pub alignment: *ASTExpression,
+    pub zero_initializer: bool = false;
+
+    ASTStaticDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, alignment: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Static, start) {
+        (this.name, this._type, this.mutable, this.alignment) = (name, _type, mutable, alignment);
+    }
+}
+
+class ASTExtendDeclaration : ASTDeclaration {
+    pub _type: *ASTType,
+    pub methods: Vector<*ASTFunctionDeclaration>;
+
+    ASTExtendDeclaration(&mut this, _type: *ASTType, start: Token) : ASTDeclaration(ASTDeclarationKind::Extend, start) {
+        this._type = _type;
+    }
+}
+
+class ASTTypeDeclaration : ASTDeclaration {
+    pub name: String,
+    pub _type: *ASTType;
+
+    ASTTypeDeclaration(&mut this, name: String, _type: *ASTType, start: Token) : ASTDeclaration(ASTDeclarationKind::Type, start) {
+        (this.name, this._type) = (name, _type);
     }
 }
 

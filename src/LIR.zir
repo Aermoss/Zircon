@@ -154,6 +154,63 @@ enum LIROpcode: u16 {
     Hlt
 }
 
+#[if EXTEND]
+extend LIROpcode {
+    fn ToString(this) -> String {
+        if this == LIROpcode::Nop { return "nop".ToString(); }
+        else if this == LIROpcode::Lb { return "lb".ToString(); }
+        else if this == LIROpcode::Lbu { return "lbu".ToString(); }
+        else if this == LIROpcode::Lh { return "lh".ToString(); }
+        else if this == LIROpcode::Lhu { return "lhu".ToString(); }
+        else if this == LIROpcode::Lw { return "lw".ToString(); }
+        else if this == LIROpcode::Lui { return "lui".ToString(); }
+        else if this == LIROpcode::Auipc { return "auipc".ToString(); }
+        else if this == LIROpcode::Sb { return "sb".ToString(); }
+        else if this == LIROpcode::Sh { return "sh".ToString(); }
+        else if this == LIROpcode::Sw { return "sw".ToString(); }
+        else if this == LIROpcode::B { return "b".ToString(); }
+        else if this == LIROpcode::Br { return "br".ToString(); }
+        else if this == LIROpcode::Bl { return "bl".ToString(); }
+        else if this == LIROpcode::Blr { return "blr".ToString(); }
+        else if this == LIROpcode::Beq { return "beq".ToString(); }
+        else if this == LIROpcode::Bne { return "bne".ToString(); }
+        else if this == LIROpcode::Blt { return "blt".ToString(); }
+        else if this == LIROpcode::Bltu { return "bltu".ToString(); }
+        else if this == LIROpcode::Bge { return "bge".ToString(); }
+        else if this == LIROpcode::Bgeu { return "bgeu".ToString(); }
+        else if this == LIROpcode::Slt { return "slt".ToString(); }
+        else if this == LIROpcode::Slti { return "slti".ToString(); }
+        else if this == LIROpcode::Sltu { return "sltu".ToString(); }
+        else if this == LIROpcode::Sltiu { return "sltiu".ToString(); }
+        else if this == LIROpcode::Add { return "add".ToString(); }
+        else if this == LIROpcode::Addi { return "addi".ToString(); }
+        else if this == LIROpcode::Sub { return "sub".ToString(); }
+        else if this == LIROpcode::Subi { return "subi".ToString(); }
+        else if this == LIROpcode::Mul { return "mul".ToString(); }
+        else if this == LIROpcode::Mulh { return "mulh".ToString(); }
+        else if this == LIROpcode::Mulhsu { return "mulhsu".ToString(); }
+        else if this == LIROpcode::Mulhu { return "mulhu".ToString(); }
+        else if this == LIROpcode::Div { return "div".ToString(); }
+        else if this == LIROpcode::Divu { return "divu".ToString(); }
+        else if this == LIROpcode::Rem { return "rem".ToString(); }
+        else if this == LIROpcode::Remu { return "remu".ToString(); }
+        else if this == LIROpcode::And { return "and".ToString(); }
+        else if this == LIROpcode::Andi { return "andi".ToString(); }
+        else if this == LIROpcode::Or { return "or".ToString(); }
+        else if this == LIROpcode::Ori { return "ori".ToString(); }
+        else if this == LIROpcode::Xor { return "xor".ToString(); }
+        else if this == LIROpcode::Xori { return "xori".ToString(); }
+        else if this == LIROpcode::Sll { return "sll".ToString(); }
+        else if this == LIROpcode::Slli { return "slli".ToString(); }
+        else if this == LIROpcode::Srl { return "srl".ToString(); }
+        else if this == LIROpcode::Srli { return "srli".ToString(); }
+        else if this == LIROpcode::Sra { return "sra".ToString(); }
+        else if this == LIROpcode::Srai { return "srai".ToString(); }
+        else if this == LIROpcode::Hlt { return "hlt".ToString(); }
+        else { return "<invalid instruction>".ToString(); }
+    }
+}
+#[else]
 fn ToString(opcode: LIROpcode) -> String {
     if opcode == LIROpcode::Nop { return "nop".ToString(); }
     else if opcode == LIROpcode::Lb { return "lb".ToString(); }
@@ -207,6 +264,7 @@ fn ToString(opcode: LIROpcode) -> String {
     else if opcode == LIROpcode::Hlt { return "hlt".ToString(); }
     else { return "<invalid instruction>".ToString(); }
 }
+#[endif]
 
 class LIRInstruction {
     pub opcode: LIROpcode,

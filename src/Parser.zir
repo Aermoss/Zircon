@@ -1016,6 +1016,8 @@ class Parser {
             return this.ParseStructureDeclaration(attributes);
         } else if token._type == TokenType::ENUMERATION {
             return this.ParseEnumerationDeclaration(attributes);
+        } else if token._type == TokenType::EXTEND {
+            return this.ParseExtendDeclaration();
         } else if token._type == TokenType::EXTERN {
             return this.ParseExternDeclaration();
         } else if token._type == TokenType::CONST {
@@ -1440,6 +1442,25 @@ class Parser {
 
         if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
         return enumeration;
+    }
+
+    fn ParseExtendDeclaration(&mut this) -> *ASTExtendDeclaration {
+        let token = this.Expect(TokenType::EXTEND);
+        if token._type == TokenType::UNKNOWN { return null; }
+        let _type = this.ParseType();
+        if _type == null { return null; }
+        let _extend = this.arena.New<ASTExtendDeclaration>(_type, token);
+        if !this.ExpectSuccess(TokenType::LBRACE) { return null; }
+
+        while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+            let attributes = this.ParseAttributes();
+            let function = this.ParseFunctionDeclaration(attributes, false);
+            if function == null { return null; }
+            _extend->methods.PushBack(function);
+        }
+
+        if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+        return _extend;
     }
 
     fn ParseExternDeclaration(&mut this) -> *ASTExternDeclaration {

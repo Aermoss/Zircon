@@ -910,6 +910,35 @@ class String {
     }
 }
 
+#[if EXTEND]
+extend i8 {
+    fn ToString(this) -> String {
+        return String(this);
+    }
+
+    fn operator+(this, string: &String) -> String {
+        return String(this) + string;
+    }
+
+    fn operator*(this, count: usize) -> String {
+        return String(this) * count;
+    }
+}
+
+extend *i8 {
+    fn ToString(this) -> String {
+        return String(this);
+    }
+
+    fn operator+(this, string: &String) -> String {
+        return String(this) + string;
+    }
+
+    fn operator*(this, count: usize) -> String {
+        return String(this) * count;
+    }
+}
+#[else]
 fn ToString(value: i8) -> String {
     return String(value);
 }
@@ -933,3 +962,4 @@ fn operator*(value: i8, count: usize) -> String {
 fn operator*(value: *i8, count: usize) -> String {
     return String(value) * count;
 }
+#[endif]
