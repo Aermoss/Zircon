@@ -407,6 +407,9 @@ class HIRType {
             }
 
             return *left == *right;
+        } else if this.IsArray() && other.IsArray() {
+            let (left, right) = (this as *HIRArrayType, other as *HIRArrayType);
+            return left->element == right->element && left->length == right->length;
         } else if this.IsFunction() && other.IsFunction() {
             let (left, right) = (this as *HIRFunctionType, other as *HIRFunctionType);
 

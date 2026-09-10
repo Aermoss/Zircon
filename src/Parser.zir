@@ -198,10 +198,10 @@ class Parser {
         } else if token._type == TokenType::INTEGER {
             this.Advance();
             let (mut value, mut suffix, mut base: u64) = (String(), String(), 10);
-            let mut index = token.value.Find('i');
+            let mut index = token.value.Find('u');
 
             if index == -1 {
-                index = token.value.Find('u');
+                index = token.value.Find('i');
             }
 
             if index != -1 {
