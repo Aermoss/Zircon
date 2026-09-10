@@ -2031,7 +2031,7 @@ class HIRBuilder {
     }
 
     pub fn IndexAccess(&mut this, value: *HIRExpression, index: *HIRExpression) -> *mut HIRIndexAccessExpression {
-        return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Pointee(), value->_type->IsMutable()));
+        return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->IsArray() ? value->_type->Element() : value->_type->Pointee(), value->_type->IsMutable()));
     }
 
     pub fn MemberAccess(&mut this, instance: *HIRExpression, _type: *HIRType, index: usize) -> *mut HIRMemberAccessExpression {

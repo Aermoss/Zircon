@@ -2215,8 +2215,8 @@ class HIRLowerer {
             return this.LowerResolvedCallExpression(candidates, values, index_access as *ASTExpression);
         }
 
-        if !value->_type->IsPointer() {
-            Logger::Log("Indexed value must be a pointer.", index_access as *ASTExpression, LogSeverity::Error);
+        if !value->_type->IsPointer() && !value->_type->IsArray() {
+            Logger::Log("Indexed value must be a pointer or an array.", index_access as *ASTExpression, LogSeverity::Error);
             return null;
         }
 
