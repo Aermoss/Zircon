@@ -556,6 +556,7 @@ class HIRLowerer {
             }
         }
 
+        let mut fields_to_construct = Vector<*HIRFieldDeclaration>(fields);
         let block = this.builder.BuildBlockStatement();
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
@@ -576,12 +577,19 @@ class HIRLowerer {
                 if value == null { continue; }
                 values.PushBack(value);
             }
+
+            for field in fields {
+                if (field as *HIRDeclaration)->name == ((_type as *HIRClassType)->declaration as *HIRDeclaration)->name {
+                    fields_to_construct.Remove(field);
+                    break;
+                }
+            }
         }
 
         let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
-        this.LowerFieldConstructors(this_dereferenced, fields);
+        this.LowerFieldConstructors(this_dereferenced, fields_to_construct);
 
         for statement in function->body->statements {
             this.LowerStatement(statement);
@@ -1744,7 +1752,7 @@ class HIRLowerer {
 
                     instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access as *ASTExpression));
                 } else if instance->_type->IsPointer() {
-                    instance = this.ImplicitDereference(instance);
+                    instance = this.builder.Dereference(instance);
                 } else {
                     Logger::Log("Expected a pointer type for arrow operator.", member_access as *ASTExpression, LogSeverity::Error);
                     return null;
@@ -1752,11 +1760,6 @@ class HIRLowerer {
             }
 
             if !instance->_type->HasFields() && !instance->_type->HasMethods() {
-                if member_access->arrow {
-                    Logger::Log("Expected a dot operator.", call as *ASTExpression, LogSeverity::Error);
-                    return null;
-                }
-
                 values.Insert(0, this.ImplicitAddressOf(instance));
                 let candidates = this.scope_manager.ResolveCandidates(member_access->member, call as *ASTExpression, false);
                 if candidates.Empty() { return null; }
@@ -2196,7 +2199,7 @@ class HIRLowerer {
 
                 instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access as *ASTExpression));
             } else if instance->_type->IsPointer() {
-                instance = this.ImplicitDereference(instance);
+                instance = this.builder.Dereference(instance);
             } else {
                 Logger::Log("Expected a pointer type for arrow operator.", member_access as *ASTExpression, LogSeverity::Error);
                 return null;

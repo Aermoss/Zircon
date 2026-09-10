@@ -71,7 +71,7 @@ class ASTPath : ASTNode {
                 result += "<";
 
                 for j in 0..segment.types.Size() {
-                    let _type = segment.types[j];
+                    let _type: *ASTType = segment.types[j];
                     result += _type->kind.ToString();
 
                     if j < segment.types.Size() - 1 {

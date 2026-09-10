@@ -188,12 +188,9 @@ class GenericDeclaration {
             this.cache[name] = instance;
         }
 
-        if instance->active != HIRLoweringPass::None {
-            return instance;
-        }
-
-        this.LowerInstance(instance);
-        return instance;
+        if instance->active == HIRLoweringPass::None {
+            this.LowerInstance(instance);
+        } return instance;
     }
 }
 
