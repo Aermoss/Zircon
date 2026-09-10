@@ -476,7 +476,9 @@ class HIRLowerer {
 
         if _class->constructors.Empty() {
             declaration->constructors.PushBack(this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), false, _class));
-        } else if !has_copy_constructor {
+        }
+
+        if !has_copy_constructor {
             declaration->constructors.PushBack(this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, _class));
         }
 
@@ -644,44 +646,20 @@ class HIRLowerer {
 
     pub fn LowerClassDeclarationFourthPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let _type = (declaration as *HIRDeclaration)->_type;
+        let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (prev_class, prev_scope) = (this.current_class, this.scope_manager.current);
         (this.current_class, this.scope_manager.current) = (_type, scope);
         let fields = (_type as *HIRClassType)->declaration->fields;
 
         for i in 0.._class->constructors.Size() {
-            this.LowerConstructorDeclaration(declaration->constructors[i], _class->constructors[i], fields);
-        }
+            let function: *mut HIRFunctionDeclaration = declaration->constructors[i];
+            this.LowerConstructorDeclaration(function, _class->constructors[i], fields);
 
-        if _class->destructor != null {
-            this.LowerDestructorDeclaration(declaration->destructor, _class->destructor, fields);
-        } else {
-            let function = declaration->destructor;
-            this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
-            this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
-            this.builder.SetCurrentBlock(block);
-            function->body = block;
-
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
-            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
-            let this_dereferenced = this.builder.Dereference(this_reference);
-            this.LowerFieldDestructors(this_dereferenced, fields);
-            this.scope_manager.PopScope();
-        }
-
-        let mut has_copy_assign = false;
-
-        for i in 0.._class->methods.Size() {
-            let function: *mut HIRFunctionDeclaration = declaration->methods[i];
-            this.LowerFunctionDeclarationSecondPass(function, _class->methods[i]);
-
-            if _class->methods[i]->name == "operator=" && function->parameters.Size() == 2 {
+            if function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
 
                 if *(parameter as *HIRDeclaration)->_type == *(this.context.ReferenceType(_type, false) as *HIRType) {
-                    if *function->_return == *(this.context.ReferenceType(_type, false) as *HIRType) {
-                        has_copy_assign = true;
-                    }
+                    has_copy_constructor = true;
                 }
             }
         }
@@ -699,7 +677,9 @@ class HIRLowerer {
             let this_dereferenced = this.builder.Dereference(this_reference);
             this.LowerFieldConstructors(this_dereferenced, fields);
             this.scope_manager.PopScope();
-        } else if _class->constructors.Size() < declaration->constructors.Size() {
+        }
+
+        if !has_copy_constructor {
             let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
@@ -737,6 +717,38 @@ class HIRLowerer {
             }
 
             this.scope_manager.PopScope();
+        }
+
+        if _class->destructor != null {
+            this.LowerDestructorDeclaration(declaration->destructor, _class->destructor, fields);
+        } else {
+            let function = declaration->destructor;
+            this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+            this.LowerFieldDestructors(this_dereferenced, fields);
+            this.scope_manager.PopScope();
+        }
+
+        for i in 0.._class->methods.Size() {
+            let function: *mut HIRFunctionDeclaration = declaration->methods[i];
+            this.LowerFunctionDeclarationSecondPass(function, _class->methods[i]);
+
+            if _class->methods[i]->name == "operator=" && function->parameters.Size() == 2 {
+                let parameter: *HIRParameterDeclaration = function->parameters[1];
+
+                if *(parameter as *HIRDeclaration)->_type == *(this.context.ReferenceType(_type, false) as *HIRType) {
+                    if *function->_return == *(this.context.ReferenceType(_type, false) as *HIRType) {
+                        has_copy_assign = true;
+                    }
+                }
+            }
         }
 
         if !has_copy_assign {
@@ -871,7 +883,7 @@ class HIRLowerer {
                 value = this.Coerce(this.LowerExpression(member->value), underlying_type);
                 if value == null { continue; }
 
-                if !underlying_type->IsCompatible(value->_type) {
+                if !(_type as *HIRType)->IsCompatible(value->_type) && !underlying_type->IsCompatible(value->_type) {
                     Logger::Log("Expected an expression of type '" + underlying_type->ToString() + "'.", member->value, LogSeverity::Error);
                     continue;
                 }
@@ -1368,65 +1380,6 @@ class HIRLowerer {
         }
     }
 
-    fn AssignmentToBinaryKind(&this, kind: ASTAssignmentKind) -> ASTBinaryKind {
-        if kind == ASTAssignmentKind::AddAssign { return ASTBinaryKind::Add; }
-        else if kind == ASTAssignmentKind::SubtractAssign { return ASTBinaryKind::Subtract; }
-        else if kind == ASTAssignmentKind::MultiplyAssign { return ASTBinaryKind::Multiply; }
-        else if kind == ASTAssignmentKind::DivideAssign { return ASTBinaryKind::Divide; }
-        else if kind == ASTAssignmentKind::ModuloAssign { return ASTBinaryKind::Modulo; }
-        else if kind == ASTAssignmentKind::LeftShiftAssign { return ASTBinaryKind::LeftShift; }
-        else if kind == ASTAssignmentKind::RightShiftAssign { return ASTBinaryKind::RightShift; }
-        else if kind == ASTAssignmentKind::AndAssign { return ASTBinaryKind::BitwiseAnd; }
-        else if kind == ASTAssignmentKind::OrAssign { return ASTBinaryKind::BitwiseOr; }
-        else { return ASTBinaryKind::BitwiseXor; }
-    }
-
-    fn LowerAssignmentExpression(&mut this, assignment: *ASTAssignmentExpression) -> *HIRExpression {
-        let left_raw = this.LowerExpression(assignment->left);
-        let mut left = this.ImplicitDereference(left_raw);
-        if left == null { return null; }
-
-        let right_raw = this.LowerExpression(assignment->right);
-        let mut right = this.ImplicitDereference(right_raw);
-        if right == null { return null; }
-
-        if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
-            right = this.Coerce(right, this.context.IntegerPointerType(false));
-        } else {
-            right = this.Coerce(right, left->_type);
-        }
-
-        if left->_type->HasFields() {
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(this.ImplicitAddressOf(left));
-            values.PushBack(right_raw);
-
-            let name = "operator" + assignment->kind.ToString();
-            let candidates = left->_type->GetCandidates(name, assignment as *ASTExpression, false);
-            if candidates.Empty() { return null; }
-            let function = this.ResolveOverload(candidates, values, assignment as *ASTExpression, false);
-            if function == null { return null; }
-            return this.LowerResolvedCallExpression(function, values, assignment as *ASTExpression);
-        }
-
-        if left->category != HIRExpressionCategory::Place {
-            Logger::Log("Cannot assign to non-place value.", assignment as *ASTExpression, LogSeverity::Error);
-            return null;
-        }
-
-        if !left->mutable {
-            Logger::Log("Cannot assign to immutable value.", assignment as *ASTExpression, LogSeverity::Error);
-            return null;
-        }
-
-        if assignment->kind != ASTAssignmentKind::Assign {
-            right = this.LowerResolvedBinaryExpression(this.AssignmentToBinaryKind(assignment->kind), left, right, assignment as *ASTExpression);
-            if right == null { return null; }
-        }
-
-        return this.builder.Assignment(left, right);
-    }
-
     fn IsDeferrableExpression(&mut this, expression: *ASTExpression) -> *HIRType {
         if expression->kind == ASTExpressionKind::Literal {
             let literal = expression as *ASTLiteral;
@@ -1508,6 +1461,8 @@ class HIRLowerer {
 
                     if declaration->kind == HIRDeclarationKind::Member {
                         return (declaration as *HIRMemberDeclaration)->value;
+                    } else if declaration->kind == HIRDeclarationKind::Constant {
+                        return (declaration as *HIRConstantDeclaration)->initializer;
                     } else if declaration->kind == HIRDeclarationKind::Static {
                         return this.builder.ReferenceDeclaration(declaration, (declaration as *HIRStaticDeclaration)->mutable);
                     } else if declaration->kind == HIRDeclarationKind::Parameter {
@@ -1522,12 +1477,12 @@ class HIRLowerer {
             return null;
         } else if expression->kind == ASTExpressionKind::Assignment {
             return this.LowerAssignmentExpression(expression as *ASTAssignmentExpression);
+        } else if expression->kind == ASTExpressionKind::Call {
+            return this.LowerCallExpression(expression as *ASTCallExpression);
         } else if expression->kind == ASTExpressionKind::New {
             return this.LowerNewExpression(expression as *ASTNewExpression);
         } else if expression->kind == ASTExpressionKind::Delete {
             return this.LowerDeleteExpression(expression as *ASTDeleteExpression);
-        } else if expression->kind == ASTExpressionKind::Call {
-            return this.LowerCallExpression(expression as *ASTCallExpression);
         } else if expression->kind == ASTExpressionKind::Cast {
             return this.LowerCastExpression(expression as *ASTCastExpression);
         } else if expression->kind == ASTExpressionKind::IndexAccess {
@@ -1656,6 +1611,65 @@ class HIRLowerer {
             Logger::Log("Unknown literal type '" + literal->kind.ToString() + "'.", literal as *ASTExpression, LogSeverity::Error);
             return null;
         }
+    }
+
+    fn AssignmentToBinaryKind(&this, kind: ASTAssignmentKind) -> ASTBinaryKind {
+        if kind == ASTAssignmentKind::AddAssign { return ASTBinaryKind::Add; }
+        else if kind == ASTAssignmentKind::SubtractAssign { return ASTBinaryKind::Subtract; }
+        else if kind == ASTAssignmentKind::MultiplyAssign { return ASTBinaryKind::Multiply; }
+        else if kind == ASTAssignmentKind::DivideAssign { return ASTBinaryKind::Divide; }
+        else if kind == ASTAssignmentKind::ModuloAssign { return ASTBinaryKind::Modulo; }
+        else if kind == ASTAssignmentKind::LeftShiftAssign { return ASTBinaryKind::LeftShift; }
+        else if kind == ASTAssignmentKind::RightShiftAssign { return ASTBinaryKind::RightShift; }
+        else if kind == ASTAssignmentKind::AndAssign { return ASTBinaryKind::BitwiseAnd; }
+        else if kind == ASTAssignmentKind::OrAssign { return ASTBinaryKind::BitwiseOr; }
+        else { return ASTBinaryKind::BitwiseXor; }
+    }
+
+    fn LowerAssignmentExpression(&mut this, assignment: *ASTAssignmentExpression) -> *HIRExpression {
+        let left_raw = this.LowerExpression(assignment->left);
+        let mut left = this.ImplicitDereference(left_raw);
+        if left == null { return null; }
+
+        let right_raw = this.LowerExpression(assignment->right);
+        let mut right = this.ImplicitDereference(right_raw);
+        if right == null { return null; }
+
+        if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
+            right = this.Coerce(right, this.context.IntegerPointerType(false));
+        } else {
+            right = this.Coerce(right, left->_type);
+        }
+
+        if left->_type->HasFields() {
+            let mut values = Vector<*HIRExpression>();
+            values.PushBack(this.ImplicitAddressOf(left));
+            values.PushBack(right_raw);
+
+            let name = "operator" + assignment->kind.ToString();
+            let candidates = left->_type->GetCandidates(name, assignment as *ASTExpression, false);
+            if candidates.Empty() { return null; }
+            let function = this.ResolveOverload(candidates, values, assignment as *ASTExpression, false);
+            if function == null { return null; }
+            return this.LowerResolvedCallExpression(function, values, assignment as *ASTExpression);
+        }
+
+        if left->category != HIRExpressionCategory::Place {
+            Logger::Log("Cannot assign to non-place value.", assignment as *ASTExpression, LogSeverity::Error);
+            return null;
+        }
+
+        if !left->mutable {
+            Logger::Log("Cannot assign to immutable value.", assignment as *ASTExpression, LogSeverity::Error);
+            return null;
+        }
+
+        if assignment->kind != ASTAssignmentKind::Assign {
+            right = this.LowerResolvedBinaryExpression(this.AssignmentToBinaryKind(assignment->kind), left, right, assignment as *ASTExpression);
+            if right == null { return null; }
+        }
+
+        return this.builder.Assignment(left, right);
     }
 
     fn LowerCallExpression(&mut this, call: *ASTCallExpression) -> *HIRExpression {
@@ -1828,8 +1842,12 @@ class HIRLowerer {
             return candidates[index];
         } else {
             if !test {
-                let candidate: *HIRFunctionDeclaration = candidates[0];
-                Logger::Log("Invalid arguments for: '" + (candidate as *HIRDeclaration)->name + "'.", node, LogSeverity::Error);
+                if !candidates.Empty() {
+                    let candidate: *HIRFunctionDeclaration = candidates[0];
+                    Logger::Log("Invalid arguments for: '" + (candidate as *HIRDeclaration)->name + "'.", node, LogSeverity::Error);
+                } else {
+                    Logger::Log("No candidates found for function call!", node, LogSeverity::Fatal);
+                }
             } return null;
         }
     }
