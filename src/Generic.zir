@@ -64,12 +64,13 @@ class GenericDeclaration {
         }
     }
 
-    pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {
-        if types.Size() != this.types.Size() {
-            Logger::Log("Generic '" + this.name + "' expects " + String::FromInteger(this.types.Size() as u64) + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);
-            return null;
+    pub fn LowerInstances(&mut this) {
+        for instance in this.cache.Values() {
+            this.LowerInstance(instance);
         }
+    }
 
+    pub fn LowerInstance(&mut this, instance: *mut GenericInstance) {
         let (prev_unsafe, prev_class) = (hir_lowerer->_unsafe, hir_lowerer->current_class);
         let (prev_scope, prev_generic) = (hir_lowerer->scope_manager.current, hir_lowerer->current_generic);
         let prev_function = hir_lowerer->builder.GetCurrentFunction();
@@ -79,34 +80,10 @@ class GenericDeclaration {
         hir_lowerer->builder.SetCurrentFunction(null);
         (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (this.scope, this);
         (hir_lowerer->_unsafe, hir_lowerer->current_class) = (false, this._class);
-        let mut name = this.name + '<';
-
-        for i in 0..types.Size() {
-            if i != 0 { name += ", "; }
-            name += types[i]->ToString();
-        } name += '>';
-
-        let mut instance: *mut GenericInstance = null;
-
-        if this.cache.Has(name) {
-            instance = this.cache[name];
-        } else {
-            instance = new GenericInstance(name, types);
-            this.cache[name] = instance;
-        }
-
-        if instance->active != HIRLoweringPass::None {
-            hir_lowerer->builder.SetCurrentBlock(prev_block);
-            hir_lowerer->builder.SetCurrentFunction(prev_function);
-            (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (prev_scope, prev_generic);
-            (hir_lowerer->_unsafe, hir_lowerer->current_class) = (prev_unsafe, prev_class);
-            return instance;
-        }
-
         hir_lowerer->scope_manager.PushScope("<generic>".ToString(), true);
 
         for i in 0..this.types.Size() {
-            hir_lowerer->scope_manager.current->Set(this.types[i], types[i], this.declaration);
+            hir_lowerer->scope_manager.current->Set(this.types[i], instance->types[i], this.declaration);
         }
 
         if this.declaration->kind == ASTDeclarationKind::Class {
@@ -187,6 +164,35 @@ class GenericDeclaration {
         hir_lowerer->builder.SetCurrentFunction(prev_function);
         (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (prev_scope, prev_generic);
         (hir_lowerer->_unsafe, hir_lowerer->current_class) = (prev_unsafe, prev_class);
+    }
+
+    pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {
+        if types.Size() != this.types.Size() {
+            Logger::Log("Generic '" + this.name + "' expects " + String::FromInteger(this.types.Size() as u64) + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);
+            return null;
+        }
+
+        let mut name = this.name + '<';
+
+        for i in 0..types.Size() {
+            if i != 0 { name += ", "; }
+            name += types[i]->ToString();
+        } name += '>';
+
+        let mut instance: *mut GenericInstance = null;
+
+        if this.cache.Has(name) {
+            instance = this.cache[name];
+        } else {
+            instance = new GenericInstance(name, types);
+            this.cache[name] = instance;
+        }
+
+        if instance->active != HIRLoweringPass::None {
+            return instance;
+        }
+
+        this.LowerInstance(instance);
         return instance;
     }
 }

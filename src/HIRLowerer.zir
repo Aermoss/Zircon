@@ -40,7 +40,7 @@ class HIRLowerer {
     pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
     pub _unsafe: bool = false,
 
-    pub generics: Vector<*GenericDeclaration>,
+    pub generics: Vector<*mut GenericDeclaration>,
     pub current_generic: *mut GenericDeclaration = null,
     pub current_class: *HIRType = null;
 
@@ -72,6 +72,10 @@ class HIRLowerer {
         for declaration in module->declarations {
             this.current_pass = HIRLoweringPass::Third;
             declared[declaration] |= this.LowerDeclarationThirdPass(declaration);
+        }
+
+        for generic in this.generics {
+            generic->LowerInstances();
         }
 
         for declaration in module->declarations {
