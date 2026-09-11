@@ -212,68 +212,10 @@ class ScopeManager {
         }
 
         if result.Empty() && !test {
-            Logger::Log("Symbol '" + path->segments.Back().name + "' not found.", path, LogSeverity::Error);
-        } return result;
-    }
-
-    pub fn ResolveCandidates(&this, path: *ASTPath, test: bool) -> Vector<*HIRFunctionDeclaration> {
-        let result = Vector<*HIRFunctionDeclaration>();
-        if path == null || path->segments.Empty() { return result; }
-        let mut symbols = Vector<*Symbol>();
-
-        if path->segments.Size() == 1 && !path->absolute {
-            let mut cursor = this.current;
-
-            while cursor != null {
-                symbols = this.LookupSymbol(cursor, path->segments.Back(), path);
-                if !symbols.Empty() { break; }
-                cursor = cursor->parent;
-            }
-        } else {
-            let scope = this.ResolveScope(path);
-
-            if scope != null {
-                symbols = this.LookupSymbol(scope, path->segments.Back(), path);
-            }
-        }
-
-        for symbol in symbols {
-            if symbol->kind == SymbolKind::Declaration && symbol->declaration->kind == HIRDeclarationKind::Function {
-                result.PushBack(symbol->declaration as *HIRFunctionDeclaration);
-            }
-        }
-
-        if result.Empty() && !test {
             if !symbols.Empty() {
                 Logger::Log("Symbol '" + path->segments.Back().name + "' is not a function.", path, LogSeverity::Error);
             } else {
                 Logger::Log("Symbol '" + path->segments.Back().name + "' not found.", path, LogSeverity::Error);
-            }
-        } return result;
-    }
-
-    pub fn ResolveCandidates(&this, name: &String, node: *ASTNode, test: bool) -> Vector<*HIRFunctionDeclaration> {
-        let mut symbols = Vector<*Symbol>();
-        let mut result = Vector<*HIRFunctionDeclaration>();
-        let mut cursor = this.current;
-
-        while cursor != null {
-            symbols = cursor->Get(name);
-            if !symbols.Empty() { break; }
-            cursor = cursor->parent;
-        }
-
-        for symbol in symbols {
-            if symbol->kind == SymbolKind::Declaration && symbol->declaration->kind == HIRDeclarationKind::Function {
-                result.PushBack(symbol->declaration as *HIRFunctionDeclaration);
-            }
-        }
-
-        if result.Empty() && !test {
-            if !symbols.Empty() {
-                Logger::Log("Symbol '" + name + "' is not a function.", node, LogSeverity::Error);
-            } else {
-                Logger::Log("Symbol '" + name + "' not found.", node, LogSeverity::Error);
             }
         } return result;
     }
