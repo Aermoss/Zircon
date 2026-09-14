@@ -148,6 +148,7 @@ class GenericDeclaration {
             if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
                 instance->active = HIRLoweringPass::Third;
                 instance->declaration = hir_lowerer->LowerFunctionDeclarationFirstPass(function, instance);
+                hir_lowerer->module->declarations.PushBack(instance->declaration);
                 (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
                 instance->symbol = new Symbol(instance->declaration);
             }
