@@ -1859,7 +1859,7 @@ class HIRModule {
             if previous != null {
                 result += '\n';
 
-                if previous->kind != declaration->kind || (declaration->kind == HIRDeclarationKind::Class || declaration->kind == HIRDeclarationKind::Structure || declaration->kind == HIRDeclarationKind::Enumeration) {
+                if previous->kind != declaration->kind || (declaration->kind == HIRDeclarationKind::Class || declaration->kind == HIRDeclarationKind::Structure || declaration->kind == HIRDeclarationKind::Enumeration || declaration->kind == HIRDeclarationKind::Extend) {
                     result += '\n';
                 } else if declaration->kind == HIRDeclarationKind::Function {
                     let current = declaration as *HIRFunctionDeclaration;
