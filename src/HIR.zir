@@ -1323,7 +1323,7 @@ class HIRIntrinsicExpression : HIRExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return ToString(this.kind) + '(' + this._type->ToString() + ')';
+        return this.kind.ToString() + '(' + this._type->ToString() + ')';
     }
 }
 

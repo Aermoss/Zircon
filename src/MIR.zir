@@ -1368,7 +1368,7 @@ class MIRBuilder {
     }
 
     pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage) -> *mut MIRFunctionDeclaration {
-        let parameter_types = Vector<*MIRType>();
+        let mut parameter_types = Vector<*MIRType>();
         for parameter in parameters { parameter_types.PushBack((parameter as *MIRValue)->_type); }
         let _type = this.context->FunctionType(parameter_types, _return);
         let function = this.context->arena.New<MIRFunctionDeclaration>(name, parameters, _return, _type, linkage);

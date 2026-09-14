@@ -313,7 +313,7 @@ class LLVMLowerer {
             let value = (constant as *MIRConstantString)->value;
             return LLVMConstStringInContext2(this.context, value.Data(), value.Length(), 0);
         } else if constant->kind == MIRConstantKind::Array {
-            let elements = Vector<LLVMValueRef>();
+            let mut elements = Vector<LLVMValueRef>();
 
             for element in (constant as *MIRConstantArray)->elements {
                 let lowered_element = this.LowerValue(element);
@@ -325,7 +325,7 @@ class LLVMLowerer {
             if _type == null { return null; }
             return LLVMConstArray2(_type, elements.Data(), elements.Size() as u64);
         } else if constant->kind == MIRConstantKind::Structure {
-            let fields = Vector<LLVMValueRef>();
+            let mut fields = Vector<LLVMValueRef>();
 
             for field in (constant as *MIRConstantStructure)->fields {
                 let lowered_field = this.LowerValue(field);

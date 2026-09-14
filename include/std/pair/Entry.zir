@@ -18,6 +18,8 @@ class Pair<L, R> {
     pub left: L,
     pub right: R;
 
+    Pair(&mut this) {}
+
     Pair(&mut this, left: L) {
         this.left = left;
     }

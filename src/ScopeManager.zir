@@ -77,7 +77,7 @@ class ScopeManager {
             types.PushBack(resolved);
         }
 
-        let symbols = Vector<*Symbol>();
+        let mut symbols = Vector<*Symbol>();
 
         for symbol in scope->Get(segment.name) {
             if !types.Empty() {
@@ -152,7 +152,7 @@ class ScopeManager {
             let mut cursor = this.current;
 
             while cursor != null {
-                let symbols = Vector<*Symbol>();
+                let mut symbols = Vector<*Symbol>();
 
                 for symbol in this.LookupSymbol(cursor, path->segments.Back(), path) {
                     if symbol->kind == SymbolKind::Type {
@@ -167,7 +167,7 @@ class ScopeManager {
             let scope = this.ResolveScope(path);
 
             if scope != null {
-                let symbols = Vector<*Symbol>();
+                let mut symbols = Vector<*Symbol>();
 
                 for symbol in this.LookupSymbol(scope, path->segments.Back(), path) {
                     if symbol->kind == SymbolKind::Type {
