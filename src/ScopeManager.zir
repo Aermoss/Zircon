@@ -184,16 +184,17 @@ class ScopeManager {
         } return Vector<*Symbol>();
     }
 
-    pub fn ResolveCandidates(&this, path: *ASTPath, test: bool) -> Vector<*HIRFunctionDeclaration> {
-        let result = Vector<*HIRFunctionDeclaration>();
-        if path == null || path->segments.Empty() { return result; }
+    pub fn ResolveCandidates(&this, path: *ASTPath, values: &Vector<*HIRExpression>, test: bool) -> Vector<*HIRFunctionDeclaration> {
         let mut symbols = Vector<*Symbol>();
+        let mut result = Vector<*HIRFunctionDeclaration>();
+        if path == null || path->segments.Empty() { return result; }
+        let segment = path->segments.Back();
 
         if path->segments.Size() == 1 && !path->absolute {
             let mut cursor = this.current;
 
             while cursor != null {
-                symbols = this.LookupSymbol(cursor, path->segments.Back(), path);
+                symbols = cursor->Get(segment.name);
                 if !symbols.Empty() { break; }
                 cursor = cursor->parent;
             }
@@ -201,13 +202,38 @@ class ScopeManager {
             let scope = this.ResolveScope(path);
 
             if scope != null {
-                symbols = this.LookupSymbol(scope, path->segments.Back(), path);
+                symbols = scope->Get(segment.name);
             }
         }
 
         for symbol in symbols {
             if symbol->kind == SymbolKind::Declaration && symbol->declaration->kind == HIRDeclarationKind::Function {
                 result.PushBack(symbol->declaration as *HIRFunctionDeclaration);
+            } else if symbol->kind == SymbolKind::Generic && symbol->generic->declaration->kind == ASTDeclarationKind::Function {
+                let function = symbol->generic->declaration as *ASTFunctionDeclaration;
+                if function->pack_name.Empty() && segment.types.Empty() { continue; }
+                let mut types = Vector<*HIRType>();
+
+                for _type in segment.types {
+                    let resolved = hir_lowerer->LowerType(_type);
+                    if resolved == null { continue; }
+                    types.PushBack(resolved);
+                }
+
+                if !function->pack_name.Empty() {
+                    let fixed = function->parameters.Size();
+                    let start = fixed < values.Size() ? fixed : values.Size();
+
+                    for i in start..values.Size() {
+                        types.PushBack(values[i]->_type);
+                    }
+                }
+
+                let instance = symbol->generic->Instantiate(types, path);
+
+                if instance != null && instance->declaration != null && instance->declaration->kind == HIRDeclarationKind::Function {
+                    result.PushBack(instance->declaration as *HIRFunctionDeclaration);
+                }
             }
         }
 

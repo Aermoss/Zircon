@@ -168,8 +168,16 @@ class GenericDeclaration {
     }
 
     pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {
-        if types.Size() != this.types.Size() {
-            Logger::Log("Generic '" + this.name + "' expects " + String::FromInteger(this.types.Size() as u64) + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);
+        let mut pack = false;
+
+        if this.declaration->kind == ASTDeclarationKind::Function {
+            pack = !(this.declaration as *ASTFunctionDeclaration)->pack_name.Empty();
+        }
+
+        if pack ? types.Size() < this.types.Size() : types.Size() != this.types.Size() {
+            let mut expected = String::FromInteger(this.types.Size() as u64);
+            if pack { expected = "at least " + expected; }
+            Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);
             return null;
         }
 
