@@ -62,7 +62,7 @@ class Scope {
     }
 
     pub fn Set(&mut this, name: &String, declaration: *HIRDeclaration, overload: bool, node: *ASTNode) -> *Symbol {
-        if this.Has(name) && !overload {
+        if !overload && this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
         } else if !this.symbols.Has(name) { 
@@ -75,7 +75,7 @@ class Scope {
     }
 
     pub fn Set(&mut this, name: &String, generic: *mut GenericDeclaration, node: *ASTNode) -> *Symbol {
-        if this.Has(name) {
+        if generic->declaration->kind != ASTDeclarationKind::Function && this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
         } else if !this.symbols.Has(name) { 
