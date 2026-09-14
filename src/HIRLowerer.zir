@@ -1273,8 +1273,6 @@ class HIRLowerer {
 
         for instance in this.temporaries.Reverse() {
             if instance == exception { continue; }
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(instance);
             let function = (instance->_type as *HIRClassType)->declaration->destructor;
             let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
             destructors.PushBack(this.builder.Destructor(instance, callee));
@@ -1304,8 +1302,6 @@ class HIRLowerer {
                     }
                 }
 
-                let mut values = Vector<*HIRExpression>();
-                values.PushBack(instance);
                 let function = (instance->_type as *HIRClassType)->declaration->destructor;
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
                 destructors.PushBack(this.builder.Destructor(instance, callee));
@@ -1853,44 +1849,120 @@ class HIRLowerer {
         if call->expression->kind == ASTExpressionKind::Path {
             let path = (call->expression as *ASTPathExpression)->path;
 
-            if !path->absolute && path->segments.Size() == 1 && (path->segments[0].name == "sizeof" || path->segments[0].name == "alignof") && path->segments[0].types.Empty() {
-                if call->arguments.Size() != 1 {
-                    Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
-                    return null;
-                }
-
-                let mut _type: *HIRType;
-                let argument: *ASTExpression = call->arguments[0];
-
-                if argument->kind == ASTExpressionKind::Path {
-                    let path = (argument as *ASTPathExpression)->path;
-                    let symbols = this.scope_manager.Resolve(path, false);
-                    if symbols.Empty() { return null; }
-
-                    for symbol in symbols {
-                        if symbol->kind == SymbolKind::Statement {
-                            _type = (symbol->statement as *HIRVariableStatement)->_type;
-                        } else if symbol->kind == SymbolKind::Declaration {
-                            _type = symbol->declaration->_type;
-                        } else {
-                            _type = symbol->_type;
-                        }
-
-                        if _type != null {
-                            break;
-                        }
-                    }
-
-                    if _type == null {
-                        Logger::Log("Symbol '" + path->ToString() + "' cannot be used as a type.", path, LogSeverity::Error);
+            if !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() {
+                if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" {
+                    if call->arguments.Size() != 1 {
+                        Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
                         return null;
                     }
-                } else {
-                    Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
-                    return null;
-                }
 
-                return this.builder.Intrinsic(path->segments[0].name == "sizeof" ? HIRIntrinsicKind::SizeOf : HIRIntrinsicKind::AlignOf, _type);
+                    let mut _type: *HIRType;
+                    let argument: *ASTExpression = call->arguments[0];
+
+                    if argument->kind == ASTExpressionKind::Path {
+                        let path = (argument as *ASTPathExpression)->path;
+                        let symbols = this.scope_manager.Resolve(path, false);
+                        if symbols.Empty() { return null; }
+
+                        for symbol in symbols {
+                            if symbol->kind == SymbolKind::Statement {
+                                _type = (symbol->statement as *HIRVariableStatement)->_type;
+                            } else if symbol->kind == SymbolKind::Declaration {
+                                _type = symbol->declaration->_type;
+                            } else {
+                                _type = symbol->_type;
+                            }
+
+                            if _type != null {
+                                break;
+                            }
+                        }
+
+                        if _type == null {
+                            Logger::Log("Symbol '" + path->ToString() + "' cannot be used as a type.", path, LogSeverity::Error);
+                            return null;
+                        }
+                    } else {
+                        Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.builder.Intrinsic(path->segments[0].name == "sizeof" ? HIRIntrinsicKind::SizeOf : HIRIntrinsicKind::AlignOf, _type);
+                } else if path->segments[0].name == "construct" {
+                    if call->arguments.Size() == 0 {
+                        Logger::Log("Invalid number of arguments for 'construct'.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let mut invalid = false;
+                    let mut values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+                    if invalid { return null; }
+
+                    let target = this.ImplicitDereference(values[0]);
+
+                    if !target->_type->IsPointer() {
+                        Logger::Log("Construct target must be a pointer.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let target_type: *HIRType = target->_type->Pointee();
+
+                    if target_type->IsClass() {
+                        let candidates = (target_type as *HIRClassType)->declaration->constructors;
+                        let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
+                        if function == null { return null; }
+                        let call = this.LowerResolvedCallExpression(function, values, call as *ASTExpression);
+                        if call == null { return null; }
+                        this.builder.BuildExpressionStatement(call);
+                    } else {
+                        values.RemoveAt(0);
+
+                        if values.Size() > 1 {
+                            Logger::Log("Primitive type initialization accepts at most 1 argument.", call as *ASTExpression, LogSeverity::Error);
+                            return null;
+                        }
+
+                        if values.Size() != 0 {
+                            let mut value = this.ImplicitDereference(values[0]);
+
+                            if target_type->IsCompatible(value->_type) {
+                                if target_type->IsMutabilityCompatible(value->_type) {
+                                    this.builder.BuildExpressionStatement(this.builder.Assignment(target, this.MakeCompatible(value, target_type)));
+                                } else {
+                                    Logger::Log("Cannot assign immutable pointer to mutable pointer.", call as *ASTExpression, LogSeverity::Error);
+                                    return null;
+                                }
+                            } else {
+                                Logger::Log("Incompatible primitive type initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", call as *ASTExpression, LogSeverity::Error);
+                                return null;
+                            }
+                        }
+                    } return target;
+                } else if path->segments[0].name == "destruct" {
+                    if call->arguments.Size() != 1 {
+                        Logger::Log("Invalid number of arguments for 'destruct'.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let mut invalid = false;
+                    let values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+                    if invalid { return null; }
+
+                    let target = this.ImplicitDereference(values[0]);
+
+                    if !target->_type->IsPointer() {
+                        Logger::Log("Destruct target must be a pointer.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let target_type: *HIRType = target->_type->Pointee();
+
+                    if target_type->IsClass() {
+                        let function = (target_type as *HIRClassType)->declaration->destructor;
+                        let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                        this.builder.BuildExpressionStatement(this.builder.Destructor(target, callee));
+                    } return null;
+                }
             }
         }
 
