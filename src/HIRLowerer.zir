@@ -771,11 +771,15 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        for i in 0.._class->methods.Size() {
-            let function: *mut HIRFunctionDeclaration = declaration->methods[i];
-            this.LowerFunctionDeclarationSecondPass(function, _class->methods[i]);
+        let mut index: usize = 0;
 
-            if _class->methods[i]->name == "operator=" && function->parameters.Size() == 2 {
+        for method in _class->methods {
+            if method->generic || !method->pack_name.Empty() { continue; }
+            let function: *mut HIRFunctionDeclaration = declaration->methods[index];
+            this.LowerFunctionDeclarationSecondPass(function, method);
+            index += 1;
+
+            if method->name == "operator=" && function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
 
                 if *(parameter as *HIRDeclaration)->_type == *(this.context.ReferenceType(_type, false) as *HIRType) {
@@ -888,9 +892,12 @@ class HIRLowerer {
         let _type = (declaration as *HIRDeclaration)->_type;
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (_type, scope);
+        let mut index: usize = 0;
 
-        for i in 0..structure->methods.Size() {
-            this.LowerFunctionDeclarationSecondPass(declaration->methods[i], structure->methods[i]);
+        for method in structure->methods {
+            if method->generic || !method->pack_name.Empty() { continue; }
+            this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
+            index += 1;
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -1789,6 +1796,59 @@ class HIRLowerer {
         } return values;
     }
 
+    fn ResolveGenericMembers(&mut this, _class: *HIRType, name: &String, types: &Vector<*ASTType>, values: &Vector<*HIRExpression>, node: *ASTNode) -> Vector<*HIRFunctionDeclaration> {
+        let mut result = Vector<*HIRFunctionDeclaration>();
+        let mut lowered_types = Vector<*HIRType>();
+
+        for _type in types {
+            let lowered_type = this.LowerType(_type);
+            if lowered_type == null { return result; }
+            lowered_types.PushBack(lowered_type);
+        }
+
+        for generic in this.generics {
+            if generic->declaration->kind != ASTDeclarationKind::Function || generic->_class == null || *generic->_class != *_class {
+                continue;
+            }
+
+            let function = generic->declaration as *ASTFunctionDeclaration;
+
+            if function->name != name {
+                continue;
+            }
+
+            if !function->public && (this.current_type == null || *this.current_type != *_class) {
+                continue;
+            }
+
+            if function->pack_name.Empty() && lowered_types.Empty() {
+                continue;
+            }
+
+            let mut types = Vector<*HIRType>(lowered_types);
+
+            if !function->pack_name.Empty() {
+                let mut start = function->parameters.Size();
+
+                if function->instance_kind != ASTInstanceKind::None {
+                    start += 1;
+                }
+
+                if start <= values.Size() {
+                    for i in start..values.Size() {
+                        types.PushBack(values[i]->_type);
+                    }
+                }
+            }
+
+            let instance = generic->Instantiate(types, node);
+
+            if instance != null && instance->declaration != null && instance->declaration->kind == HIRDeclarationKind::Function {
+                result.PushBack(instance->declaration as *HIRFunctionDeclaration);
+            }
+        } return result;
+    }
+
     fn LowerCallExpression(&mut this, call: *ASTCallExpression) -> *HIRExpression {
         if call->expression->kind == ASTExpressionKind::Path {
             let path = (call->expression as *ASTPathExpression)->path;
@@ -1862,8 +1922,14 @@ class HIRLowerer {
 
             if !instance->_type->HasFields() && !instance->_type->HasMethods() {
                 values.Insert(0, this.ImplicitAddressOf(instance));
-                let candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call as *ASTExpression, false);
-                if candidates.Empty() { return null; }
+                let mut candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call as *ASTExpression, true);
+                candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call as *ASTExpression);
+
+                if candidates.Empty() {
+                    Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call as *ASTExpression, LogSeverity::Error);
+                    return null;
+                }
+
                 return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
             } else {
                 let index = instance->_type->HasFields() ? instance->_type->Index(member_access->member) : -1;
@@ -1880,8 +1946,14 @@ class HIRLowerer {
                     return this.LowerResolvedCallExpression(target, values, call as *ASTExpression);
                 } else {
                     values.Insert(0, this.ImplicitAddressOf(instance));
-                    let candidates = instance->_type->GetCandidates(member_access->member, call as *ASTExpression, false);
-                    if candidates.Empty() { return null; }
+                    let mut candidates = instance->_type->GetCandidates(member_access->member, call as *ASTExpression, true);
+                    candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call as *ASTExpression);
+
+                    if candidates.Empty() {
+                        Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call as *ASTExpression, LogSeverity::Error);
+                        return null;
+                    }
+
                     return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
                 }
             }
