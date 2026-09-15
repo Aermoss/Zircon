@@ -537,7 +537,7 @@ class LLVMLowerer {
 
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> LLVMValueRef {
         let instruction = call as *MIRInstruction;
-        let _type = this.LowerType(call->callee->_type);
+        let _type = this.LowerFunctionType(call->callee->_type as *MIRFunctionType);
         if _type == null { return null; }
         let callee = this.LowerValue(call->callee);
         if callee == null { return null; }
@@ -641,6 +641,20 @@ class LLVMLowerer {
         return LLVMBuildUnreachable(this.builder);
     }
 
+    fn LowerFunctionType(&mut this, function: *MIRFunctionType) -> LLVMTypeRef {
+        let mut parameters = Vector<LLVMTypeRef>();
+
+        for parameter in function->parameters {
+            let lowered_parameter = this.LowerType(parameter);
+            if lowered_parameter == null { return null; }
+            parameters.PushBack(lowered_parameter);
+        }
+
+        let _return = this.LowerType(function->_return);
+        if _return == null { return null; }
+        return LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0);
+    }
+
     fn LowerType(&mut this, _type: *MIRType) -> LLVMTypeRef {
         if _type->kind == MIRTypeKind::Void {
             return LLVMVoidTypeInContext(this.context);
@@ -665,18 +679,7 @@ class LLVMLowerer {
         } else if _type->kind == MIRTypeKind::Structure {
             return this.types.Get(_type, null);
         } else if _type->kind == MIRTypeKind::Function {
-            let function = _type as *MIRFunctionType;
-            let mut parameters = Vector<LLVMTypeRef>();
-
-            for parameter in function->parameters {
-                let lowered_parameter = this.LowerType(parameter);
-                if lowered_parameter == null { return null; }
-                parameters.PushBack(lowered_parameter);
-            }
-
-            let _return = this.LowerType(function->_return);
-            if _return == null { return null; }
-            return LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0);
+            return LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0);
         } else {
             return null;
         }

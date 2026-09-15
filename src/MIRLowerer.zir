@@ -1333,7 +1333,7 @@ class MIRLowerer {
                 parameters.PushBack(lowered_parameter);
             }
 
-            return this.context->PointerType(this.context->FunctionType(parameters, _return));
+            return this.context->FunctionType(parameters, _return);
         } else {
             return null;
         }
