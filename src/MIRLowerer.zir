@@ -641,15 +641,16 @@ class MIRLowerer {
             let place = this.LowerPlaceExpression(expression);
             if place == null { return null; }
 
-            if place->kind == MIRValueKind::Instruction {
-                let instruction = place as *MIRInstruction;
+            if place->_type->kind == MIRTypeKind::Pointer {
+                let pointee = (place->_type as *MIRPointerType)->pointee;
 
-                if instruction->kind == MIRInstructionKind::Alloca && (instruction as *MIRAllocaInstruction)->_type->kind == MIRTypeKind::Array {
-                    return place;
+                if pointee->kind == MIRTypeKind::Array {
+                    return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, place as *MIRInstruction, this.context.PointerType((pointee as *MIRArrayType)->element));
                 }
+            } else if place->_type->kind == MIRTypeKind::Function {
+                return place;
             }
 
-            if place->_type->kind == MIRTypeKind::Function { return place; }
             return this.builder.BuildLoad("load".ToString(), place) as *MIRInstruction;
         }
     }

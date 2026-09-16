@@ -1215,7 +1215,7 @@ class MIRBuilder {
     }
 
     pub fn BuildAlloca(&mut this, name: String, _type: *MIRType) -> *mut MIRAllocaInstruction {
-        let alloca = this.context->arena.New<MIRAllocaInstruction>(name, _type, this.context->PointerType(_type->kind == MIRTypeKind::Array ? ( _type as *MIRArrayType)->element : _type));
+        let alloca = this.context->arena.New<MIRAllocaInstruction>(name, _type, this.context->PointerType(_type));
         this.function->AddAllocaInstruction(alloca);
         return alloca;
     }
