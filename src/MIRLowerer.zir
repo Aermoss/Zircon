@@ -721,42 +721,44 @@ class MIRLowerer {
         return value;
     }
 
+    fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>) -> Vector<*MIRValue> {
+        let mut lowered_arguments = Vector<*MIRValue>();
+
+        for i in 0..arguments.Size() {
+            let argument: *HIRExpression = arguments[i];
+            let _type: *HIRType = types[i];
+
+            if this.IsAggregate(_type) {
+                let lowered_type = this.LowerType(_type);
+                if lowered_type == null { return Vector<*MIRValue>(); }
+                let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), lowered_type);
+                this.LowerExpressionTo(argument, alloca as *MIRInstruction);
+
+                if this.IsIndirectAggregate(_type) {
+                    lowered_arguments.PushBack(alloca as *MIRInstruction);
+                } else {
+                    let target = this.context.PointerType(this.LowerAggregateType(_type));
+                    let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca as *MIRInstruction, target);
+                    let load = this.builder.BuildLoad("abi.value".ToString(), pointer as *MIRInstruction);
+                    lowered_arguments.PushBack(load as *MIRInstruction);
+                }
+            } else {
+                let value = this.LowerExpression(argument);
+                if value == null { return Vector<*MIRValue>(); }
+                lowered_arguments.PushBack(value);
+            }
+        } return lowered_arguments;
+    }
+
     fn LowerCallExpression(&mut this, call: *HIRCallExpression, destination: *MIRValue) -> *MIRValue {
         let _return = call->callee->_type->Return();
         let parameters = call->callee->_type->Parameters();
         let callee = this.LowerExpression(call->callee);
         if callee == null { return null; }
+
         let mut arguments = Vector<*MIRValue>();
-
-        if this.IsIndirectAggregate(_return) {
-            arguments.PushBack(destination);
-        }
-
-        for i in 0..call->arguments.Size() {
-            let argument: *HIRExpression = call->arguments[i];
-            let _type: *HIRType = parameters[i];
-
-            if this.IsAggregate(_type) {
-                let lowered_type = this.LowerType(_type);
-                if lowered_type == null { return null; }
-                let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), lowered_type);
-                this.LowerExpressionTo(argument, alloca as *MIRInstruction);
-
-                if this.IsIndirectAggregate(_type) {
-                    arguments.PushBack(alloca as *MIRInstruction);
-                } else {
-                    let target = this.context.PointerType(this.LowerAggregateType(_type));
-                    let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca as *MIRInstruction, target);
-                    let load = this.builder.BuildLoad("abi.value".ToString(), pointer as *MIRInstruction);
-                    arguments.PushBack(load as *MIRInstruction);
-                }
-            } else {
-                let value = this.LowerExpression(argument);
-                if value == null { return null; }
-                arguments.PushBack(value);
-            }
-        }
-
+        if this.IsIndirectAggregate(_return) { arguments.PushBack(destination); }
+        arguments += this.LowerCallArguments(call->arguments, parameters);
         let result = this.builder.BuildCall("call".ToString(), callee, arguments) as *MIRInstruction;
 
         if this.IsIndirectAggregate(_return) {
@@ -776,13 +778,9 @@ class MIRLowerer {
         if callee == null { return null; }
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(destination);
-
-        for argument in constructor->arguments {
-            let lowered = this.LowerExpression(argument);
-            if lowered == null { return null; }
-            arguments.PushBack(lowered);
-        }
-
+        let mut types = Vector<*HIRType>(constructor->callee->_type->Parameters());
+        types.RemoveAt(0);
+        arguments += this.LowerCallArguments(constructor->arguments, types);
         this.builder.BuildCall("constructor".ToString(), callee, arguments) as *MIRInstruction;
         return destination;
     }
@@ -869,16 +867,13 @@ class MIRLowerer {
             pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(this.LowerType(_new->_type)));
 
             if _new->callee != null {
+                let callee = this.LowerExpression(_new->callee);
+                if callee == null { return null; }
                 let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(pointer);
-
-                for argument in _new->arguments {
-                    let lowered_argument = this.LowerExpression(argument);
-                    if lowered_argument == null { return null; }
-                    arguments.PushBack(lowered_argument);
-                }
-
-                let callee = this.LowerExpression(_new->callee);
+                let mut types = Vector<*HIRType>(_new->callee->_type->Parameters());
+                types.RemoveAt(0);
+                arguments += this.LowerCallArguments(_new->arguments, types);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments) as *MIRInstruction;
             }
         } return pointer;
@@ -918,18 +913,20 @@ class MIRLowerer {
                 this.builder.BuildConditionalBranch(condition, loop_block, end_block);
 
                 this.builder.SetCurrentBlock(loop_block);
+                let callee = this.LowerExpression(_delete->callee);
+                if callee == null { return null; }
                 let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(this.builder.BuildArrayGEP("delete.gep".ToString(), pointer, index));
-                let callee = this.LowerExpression(_delete->callee);
                 this.builder.BuildCall("delete.destructor".ToString(), callee, arguments) as *MIRInstruction;
                 this.builder.BuildStore(this.builder.BuildBinary("delete.add".ToString(), MIRBinaryKind::Add, index, this.builder.ConstantInteger(1, size_type) as *MIRConstant, size_type), alloca);
                 this.builder.BuildBranch(condition_block);
                 this.builder.SetCurrentBlock(end_block);
             }
         } else if _delete->callee != null {
+            let callee = this.LowerExpression(_delete->callee);
+            if callee == null { return null; }
             let mut arguments = Vector<*MIRValue>();
             arguments.PushBack(pointer);
-            let callee = this.LowerExpression(_delete->callee);
             this.builder.BuildCall("delete.destructor".ToString(), callee, arguments) as *MIRInstruction;
         }
 
