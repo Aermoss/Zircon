@@ -2016,11 +2016,132 @@ class HIRBuilder {
         return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::Dereference, operand, operand->_type->Pointee(), HIRExpressionCategory::Place, operand->_type->IsMutable());
     }
 
-    pub fn Unary(&mut this, kind: HIRUnaryKind, operand: *HIRExpression) -> *mut HIRUnaryExpression {
+    fn MaskToWidth(&this, value: u64, width: u64) -> u64 {
+        if width >= 64 { return value; }
+        return value & ((1u64 << width) - 1);
+    }
+
+    fn FoldUnary(&mut this, kind: HIRUnaryKind, operand: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
+        if kind == HIRUnaryKind::Negate {
+            if operand->kind == HIRLiteralKind::Integer {
+                return this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width() as u64), _type) as *HIRLiteral;
+            } else if operand->kind == HIRLiteralKind::Float {
+                return this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type) as *HIRLiteral;
+            } else { return null; }
+        } else if kind == HIRUnaryKind::Not {
+            if operand->kind == HIRLiteralKind::Integer {
+                return this.IntegerLiteral(this.MaskToWidth(!(operand as *HIRIntegerLiteral)->value, _type->Width() as u64), _type) as *HIRLiteral;
+            } else if operand->kind == HIRLiteralKind::Boolean {
+                return this.BooleanLiteral(!(operand as *HIRBooleanLiteral)->value, _type) as *HIRLiteral;
+            } else { return null; }
+        } else { return null; }
+    }
+
+    pub fn Unary(&mut this, kind: HIRUnaryKind, operand: *HIRExpression) -> *HIRExpression {
+        if operand->kind == HIRExpressionKind::Literal && kind != HIRUnaryKind::AddressOf && kind != HIRUnaryKind::Dereference {
+            let folded = this.FoldUnary(kind, operand as *HIRLiteral, operand->_type);
+            if folded != null { return folded; }
+        }
+
         return this.context->arena.New<HIRUnaryExpression>(kind, operand, operand->_type, HIRExpressionCategory::Value, false);
     }
 
-    pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, _type: *HIRType) -> *mut HIRBinaryExpression {
+    fn SignExtend(&this, value: u64, width: u64) -> i64 {
+        let masked = this.MaskToWidth(value, width);
+        if width >= 64 { return masked as i64; }
+        let sign_bit = 1u64 << (width - 1);
+
+        if (masked & sign_bit) != 0 {
+            return (masked | !((1u64 << width) - 1)) as i64;
+        } return masked as i64;
+    }
+
+    fn FoldBinary(&mut this, kind: HIRBinaryKind, left: *HIRLiteral, right: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
+        if left->kind == HIRLiteralKind::Integer && right->kind == HIRLiteralKind::Integer {
+            let (left, right) = ((left as *HIRIntegerLiteral)->value, (right as *HIRIntegerLiteral)->value);
+            if (kind == HIRBinaryKind::Divide || kind == HIRBinaryKind::Modulo) && right == 0 { return null; }
+            let (signed, width) = (_type->IsSigned(), _type->Width() as u64);
+
+            if kind == HIRBinaryKind::Add {
+                return this.IntegerLiteral(this.MaskToWidth(left + right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Subtract {
+                return this.IntegerLiteral(this.MaskToWidth(left - right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Multiply {
+                return this.IntegerLiteral(this.MaskToWidth(left * right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Divide {
+                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 : left / right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Modulo {
+                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 : left % right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::BitwiseAnd {
+                return this.IntegerLiteral(left & right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::BitwiseOr {
+                return this.IntegerLiteral(left | right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::BitwiseXor {
+                return this.IntegerLiteral(left ^ right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::LeftShift {
+                return this.IntegerLiteral(this.MaskToWidth(left << right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::RightShift {
+                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) >> right as i64) as u64 : left >> right, width), _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Equal {
+                return this.BooleanLiteral(left == right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::NotEqual {
+                return this.BooleanLiteral(left != right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Less {
+                return this.BooleanLiteral(signed ? this.SignExtend(left, width) < this.SignExtend(right, width) : left < right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::LessEqual {
+                return this.BooleanLiteral(signed ? this.SignExtend(left, width) <= this.SignExtend(right, width) : left <= right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Greater {
+                return this.BooleanLiteral(signed ? this.SignExtend(left, width) > this.SignExtend(right, width) : left > right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::GreaterEqual {
+                return this.BooleanLiteral(signed ? this.SignExtend(left, width) >= this.SignExtend(right, width) : left >= right, this.context->BooleanType()) as *HIRLiteral;
+            } else { return null; }
+        } else if left->kind == HIRLiteralKind::Float && right->kind == HIRLiteralKind::Float {
+            let left = (left as *HIRFloatLiteral)->value;
+            let right = (right as *HIRFloatLiteral)->value;
+
+            if kind == HIRBinaryKind::Add {
+                return this.FloatLiteral(left + right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Subtract {
+                return this.FloatLiteral(left - right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Multiply {
+                return this.FloatLiteral(left * right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Divide {
+                return this.FloatLiteral(left / right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Equal {
+                return this.BooleanLiteral(left == right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::NotEqual {
+                return this.BooleanLiteral(left != right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Less {
+                return this.BooleanLiteral(left < right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::LessEqual {
+                return this.BooleanLiteral(left <= right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Greater {
+                return this.BooleanLiteral(left > right, this.context->BooleanType()) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::GreaterEqual {
+                return this.BooleanLiteral(left >= right, this.context->BooleanType()) as *HIRLiteral;
+            } else { return null; }
+        } else if left->kind == HIRLiteralKind::Boolean && right->kind == HIRLiteralKind::Boolean {
+            let left = (left as *HIRBooleanLiteral)->value;
+            let right = (right as *HIRBooleanLiteral)->value;
+
+            if kind == HIRBinaryKind::BitwiseAnd || kind == HIRBinaryKind::LogicalAnd {
+                return this.BooleanLiteral(left && right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::BitwiseOr || kind == HIRBinaryKind::LogicalOr {
+                return this.BooleanLiteral(left || right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::BitwiseXor || kind == HIRBinaryKind::NotEqual {
+                return this.BooleanLiteral(left != right, _type) as *HIRLiteral;
+            } else if kind == HIRBinaryKind::Equal {
+                return this.BooleanLiteral(left == right, _type) as *HIRLiteral;
+            } else { return null; }
+        } else { return null; }
+    }
+
+    pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, _type: *HIRType) -> *HIRExpression {
+        if left->kind == HIRExpressionKind::Literal && right->kind == HIRExpressionKind::Literal {
+            let folded = this.FoldBinary(kind, left as *HIRLiteral, right as *HIRLiteral, _type);
+            if folded != null { return folded; }
+        }
+
         return this.context->arena.New<HIRBinaryExpression>(kind, left, right, _type);
     }
 
@@ -2032,7 +2153,41 @@ class HIRBuilder {
         return this.context->arena.New<HIRCallExpression>(callee, arguments);
     }
 
-    pub fn Cast(&mut this, value: *HIRExpression, _type: *HIRType) -> *mut HIRCastExpression {
+    fn FoldCast(&mut this, value: *HIRLiteral, target: *HIRType) -> *HIRExpression {
+        if !target->IsInteger() && !target->IsFloat() && !target->IsBoolean() && !target->IsCharacter() && !target->IsEnumeration() {
+            return null;
+        }
+
+        if value->kind == HIRLiteralKind::Integer || value->kind == HIRLiteralKind::Character || value->kind == HIRLiteralKind::Boolean {
+            let raw = value->kind == HIRLiteralKind::Boolean ? ((value as *HIRBooleanLiteral)->value ? 1u64 : 0u64)
+                : value->kind == HIRLiteralKind::Character ? (value as *HIRCharacterLiteral)->value as u64
+                : (value as *HIRIntegerLiteral)->value;
+
+            if target->IsFloat() {
+                let source = (value as *HIRExpression)->_type;
+                return this.FloatLiteral(source->IsInteger() && source->IsSigned() ? this.SignExtend(raw, source->Width() as u64) as f64 : raw as f64, target) as *HIRLiteral;
+            } else {
+                return this.IntegerLiteral(this.MaskToWidth(raw, target->Width() as u64), target) as *HIRLiteral;
+            }
+        } else if value->kind == HIRLiteralKind::Float {
+            let value = (value as *HIRFloatLiteral)->value;
+
+            if target->IsInteger() {
+                return this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width() as u64), target) as *HIRLiteral;
+            } else {
+                return this.FloatLiteral(value, target) as *HIRLiteral;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    pub fn Cast(&mut this, value: *HIRExpression, _type: *HIRType) -> *HIRExpression {
+        if value->kind == HIRExpressionKind::Literal {
+            let folded = this.FoldCast(value as *HIRLiteral, _type);
+            if folded != null { return folded; }
+        }
+
         return this.context->arena.New<HIRCastExpression>(value, _type);
     }
 
