@@ -593,6 +593,10 @@ class HIRLowerer {
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
 
+        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
+        let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+        let this_dereferenced = this.builder.Dereference(this_reference);
+
         for constructor in function->constructors {
             let _type = this.LowerType((constructor->expression as *ASTPathExpression)->path);
             if _type == null { continue; }
@@ -602,25 +606,37 @@ class HIRLowerer {
                 continue;
             }
 
-            let mut values = Vector<*HIRExpression>();
+            for i in 0..fields.Size() {
+                let field: *HIRFieldDeclaration = fields[i];
 
-            for argument in constructor->arguments {
-                let value = this.LowerExpression(argument);
-                if value == null { continue; }
-                values.PushBack(value);
-            }
-
-            for field in fields {
-                if (field as *HIRDeclaration)->name == ((_type as *HIRClassType)->declaration as *HIRDeclaration)->name {
-                    fields_to_construct.Remove(field);
-                    break;
+                if (field as *HIRDeclaration)->name != ((_type as *HIRClassType)->declaration as *HIRDeclaration)->name {
+                    continue;
                 }
+
+                let mut values = Vector<*HIRExpression>();
+                let this_field = this.builder.MemberAccess(this_dereferenced, (field as *HIRDeclaration)->_type, i);
+                values.PushBack(this.ImplicitAddressOf(this_field));
+                fields_to_construct.Remove(field);
+
+                let mut invalid = false;
+                values += this.LowerCallArguments(constructor->arguments, constructor as *ASTExpression, &mut invalid);
+                if invalid { break; }
+
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
+                let function = this.ResolveOverload(candidates, values, null, false);
+                if function == null { break; }
+                let call = this.LowerResolvedCallExpression(function, values, null);
+                if call == null { break; }
+                this.builder.BuildExpressionStatement(call);
+                break;
             }
         }
 
-        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
-        let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
-        let this_dereferenced = this.builder.Dereference(this_reference);
         this.LowerFieldConstructors(this_dereferenced, fields_to_construct);
 
         for statement in function->body->statements {
