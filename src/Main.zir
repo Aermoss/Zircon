@@ -655,17 +655,28 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let ast_module = parser.Parse(tokens);
 
             let mut hir_lowerer = HIRLowerer();
+            let hir_start = timer.Get();
             let hir_module = hir_lowerer.Lower(ast_module);
 
             if !Logger::HasError() {
-                _WriteFile(name + ".hir", hir_module->ToString());
+                WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
+                // _WriteFile(name + ".hir", hir_module->ToString());
+
                 let mut mir_lowerer = MIRLowerer(target.Info());
+                let mir_start = timer.Get();
                 let mir_module = mir_lowerer.Lower(hir_module);
-                _WriteFile(name + ".mir", mir_module->ToString());
+                WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
+                // _WriteFile(name + ".mir", mir_module->ToString());
+
                 let mut lir_lowerer = LIRLowerer();
+                let lir_start = timer.Get();
                 let lir_module = lir_lowerer.Lower(mir_module);
-                _WriteFile(name + ".lir", lir_module->ToString());
+                WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
+                // _WriteFile(name + ".lir", lir_module->ToString());
+
+                let llvm_start = timer.Get();
                 module = llvm_lowerer.Lower(mir_module);
+                WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
             }
         } else if extension == ".ll" || extension == ".bc" {
             if verbose {
