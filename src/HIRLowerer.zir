@@ -709,7 +709,8 @@ class HIRLowerer {
         }
 
         if _class->constructors.Empty() {
-            let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
+            let index = declaration->constructors.Size() - (has_copy_constructor ? 1 : 2);
+            let function: *mut HIRFunctionDeclaration = declaration->constructors[index];
             this.scope_manager.PushScope((function as *HIRDeclaration)->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.BuildBlockStatement();
