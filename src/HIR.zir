@@ -352,8 +352,9 @@ class HIRType {
             let declaration = (this as *HIRClassType)->declaration;
 
             if (declaration as *HIRDeclaration)->name == name {
-                result += declaration->constructors;
-                return result;
+                for constructor in declaration->constructors {
+                    result.PushBack(constructor);
+                } return result;
             } else if ('~' + (declaration as *HIRDeclaration)->name) == name {
                 result.PushBack(declaration->destructor);
                 return result;
@@ -1567,25 +1568,25 @@ class HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        if this->kind == HIRDeclarationKind::Parameter {
+        if this.kind == HIRDeclarationKind::Parameter {
             return (this as *HIRParameterDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Function {
+        } else if this.kind == HIRDeclarationKind::Function {
             return (this as *HIRFunctionDeclaration)->ToString(0);
-        } else if this->kind == HIRDeclarationKind::Field {
+        } else if this.kind == HIRDeclarationKind::Field {
             return (this as *HIRFieldDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Class {
+        } else if this.kind == HIRDeclarationKind::Class {
             return (this as *HIRClassDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Structure {
+        } else if this.kind == HIRDeclarationKind::Structure {
             return (this as *HIRStructureDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Member {
+        } else if this.kind == HIRDeclarationKind::Member {
             return (this as *HIRMemberDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Enumeration {
+        } else if this.kind == HIRDeclarationKind::Enumeration {
             return (this as *HIREnumerationDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Extend {
+        } else if this.kind == HIRDeclarationKind::Extend {
             return (this as *HIRExtendDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Constant {
+        } else if this.kind == HIRDeclarationKind::Constant {
             return (this as *HIRConstantDeclaration)->ToString();
-        } else if this->kind == HIRDeclarationKind::Static {
+        } else if this.kind == HIRDeclarationKind::Static {
             return (this as *HIRStaticDeclaration)->ToString();
         } else {
             return "<invalid declaration>".ToString();
@@ -1948,6 +1949,8 @@ class HIRBuilder {
     module: *mut HIRModule,
     function: *mut HIRFunctionDeclaration = null,
     block: *mut HIRBlockStatement = null;
+
+    HIRBuilder(&mut this) {}
 
     HIRBuilder(&mut this, context: *mut HIRContext, module: *mut HIRModule) {
         (this.context, this.module) = (context, module);

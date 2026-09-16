@@ -39,7 +39,7 @@ class MIRLowerer {
     }
 
     pub fn Lower(&mut this, module: *HIRModule) -> *MIRModule {
-        this.module = this.context->arena.New<MIRModule>();
+        this.module = this.context.arena.New<MIRModule>();
         this.builder = MIRBuilder(&mut this.context, this.module);
         this.LowerModule(module);
         return this.module;
@@ -177,11 +177,11 @@ class MIRLowerer {
         if !this.IsAggregate(_type) {
             return lowered_type;
         } else if this.IsIndirectAggregate(_type) {
-            return this.context->PointerType(lowered_type);
+            return this.context.PointerType(lowered_type);
         } else {
             let size = _type->Size();
             let width: u32 = size > 4 ? 64 : size > 2 ? 32 : size > 1 ? 16 : 8;
-            return this.context->IntegerType(width);
+            return this.context.IntegerType(width);
         }
     }
 
@@ -199,7 +199,7 @@ class MIRLowerer {
 
         if this.IsIndirectAggregate(function->_return) {
             parameters.PushBack(this.builder.BuildParameter("sret".ToString(), 0, _return));
-            _return = this.context->VoidType();
+            _return = this.context.VoidType();
         }
 
         for parameter in function->parameters {
@@ -236,7 +236,7 @@ class MIRLowerer {
             } else if this.IsAggregate(declaration->_type) {
                 let alloca = this.builder.BuildAlloca(declaration->name, this.LowerType(declaration->_type));
                 this.parameters[declaration] = (alloca as *MIRInstruction) as *MIRValue;
-                let target = this.context->PointerType(this.LowerAggregateType(declaration->_type));
+                let target = this.context.PointerType(this.LowerAggregateType(declaration->_type));
                 let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca as *MIRInstruction, target);
                 this.builder.BuildStore(lowered_parameter, pointer as *MIRInstruction);
             } else {
@@ -257,14 +257,14 @@ class MIRLowerer {
 
     fn LowerClassDeclarationFirstPass(&mut this, _class: *HIRClassDeclaration) {
         let declaration = _class as *HIRDeclaration;
-        let lowered = this.builder.BuildType(declaration->name, this.context->StructureType(declaration->name));
+        let lowered = this.builder.BuildType(declaration->name, this.context.StructureType(declaration->name));
         this.types[declaration->_type] = lowered;
     }
 
     fn LowerClassDeclarationSecondPass(&mut this, _class: *HIRClassDeclaration) {
         let declaration = _class as *HIRDeclaration;
         let lowered: *mut MIRDeclaration = this.types[declaration->_type];
-        let fields = Vector<*MIRType>();
+        let mut fields = Vector<*MIRType>();
 
         for field in _class->fields {
             let declaration = field as *HIRDeclaration;
@@ -310,14 +310,14 @@ class MIRLowerer {
 
     fn LowerStructureDeclarationFirstPass(&mut this, structure: *HIRStructureDeclaration) {
         let declaration = structure as *HIRDeclaration;
-        let lowered = this.builder.BuildType(declaration->name, this.context->StructureType(declaration->name));
+        let lowered = this.builder.BuildType(declaration->name, this.context.StructureType(declaration->name));
         this.types[declaration->_type] = lowered;
     }
 
     fn LowerStructureDeclarationSecondPass(&mut this, structure: *HIRStructureDeclaration) {
         let declaration = structure as *HIRDeclaration;
         let lowered: *mut MIRDeclaration = this.types[declaration->_type];
-        let fields = Vector<*MIRType>();
+        let mut fields = Vector<*MIRType>();
 
         for field in structure->fields {
             let declaration = field as *HIRDeclaration;
@@ -402,7 +402,7 @@ class MIRLowerer {
             if _type == null { return; }
             let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), _type);
             this.LowerExpressionTo(_return->expression, alloca as *MIRInstruction);
-            let target = this.context->PointerType(this.LowerAggregateType(this.current_return));
+            let target = this.context.PointerType(this.LowerAggregateType(this.current_return));
             let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca as *MIRInstruction, target);
             let load = this.builder.BuildLoad("abi.value".ToString(), pointer as *MIRInstruction);
             for destructor in _return->destructors { this.LowerExpression(destructor); }
@@ -673,7 +673,7 @@ class MIRLowerer {
                 _static = this.strings[value];
             } else {
                 let name = "string." + String::FromInteger(this.strings.Size() as u64);
-                let array_type = this.context->ArrayType(this.context->IntegerType(8), value->Length() + 1);
+                let array_type = this.context.ArrayType(this.context.IntegerType(8), value.Length() + 1);
                 let initializer = this.builder.ConstantString(value, array_type) as *MIRConstant;
                 _static = this.builder.BuildStatic(name, array_type, false, initializer, MIRDeclarationLinkage::Private);
                 this.strings[value] = _static;
@@ -745,7 +745,7 @@ class MIRLowerer {
                 if this.IsIndirectAggregate(_type) {
                     arguments.PushBack(alloca as *MIRInstruction);
                 } else {
-                    let target = this.context->PointerType(this.LowerAggregateType(_type));
+                    let target = this.context.PointerType(this.LowerAggregateType(_type));
                     let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca as *MIRInstruction, target);
                     let load = this.builder.BuildLoad("abi.value".ToString(), pointer as *MIRInstruction);
                     arguments.PushBack(load as *MIRInstruction);
@@ -762,7 +762,7 @@ class MIRLowerer {
         if this.IsIndirectAggregate(_return) {
             return destination;
         } else if this.IsAggregate(_return) {
-            let target = this.context->PointerType(this.LowerAggregateType(_return));
+            let target = this.context.PointerType(this.LowerAggregateType(_return));
             let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, destination, target);
             this.builder.BuildStore(result, pointer as *MIRInstruction);
             return destination;
@@ -798,11 +798,17 @@ class MIRLowerer {
         return null;
     }
 
-    fn LowerRuntimeFunction(&mut this, name: String, parameters: &Vector<*MIRType>, _return: *MIRType) -> *MIRFunctionDeclaration {
+    fn LowerRuntimeFunction(&mut this, name: String, parameter_types: &Vector<*MIRType>, _return: *MIRType) -> *MIRFunctionDeclaration {
         for declaration in this.module->declarations {
             if declaration->kind == MIRDeclarationKind::Function && declaration->name == name {
                 return (declaration as *MIRLinkableDeclaration) as *MIRFunctionDeclaration;
             }
+        }
+
+        let mut parameters = Vector<*MIRParameter>();
+
+        for i in 0..parameter_types.Size() {
+            parameters.PushBack(this.builder.BuildParameter('_' + String::FromInteger(i as u64), i as u32, parameter_types[i]));
         }
 
         if this.runtime_functions.Has(name) { return this.runtime_functions[name]; }
@@ -813,9 +819,9 @@ class MIRLowerer {
 
     fn LowerNewExpression(&mut this, _new: *HIRNewExpression) -> *MIRValue {
         let mut parameters = Vector<*MIRType>();
-        let size_type = this.context->IntegerType(this.target_info.pointer_size as u32 * 8);
+        let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
         parameters.PushBack(size_type);
-        let malloc = this.LowerRuntimeFunction("malloc".ToString(), parameters, this.context->PointerType(this.context->VoidType()));
+        let malloc = this.LowerRuntimeFunction("malloc".ToString(), parameters, this.context.PointerType(this.context.VoidType()));
         let mut allocation_size = (this.builder.ConstantInteger(_new->_type->Size() as u64, size_type) as *MIRConstant) as *MIRValue;
         let callee = this.builder.ReferenceDeclaration(malloc as *MIRLinkableDeclaration);
         let mut pointer: *MIRValue = null;
@@ -829,10 +835,10 @@ class MIRLowerer {
             let mut arguments = Vector<*MIRValue>();
             arguments.PushBack(this.builder.BuildBinary("new.size".ToString(), MIRBinaryKind::Add, allocation_size, pointer_size, size_type));
             pointer = this.builder.BuildCall("new".ToString(), callee, arguments) as *MIRInstruction;
-            this.builder.BuildStore(size, this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context->PointerType(size_type)));
-            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context->PointerType(this.context->IntegerType(8)));
+            this.builder.BuildStore(size, this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(size_type)));
+            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(this.context.IntegerType(8)));
             pointer = this.builder.BuildArrayGEP("new.gep".ToString(), pointer, this.builder.ConstantInteger(8, size_type) as *MIRConstant);
-            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context->PointerType(this.LowerType(_new->_type)));
+            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(this.LowerType(_new->_type)));
 
             if _new->callee != null {
                 let alloca = this.builder.BuildAlloca("new.index".ToString(), size_type) as *MIRInstruction;
@@ -844,11 +850,11 @@ class MIRLowerer {
 
                 this.builder.SetCurrentBlock(condition_block);
                 let index = this.builder.BuildLoad("new.index.load".ToString(), alloca) as *MIRInstruction;
-                let condition = this.builder.BuildBinary("new.lt".ToString(), MIRBinaryKind::ICmpUlt, index, size, this.context->IntegerType(1));
+                let condition = this.builder.BuildBinary("new.lt".ToString(), MIRBinaryKind::ICmpUlt, index, size, this.context.IntegerType(1));
                 this.builder.BuildConditionalBranch(condition, loop_block, end_block);
 
                 this.builder.SetCurrentBlock(loop_block);
-                let arguments = Vector<*MIRValue>();
+                let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(this.builder.BuildArrayGEP("new.gep".ToString(), pointer, index));
                 let callee = this.LowerExpression(_new->callee);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments) as *MIRInstruction;
@@ -860,10 +866,10 @@ class MIRLowerer {
             let mut arguments = Vector<*MIRValue>();
             arguments.PushBack(allocation_size);
             pointer = this.builder.BuildCall("new".ToString(), callee, arguments) as *MIRInstruction;
-            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context->PointerType(this.LowerType(_new->_type)));
+            pointer = this.builder.BuildCast("new.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(this.LowerType(_new->_type)));
 
             if _new->callee != null {
-                let arguments = Vector<*MIRValue>();
+                let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(pointer);
                 let callee = this.LowerExpression(_new->callee);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments) as *MIRInstruction;
@@ -875,22 +881,22 @@ class MIRLowerer {
         let pointer = this.LowerExpression(_delete->value);
         if pointer == null { return null; }
         let mut parameters = Vector<*MIRType>();
-        parameters.PushBack(this.context->PointerType(this.context->VoidType()));
-        let free = this.LowerRuntimeFunction("free".ToString(), parameters, this.context->VoidType());
+        parameters.PushBack(this.context.PointerType(this.context.VoidType()));
+        let free = this.LowerRuntimeFunction("free".ToString(), parameters, this.context.VoidType());
         let callee = this.builder.ReferenceDeclaration(free as *MIRLinkableDeclaration);
         let pointer_type = pointer->_type as *MIRPointerType;
         let mut raw_pointer = pointer;
 
         if pointer_type->pointee->kind != MIRTypeKind::Integer || (pointer_type->pointee as *MIRIntegerType)->width != 8 {
-            raw_pointer = this.builder.BuildCast("delete.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context->PointerType(this.context->IntegerType(8))) as *MIRInstruction;
+            raw_pointer = this.builder.BuildCast("delete.cast".ToString(), MIRCastKind::Bitcast, pointer, this.context.PointerType(this.context.IntegerType(8))) as *MIRInstruction;
         }
 
         if _delete->array {
-            let size_type = this.context->IntegerType(this.target_info.pointer_size as u32 * 8);
+            let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
             raw_pointer = this.builder.BuildArrayGEP("delete.gep".ToString(), raw_pointer, this.builder.ConstantInteger(-8 as u64, size_type) as *MIRConstant);
 
             if _delete->callee != null {
-                let size = this.builder.BuildLoad("delete.size".ToString(), this.builder.BuildCast("delete.cast".ToString(), MIRCastKind::Bitcast, raw_pointer, this.context->PointerType(size_type))) as *MIRInstruction;
+                let size = this.builder.BuildLoad("delete.size".ToString(), this.builder.BuildCast("delete.cast".ToString(), MIRCastKind::Bitcast, raw_pointer, this.context.PointerType(size_type))) as *MIRInstruction;
 
                 let alloca = this.builder.BuildAlloca("delete.index".ToString(), size_type) as *MIRInstruction;
                 this.builder.BuildStore(this.builder.ConstantInteger(0, size_type) as *MIRConstant, alloca);
@@ -901,11 +907,11 @@ class MIRLowerer {
 
                 this.builder.SetCurrentBlock(condition_block);
                 let index = this.builder.BuildLoad("delete.index.load".ToString(), alloca) as *MIRInstruction;
-                let condition = this.builder.BuildBinary("delete.lt".ToString(), MIRBinaryKind::ICmpUlt, index, size, this.context->IntegerType(1));
+                let condition = this.builder.BuildBinary("delete.lt".ToString(), MIRBinaryKind::ICmpUlt, index, size, this.context.IntegerType(1));
                 this.builder.BuildConditionalBranch(condition, loop_block, end_block);
 
                 this.builder.SetCurrentBlock(loop_block);
-                let arguments = Vector<*MIRValue>();
+                let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(this.builder.BuildArrayGEP("delete.gep".ToString(), pointer, index));
                 let callee = this.LowerExpression(_delete->callee);
                 this.builder.BuildCall("delete.destructor".ToString(), callee, arguments) as *MIRInstruction;
@@ -914,7 +920,7 @@ class MIRLowerer {
                 this.builder.SetCurrentBlock(end_block);
             }
         } else if _delete->callee != null {
-            let arguments = Vector<*MIRValue>();
+            let mut arguments = Vector<*MIRValue>();
             arguments.PushBack(pointer);
             let callee = this.LowerExpression(_delete->callee);
             this.builder.BuildCall("delete.destructor".ToString(), callee, arguments) as *MIRInstruction;
@@ -1001,7 +1007,7 @@ class MIRLowerer {
             if target_type->IsPointer() {
                 if value_type->Pointee().IsClass() && target_type->Pointee().IsClass() {
                     let (source_class, target_class) = (value_type->Pointee(), target_type->Pointee());
-                    let (source_fields, target_fields) = (source_class->Fields(), target_class->Fields());
+                    let (source_fields, target_fields) = (source_class.Fields(), target_class.Fields());
                     let (mut related, mut index: u32) = (false, 0);
 
                     for i in 0..source_fields.Size() {
@@ -1061,7 +1067,7 @@ class MIRLowerer {
         let expression = member_access as *HIRExpression;
         let instance = this.LowerPlaceExpression(member_access->instance);
         if instance == null { return null; }
-        let field_type = this.context->PointerType(this.LowerType(expression->_type));
+        let field_type = this.context.PointerType(this.LowerType(expression->_type));
         return this.builder.BuildStructGEP("field.access".ToString(), instance, member_access->index as u32, field_type);
     }
 
@@ -1216,11 +1222,11 @@ class MIRLowerer {
             if left_type->IsPointer() && right_type->IsPointer() {
                 if binary->kind == HIRBinaryKind::Subtract {
                     let element_type = left_type->IsNullPointer() ? right_type->Pointee() : left_type->Pointee();
-                    let size_type = this.context->IntegerType(this.target_info.pointer_size as u32 * 8);
+                    let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
                     let left = this.builder.BuildCast("ptr.diff.left".ToString(), MIRCastKind::PtrToInt, pointer, size_type);
                     let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, other, size_type);
                     let difference = this.builder.BuildBinary("ptr.diff.bytes".ToString(), MIRBinaryKind::Sub, left, right, size_type) as *MIRInstruction;
-                    let size_value = this.builder.ConstantInteger(element_type->Size() as u64, size_type) as *MIRConstant;
+                    let size_value = this.builder.ConstantInteger(element_type.Size() as u64, size_type) as *MIRConstant;
                     return this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type);
                 } else if binary->kind == HIRBinaryKind::Equal {
                     return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, pointer, other, result_type);
@@ -1301,19 +1307,19 @@ class MIRLowerer {
 
     pub fn LowerType(&mut this, _type: *HIRType) -> *MIRType {
         if _type->IsVoid() {
-            return this.context->VoidType();
+            return this.context.VoidType();
         } else if _type->IsBoolean() || _type->IsCharacter() || _type->IsInteger() || _type->IsEnumeration() {
-            return this.context->IntegerType(_type->Width());
+            return this.context.IntegerType(_type->Width());
         } else if _type->IsFloat() {
-            return this.context->FloatType(_type->Width());
+            return this.context.FloatType(_type->Width());
         } else if _type->IsPointer() {
             let pointee = this.LowerType(_type->Pointee());
             if pointee == null { return null; }
-            return this.context->PointerType(pointee);
+            return this.context.PointerType(pointee);
         } else if _type->IsArray() {
             let element = this.LowerType(_type->Element());
             if element == null { return null; }
-            return this.context->ArrayType(element, _type->Length());
+            return this.context.ArrayType(element, _type->Length());
         } else if _type->IsClass() || _type->IsStructure() {
             let declaration = this.types.Get(_type, null);
             return declaration != null ? declaration->_type : null;
@@ -1324,7 +1330,7 @@ class MIRLowerer {
 
             if this.IsIndirectAggregate(_type->Return()) {
                 parameters.PushBack(_return);
-                _return = this.context->VoidType();
+                _return = this.context.VoidType();
             }
 
             for parameter in _type->Parameters() {
@@ -1333,7 +1339,7 @@ class MIRLowerer {
                 parameters.PushBack(lowered_parameter);
             }
 
-            return this.context->FunctionType(parameters, _return);
+            return this.context.FunctionType(parameters, _return);
         } else {
             return null;
         }

@@ -384,6 +384,8 @@ class LIRBuilder {
     block: *mut LIRBlock = null,
     register_index: u32 = 0;
 
+    LIRBuilder(&mut this) {}
+
     LIRBuilder(&mut this, context: *mut LIRContext, module: *mut LIRModule) {
         (this.context, this.module) = (context, module);
     }

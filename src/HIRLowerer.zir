@@ -57,7 +57,7 @@ class HIRLowerer {
     }
 
     pub fn Lower(&mut this, module: *ASTModule) -> *HIRModule {
-        this.module = this.context->arena.New<HIRModule>();
+        this.module = this.context.arena.New<HIRModule>();
         this.builder = HIRBuilder(&mut this.context, this.module);
         let mut declared = Map<*ASTNode, bool>();
 
@@ -553,7 +553,12 @@ class HIRLowerer {
             if field_type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(this_field));
-                let candidates = (field_type as *HIRClassType)->declaration->constructors;
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (field_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
                 let function = this.ResolveOverload(candidates, values, null, false);
                 if function == null { continue; }
                 let call = this.LowerResolvedCallExpression(function, values, null);
@@ -740,7 +745,12 @@ class HIRLowerer {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(this_field));
                     values.PushBack(this.ImplicitAddressOf(other_field));
-                    let candidates = (field_type as *HIRClassType)->declaration->constructors;
+                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                    for candidate in (field_type as *HIRClassType)->declaration->constructors {
+                        candidates.PushBack(candidate);
+                    }
+
                     let function = this.ResolveOverload(candidates, values, _class as *ASTDeclaration, false);
                     if function == null { continue; }
                     let call = this.LowerResolvedCallExpression(function, values, _class as *ASTDeclaration);
@@ -1077,7 +1087,12 @@ class HIRLowerer {
                 values.PushBack(this.ImplicitAddressOf(value));
                 let arguments = Vector<*HIRExpression>(values);
                 values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
-                let candidates = (value->_type as *HIRClassType)->declaration->constructors;
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (value->_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
                 let function = this.ResolveOverload(candidates, values, _return->expression, false);
                 if function == null { return; }
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
@@ -1420,7 +1435,12 @@ class HIRLowerer {
                 values.PushBack(reciever);
 
                 if initializer != null { values.PushBack(initializer); }
-                let candidates = (_type as *HIRClassType)->declaration->constructors;
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
                 let function = this.ResolveOverload(candidates, values, variable as *ASTStatement, initializer == null);
                 if initializer != null && function == null { return; }
 
@@ -1908,7 +1928,12 @@ class HIRLowerer {
                     let target_type: *HIRType = target->_type->Pointee();
 
                     if target_type->IsClass() {
-                        let candidates = (target_type as *HIRClassType)->declaration->constructors;
+                        let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                        for candidate in (target_type as *HIRClassType)->declaration->constructors {
+                            candidates.PushBack(candidate);
+                        }
+
                         let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
                         if function == null { return null; }
                         let call = this.LowerResolvedCallExpression(function, values, call as *ASTExpression);
@@ -1967,7 +1992,7 @@ class HIRLowerer {
         }
 
         let mut invalid = false;
-        let values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+        let mut values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
         if invalid { return null; }
 
         if call->expression->kind == ASTExpressionKind::MemberAccess {
@@ -1977,7 +2002,7 @@ class HIRLowerer {
 
             if member_access->arrow {
                 if instance->_type->HasMethods() {
-                    let values = Vector<*HIRExpression>();
+                    let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(instance));
 
                     let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access as *ASTExpression, false);
@@ -2037,7 +2062,12 @@ class HIRLowerer {
                     if symbol->kind == SymbolKind::Type && symbol->_type->IsClass() {
                         let arguments = Vector<*HIRExpression>(values);
                         values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
-                        let candidates = (symbol->_type as *HIRClassType)->declaration->constructors;
+                        let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                        for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
+                            candidates.PushBack(candidate);
+                        }
+
                         let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
                         if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
@@ -2141,7 +2171,12 @@ class HIRLowerer {
                     values.PushBack(this.ImplicitAddressOf(value));
                     let arguments = Vector<*HIRExpression>(values);
                     values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
-                    let candidates = (value->_type as *HIRClassType)->declaration->constructors;
+                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                    for candidate in (value->_type as *HIRClassType)->declaration->constructors {
+                        candidates.PushBack(candidate);
+                    }
+
                     let function = this.ResolveOverload(candidates, values, node, false);
                     if function == null { return null; }
                     let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
@@ -2170,7 +2205,7 @@ class HIRLowerer {
 
         let call = this.builder.Call(function, values);
 
-        if function->_type->Return()->HasFields() {
+        if function->_type->Return().HasFields() {
             this.temporaries.PushBack(call);
         } return call;
     }
@@ -2191,7 +2226,12 @@ class HIRLowerer {
             if _type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.builder.NullLiteral() as *HIRLiteral);
-                let candidates = (_type as *HIRClassType)->declaration->constructors;
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
                 let function = this.ResolveOverload(candidates, values, _new as *ASTExpression, false);
                 if function == null { return null; }
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
@@ -2201,13 +2241,18 @@ class HIRLowerer {
             }
         } else if _new->initialized {
             let mut invalid = false;
-            let values = this.LowerCallArguments(_new->arguments, _new as *ASTExpression, &mut invalid);
+            let mut values = this.LowerCallArguments(_new->arguments, _new as *ASTExpression, &mut invalid);
             if invalid { return null; }
 
             if _type->IsClass() {
                 let arguments = Vector<*HIRExpression>(values);
                 values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
-                let candidates = (_type as *HIRClassType)->declaration->constructors;
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
                 let function = this.ResolveOverload(candidates, values, _new as *ASTExpression, false);
                 if function == null { return null; }
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
@@ -2432,7 +2477,7 @@ class HIRLowerer {
 
         if member_access->arrow {
             if instance->_type->HasMethods() {
-                let values = Vector<*HIRExpression>();
+                let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(instance));
 
                 let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access as *ASTExpression, false);

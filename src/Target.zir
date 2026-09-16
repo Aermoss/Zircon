@@ -21,6 +21,8 @@ class TargetInfo {
     pub pointer_align: usize,
     pub stack_align: usize;
 
+    TargetInfo(&mut this) {}
+
     TargetInfo(&mut this, pointer_size: usize, pointer_align: usize, stack_align: usize) {
         (this.pointer_size, this.pointer_align, this.stack_align) = (pointer_size, pointer_align, stack_align);
     }

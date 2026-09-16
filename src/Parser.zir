@@ -859,7 +859,7 @@ class Parser {
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                node->inputs.PushBack(Pair<String, *ASTNode>(register, expression));
+                node->inputs.PushBack(Pair<String, *ASTExpression>(register, expression));
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -876,7 +876,7 @@ class Parser {
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                node->outputs.PushBack(Pair<String, *ASTNode>(register, expression));
+                node->outputs.PushBack(Pair<String, *ASTExpression>(register, expression));
                 if !this.Match(TokenType::COMMA) { break; }
             }
         }
