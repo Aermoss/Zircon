@@ -562,7 +562,11 @@ class HIRLowerer {
                 if call == null { continue; }
                 this.builder.BuildExpressionStatement(call);
             } else if field->initializer != null {
-                this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, this.LowerExpression(field->initializer)));
+                let initializer = this.Coerce(this.LowerExpression(field->initializer), field_type);
+
+                if initializer != null {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, initializer));
+                }
             }
         }
     }
