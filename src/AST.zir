@@ -56,6 +56,8 @@ class ASTPathSegment {
     pub name: String,
     pub types: Vector<*ASTType>;
 
+    ASTPathSegment(&mut this) {}
+
     ASTPathSegment(&mut this, name: String) {
         this.name = name;
     }

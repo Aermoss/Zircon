@@ -762,6 +762,8 @@ class MIRPhiIncoming {
     pub value: *MIRValue,
     pub block: *MIRBlock;
 
+    MIRPhiIncoming(&mut this) {}
+
     MIRPhiIncoming(&mut this, value: *MIRValue, block: *MIRBlock) {
         (this.value, this.block) = (value, block);
     }

@@ -89,6 +89,10 @@ class HIRLowerer {
             }
         }
 
+        for generic in this.generics {
+            generic->LowerInstances();
+        }
+
         this.class_data.Clear();
         this.structure_data.Clear();
         this.extend_data.Clear();
@@ -2839,8 +2843,8 @@ class HIRLowerer {
         let mut else_value = this.LowerExpression(ternary->_else);
         if else_value == null { return null; }
 
-        this.Coerce(then_value, target != null ? target : else_value->_type);
-        this.Coerce(else_value, target != null ? target : then_value->_type);
+        then_value = this.Coerce(then_value, target != null ? target : else_value->_type);
+        else_value = this.Coerce(else_value, target != null ? target : then_value->_type);
 
         let mutable = then_value->mutable && else_value->mutable ? true : false;
         let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place)
