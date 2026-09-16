@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/map", "std/pair",
+#[include "std/str", "std/vec", "std/arena",
     "src/Scope.zir", "src/Symbol.zir", "src/HIR.zir" : *]
 
 class GenericInstance {
-    pub name: String,
     pub symbol: *Symbol = null,
     pub scope: *mut Scope = null,
     pub declaration: *mut HIRDeclaration = null,
-    pub completed: HIRLoweringPass = HIRLoweringPass::None,
-    pub active: HIRLoweringPass = HIRLoweringPass::None,
+    pub completed: HIRLoweringPass = ::HIRLoweringPass::None,
+    pub active: HIRLoweringPass = ::HIRLoweringPass::None,
     pub types: Vector<*HIRType>;
 
-    GenericInstance(&mut this, name: &String, types: &Vector<*HIRType>) {
-        (this.name, this.types) = (name, types);
+    GenericInstance(&mut this, types: &Vector<*HIRType>) {
+        this.types = types;
     }
 }
 
 class GenericDeclaration {
-    cache: Map<String, *mut GenericInstance>,
+    arena: Arena,
+    instances: Vector<*mut GenericInstance>,
 
     pub declaration: *ASTDeclaration,
     pub scope: *mut Scope,
@@ -56,16 +56,8 @@ class GenericDeclaration {
         }
     }
 
-    ~GenericDeclaration(&this) {
-        for instance in this.cache.Values() {
-            if instance->symbol != null {
-                delete instance->symbol;
-            } delete instance;
-        }
-    }
-
     pub fn LowerInstances(&mut this) {
-        for instance in this.cache.Values() {
+        for instance in this.instances {
             this.LowerInstance(instance);
         }
     }
@@ -94,7 +86,7 @@ class GenericDeclaration {
                 let pair = hir_lowerer->LowerClassDeclarationFirstPass(_class, instance);
                 (instance->completed, instance->active) = (HIRLoweringPass::First, HIRLoweringPass::None);
                 (instance->declaration, instance->scope) = (pair.left, hir_lowerer->scope_manager.current);
-                instance->symbol = new Symbol(instance->declaration->_type);
+                instance->symbol = this.arena.New<Symbol>(instance->declaration->_type);
             }
 
             if instance->completed < HIRLoweringPass::Second && hir_lowerer->current_pass >= HIRLoweringPass::Second {
@@ -122,7 +114,7 @@ class GenericDeclaration {
                 let pair = hir_lowerer->LowerStructureDeclarationFirstPass(structure, instance);
                 (instance->completed, instance->active) = (HIRLoweringPass::First, HIRLoweringPass::None);
                 (instance->declaration, instance->scope) = (pair.left, hir_lowerer->scope_manager.current);
-                instance->symbol = new Symbol(instance->declaration->_type);
+                instance->symbol = this.arena.New<Symbol>(instance->declaration->_type);
             }
 
             if instance->completed < HIRLoweringPass::Second && hir_lowerer->current_pass >= HIRLoweringPass::Second {
@@ -150,7 +142,7 @@ class GenericDeclaration {
                 instance->declaration = hir_lowerer->LowerFunctionDeclarationFirstPass(function, instance);
                 hir_lowerer->module->declarations.PushBack(instance->declaration);
                 (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
-                instance->symbol = new Symbol(instance->declaration);
+                instance->symbol = this.arena.New<Symbol>(instance->declaration);
             }
 
             if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
@@ -181,20 +173,31 @@ class GenericDeclaration {
             return null;
         }
 
-        let mut name = this.name + '<';
-
-        for i in 0..types.Size() {
-            if i != 0 { name += ", "; }
-            name += types[i]->ToString();
-        } name += '>';
-
         let mut instance: *mut GenericInstance = null;
 
-        if this.cache.Has(name) {
-            instance = this.cache[name];
-        } else {
-            instance = new GenericInstance(name, types);
-            this.cache[name] = instance;
+        for current in this.instances {
+            if current->types.Size() != types.Size() {
+                continue;
+            }
+
+            let mut _match = true;
+
+            for i in 0..types.Size() {
+                if !current->types[i]->IsSame(types[i]) {
+                    _match = false;
+                    break;
+                }
+            }
+
+            if _match {
+                instance = current;
+                break;
+            }
+        }
+
+        if instance == null {
+            instance = this.arena.New<GenericInstance>(types);
+            this.instances.PushBack(instance);
         }
 
         if instance->active == HIRLoweringPass::None {
