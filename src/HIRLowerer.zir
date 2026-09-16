@@ -2064,18 +2064,19 @@ class HIRLowerer {
 
                 for symbol in this.scope_manager.ResolveType(path, true) {
                     if symbol->kind == SymbolKind::Type && symbol->_type->IsClass() {
-                        let arguments = Vector<*HIRExpression>(values);
-                        values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
                         let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                         for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
                             candidates.PushBack(candidate);
                         }
 
+                        values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
                         let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
                         if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-                        let constructor = this.builder.Constructor(callee, arguments, symbol->_type);
+                        if !this.ValidateCallArguments(callee, values, call as *ASTExpression) { return null; }
+                        values.RemoveAt(0);
+                        let constructor = this.builder.Constructor(callee, values, symbol->_type);
                         this.temporaries.PushBack(constructor);
                         return constructor;
                     }
@@ -2138,34 +2139,23 @@ class HIRLowerer {
         }
     }
 
-    fn LowerResolvedCallExpression(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
-        let function = this.ResolveOverload(candidates, values, node, false);
-        if function == null { return null; }
-        return this.LowerResolvedCallExpression(function, values, node);
-    }
-
-    fn LowerResolvedCallExpression(&mut this, function: *HIRFunctionDeclaration, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
-        let expression = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-        return this.LowerResolvedCallExpression(expression, values, node);
-    }
-
-    fn LowerResolvedCallExpression(&mut this, function: *HIRExpression, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
-        if !function->_type->IsFunction() {
-            Logger::Log("Call target is not a function.", node, LogSeverity::Error);
-            return null;
+    fn ValidateCallArguments(&mut this, callee: *HIRExpression, values: &mut Vector<*HIRExpression>, node: *ASTNode) -> bool {
+        if !callee->_type->IsFunction() {
+            Logger::Log("Callee is not a function.", node, LogSeverity::Error);
+            return false;
         }
 
-        let param_types = function->_type->Parameters();
+        let parameter_types = callee->_type->Parameters();
 
-        for i in 0..param_types.Size() {
-            let param_type: *HIRType = param_types[i];
-            let mut value = this.Coerce(values[i], param_type);
+        for i in 0..parameter_types.Size() {
+            let parameter_type: *HIRType = parameter_types[i];
+            let mut value = this.Coerce(values[i], parameter_type);
 
-            if param_type->IsReference() && param_type->Pointee().IsCompatible(value->_type) {
+            if parameter_type->IsReference() && parameter_type->Pointee().IsCompatible(value->_type) {
                 value = this.ImplicitAddressOf(value);
             }
 
-            if value->_type->IsReference() && param_type->IsCompatible(value->_type->Pointee()) {
+            if value->_type->IsReference() && parameter_type->IsCompatible(value->_type->Pointee()) {
                 value = this.ImplicitDereference(value);
             }
 
@@ -2182,7 +2172,7 @@ class HIRLowerer {
                     }
 
                     let function = this.ResolveOverload(candidates, values, node, false);
-                    if function == null { return null; }
+                    if function == null { return false; }
                     let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
                     value = this.builder.Constructor(callee, arguments, value->_type);
                 } else {
@@ -2190,26 +2180,42 @@ class HIRLowerer {
                 }
             }
 
-            if !param_type->IsCompatible(value->_type) {
-                if function->kind == HIRExpressionKind::DeclarationReference {
-                    let name = (function as *HIRDeclarationReference)->declaration->name;
-                    Logger::Log("Incompatible argument types for function '" + name + "'. ('" + param_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
+            if !parameter_type->IsCompatible(value->_type) {
+                if callee->kind == HIRExpressionKind::DeclarationReference {
+                    let name = (callee as *HIRDeclarationReference)->declaration->name;
+                    Logger::Log("Incompatible argument types for function '" + name + "'. ('" + parameter_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
                 } else {
-                    Logger::Log("Incompatible argument types for function. ('" + param_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
-                } return null;
+                    Logger::Log("Incompatible argument types for function. ('" + parameter_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
+                } return false;
             }
 
-            if !param_type->IsMutabilityCompatible(value->_type) {
+            if !parameter_type->IsMutabilityCompatible(value->_type) {
                 Logger::Log("Cannot assign immutable pointer to mutable pointer.", node, LogSeverity::Error);
-                return null;
+                return false;
             }
 
-            values[i] = this.MakeCompatible(value, param_type);
+            values[i] = this.MakeCompatible(value, parameter_type);
+        } return true;
+    }
+
+    fn LowerResolvedCallExpression(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+        let function = this.ResolveOverload(candidates, values, node, false);
+        if function == null { return null; }
+        return this.LowerResolvedCallExpression(function, values, node);
+    }
+
+    fn LowerResolvedCallExpression(&mut this, function: *HIRFunctionDeclaration, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+        return this.LowerResolvedCallExpression(this.builder.ReferenceDeclaration(function as *HIRDeclaration, false), values, node);
+    }
+
+    fn LowerResolvedCallExpression(&mut this, callee: *HIRExpression, mut values: Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+        if !this.ValidateCallArguments(callee, values, node) {
+            return null;
         }
 
-        let call = this.builder.Call(function, values);
+        let call = this.builder.Call(callee, values);
 
-        if function->_type->Return().HasFields() {
+        if callee->_type->Return().HasFields() {
             this.temporaries.PushBack(call);
         } return call;
     }
