@@ -871,6 +871,13 @@ class MIRLowerer {
             if _new->callee != null {
                 let mut arguments = Vector<*MIRValue>();
                 arguments.PushBack(pointer);
+
+                for argument in _new->arguments {
+                    let lowered_argument = this.LowerExpression(argument);
+                    if lowered_argument == null { return null; }
+                    arguments.PushBack(lowered_argument);
+                }
+
                 let callee = this.LowerExpression(_new->callee);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments) as *MIRInstruction;
             }
