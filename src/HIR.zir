@@ -328,7 +328,7 @@ class HIRType {
         } return -1;
     }
 
-    pub fn Methods(&this) -> &Vector<*HIRFunctionDeclaration> {
+    pub fn Methods(&this) -> &Vector<*mut HIRFunctionDeclaration> {
         if !this.HasMethods() {
             Logger::Log("HIRType", "Not a class, structure or variant!", LogSeverity::Fatal);
         }

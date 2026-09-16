@@ -38,12 +38,4 @@ class Pair<L, R> {
         (this.left, this.right) = (other.left, other.right);
         return this;
     }
-
-    pub fn operator==(&this, other: &Pair<L, R>) -> bool {
-        return this.left == other.left && this.right == other.right;
-    }
-
-    pub fn operator!=(&this, other: &Pair<L, R>) -> bool {
-        return !this.operator==(other);
-    }
 }

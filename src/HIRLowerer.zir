@@ -1086,6 +1086,14 @@ class HIRLowerer {
             value = this.Coerce(this.LowerExpression(_return->expression), return_type);
             if value == null { return; }
 
+            if return_type.IsReference() && return_type.Pointee().IsCompatible(value->_type) {
+                value = this.ImplicitAddressOf(value);
+            }
+
+            if value->_type->IsReference() && return_type.IsCompatible(value->_type->Pointee()) {
+                value = this.ImplicitDereference(value);
+            }
+
             if value->_type->IsClass() && value->category == HIRExpressionCategory::Place {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(value));
@@ -1102,6 +1110,18 @@ class HIRLowerer {
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
                 value = this.builder.Constructor(callee, arguments, value->_type);
             }
+
+            if !return_type.IsCompatible(value->_type) {
+                Logger::Log("Incompatible return types. ('" + return_type.ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
+                return;
+            }
+
+            if !return_type.IsMutabilityCompatible(value->_type) {
+                Logger::Log("Cannot assign immutable pointer to mutable pointer.", _return->expression, LogSeverity::Error);
+                return;
+            }
+
+            value = this.MakeCompatible(value, return_type);
         }
 
         let mut destructors = this.GetTemporaryDestructors(value);
@@ -1238,14 +1258,14 @@ class HIRLowerer {
             condition = this.builder.Binary(kind, iterator_ref, end, this.context.BooleanType());
             let next = this.builder.Binary(HIRBinaryKind::Add, iterator_ref, one, iterator_type);
             step = this.builder.Assignment(iterator_ref, next);
-            variable = this.builder.BuildVariableStatement(_for->variable, iterator_type, iterator_ref, false);
+            variable = this.builder.BuildVariableStatement(_for->variable, iterator_type, iterator_ref, true);
         } else if iterator_type->IsPointer() {
             condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_ref, end, this.context.BooleanType());
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
             let step_value = this.builder.Binary(HIRBinaryKind::Add, iterator_ref, one, iterator_type);
             step = this.builder.Assignment(iterator_ref, step_value);
             let value = this.builder.Dereference(iterator_ref);
-            variable = this.builder.BuildVariableStatement(_for->variable, iterator_type->Pointee(), value, false);
+            variable = this.builder.BuildVariableStatement(_for->variable, iterator_type->Pointee(), value, true);
         } else {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(iterator_ref);
@@ -1266,7 +1286,7 @@ class HIRLowerer {
             let dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for as *ASTStatement, false);
             let value = this.LowerResolvedCallExpression(dereference_candidates, values, _for as *ASTStatement);
             if value == null { return; }
-            variable = this.builder.BuildVariableStatement(_for->variable, (value as *HIRExpression)->_type, value, false);
+            variable = this.builder.BuildVariableStatement(_for->variable, (value as *HIRExpression)->_type, value, true);
         }
 
         this.scope_manager.PushScope("<for>".ToString(), false);
@@ -1364,7 +1384,7 @@ class HIRLowerer {
         }
 
         this._unsafe = true;
-        this.LowerBlockStatement(_unsafe->body);
+        this.builder.GetCurrentBlock()->statements.PushBack(this.LowerBlockStatement(_unsafe->body));
         this._unsafe = false;
     }
 
@@ -1403,12 +1423,12 @@ class HIRLowerer {
                         initializer = this.ImplicitDereference(initializer);
                     }
 
-                    if ! _type->IsCompatible(initializer->_type) {
+                    if !_type->IsCompatible(initializer->_type) {
                         Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable as *ASTStatement, LogSeverity::Error);
                         return;
                     }
 
-                    if ! _type->IsMutabilityCompatible(initializer->_type) {
+                    if !_type->IsMutabilityCompatible(initializer->_type) {
                         Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable as *ASTStatement, LogSeverity::Error);
                         return;
                     }
@@ -1723,12 +1743,10 @@ class HIRLowerer {
     }
 
     fn LowerAssignmentExpression(&mut this, assignment: *ASTAssignmentExpression) -> *HIRExpression {
-        let left_raw = this.LowerExpression(assignment->left);
-        let mut left = this.ImplicitDereference(left_raw);
+        let mut left = this.ImplicitDereference(this.LowerExpression(assignment->left));
         if left == null { return null; }
 
-        let right_raw = this.LowerExpression(assignment->right);
-        let mut right = this.ImplicitDereference(right_raw);
+        let mut right = this.LowerExpression(assignment->right);
         if right == null { return null; }
 
         if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
@@ -1740,7 +1758,7 @@ class HIRLowerer {
         if left->_type->HasFields() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.ImplicitAddressOf(left));
-            values.PushBack(right_raw);
+            values.PushBack(right);
 
             let name = "operator" + assignment->kind.ToString();
             let candidates = left->_type->GetCandidates(name, assignment as *ASTExpression, false);
@@ -1765,7 +1783,21 @@ class HIRLowerer {
             if right == null { return null; }
         }
 
-        return this.builder.Assignment(left, right);
+        if right->_type->IsReference() && left->_type->IsCompatible(right->_type->Pointee()) {
+            right = this.ImplicitDereference(right);
+        }
+
+        if !left->_type->IsCompatible(right->_type) {
+            Logger::Log("Incompatible assignment types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", assignment as *ASTExpression, LogSeverity::Error);
+            return null;
+        }
+
+        if !left->_type->IsMutabilityCompatible(right->_type) {
+            Logger::Log("Cannot assign immutable pointer to mutable pointer.", assignment as *ASTExpression, LogSeverity::Error);
+            return null;
+        }
+
+        return this.builder.Assignment(left, this.MakeCompatible(right, left->_type));
     }
 
     fn LowerCallArguments(&mut this, arguments: &Vector<*ASTExpression>, node: *ASTNode, invalid: *mut bool) -> Vector<*HIRExpression> {
