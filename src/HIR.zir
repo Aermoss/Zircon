@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/arena", "src/AST.zir", "src/Logger.zir" : *]
+#[include "std/str", "std/vec", "std/arena",
+    "src/AST.zir", "src/Generic.zir", "src/Logger.zir" : *]
 
 enum HIRTypeKind: u8 {
     Void, Boolean, Character,
@@ -1612,7 +1613,8 @@ class HIRFunctionDeclaration : HIRDeclaration {
     pub public: bool,
     pub parameters: Vector<*HIRParameterDeclaration>,
     pub _return: *HIRType,
-    pub body: *HIRBlockStatement = null;
+    pub body: *HIRBlockStatement = null,
+    pub instance: *GenericInstance = null;
 
     HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRDeclaration(HIRDeclarationKind::Function, abi, name, _type) {
         (this.parameters, this._return, this.no_mangle, this.public) = (parameters, _return, no_mangle, public);
@@ -1660,7 +1662,8 @@ class HIRClassDeclaration : HIRDeclaration {
     pub fields: Vector<*HIRFieldDeclaration>,
     pub constructors: Vector<*mut HIRFunctionDeclaration>,
     pub destructor: *mut HIRFunctionDeclaration = null,
-    pub methods: Vector<*mut HIRFunctionDeclaration>;
+    pub methods: Vector<*mut HIRFunctionDeclaration>,
+    pub instance: *GenericInstance = null;
 
     HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Class, name, _type) {}
 
@@ -1697,7 +1700,8 @@ class HIRClassDeclaration : HIRDeclaration {
 
 class HIRStructureDeclaration : HIRDeclaration {
     pub fields: Vector<*HIRFieldDeclaration>,
-    pub methods: Vector<*mut HIRFunctionDeclaration>;
+    pub methods: Vector<*mut HIRFunctionDeclaration>,
+    pub instance: *GenericInstance = null;
 
     HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Structure, name, _type) {}
 

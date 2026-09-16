@@ -86,6 +86,7 @@ class GenericDeclaration {
                 let pair = hir_lowerer->LowerClassDeclarationFirstPass(_class, instance);
                 (instance->completed, instance->active) = (HIRLoweringPass::First, HIRLoweringPass::None);
                 (instance->declaration, instance->scope) = (pair.left, hir_lowerer->scope_manager.current);
+                (instance->declaration as *mut HIRClassDeclaration)->instance = instance;
                 instance->symbol = this.arena.New<Symbol>(instance->declaration->_type);
             }
 
@@ -114,6 +115,7 @@ class GenericDeclaration {
                 let pair = hir_lowerer->LowerStructureDeclarationFirstPass(structure, instance);
                 (instance->completed, instance->active) = (HIRLoweringPass::First, HIRLoweringPass::None);
                 (instance->declaration, instance->scope) = (pair.left, hir_lowerer->scope_manager.current);
+                (instance->declaration as *mut HIRStructureDeclaration)->instance = instance;
                 instance->symbol = this.arena.New<Symbol>(instance->declaration->_type);
             }
 
@@ -140,6 +142,7 @@ class GenericDeclaration {
             if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
                 instance->active = HIRLoweringPass::Third;
                 instance->declaration = hir_lowerer->LowerFunctionDeclarationFirstPass(function, instance);
+                (instance->declaration as *mut HIRFunctionDeclaration)->instance = instance;
                 hir_lowerer->module->declarations.PushBack(instance->declaration);
                 (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
                 instance->symbol = this.arena.New<Symbol>(instance->declaration);

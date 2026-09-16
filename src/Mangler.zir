@@ -47,28 +47,34 @@ class Mangler {
             for param in _type->Parameters() {
                 result += Mangler::MangleType(param);
             }
-        } else if _type->IsClass() || _type->IsStructure() || _type->IsEnumeration() {
-            let mut declaration: *HIRDeclaration = null;
+        } else if _type->IsClass() {
+            let declaration = (_type as *HIRClassType)->declaration;
+            let name = (declaration as *HIRDeclaration)->name;
+            result += String::FromInteger(name.Length() as u64) + name;
 
-            if _type->IsClass() {
-                declaration = (_type as *HIRClassType)->declaration;
-            } else if _type->IsStructure() {
-                declaration = (_type as *HIRStructureType)->declaration;
-            } else {
-                declaration = (_type as *HIREnumerationType)->declaration;
+            if declaration->instance != null {
+                result += "I";
+
+                for _type in declaration->instance->types {
+                    result += Mangler::MangleType(_type);
+                } result += "E";
             }
+        } else if _type->IsStructure() {
+            let declaration = (_type as *HIRStructureType)->declaration;
+            let name = (declaration as *HIRDeclaration)->name;
+            result += String::FromInteger(name.Length() as u64) + name;
 
-            let mut name = declaration->name;
+            if declaration->instance != null {
+                result += "I";
 
-            if Mangler::IsMangled(name) {
-                let (mut start: usize, mut end) = (2, name.Length() - 1);
-
-                while name[start] == 'N' && name[end] == 'E' {
-                    (start, end) = (start + 1, end - 1);
-                }
-
-                name = name.SubString(start, end - start + 1);
-            } result += name;
+                for _type in declaration->instance->types {
+                    result += Mangler::MangleType(_type);
+                } result += "E";
+            }
+        } else if _type->IsEnumeration() {
+            let declaration = (_type as *HIREnumerationType)->declaration;
+            let name = (declaration as *HIRDeclaration)->name;
+            result += String::FromInteger(name.Length() as u64) + name;
         } else {
             Logger::Log("Mangler", "Unknown type '" + _type->ToString() + "'.", LogSeverity::Error);
         } return result;
@@ -101,7 +107,7 @@ class Mangler {
         } return result;
     }
 
-    fn MangleName(name: &String, mut names: Vector<String>) -> String {
+    pub fn MangleName(name: &String, types: &Vector<*HIRType>, mut names: Vector<String>) -> String {
         let mut result = "$z".ToString();
         names.PushBack(name);
 
@@ -123,13 +129,21 @@ class Mangler {
             }
         }
 
-        if names.Size() > 1 || has_namespace {
+        if names.Size() > 1 || !types.Empty() || has_namespace {
             result += "N";
         }
 
         result += name_result;
 
-        if names.Size() > 1 || has_namespace {
+        if !types.Empty() {
+            result += "I";
+
+            for _type in types {
+                result += Mangler::MangleType(_type);
+            } result += "E";
+        }
+
+        if names.Size() > 1 || !types.Empty() || has_namespace {
             result += "E";
         } return result;
     }
@@ -178,47 +192,6 @@ class Mangler {
 
         for param in _type->Parameters() {
             result += Mangler::MangleTypeSubstituted(param, substitution_table);
-        } return result;
-    }
-
-    pub fn MangleClass(name: &String, types: &Vector<*HIRType>, mut names: Vector<String>) -> String {
-        let mut result = "$z".ToString();
-        names.PushBack(name);
-
-        let mut has_namespace = false;
-        let mut name_result = String();
-
-        for name in names {
-            if Mangler::IsMangled(name) {
-                let (mut start: usize, mut end) = (2, name.Length() - 1);
-
-                while name[start] == 'N' && name[end] == 'E' {
-                    (start, end) = (start + 1, end - 1);
-                }
-
-                name_result += name.SubString(start, end - start + 1);
-                has_namespace = true;
-            } else {
-                name_result += String::FromInteger(name.Length() as u64) + name;
-            }
-        }
-
-        if names.Size() > 1 || !types.Empty() || has_namespace {
-            result += "N";
-        }
-
-        result += name_result;
-
-        if !types.Empty() {
-            result += "I";
-
-            for _type in types {
-                result += Mangler::MangleType(_type);
-            } result += "E";
-        }
-
-        if names.Size() > 1 || !types.Empty() || has_namespace {
-            result += "E";
         } return result;
     }
 }

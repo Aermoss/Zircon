@@ -277,7 +277,9 @@ class MIRLowerer {
     }
 
     fn LowerClassDeclarationThirdPass(&mut this, _class: *HIRClassDeclaration) {
-        this.namespaces.PushBack((_class as *HIRDeclaration)->name);
+        let mut types = Vector<*HIRType>();
+        if _class->instance != null { types = _class->instance->types; }
+        this.namespaces.PushBack(Mangler::MangleName((_class as *HIRDeclaration)->name, types, this.namespaces));
 
         for constructor in _class->constructors {
             this.LowerFunctionDeclarationFirstPass(constructor);
@@ -330,7 +332,9 @@ class MIRLowerer {
     }
 
     fn LowerStructureDeclarationThirdPass(&mut this, structure: *HIRStructureDeclaration) {
-        this.namespaces.PushBack((structure as *HIRDeclaration)->name);
+        let mut types = Vector<*HIRType>();
+        if structure->instance != null { types = structure->instance->types; }
+        this.namespaces.PushBack(Mangler::MangleName((structure as *HIRDeclaration)->name, types, this.namespaces));
 
         for method in structure->methods {
             this.LowerFunctionDeclarationFirstPass(method);
@@ -346,7 +350,7 @@ class MIRLowerer {
     }
 
     fn LowerExtendDeclarationFirstPass(&mut this, _extend: *HIRExtendDeclaration) {
-        this.namespaces.PushBack((_extend as *HIRDeclaration)->name);
+        this.namespaces.PushBack(Mangler::MangleName((_extend as *HIRDeclaration)->name, Vector<*HIRType>(), this.namespaces));
 
         for method in _extend->methods {
             this.LowerFunctionDeclarationFirstPass(method);

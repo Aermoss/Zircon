@@ -97,13 +97,6 @@ class HIRLowerer {
         this.structure_data.Clear();
         this.extend_data.Clear();
         this.function_data.Clear();
-
-        for generic in this.generics {
-            delete generic;
-        }
-
-        this.generics.Clear();
-        this.current_pass = HIRLoweringPass::None;
         return this.module;
     }
 
@@ -344,7 +337,7 @@ class HIRLowerer {
 
     pub fn LowerFunctionDeclarationFirstPass(&mut this, function: *ASTFunctionDeclaration, instance: *mut GenericInstance) -> *mut HIRFunctionDeclaration {
         if (function->generic || !function->pack_name.Empty()) && instance == null {
-            let generic = new GenericDeclaration(function);
+            let generic = this.context.arena.New<GenericDeclaration>(function);
             this.scope_manager.current->Set(function->name, generic, function as *ASTDeclaration);
             this.generics.PushBack(generic);
             return null;
@@ -421,7 +414,7 @@ class HIRLowerer {
 
     pub fn LowerClassDeclarationFirstPass(&mut this, _class: *ASTClassDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRClassDeclaration, *mut Scope> {
         if _class->generic && instance == null {
-            let generic = new GenericDeclaration(_class);
+            let generic = this.context.arena.New<GenericDeclaration>(_class);
             this.scope_manager.current->Set(_class->name, generic, _class as *ASTDeclaration);
             this.generics.PushBack(generic);
             return Pair<*mut HIRClassDeclaration, *mut Scope>(null, null);
@@ -868,7 +861,7 @@ class HIRLowerer {
 
     pub fn LowerStructureDeclarationFirstPass(&mut this, structure: *ASTStructureDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRStructureDeclaration, *mut Scope> {
         if structure->generic && instance == null {
-            let generic = new GenericDeclaration(structure);
+            let generic = this.context.arena.New<GenericDeclaration>(structure);
             this.scope_manager.current->Set(structure->name, generic, structure as *ASTDeclaration);
             this.generics.PushBack(generic);
             return Pair<*mut HIRStructureDeclaration, *mut Scope>(null, null);
