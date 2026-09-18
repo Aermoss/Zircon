@@ -562,6 +562,10 @@ class MIRLowerer {
         }
 
         this.builder.SetCurrentBlock(end_block);
+
+        for destructor in _for->destructors {
+            this.LowerExpression(destructor);
+        }
     }
 
     fn LowerBreakStatement(&mut this, _break: *HIRBreakStatement) {

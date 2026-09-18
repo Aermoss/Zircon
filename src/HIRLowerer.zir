@@ -953,13 +953,13 @@ class HIRLowerer {
                 value = this.Coerce(this.LowerExpression(member->value), underlying_type);
                 if value == null { continue; }
 
-                if !(_type as *HIRType)->IsCompatible(value->_type) && !underlying_type->IsCompatible(value->_type) {
-                    Logger::Log("Expected an expression of type '" + underlying_type->ToString() + "'.", member->value, LogSeverity::Error);
-                    continue;
+                if underlying_type->IsSame(value->_type) {
+                    value = this.builder.Cast(value, _type);
                 }
 
-                unsafe {
-                    (value as *mut HIRExpression)->_type = _type;
+                if !(_type as *HIRType)->IsCompatible(value->_type) {
+                    Logger::Log("Expected an expression of type '" + underlying_type->ToString() + "'.", member->value, LogSeverity::Error);
+                    continue;
                 }
             }
 
@@ -1096,15 +1096,15 @@ class HIRLowerer {
 
         if _return->expression != null {
             let function = this.builder.GetCurrentFunction();
-            let return_type = (function as *HIRDeclaration)->_type->Return();
+            let return_type = function->_return;
             value = this.Coerce(this.LowerExpression(_return->expression), return_type);
             if value == null { return; }
 
-            if return_type.IsReference() && return_type.Pointee().IsCompatible(value->_type) {
+            if return_type->IsReference() && return_type->Pointee().IsCompatible(value->_type) {
                 value = this.ImplicitAddressOf(value);
             }
 
-            if value->_type->IsReference() && return_type.IsCompatible(value->_type->Pointee()) {
+            if value->_type->IsReference() && return_type->IsCompatible(value->_type->Pointee()) {
                 value = this.ImplicitDereference(value);
             }
 
@@ -1125,12 +1125,12 @@ class HIRLowerer {
                 value = this.builder.Constructor(callee, arguments, value->_type);
             }
 
-            if !return_type.IsCompatible(value->_type) {
-                Logger::Log("Incompatible return types. ('" + return_type.ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
+            if !return_type->IsCompatible(value->_type) {
+                Logger::Log("Incompatible return types. ('" + return_type->ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
                 return;
             }
 
-            if !return_type.IsMutabilityCompatible(value->_type) {
+            if !return_type->IsMutabilityCompatible(value->_type) {
                 Logger::Log("Cannot assign immutable pointer to mutable pointer.", _return->expression, LogSeverity::Error);
                 return;
             }
@@ -1203,6 +1203,7 @@ class HIRLowerer {
     fn LowerForStatement(&mut this, _for: *ASTForStatement) {
         let (mut start: *HIRExpression, mut end: *HIRExpression);
         let (mut is_range, mut inclusive) = (false, false);
+        let temporary_index = this.temporaries.Size();
 
         if _for->iterable->kind == ASTExpressionKind::Range {
             let range = _for->iterable as *ASTRangeExpression;
@@ -1307,13 +1308,15 @@ class HIRLowerer {
             variable = this.builder.BuildVariableStatement(_for->variable, (value as *HIRExpression)->_type, value, true);
         }
 
+        let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
+
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
         this.scope_manager.current->Set(_for->variable, variable, _for as *ASTStatement);
         let body = this.LowerBlockStatement(_for->body);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
-        this.builder.BuildForStatement(iterator, variable, condition, step, body);
+        this.builder.BuildForStatement(iterator, variable, condition, step, destructors, body);
     }
 
     fn LowerLoopStatement(&mut this, _loop: *ASTLoopStatement) {
