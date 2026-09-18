@@ -1283,7 +1283,6 @@ class HIRLowerer {
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
             let step_value = this.builder.Binary(HIRBinaryKind::Add, iterator_ref, one, iterator_type);
             step = this.builder.Assignment(iterator_ref, step_value);
-            let value = this.builder.Dereference(iterator_ref);
             variable = this.builder.BuildVariableStatement(_for->variable, iterator_type->Pointee(), value, true);
         } else {
             let mut values = Vector<*HIRExpression>();
