@@ -39,7 +39,7 @@ class Scope {
         if this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
-        } else if !this.symbols.Has(name) { 
+        } else if !this.symbols.Has(name) {
             this.symbols[name] = Vector<*Symbol>();
         }
 
@@ -52,7 +52,7 @@ class Scope {
         if this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
-        } else if !this.symbols.Has(name) { 
+        } else if !this.symbols.Has(name) {
             this.symbols[name] = Vector<*Symbol>();
         }
 
@@ -65,7 +65,7 @@ class Scope {
         if !overload && this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
-        } else if !this.symbols.Has(name) { 
+        } else if !this.symbols.Has(name) {
             this.symbols[name] = Vector<*Symbol>();
         }
 
@@ -78,7 +78,7 @@ class Scope {
         if generic->declaration->kind != ASTDeclarationKind::Function && this.Has(name) {
             Logger::Log("Symbol '" + name + "' already exists.", node, LogSeverity::Error);
             return null;
-        } else if !this.symbols.Has(name) { 
+        } else if !this.symbols.Has(name) {
             this.symbols[name] = Vector<*Symbol>();
         }
 
