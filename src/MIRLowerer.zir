@@ -1056,8 +1056,6 @@ class MIRLowerer {
 
                     if index != 0 {
                         value = this.builder.BuildStructGEP("cast.base".ToString(), value, index, this.LowerType(target_type));
-                    } else if !related {
-                        return null;
                     }
                 }
 
