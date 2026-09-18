@@ -660,7 +660,7 @@ class HIRExpression {
     pub kind: HIRExpressionKind,
     pub _type: *HIRType,
     pub category: HIRExpressionCategory = ::HIRExpressionCategory::Value,
-    pub mutable: bool = false;
+    pub mutable: bool = true;
 
     HIRExpression(&mut this, kind: HIRExpressionKind, _type: *HIRType) {
         (this.kind, this._type) = (kind, _type);
@@ -1053,10 +1053,11 @@ fn ToString(kind: HIRBinaryKind) -> String {
 class HIRBinaryExpression : HIRExpression {
     pub kind: HIRBinaryKind,
     pub left: *HIRExpression,
-    pub right: *HIRExpression;
+    pub right: *HIRExpression,
+    pub destructors: Vector<*HIRExpression>;
 
-    HIRBinaryExpression(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, _type: *HIRType) : HIRExpression(HIRExpressionKind::Binary, _type) {
-        (this.kind, this.left, this.right) = (kind, left, right);
+    HIRBinaryExpression(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, destructors: Vector<*HIRExpression>, _type: *HIRType) : HIRExpression(HIRExpressionKind::Binary, _type) {
+        (this.kind, this.left, this.right, this.destructors) = (kind, left, right, destructors);
     }
 
     pub fn ToString(&this) -> String {
@@ -1081,10 +1082,12 @@ class HIRBinaryExpression : HIRExpression {
 class HIRTernaryExpression : HIRExpression {
     pub condition: *HIRExpression,
     pub then_value: *HIRExpression,
-    pub else_value: *HIRExpression;
+    pub then_destructors: Vector<*HIRExpression>,
+    pub else_value: *HIRExpression,
+    pub else_destructors: Vector<*HIRExpression>;
 
-    HIRTernaryExpression(&mut this, condition: *HIRExpression, then_value: *HIRExpression, else_value: *HIRExpression, category: HIRExpressionCategory, mutable: bool) : HIRExpression(HIRExpressionKind::Ternary, then_value->_type, category, mutable) {
-        (this.condition, this.then_value, this.else_value) = (condition, then_value, else_value);
+    HIRTernaryExpression(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, category: HIRExpressionCategory, mutable: bool) : HIRExpression(HIRExpressionKind::Ternary, then_value->_type, category, mutable) {
+        (this.condition, this.then_value, this.then_destructors, this.else_value, this.else_destructors) = (condition, then_value, then_destructors, else_value, else_destructors);
     }
 
     pub fn ToString(&this) -> String {
@@ -1184,7 +1187,7 @@ class HIRMemberAccessExpression : HIRExpression {
     pub instance: *HIRExpression,
     pub index: usize;
 
-    HIRMemberAccessExpression(&mut this, instance: *HIRExpression, _type: *HIRType, index: usize) : HIRExpression(HIRExpressionKind::MemberAccess, _type, instance->category, instance->mutable) {
+    HIRMemberAccessExpression(&mut this, instance: *HIRExpression, _type: *HIRType, index: usize) : HIRExpression(HIRExpressionKind::MemberAccess, _type, HIRExpressionCategory::Place, instance->mutable) {
         (this.instance, this.index) = (instance, index);
     }
 
@@ -1479,11 +1482,12 @@ class HIRContinueStatement : HIRStatement {
 
 class HIRIfStatement : HIRStatement {
     pub condition: *HIRExpression,
+    pub destructors: Vector<*HIRExpression>,
     pub then_body: *HIRBlockStatement,
     pub else_body: *HIRBlockStatement;
 
-    HIRIfStatement(&mut this, condition: *HIRExpression, then_body: *HIRBlockStatement, else_body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::If) {
-        (this.condition, this.then_body, this.else_body) = (condition, then_body, else_body);
+    HIRIfStatement(&mut this, condition: *HIRExpression, destructors: Vector<*HIRExpression>, then_body: *HIRBlockStatement, else_body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::If) {
+        (this.condition, this.destructors, this.then_body, this.else_body) = (condition, destructors, then_body, else_body);
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -1497,11 +1501,12 @@ class HIRIfStatement : HIRStatement {
 
 class HIRWhileStatement : HIRStatement {
     pub condition: *HIRExpression,
+    pub destructors: Vector<*HIRExpression>,
     pub while_body: *HIRBlockStatement,
     pub else_body: *HIRBlockStatement;
 
-    HIRWhileStatement(&mut this, condition: *HIRExpression, while_body: *HIRBlockStatement, else_body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::While) {
-        (this.condition, this.while_body, this.else_body) = (condition, while_body, else_body);
+    HIRWhileStatement(&mut this, condition: *HIRExpression, destructors: Vector<*HIRExpression>, while_body: *HIRBlockStatement, else_body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::While) {
+        (this.condition, this.destructors, this.while_body, this.else_body) = (condition, destructors, while_body, else_body);
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2141,16 +2146,20 @@ class HIRBuilder {
     }
 
     pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, _type: *HIRType) -> *HIRExpression {
+        return this.Binary(kind, left, right, Vector<*HIRExpression>(), _type);
+    }
+
+    pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, destructors: Vector<*HIRExpression>, _type: *HIRType) -> *HIRExpression {
         if left->kind == HIRExpressionKind::Literal && right->kind == HIRExpressionKind::Literal {
             let folded = this.FoldBinary(kind, left as *HIRLiteral, right as *HIRLiteral, _type);
             if folded != null { return folded; }
         }
 
-        return this.context->arena.New<HIRBinaryExpression>(kind, left, right, _type);
+        return this.context->arena.New<HIRBinaryExpression>(kind, left, right, destructors, _type);
     }
 
-    pub fn Ternary(&mut this, condition: *HIRExpression, then_value: *HIRExpression, else_value: *HIRExpression, category: HIRExpressionCategory, mutable: bool) -> *mut HIRTernaryExpression {
-        return this.context->arena.New<HIRTernaryExpression>(condition, then_value, else_value, category, mutable);
+    pub fn Ternary(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, category: HIRExpressionCategory, mutable: bool) -> *mut HIRTernaryExpression {
+        return this.context->arena.New<HIRTernaryExpression>(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
     }
 
     pub fn Call(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRCallExpression {
@@ -2240,9 +2249,7 @@ class HIRBuilder {
     }
 
     pub fn BuildVariableStatement(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, mutable: bool) -> *mut HIRVariableStatement {
-        let variable = this.context->arena.New<HIRVariableStatement>(name, _type, initializer, mutable);
-        this.block->statements.PushBack(variable);
-        return variable;
+        return this.context->arena.New<HIRVariableStatement>(name, _type, initializer, mutable);
     }
 
     pub fn BuildExpressionStatement(&mut this, expression: *HIRExpression) -> *mut HIRExpressionStatement {
@@ -2269,14 +2276,14 @@ class HIRBuilder {
         return _continue;
     }
 
-    pub fn BuildIfStatement(&mut this, condition: *HIRExpression, then_body: *HIRBlockStatement, else_body: *HIRBlockStatement) -> *mut HIRIfStatement {
-        let statement = this.context->arena.New<HIRIfStatement>(condition, then_body, else_body);
+    pub fn BuildIfStatement(&mut this, condition: *HIRExpression, destructors: Vector<*HIRExpression>, then_body: *HIRBlockStatement, else_body: *HIRBlockStatement) -> *mut HIRIfStatement {
+        let statement = this.context->arena.New<HIRIfStatement>(condition, destructors, then_body, else_body);
         this.block->statements.PushBack(statement);
         return statement;
     }
 
-    pub fn BuildWhileStatement(&mut this, condition: *HIRExpression, while_body: *HIRBlockStatement, else_body: *HIRBlockStatement) -> *mut HIRWhileStatement {
-        let statement = this.context->arena.New<HIRWhileStatement>(condition, while_body, else_body);
+    pub fn BuildWhileStatement(&mut this, condition: *HIRExpression, destructors: Vector<*HIRExpression>, while_body: *HIRBlockStatement, else_body: *HIRBlockStatement) -> *mut HIRWhileStatement {
+        let statement = this.context->arena.New<HIRWhileStatement>(condition, destructors, while_body, else_body);
         this.block->statements.PushBack(statement);
         return statement;
     }

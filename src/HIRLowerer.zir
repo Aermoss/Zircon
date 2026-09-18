@@ -1150,6 +1150,8 @@ class HIRLowerer {
             Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", _if->condition, LogSeverity::Error);
         }
 
+        let destructors = this.GetTemporaryDestructors(condition);
+
         this.scope_manager.PushScope("<then>".ToString(), false);
         let (then_body, mut else_body: *HIRBlockStatement) = (this.LowerBlockStatement(_if->body), null);
         this.scope_manager.PopScope();
@@ -1171,7 +1173,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        this.builder.BuildIfStatement(condition, then_body, else_body);
+        this.builder.BuildIfStatement(condition, destructors, then_body, else_body);
     }
 
     fn LowerWhileStatement(&mut this, _while: *ASTWhileStatement) {
@@ -1180,6 +1182,8 @@ class HIRLowerer {
         if condition != null && !condition->_type->IsBoolean() {
             Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", _while->condition, LogSeverity::Error);
         }
+
+        let destructors = this.GetTemporaryDestructors(condition);
 
         this.scope_manager.PushScope("<while>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
@@ -1193,7 +1197,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        this.builder.BuildWhileStatement(condition, while_body, else_body);
+        this.builder.BuildWhileStatement(condition, destructors, while_body, else_body);
     }
 
     fn LowerForStatement(&mut this, _for: *ASTForStatement) {
@@ -1319,6 +1323,28 @@ class HIRLowerer {
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
         this.builder.BuildLoopStatement(body);
+    }
+
+    fn GetTemporaryDestructorsSince(&mut this, index: usize, exception: *HIRExpression) -> Vector<*HIRExpression> {
+        let mut destructors = Vector<*HIRExpression>();
+        let mut carry = Vector<*HIRExpression>();
+
+        for i in 0..this.temporaries.Size() {
+            let instance: *HIRExpression = this.temporaries[i];
+
+            if i < index {
+                carry.PushBack(instance);
+                continue;
+            }
+
+            if instance == exception { continue; }
+            let function = (instance->_type as *HIRClassType)->declaration->destructor;
+            let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+            destructors.Insert(0, this.builder.Destructor(instance, callee));
+        }
+
+        this.temporaries.Swap(carry);
+        return destructors;
     }
 
     fn GetTemporaryDestructors(&mut this, exception: *HIRExpression) -> Vector<*HIRExpression> {
@@ -1465,6 +1491,7 @@ class HIRLowerer {
             let construct = _type->IsClass() && (initializer != null ? initializer->_type->IsClass() && initializer->category == HIRExpressionCategory::Place : true);
             let statement = this.builder.BuildVariableStatement(variable->name, _type, !construct ? initializer : null, variable->mutable);
             this.scope_manager.current->Set(variable->name, statement, variable as *ASTStatement);
+            this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
             if construct {
                 let mut values = Vector<*HIRExpression>();
@@ -2702,20 +2729,17 @@ class HIRLowerer {
                 return null;
             }
 
-            this.scope_manager.PushScope("<short circuit>".ToString(), false);
+            let index = this.temporaries.Size();
             let right = this.LowerExpression(binary->right);
-            this.scope_manager.PopScope();
-
-            if right == null {
-                return null;
-            }
+            let destructors = this.GetTemporaryDestructorsSince(index, right);
+            if right == null { return null; }
 
             if !right->_type->IsBoolean() {
                 Logger::Log("Invalid type '" + right->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary as *ASTExpression, LogSeverity::Error);
                 return null;
             }
 
-            return this.builder.Binary(this.LowerBinaryKind(binary->kind), left, right, left->_type);
+            return this.builder.Binary(this.LowerBinaryKind(binary->kind), left, right, destructors, left->_type);
         }
 
         let mut right = this.LowerExpression(binary->right);
@@ -2889,10 +2913,14 @@ class HIRLowerer {
             Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", ternary->condition, LogSeverity::Error);
         }
 
+        let then_index = this.temporaries.Size();
         let mut then_value = this.LowerExpression(ternary->then);
+        let then_destructors = this.GetTemporaryDestructorsSince(then_index, then_value);
         if then_value == null { return null; }
 
+        let else_index = this.temporaries.Size();
         let mut else_value = this.LowerExpression(ternary->_else);
+        let else_destructors = this.GetTemporaryDestructorsSince(else_index, else_value);
         if else_value == null { return null; }
 
         then_value = this.Coerce(then_value, target != null ? target : else_value->_type);
@@ -2901,7 +2929,7 @@ class HIRLowerer {
         let mutable = then_value->mutable && else_value->mutable ? true : false;
         let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place)
             ? HIRExpressionCategory::Place : HIRExpressionCategory::Value;
-        return this.builder.Ternary(condition, then_value, else_value, category, mutable);
+        return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
     }
 
     pub fn LowerType(&mut this, path: *ASTPath) -> *HIRType {

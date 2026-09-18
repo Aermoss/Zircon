@@ -440,6 +440,10 @@ class MIRLowerer {
         let condition = this.LowerExpression(_if->condition);
         if condition == null { return; }
 
+        for destructor in _if->destructors {
+            this.LowerExpression(destructor);
+        }
+
         let then_block = this.builder.BuildBlock("if.then".ToString());
         let mut merge_block: *mut MIRBlock = null;
 
@@ -481,6 +485,11 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(condition_block);
         let condition = this.LowerExpression(_while->condition);
         if condition == null { return; }
+
+        for destructor in _while->destructors {
+            this.LowerExpression(destructor);
+        }
+
         this.builder.BuildConditionalBranch(condition, body_block, end_block);
 
         this.builder.SetCurrentBlock(body_block);
@@ -1124,6 +1133,11 @@ class MIRLowerer {
             this.builder.SetCurrentBlock(right_block);
             let right = this.LowerExpression(binary->right);
             if right == null { return null; }
+
+            for destructor in binary->destructors {
+                this.LowerExpression(destructor);
+            }
+
             right_block = this.builder.GetCurrentBlock();
             this.builder.BuildBranch(merge_block);
 
@@ -1296,12 +1310,22 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(then_block);
         let then_value = this.LowerExpression(ternary->then_value);
         if then_value == null { return null; }
+
+        for destructor in ternary->then_destructors {
+            this.LowerExpression(destructor);
+        }
+
         then_block = this.builder.GetCurrentBlock();
         this.builder.BuildBranch(merge_block);
 
         this.builder.SetCurrentBlock(else_block);
         let else_value = this.LowerExpression(ternary->else_value);
         if else_value == null { return null; }
+
+        for destructor in ternary->else_destructors {
+            this.LowerExpression(destructor);
+        }
+
         else_block = this.builder.GetCurrentBlock();
         this.builder.BuildBranch(merge_block);
 
