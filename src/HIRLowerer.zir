@@ -444,13 +444,13 @@ class HIRLowerer {
             let parent_type = this.LowerType(parent);
             if parent_type == null { continue; }
             let parent_name = ((parent_type as *HIRClassType)->declaration as *HIRDeclaration)->name;
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(parent_name, parent_type, null, false));
+            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(parent_name, parent_type, declaration->fields.Size(), null, false));
         }
 
         for field in _class->fields {
             let field_type = this.LowerType(field->_type);
             if field_type == null { continue; }
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, field->initializer, field->public));
+            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Size(), field->initializer, field->public));
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -542,10 +542,9 @@ class HIRLowerer {
     }
 
     pub fn LowerFieldConstructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
-        for i in 0..fields.Size() {
-            let field: *HIRFieldDeclaration = fields[i];
+        for field in fields {
             let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
+            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
 
             if field_type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
@@ -603,15 +602,13 @@ class HIRLowerer {
                 continue;
             }
 
-            for i in 0..fields.Size() {
-                let field: *HIRFieldDeclaration = fields[i];
-
+            for field in fields {
                 if (field as *HIRDeclaration)->name != ((_type as *HIRClassType)->declaration as *HIRDeclaration)->name {
                     continue;
                 }
 
                 let mut values = Vector<*HIRExpression>();
-                let this_field = this.builder.MemberAccess(this_dereferenced, (field as *HIRDeclaration)->_type, i);
+                let this_field = this.builder.MemberAccess(this_dereferenced, (field as *HIRDeclaration)->_type, field->index);
                 values.PushBack(this.ImplicitAddressOf(this_field));
                 fields_to_construct.Remove(field);
 
@@ -645,10 +642,9 @@ class HIRLowerer {
     }
 
     pub fn LowerFieldDestructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
-        for i in 0..fields.Size() {
-            let field: *HIRFieldDeclaration = fields[i];
+        for field in fields {
             let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
+            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
 
             if field_type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
@@ -670,10 +666,9 @@ class HIRLowerer {
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
 
-        for i in 0..fields.Size() {
-            let field: *HIRFieldDeclaration = fields[i];
+        for field in fields {
             let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
+            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
 
             if field_type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this_field);
@@ -753,11 +748,10 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0..fields.Size() {
-                let field: *HIRFieldDeclaration = fields[i];
+            for field in fields {
                 let field_type = (field as *HIRDeclaration)->_type;
-                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
-                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, i);
+                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
+                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, field->index);
 
                 if field_type->IsClass() {
                     let mut values = Vector<*HIRExpression>();
@@ -834,11 +828,10 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0..fields.Size() {
-                let field: *HIRFieldDeclaration = fields[i];
+            for field in fields {
                 let field_type = (field as *HIRDeclaration)->_type;
-                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, i);
-                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, i);
+                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
+                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, field->index);
 
                 if field_type->IsClass() {
                     let mut values = Vector<*HIRExpression>();
@@ -894,7 +887,7 @@ class HIRLowerer {
         for field in structure->fields {
             let field_type = this.LowerType(field->_type);
             if field_type == null { continue; }
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, field->initializer, field->public));
+            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Size(), field->initializer, field->public));
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);

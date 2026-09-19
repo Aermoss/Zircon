@@ -1646,11 +1646,12 @@ class HIRFunctionDeclaration : HIRDeclaration {
 }
 
 class HIRFieldDeclaration : HIRDeclaration {
+    pub index: usize,
     pub initializer: *ASTExpression,
     pub public: bool;
 
-    HIRFieldDeclaration(&mut this, name: String, _type: *HIRType, initializer: *ASTExpression, public: bool) : HIRDeclaration(HIRDeclarationKind::Field, name, _type) {
-        (this.initializer, this.public) = (initializer, public);
+    HIRFieldDeclaration(&mut this, name: String, _type: *HIRType, index: usize, initializer: *ASTExpression, public: bool) : HIRDeclaration(HIRDeclarationKind::Field, name, _type) {
+        (this.index, this.initializer, this.public) = (index, initializer, public);
     }
 
     pub fn ToString(&this) -> String {
@@ -2316,8 +2317,8 @@ class HIRBuilder {
         return this.function;
     }
 
-    pub fn BuildFieldDeclaration(&mut this, name: String, _type: *HIRType, initializer: *ASTExpression, public: bool) -> *mut HIRFieldDeclaration {
-        return this.context->arena.New<HIRFieldDeclaration>(name, _type, initializer, public);
+    pub fn BuildFieldDeclaration(&mut this, name: String, _type: *HIRType, index: usize, initializer: *ASTExpression, public: bool) -> *mut HIRFieldDeclaration {
+        return this.context->arena.New<HIRFieldDeclaration>(name, _type, index, initializer, public);
     }
 
     pub fn BuildClassDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRClassDeclaration {
