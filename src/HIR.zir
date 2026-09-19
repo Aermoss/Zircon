@@ -647,7 +647,7 @@ enum HIRExpressionKind: u8 {
     Literal,
     VariableReference, DeclarationReference,
     Assignment, Unary, Binary, Ternary,
-    Call, Cast, IndexAccess, MemberAccess,
+    Call, Cast, IndexAccess, FieldAccess,
     New, Delete, Constructor, Destructor,
     Intrinsic, Deferred
 }
@@ -705,7 +705,7 @@ class HIRExpression {
             return 130;
         } else if this.kind == HIRExpressionKind::Cast {
             return 140;
-        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::MemberAccess {
+        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::FieldAccess {
             return 150;
         } else {
             return 160;
@@ -733,8 +733,8 @@ class HIRExpression {
             return (this as *HIRCastExpression)->ToString();
         } else if this.kind == HIRExpressionKind::IndexAccess {
             return (this as *HIRIndexAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::MemberAccess {
-            return (this as *HIRMemberAccessExpression)->ToString();
+        } else if this.kind == HIRExpressionKind::FieldAccess {
+            return (this as *HIRFieldAccessExpression)->ToString();
         } else if this.kind == HIRExpressionKind::New {
             return (this as *HIRNewExpression)->ToString();
         } else if this.kind == HIRExpressionKind::Delete {
@@ -1183,12 +1183,12 @@ class HIRIndexAccessExpression : HIRExpression {
     }
 }
 
-class HIRMemberAccessExpression : HIRExpression {
+class HIRFieldAccessExpression : HIRExpression {
     pub instance: *HIRExpression,
-    pub index: usize;
+    pub field: *HIRFieldDeclaration;
 
-    HIRMemberAccessExpression(&mut this, instance: *HIRExpression, _type: *HIRType, index: usize) : HIRExpression(HIRExpressionKind::MemberAccess, _type, HIRExpressionCategory::Place, instance->mutable) {
-        (this.instance, this.index) = (instance, index);
+    HIRFieldAccessExpression(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) : HIRExpression(HIRExpressionKind::FieldAccess, (field as *HIRDeclaration)->_type, HIRExpressionCategory::Place, instance->mutable) {
+        (this.instance, this.field) = (instance, field);
     }
 
     pub fn ToString(&this) -> String {
@@ -1200,7 +1200,7 @@ class HIRMemberAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + '.' + String::FromInteger(this.index as u64);
+        return result + '.' + (this.field as *HIRDeclaration)->name;
     }
 }
 
@@ -2209,8 +2209,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->IsArray() ? value->_type->Element() : value->_type->Pointee(), value->_type->IsMutable()));
     }
 
-    pub fn MemberAccess(&mut this, instance: *HIRExpression, _type: *HIRType, index: usize) -> *mut HIRMemberAccessExpression {
-        return this.context->arena.New<HIRMemberAccessExpression>(instance, _type, index);
+    pub fn FieldAccess(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) -> *mut HIRFieldAccessExpression {
+        return this.context->arena.New<HIRFieldAccessExpression>(instance, field);
     }
 
     pub fn New(&mut this, _type: *HIRType, size: *HIRExpression, initialized: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRNewExpression {

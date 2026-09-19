@@ -543,8 +543,8 @@ class HIRLowerer {
 
     pub fn LowerFieldConstructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
         for field in fields {
+            let this_field = this.builder.FieldAccess(this_dereferenced, field);
             let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
 
             if field_type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
@@ -608,7 +608,7 @@ class HIRLowerer {
                 }
 
                 let mut values = Vector<*HIRExpression>();
-                let this_field = this.builder.MemberAccess(this_dereferenced, (field as *HIRDeclaration)->_type, field->index);
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
                 values.PushBack(this.ImplicitAddressOf(this_field));
                 fields_to_construct.Remove(field);
 
@@ -643,8 +643,8 @@ class HIRLowerer {
 
     pub fn LowerFieldDestructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
         for field in fields {
+            let this_field = this.builder.FieldAccess(this_dereferenced, field);
             let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
 
             if field_type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
@@ -667,10 +667,9 @@ class HIRLowerer {
         let this_dereferenced = this.builder.Dereference(this_reference);
 
         for field in fields {
-            let field_type = (field as *HIRDeclaration)->_type;
-            let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
+            let this_field = this.builder.FieldAccess(this_dereferenced, field);
 
-            if field_type->IsClass() {
+            if (field as *HIRDeclaration)->_type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this_field);
             }
         }
@@ -749,9 +748,9 @@ class HIRLowerer {
             let other_dereferenced = this.builder.Dereference(other_reference);
 
             for field in fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+                let other_field = this.builder.FieldAccess(other_dereferenced, field);
                 let field_type = (field as *HIRDeclaration)->_type;
-                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
-                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, field->index);
 
                 if field_type->IsClass() {
                     let mut values = Vector<*HIRExpression>();
@@ -829,9 +828,9 @@ class HIRLowerer {
             let other_dereferenced = this.builder.Dereference(other_reference);
 
             for field in fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+                let other_field = this.builder.FieldAccess(other_dereferenced, field);
                 let field_type = (field as *HIRDeclaration)->_type;
-                let this_field = this.builder.MemberAccess(this_dereferenced, field_type, field->index);
-                let other_field = this.builder.MemberAccess(other_dereferenced, field_type, field->index);
 
                 if field_type->IsClass() {
                     let mut values = Vector<*HIRExpression>();
@@ -2109,8 +2108,7 @@ class HIRLowerer {
                         return null;
                     }
 
-                    let target = this.builder.MemberAccess(instance, (field as *HIRDeclaration)->_type, index as usize);
-                    return this.LowerResolvedCallExpression(target, values, call as *ASTExpression);
+                    return this.LowerResolvedCallExpression(this.builder.FieldAccess(instance, field), values, call as *ASTExpression);
                 } else {
                     values.Insert(0, this.ImplicitAddressOf(instance));
                     let mut candidates = instance->_type->GetCandidates(member_access->member, call as *ASTExpression, true);
@@ -2583,7 +2581,7 @@ class HIRLowerer {
                 return null;
             }
 
-            return this.builder.MemberAccess(instance, (field as *HIRDeclaration)->_type, index as usize);
+            return this.builder.FieldAccess(instance, field);
         } else {
             Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access as *ASTExpression, LogSeverity::Error);
             return null;

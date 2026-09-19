@@ -599,8 +599,8 @@ class MIRLowerer {
             } else {
                 return this.parameters.Get(declaration, null);
             }
-        } else if expression->kind == HIRExpressionKind::MemberAccess {
-            return this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression);
+        } else if expression->kind == HIRExpressionKind::FieldAccess {
+            return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
         } else if expression->kind == HIRExpressionKind::Unary && (expression as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference {
             return this.LowerUnaryExpression(expression as *HIRUnaryExpression);
         } else {
@@ -1079,12 +1079,12 @@ class MIRLowerer {
         return this.builder.BuildArrayGEP("index.access".ToString(), value, index);
     }
 
-    fn LowerMemberAccessExpression(&mut this, member_access: *HIRMemberAccessExpression) -> *MIRValue {
-        let expression = member_access as *HIRExpression;
-        let instance = this.LowerPlaceExpression(member_access->instance);
+    fn LowerFieldAccessExpression(&mut this, field_access: *HIRFieldAccessExpression) -> *MIRValue {
+        let expression = field_access as *HIRExpression;
+        let instance = this.LowerPlaceExpression(field_access->instance);
         if instance == null { return null; }
-        let field_type = this.context.PointerType(this.LowerType(expression->_type));
-        return this.builder.BuildStructGEP("field.access".ToString(), instance, member_access->index as u32, field_type);
+        let field_type = this.context.PointerType(this.LowerType((field_access->field as *HIRDeclaration)->_type));
+        return this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type);
     }
 
     fn LowerUnaryExpression(&mut this, unary: *HIRUnaryExpression) -> *MIRValue {
