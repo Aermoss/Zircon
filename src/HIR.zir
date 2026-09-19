@@ -1528,14 +1528,13 @@ class HIRLoopStatement : HIRStatement {
 
 class HIRForStatement : HIRStatement {
     pub iterator: *HIRVariableStatement,
-    pub variable: *HIRVariableStatement,
     pub condition: *HIRExpression,
     pub step: *HIRExpression,
     pub destructors: Vector<*HIRExpression>,
     pub body: *HIRBlockStatement;
 
-    HIRForStatement(&mut this, iterator: *HIRVariableStatement, variable: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::For) {
-        (this.iterator, this.variable, this.condition, this.step, this.destructors, this.body) = (iterator, variable, condition, step, destructors, body);
+    HIRForStatement(&mut this, iterator: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::For) {
+        (this.iterator, this.condition, this.step, this.destructors, this.body) = (iterator, condition, step, destructors, body);
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2295,8 +2294,8 @@ class HIRBuilder {
         return statement;
     }
 
-    pub fn BuildForStatement(&mut this, iterator: *HIRVariableStatement, variable: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) -> *mut HIRForStatement {
-        let statement = this.context->arena.New<HIRForStatement>(iterator, variable, condition, step, destructors, body);
+    pub fn BuildForStatement(&mut this, iterator: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) -> *mut HIRForStatement {
+        let statement = this.context->arena.New<HIRForStatement>(iterator, condition, step, destructors, body);
         this.block->statements.PushBack(statement);
         return statement;
     }

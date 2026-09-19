@@ -527,8 +527,6 @@ class MIRLowerer {
 
     fn LowerForStatement(&mut this, _for: *HIRForStatement) {
         this.LowerVariableStatement(_for->iterator);
-        let alloca = this.builder.BuildAlloca(_for->variable->name, this.LowerType(_for->variable->_type));
-        this.variables[_for->variable] = (alloca as *MIRInstruction) as *MIRValue;
 
         let condition_block = this.builder.BuildBlock("for.cond".ToString());
         let body_block = this.builder.BuildBlock("for.body".ToString());
@@ -542,8 +540,6 @@ class MIRLowerer {
         this.builder.BuildConditionalBranch(condition, body_block, end_block);
 
         this.builder.SetCurrentBlock(body_block);
-        this.LowerExpressionTo(_for->variable->initializer, alloca as *MIRInstruction);
-
         this.break_blocks.PushBack(end_block);
         this.continue_blocks.PushBack(step_block);
         this.LowerBlockStatement(_for->body);

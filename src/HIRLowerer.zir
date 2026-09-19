@@ -1257,12 +1257,9 @@ class HIRLowerer {
             return;
         }
 
-        let iterator = this.builder.BuildVariableStatement("iterator".ToString(), iterator_type, start, true);
-        let iterator_ref = this.builder.ReferenceVariable(iterator);
-
-        let mut variable: *HIRVariableStatement = null;
-        let mut condition: *HIRExpression = null;
-        let mut step: *HIRExpression = null;
+        let iterator = this.builder.BuildVariableStatement("iterator".ToString(), iterator_type, start, false);
+        let (mut alias: *HIRExpression, mut condition: *HIRExpression, mut step: *HIRExpression) = (null, null, null);
+        let iterator_reference = this.builder.ReferenceVariable(iterator);
 
         if is_range {
             let mut one: *HIRExpression = null;
@@ -1273,50 +1270,48 @@ class HIRLowerer {
                 one = this.builder.IntegerLiteral(1, iterator_type) as *HIRLiteral;
             }
 
-            let kind = inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less;
-            condition = this.builder.Binary(kind, iterator_ref, end, this.context.BooleanType());
-            let next = this.builder.Binary(HIRBinaryKind::Add, iterator_ref, one, iterator_type);
-            step = this.builder.Assignment(iterator_ref, next);
-            variable = this.builder.BuildVariableStatement(_for->variable, iterator_type, iterator_ref, true);
+            alias = iterator_reference;
+            condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, end, this.context.BooleanType());
+            step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
         } else if iterator_type->IsPointer() {
-            condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_ref, end, this.context.BooleanType());
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
-            let step_value = this.builder.Binary(HIRBinaryKind::Add, iterator_ref, one, iterator_type);
-            step = this.builder.Assignment(iterator_ref, step_value);
-            let reference_type = this.context.ReferenceType(iterator_type->Pointee(), true);
-            variable = this.builder.BuildVariableStatement(_for->variable, reference_type, iterator_ref, true);
+            step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
+            condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, end, this.context.BooleanType());
+            alias = this.builder.Dereference(iterator_reference);
         } else {
             let mut values = Vector<*HIRExpression>();
-            values.PushBack(iterator_ref);
+            values.PushBack(iterator_reference);
             values.PushBack(end);
             let condition_candidates = iterator_type->GetCandidates("operator!=".ToString(), _for as *ASTStatement, false);
-            condition = this.LowerResolvedCallExpression(condition_candidates, values, _for as *ASTStatement);
-            if condition == null { return; }
+            if condition_candidates.Empty() { return; }
+            let condition_call = this.LowerResolvedCallExpression(condition_candidates, values, _for as *ASTStatement);
+            if condition_call == null { return; }
+            condition = condition_call;
 
-            values = Vector<*HIRExpression>();
-            values.PushBack(iterator_ref);
-            values.PushBack(this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral);
+            values.Back() = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
             let step_candidates = iterator_type->GetCandidates("operator+=".ToString(), _for as *ASTStatement, false);
-            step = this.LowerResolvedCallExpression(step_candidates, values, _for as *ASTStatement);
-            if step == null { return; }
+            if step_candidates.Empty() { return; }
+            let step_call = this.LowerResolvedCallExpression(step_candidates, values, _for as *ASTStatement);
+            if step_call == null { return; }
+            step = step_call;
 
-            values = Vector<*HIRExpression>();
-            values.PushBack(iterator_ref);
+            values.PopBack();
             let dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for as *ASTStatement, false);
-            let value = this.LowerResolvedCallExpression(dereference_candidates, values, _for as *ASTStatement);
-            if value == null { return; }
-            variable = this.builder.BuildVariableStatement(_for->variable, (value as *HIRExpression)->_type, value, true);
+            if dereference_candidates.Empty() { return; }
+            let dereference_call = this.LowerResolvedCallExpression(dereference_candidates, values, _for as *ASTStatement);
+            if dereference_call == null { return; }
+            alias = dereference_call;
         }
 
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
 
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
-        this.scope_manager.current->Set(_for->variable, variable, _for as *ASTStatement);
+        this.scope_manager.current->Set(_for->variable, alias, _for as *ASTStatement);
         let body = this.LowerBlockStatement(_for->body);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
-        this.builder.BuildForStatement(iterator, variable, condition, step, destructors, body);
+        this.builder.BuildForStatement(iterator, condition, step, destructors, body);
     }
 
     fn LowerLoopStatement(&mut this, _loop: *ASTLoopStatement) {
@@ -1614,7 +1609,9 @@ class HIRLowerer {
             if symbols.Empty() { return null; }
 
             for symbol in symbols {
-                if symbol->kind == SymbolKind::Statement {
+                if symbol->kind == SymbolKind::Expression {
+                    return symbol->expression;
+                } else if symbol->kind == SymbolKind::Statement {
                     return this.builder.ReferenceVariable(symbol->statement as *HIRVariableStatement);
                 } else if symbol->kind == SymbolKind::Declaration {
                     let declaration = symbol->declaration;

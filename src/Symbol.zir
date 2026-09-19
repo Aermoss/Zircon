@@ -17,18 +17,23 @@
 #[include "std/str", "src/HIR.zir", "src/Generic.zir" : *]
 
 enum SymbolKind: i32 {
-    Type, Statement, Declaration, Generic
+    Type, Expression, Statement, Declaration, Generic
 }
 
 class Symbol {
     pub kind: SymbolKind,
-    pub _type: *HIRType,
+    pub _type: *HIRType = null,
+    pub expression: *HIRExpression = null,
     pub statement: *HIRStatement = null,
     pub declaration: *HIRDeclaration = null,
     pub generic: *mut GenericDeclaration = null;
 
     Symbol(&mut this, _type: *HIRType) {
         (this.kind, this._type) = (SymbolKind::Type, _type);
+    }
+
+    Symbol(&mut this, expression: *HIRExpression) {
+        (this.kind, this.expression) = (SymbolKind::Expression, expression);
     }
 
     Symbol(&mut this, statement: *HIRStatement) {
