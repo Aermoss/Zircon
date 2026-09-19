@@ -1330,7 +1330,8 @@ class HIRLowerer {
             if instance == exception { continue; }
             let function = (instance->_type as *HIRClassType)->declaration->destructor;
             let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-            destructors.Insert(0, this.builder.Destructor(instance, callee));
+            let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
+            destructors.Insert(0, destructor);
         }
 
         this.temporaries.Swap(carry);
@@ -1344,7 +1345,8 @@ class HIRLowerer {
             if instance == exception { continue; }
             let function = (instance->_type as *HIRClassType)->declaration->destructor;
             let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-            destructors.PushBack(this.builder.Destructor(instance, callee));
+            let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
+            destructors.PushBack(destructor);
         }
 
         this.temporaries.Clear();
@@ -1373,7 +1375,8 @@ class HIRLowerer {
 
                 let function = (instance->_type as *HIRClassType)->declaration->destructor;
                 let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-                destructors.PushBack(this.builder.Destructor(instance, callee));
+                let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
+                destructors.PushBack(destructor);
             }
 
             if scope == target { break; }

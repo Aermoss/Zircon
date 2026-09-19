@@ -800,7 +800,7 @@ class MIRLowerer {
     }
 
     fn LowerDestructorExpression(&mut this, destructor: *HIRDestructorExpression) -> *MIRValue {
-        let instance = this.LowerPlaceExpression(destructor->instance);
+        let instance = this.LowerExpression(destructor->instance);
         if instance == null { return null; }
         let callee = this.LowerExpression(destructor->callee);
         if callee == null { return null; }
