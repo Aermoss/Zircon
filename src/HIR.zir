@@ -948,7 +948,6 @@ enum HIRUnaryKind: u8 {
     AddressOf, Dereference, Negate, Not
 }
 
-#[if EXTEND]
 extend HIRUnaryKind {
     pub fn ToString(this) -> String {
         if this == HIRUnaryKind::AddressOf { return '&'.ToString(); }
@@ -958,15 +957,6 @@ extend HIRUnaryKind {
         else { return "<invalid unary>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: HIRUnaryKind) -> String {
-    if kind == HIRUnaryKind::AddressOf { return '&'.ToString(); }
-    else if kind == HIRUnaryKind::Dereference { return '*'.ToString(); }
-    else if kind == HIRUnaryKind::Negate { return '-'.ToString(); }
-    else if kind == HIRUnaryKind::Not { return '!'.ToString(); }
-    else { return "<invalid unary>".ToString(); }
-}
-#[endif]
 
 class HIRUnaryExpression : HIRExpression {
     pub kind: HIRUnaryKind,
@@ -998,7 +988,6 @@ enum HIRBinaryKind: u8 {
     LeftShift, RightShift
 }
 
-#[if EXTEND]
 extend HIRBinaryKind {
     pub fn ToString(this) -> String {
         if this == HIRBinaryKind::Add { return '+'.ToString(); }
@@ -1022,29 +1011,6 @@ extend HIRBinaryKind {
         else { return "<invalid binary>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: HIRBinaryKind) -> String {
-    if kind == HIRBinaryKind::Add { return '+'.ToString(); }
-    else if kind == HIRBinaryKind::Subtract { return '-'.ToString(); }
-    else if kind == HIRBinaryKind::Multiply { return '*'.ToString(); }
-    else if kind == HIRBinaryKind::Divide { return '/'.ToString(); }
-    else if kind == HIRBinaryKind::Modulo { return '%'.ToString(); }
-    else if kind == HIRBinaryKind::Equal { return "==".ToString(); }
-    else if kind == HIRBinaryKind::NotEqual { return "!=".ToString(); }
-    else if kind == HIRBinaryKind::Less { return '<'.ToString(); }
-    else if kind == HIRBinaryKind::LessEqual { return "<=".ToString(); }
-    else if kind == HIRBinaryKind::Greater { return '>'.ToString(); }
-    else if kind == HIRBinaryKind::GreaterEqual { return ">=".ToString(); }
-    else if kind == HIRBinaryKind::LogicalAnd { return "&&".ToString(); }
-    else if kind == HIRBinaryKind::LogicalOr { return "||".ToString(); }
-    else if kind == HIRBinaryKind::BitwiseAnd { return '&'.ToString(); }
-    else if kind == HIRBinaryKind::BitwiseOr { return '|'.ToString(); }
-    else if kind == HIRBinaryKind::BitwiseXor { return '^'.ToString(); }
-    else if kind == HIRBinaryKind::LeftShift { return "<<".ToString(); }
-    else if kind == HIRBinaryKind::RightShift { return ">>".ToString(); }
-    else { return "<invalid binary>".ToString(); }
-}
-#[endif]
 
 class HIRBinaryExpression : HIRExpression {
     pub kind: HIRBinaryKind,
@@ -1299,7 +1265,6 @@ enum HIRIntrinsicKind: u8 {
     SizeOf, AlignOf
 }
 
-#[if EXTEND]
 extend HIRIntrinsicKind {
     pub fn ToString(this) -> String {
         if this == HIRIntrinsicKind::SizeOf { return "sizeof".ToString(); }
@@ -1307,13 +1272,6 @@ extend HIRIntrinsicKind {
         else { return "<invalid intrinsic>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: HIRIntrinsicKind) -> String {
-    if kind == HIRIntrinsicKind::SizeOf { return "sizeof".ToString(); }
-    else if kind == HIRIntrinsicKind::AlignOf { return "alignof".ToString(); }
-    else { return "<invalid intrinsic>".ToString(); }
-}
-#[endif]
 
 class HIRIntrinsicExpression : HIRExpression {
     pub kind: HIRIntrinsicKind,

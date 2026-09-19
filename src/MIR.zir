@@ -342,7 +342,6 @@ enum MIRUnaryKind: u8 {
     Neg, FNeg, Not
 }
 
-#[if EXTEND]
 extend MIRUnaryKind {
     pub fn ToString(this) -> String {
         if this == MIRUnaryKind::Neg { return "neg".ToString(); }
@@ -351,14 +350,6 @@ extend MIRUnaryKind {
         else { return "<invalid unary>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: MIRUnaryKind) -> String {
-    if kind == MIRUnaryKind::Neg { return "neg".ToString(); }
-    else if kind == MIRUnaryKind::FNeg { return "fneg".ToString(); }
-    else if kind == MIRUnaryKind::Not { return "not".ToString(); }
-    else { return "<invalid unary>".ToString(); }
-}
-#[endif]
 
 class MIRUnaryExpression : MIRConstantExpression {
     pub kind: MIRUnaryKind,
@@ -381,7 +372,6 @@ enum MIRBinaryKind: u8 {
     FCmpEq, FCmpNe, FCmpLt, FCmpGt, FCmpLe, FCmpGe
 }
 
-#[if EXTEND]
 extend MIRBinaryKind {
     pub fn ToString(this) -> String {
         if this == MIRBinaryKind::Add { return "add".ToString(); }
@@ -421,45 +411,6 @@ extend MIRBinaryKind {
         else { return "<invalid binary>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: MIRBinaryKind) -> String {
-    if kind == MIRBinaryKind::Add { return "add".ToString(); }
-    else if kind == MIRBinaryKind::Sub { return "sub".ToString(); }
-    else if kind == MIRBinaryKind::Mul { return "mul".ToString(); }
-    else if kind == MIRBinaryKind::SDiv { return "sdiv".ToString(); }
-    else if kind == MIRBinaryKind::UDiv { return "udiv".ToString(); }
-    else if kind == MIRBinaryKind::SRem { return "srem".ToString(); }
-    else if kind == MIRBinaryKind::URem { return "urem".ToString(); }
-    else if kind == MIRBinaryKind::And { return "and".ToString(); }
-    else if kind == MIRBinaryKind::Or { return "or".ToString(); }
-    else if kind == MIRBinaryKind::Xor { return "xor".ToString(); }
-    else if kind == MIRBinaryKind::Shl { return "shl".ToString(); }
-    else if kind == MIRBinaryKind::LShr { return "lshr".ToString(); }
-    else if kind == MIRBinaryKind::AShr { return "ashr".ToString(); }
-    else if kind == MIRBinaryKind::FAdd { return "fadd".ToString(); }
-    else if kind == MIRBinaryKind::FSub { return "fsub".ToString(); }
-    else if kind == MIRBinaryKind::FMul { return "fmul".ToString(); }
-    else if kind == MIRBinaryKind::FDiv { return "fdiv".ToString(); }
-    else if kind == MIRBinaryKind::FRem { return "frem".ToString(); }
-    else if kind == MIRBinaryKind::ICmpEq { return "icmp eq".ToString(); }
-    else if kind == MIRBinaryKind::ICmpNe { return "icmp ne".ToString(); }
-    else if kind == MIRBinaryKind::ICmpSlt { return "icmp slt".ToString(); }
-    else if kind == MIRBinaryKind::ICmpSgt { return "icmp sgt".ToString(); }
-    else if kind == MIRBinaryKind::ICmpSle { return "icmp sle".ToString(); }
-    else if kind == MIRBinaryKind::ICmpSge { return "icmp sge".ToString(); }
-    else if kind == MIRBinaryKind::ICmpUlt { return "icmp ult".ToString(); }
-    else if kind == MIRBinaryKind::ICmpUgt { return "icmp ugt".ToString(); }
-    else if kind == MIRBinaryKind::ICmpUle { return "icmp ule".ToString(); }
-    else if kind == MIRBinaryKind::ICmpUge { return "icmp uge".ToString(); }
-    else if kind == MIRBinaryKind::FCmpEq { return "fcmp eq".ToString(); }
-    else if kind == MIRBinaryKind::FCmpNe { return "fcmp ne".ToString(); }
-    else if kind == MIRBinaryKind::FCmpLt { return "fcmp lt".ToString(); }
-    else if kind == MIRBinaryKind::FCmpGt { return "fcmp gt".ToString(); }
-    else if kind == MIRBinaryKind::FCmpLe { return "fcmp le".ToString(); }
-    else if kind == MIRBinaryKind::FCmpGe { return "fcmp ge".ToString(); }
-    else { return "<invalid binary>".ToString(); }
-}
-#[endif]
 
 class MIRBinaryExpression : MIRConstantExpression {
     pub kind: MIRBinaryKind,
@@ -481,7 +432,6 @@ enum MIRCastKind: u8 {
     PtrToInt, IntToPtr, Bitcast
 }
 
-#[if EXTEND]
 extend MIRCastKind {
     pub fn ToString(this) -> String {
         if this == MIRCastKind::Trunc { return "trunc".ToString(); }
@@ -499,23 +449,6 @@ extend MIRCastKind {
         else { return "<invalid cast>".ToString(); }
     }
 }
-#[else]
-fn ToString(kind: MIRCastKind) -> String {
-    if kind == MIRCastKind::Trunc { return "trunc".ToString(); }
-    else if kind == MIRCastKind::ZExt { return "zext".ToString(); }
-    else if kind == MIRCastKind::SExt { return "sext".ToString(); }
-    else if kind == MIRCastKind::FPTrunc { return "fptrunc".ToString(); }
-    else if kind == MIRCastKind::FPExt { return "fpext".ToString(); }
-    else if kind == MIRCastKind::FPToSI { return "fptosi".ToString(); }
-    else if kind == MIRCastKind::FPToUI { return "fptoui".ToString(); }
-    else if kind == MIRCastKind::SIToFP { return "sitofp".ToString(); }
-    else if kind == MIRCastKind::UIToFP { return "uitofp".ToString(); }
-    else if kind == MIRCastKind::PtrToInt { return "ptrtoint".ToString(); }
-    else if kind == MIRCastKind::IntToPtr { return "inttoptr".ToString(); }
-    else if kind == MIRCastKind::Bitcast { return "bitcast".ToString(); }
-    else { return "<invalid cast>".ToString(); }
-}
-#[endif]
 
 class MIRCastExpression : MIRConstantExpression {
     pub kind: MIRCastKind,

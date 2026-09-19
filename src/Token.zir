@@ -41,7 +41,6 @@ enum TokenType: i32 {
     ELIF, ENDIF, INCLUDE, ERROR, WARNING
 }
 
-#[if EXTEND]
 extend TokenType {
     pub fn ToString(this) -> String {
         if this == TokenType::EOF { return "EOF".ToString(); }
@@ -146,110 +145,6 @@ extend TokenType {
         else { return "UNKNOWN".ToString(); }
     }
 }
-#[else]
-fn ToString(_type: TokenType) -> String {
-    if _type == TokenType::EOF { return "EOF".ToString(); }
-    else if _type == TokenType::IDENTIFIER { return "IDENTIFIER".ToString(); }
-    else if _type == TokenType::INTEGER { return "INTEGER".ToString(); }
-    else if _type == TokenType::FLOAT { return "FLOAT".ToString(); }
-    else if _type == TokenType::STRING { return "STRING".ToString(); }
-    else if _type == TokenType::CHAR { return "CHAR".ToString(); }
-    else if _type == TokenType::TRUE { return "TRUE".ToString(); }
-    else if _type == TokenType::FALSE { return "FALSE".ToString(); }
-    else if _type == TokenType::NULL { return "NULL".ToString(); }
-    else if _type == TokenType::ZERO { return "ZERO".ToString(); }
-    else if _type == TokenType::NEW { return "NEW".ToString(); }
-    else if _type == TokenType::DELETE { return "DELETE".ToString(); }
-    else if _type == TokenType::ASYNC { return "ASYNC".ToString(); }
-    else if _type == TokenType::AWAIT { return "AWAIT".ToString(); }
-    else if _type == TokenType::AS { return "AS".ToString(); }
-    else if _type == TokenType::THIS { return "THIS".ToString(); }
-    else if _type == TokenType::OPERATOR { return "OPERATOR".ToString(); }
-    else if _type == TokenType::IF { return "IF".ToString(); }
-    else if _type == TokenType::ELSE { return "ELSE".ToString(); }
-    else if _type == TokenType::FOR { return "FOR".ToString(); }
-    else if _type == TokenType::IN { return "IN".ToString(); }
-    else if _type == TokenType::WHILE { return "WHILE".ToString(); }
-    else if _type == TokenType::LOOP { return "LOOP".ToString(); }
-    else if _type == TokenType::MATCH { return "MATCH".ToString(); }
-    else if _type == TokenType::RETURN { return "RETURN".ToString(); }
-    else if _type == TokenType::BREAK { return "BREAK".ToString(); }
-    else if _type == TokenType::CONTINUE { return "CONTINUE".ToString(); }
-    else if _type == TokenType::FUNCTION { return "FUNCTION".ToString(); }
-    else if _type == TokenType::CLASS { return "CLASS".ToString(); }
-    else if _type == TokenType::STRUCTURE { return "STRUCTURE".ToString(); }
-    else if _type == TokenType::ENUMERATION { return "ENUMERATION".ToString(); }
-    else if _type == TokenType::EXTEND { return "EXTEND".ToString(); }
-    else if _type == TokenType::TYPE { return "TYPE".ToString(); }
-    else if _type == TokenType::EXTERN { return "EXTERN".ToString(); }
-    else if _type == TokenType::LET { return "LET".ToString(); }
-    else if _type == TokenType::MUT { return "MUT".ToString(); }
-    else if _type == TokenType::CONST { return "CONST".ToString(); }
-    else if _type == TokenType::STATIC { return "STATIC".ToString(); }
-    else if _type == TokenType::PUBLIC { return "PUBLIC".ToString(); }
-    else if _type == TokenType::ASSEMBLY { return "ASSEMBLY".ToString(); }
-    else if _type == TokenType::ASSEMBLY_CODE { return "ASSEMBLY_CODE".ToString(); }
-    else if _type == TokenType::VOLATILE { return "VOLATILE".ToString(); }
-    else if _type == TokenType::UNSAFE { return "UNSAFE".ToString(); }
-    else if _type == TokenType::ASSIGN { return "ASSIGN".ToString(); }
-    else if _type == TokenType::PLUS_ASSIGN { return "PLUS_ASSIGN".ToString(); }
-    else if _type == TokenType::MINUS_ASSIGN { return "MINUS_ASSIGN".ToString(); }
-    else if _type == TokenType::MUL_ASSIGN { return "MUL_ASSIGN".ToString(); }
-    else if _type == TokenType::DIV_ASSIGN { return "DIV_ASSIGN".ToString(); }
-    else if _type == TokenType::MOD_ASSIGN { return "MOD_ASSIGN".ToString(); }
-    else if _type == TokenType::LSHIFT_ASSIGN { return "LSHIFT_ASSIGN".ToString(); }
-    else if _type == TokenType::RSHIFT_ASSIGN { return "RSHIFT_ASSIGN".ToString(); }
-    else if _type == TokenType::AND_ASSIGN { return "AND_ASSIGN".ToString(); }
-    else if _type == TokenType::OR_ASSIGN { return "OR_ASSIGN".ToString(); }
-    else if _type == TokenType::XOR_ASSIGN { return "XOR_ASSIGN".ToString(); }
-    else if _type == TokenType::PLUS { return "PLUS".ToString(); }
-    else if _type == TokenType::MINUS { return "MINUS".ToString(); }
-    else if _type == TokenType::MUL { return "MUL".ToString(); }
-    else if _type == TokenType::DIV { return "DIV".ToString(); }
-    else if _type == TokenType::MOD { return "MOD".ToString(); }
-    else if _type == TokenType::AND { return "AND".ToString(); }
-    else if _type == TokenType::OR { return "OR".ToString(); }
-    else if _type == TokenType::NOT { return "NOT".ToString(); }
-    else if _type == TokenType::BITWISE_AND { return "BITWISE_AND".ToString(); }
-    else if _type == TokenType::BITWISE_OR { return "BITWISE_OR".ToString(); }
-    else if _type == TokenType::BITWISE_XOR { return "BITWISE_XOR".ToString(); }
-    else if _type == TokenType::LSHIFT { return "LSHIFT".ToString(); }
-    else if _type == TokenType::RSHIFT { return "RSHIFT".ToString(); }
-    else if _type == TokenType::TILDE { return "TILDE".ToString(); }
-    else if _type == TokenType::EQUAL { return "EQUAL".ToString(); }
-    else if _type == TokenType::NOT_EQUAL { return "NOT_EQUAL".ToString(); }
-    else if _type == TokenType::GREATER { return "GREATER".ToString(); }
-    else if _type == TokenType::LESS { return "LESS".ToString(); }
-    else if _type == TokenType::GREATER_EQUAL { return "GREATER_EQUAL".ToString(); }
-    else if _type == TokenType::LESS_EQUAL { return "LESS_EQUAL".ToString(); }
-    else if _type == TokenType::LPAREN { return "LPAREN".ToString(); }
-    else if _type == TokenType::RPAREN { return "RPAREN".ToString(); }
-    else if _type == TokenType::LBRACE { return "LBRACE".ToString(); }
-    else if _type == TokenType::RBRACE { return "RBRACE".ToString(); }
-    else if _type == TokenType::LBRACKET { return "LBRACKET".ToString(); }
-    else if _type == TokenType::RBRACKET { return "RBRACKET".ToString(); }
-    else if _type == TokenType::DOT { return "DOT".ToString(); }
-    else if _type == TokenType::TWO_DOT { return "TWO_DOT".ToString(); }
-    else if _type == TokenType::THREE_DOT { return "THREE_DOT".ToString(); }
-    else if _type == TokenType::COMMA { return "COMMA".ToString(); }
-    else if _type == TokenType::COLON { return "COLON".ToString(); }
-    else if _type == TokenType::DOUBLE_COLON { return "DOUBLE_COLON".ToString(); }
-    else if _type == TokenType::SEMICOLON { return "SEMICOLON".ToString(); }
-    else if _type == TokenType::AT { return "AT".ToString(); }
-    else if _type == TokenType::QUESTION_MARK { return "QUESTION_MARK".ToString(); }
-    else if _type == TokenType::BACKSLASH { return "BACKSLASH".ToString(); }
-    else if _type == TokenType::ARROW { return "ARROW".ToString(); }
-    else if _type == TokenType::FAT_ARROW { return "FAT_ARROW".ToString(); }
-    else if _type == TokenType::PREPROCESSOR_START { return "PREPROCESSOR_START".ToString(); }
-    else if _type == TokenType::PREPROCESSOR_END { return "PREPROCESSOR_END".ToString(); }
-    else if _type == TokenType::ELIF { return "ELIF".ToString(); }
-    else if _type == TokenType::ENDIF { return "ENDIF".ToString(); }
-    else if _type == TokenType::INCLUDE { return "INCLUDE".ToString(); }
-    else if _type == TokenType::ERROR { return "ERROR".ToString(); }
-    else if _type == TokenType::WARNING { return "WARNING".ToString(); }
-    else { return "UNKNOWN".ToString(); }
-}
-#[endif]
 
 fn StringToKeyword(string: &String) -> TokenType {
     if string == "true" { return TokenType::TRUE; }

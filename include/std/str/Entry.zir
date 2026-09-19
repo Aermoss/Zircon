@@ -910,7 +910,6 @@ class String {
     }
 }
 
-#[if EXTEND]
 extend i8 {
     pub fn ToString(this) -> String {
         return String(this);
@@ -938,28 +937,3 @@ extend *i8 {
         return String(this) * count;
     }
 }
-#[else]
-fn ToString(value: i8) -> String {
-    return String(value);
-}
-
-fn ToString(value: *i8) -> String {
-    return String(value);
-}
-
-fn operator+(value: i8, string: &String) -> String {
-    return String(value) + string;
-}
-
-fn operator+(value: *i8, string: &String) -> String {
-    return String(value) + string;
-}
-
-fn operator*(value: i8, count: usize) -> String {
-    return String(value) * count;
-}
-
-fn operator*(value: *i8, count: usize) -> String {
-    return String(value) * count;
-}
-#[endif]

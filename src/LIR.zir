@@ -154,7 +154,6 @@ enum LIROpcode: u16 {
     Hlt
 }
 
-#[if EXTEND]
 extend LIROpcode {
     pub fn ToString(this) -> String {
         if this == LIROpcode::Nop { return "nop".ToString(); }
@@ -210,61 +209,6 @@ extend LIROpcode {
         else { return "<invalid instruction>".ToString(); }
     }
 }
-#[else]
-fn ToString(opcode: LIROpcode) -> String {
-    if opcode == LIROpcode::Nop { return "nop".ToString(); }
-    else if opcode == LIROpcode::Lb { return "lb".ToString(); }
-    else if opcode == LIROpcode::Lbu { return "lbu".ToString(); }
-    else if opcode == LIROpcode::Lh { return "lh".ToString(); }
-    else if opcode == LIROpcode::Lhu { return "lhu".ToString(); }
-    else if opcode == LIROpcode::Lw { return "lw".ToString(); }
-    else if opcode == LIROpcode::Lui { return "lui".ToString(); }
-    else if opcode == LIROpcode::Auipc { return "auipc".ToString(); }
-    else if opcode == LIROpcode::Sb { return "sb".ToString(); }
-    else if opcode == LIROpcode::Sh { return "sh".ToString(); }
-    else if opcode == LIROpcode::Sw { return "sw".ToString(); }
-    else if opcode == LIROpcode::B { return "b".ToString(); }
-    else if opcode == LIROpcode::Br { return "br".ToString(); }
-    else if opcode == LIROpcode::Bl { return "bl".ToString(); }
-    else if opcode == LIROpcode::Blr { return "blr".ToString(); }
-    else if opcode == LIROpcode::Beq { return "beq".ToString(); }
-    else if opcode == LIROpcode::Bne { return "bne".ToString(); }
-    else if opcode == LIROpcode::Blt { return "blt".ToString(); }
-    else if opcode == LIROpcode::Bltu { return "bltu".ToString(); }
-    else if opcode == LIROpcode::Bge { return "bge".ToString(); }
-    else if opcode == LIROpcode::Bgeu { return "bgeu".ToString(); }
-    else if opcode == LIROpcode::Slt { return "slt".ToString(); }
-    else if opcode == LIROpcode::Slti { return "slti".ToString(); }
-    else if opcode == LIROpcode::Sltu { return "sltu".ToString(); }
-    else if opcode == LIROpcode::Sltiu { return "sltiu".ToString(); }
-    else if opcode == LIROpcode::Add { return "add".ToString(); }
-    else if opcode == LIROpcode::Addi { return "addi".ToString(); }
-    else if opcode == LIROpcode::Sub { return "sub".ToString(); }
-    else if opcode == LIROpcode::Subi { return "subi".ToString(); }
-    else if opcode == LIROpcode::Mul { return "mul".ToString(); }
-    else if opcode == LIROpcode::Mulh { return "mulh".ToString(); }
-    else if opcode == LIROpcode::Mulhsu { return "mulhsu".ToString(); }
-    else if opcode == LIROpcode::Mulhu { return "mulhu".ToString(); }
-    else if opcode == LIROpcode::Div { return "div".ToString(); }
-    else if opcode == LIROpcode::Divu { return "divu".ToString(); }
-    else if opcode == LIROpcode::Rem { return "rem".ToString(); }
-    else if opcode == LIROpcode::Remu { return "remu".ToString(); }
-    else if opcode == LIROpcode::And { return "and".ToString(); }
-    else if opcode == LIROpcode::Andi { return "andi".ToString(); }
-    else if opcode == LIROpcode::Or { return "or".ToString(); }
-    else if opcode == LIROpcode::Ori { return "ori".ToString(); }
-    else if opcode == LIROpcode::Xor { return "xor".ToString(); }
-    else if opcode == LIROpcode::Xori { return "xori".ToString(); }
-    else if opcode == LIROpcode::Sll { return "sll".ToString(); }
-    else if opcode == LIROpcode::Slli { return "slli".ToString(); }
-    else if opcode == LIROpcode::Srl { return "srl".ToString(); }
-    else if opcode == LIROpcode::Srli { return "srli".ToString(); }
-    else if opcode == LIROpcode::Sra { return "sra".ToString(); }
-    else if opcode == LIROpcode::Srai { return "srai".ToString(); }
-    else if opcode == LIROpcode::Hlt { return "hlt".ToString(); }
-    else { return "<invalid instruction>".ToString(); }
-}
-#[endif]
 
 class LIRInstruction {
     pub opcode: LIROpcode,
