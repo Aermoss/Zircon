@@ -420,7 +420,7 @@ class HIRType {
             }
 
             for i in 0..left->parameters.Size() {
-                let (left_parameter, right_parameter) = (left->parameters[i], right->parameters[i]);
+                let (left_parameter: *HIRType, right_parameter: *HIRType) = (left->parameters[i], right->parameters[i]);
 
                 if left_parameter != right_parameter {
                     if left_parameter == null || right_parameter == null { return false; }
