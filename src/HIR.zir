@@ -52,16 +52,12 @@ class HIRType {
     pub fn IsEnumeration(&this) -> bool { return this.kind == HIRTypeKind::Enumeration; }
 
     pub fn IsTrivial(&this) -> bool {
-        if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() {
+        if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsFunction() {
             return true;
         }
 
         if this.IsArray() {
             return (this as *HIRArrayType)->element->IsTrivial();
-        }
-
-        if this.IsFunction() {
-            return false;
         }
 
         if this.HasFields() {
@@ -230,7 +226,7 @@ class HIRType {
             return 1;
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             return (this.Width() / 8) as usize;
-        } else if this.IsPointer() {
+        } else if this.IsPointer() || this.IsFunction() {
             return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
         } else if this.IsArray() {
             return this.Element().Alignment();
@@ -253,7 +249,7 @@ class HIRType {
             return 1;
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             return (this.Width() / 8) as usize;
-        } else if this.IsPointer() {
+        } else if this.IsPointer() || this.IsFunction() {
             return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
         } else if this.IsArray() {
             return this.Element().Size() * this.Length();

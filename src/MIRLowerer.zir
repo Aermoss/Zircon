@@ -190,7 +190,9 @@ class MIRLowerer {
         let mut name = declaration->name;
 
         if declaration->abi == HIRDeclarationABI::Native && !function->no_mangle {
-            name = Mangler::MangleFunction(name, declaration->_type, Vector<*HIRType>(), this.namespaces);
+            let mut types = Vector<*HIRType>();
+            if function->instance != null { types = function->instance->types; }
+            name = Mangler::MangleFunction(name, declaration->_type, types, this.namespaces);
         }
 
         let mut parameters = Vector<*MIRParameter>();
