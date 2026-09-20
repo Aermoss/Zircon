@@ -184,7 +184,7 @@ class Parser {
 
         if token._type == TokenType::TRUE || token._type == TokenType::FALSE {
             this.Advance();
-            return this.arena.New<ASTBooleanLiteral>(token._type == TokenType::TRUE, token) as *ASTLiteral;
+            return this.arena.New<ASTBooleanLiteral>(token._type == TokenType::TRUE, token);
         } else if token._type == TokenType::CHAR {
             this.Advance();
 
@@ -194,7 +194,7 @@ class Parser {
             }
 
             let character: i8 = token.value[0];
-            return this.arena.New<ASTCharacterLiteral>(character as u32, token) as *ASTLiteral;
+            return this.arena.New<ASTCharacterLiteral>(character as u32, token);
         } else if token._type == TokenType::INTEGER {
             this.Advance();
             let (mut value, mut suffix, mut base: u64) = (String(), String(), 10);
@@ -219,7 +219,7 @@ class Parser {
                 (value, base) = (value.SubString(2), 2);
             }
 
-            return this.arena.New<ASTIntegerLiteral>(value.ToUnsignedInteger(base), suffix, token) as *ASTLiteral;
+            return this.arena.New<ASTIntegerLiteral>(value.ToUnsignedInteger(base), suffix, token);
         } else if token._type == TokenType::FLOAT {
             this.Advance();
             let (mut value, mut suffix) = (String(), String());
@@ -232,13 +232,13 @@ class Parser {
                 value = token.value;
             }
 
-            return this.arena.New<ASTFloatLiteral>(value.ToFloat(), suffix, token) as *ASTLiteral;
+            return this.arena.New<ASTFloatLiteral>(value.ToFloat(), suffix, token);
         } else if token._type == TokenType::STRING {
             this.Advance();
-            return this.arena.New<ASTStringLiteral>(token.value, token) as *ASTLiteral;
+            return this.arena.New<ASTStringLiteral>(token.value, token);
         } else if token._type == TokenType::NULL {
             this.Advance();
-            return this.arena.New<ASTNullLiteral>(token) as *ASTLiteral;
+            return this.arena.New<ASTNullLiteral>(token);
         } else if token._type == TokenType::IDENTIFIER || token._type == TokenType::THIS || token._type == TokenType::OPERATOR || token._type == TokenType::DOUBLE_COLON {
             return this.arena.New<ASTPathExpression>(this.ParsePath(), token);
         } else if token._type == TokenType::LBRACE {
@@ -257,7 +257,7 @@ class Parser {
                 }
 
                 if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
-            } return array as *ASTLiteral;
+            } return array;
         } else if token._type == TokenType::LPAREN {
             this.Advance();
             let mut expression = this.ParseExpression();
@@ -368,7 +368,7 @@ class Parser {
                 }
 
                 if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
-                expression = structure as *ASTLiteral;
+                expression = structure;
             } else if token._type == TokenType::THREE_DOT {
                 this.Advance();
                 expression = this.arena.New<ASTPackSplatExpression>(expression, token);
@@ -1482,7 +1482,7 @@ class Parser {
                     continue;
                 }
 
-                extern_block->declarations.PushBack(function as *ASTDeclaration);
+                extern_block->declarations.PushBack(function);
             } else if this.Current()._type == TokenType::STATIC {
                 let _static = this.ParseStaticDeclaration(attributes);
 
@@ -1491,7 +1491,7 @@ class Parser {
                     continue;
                 }
 
-                extern_block->declarations.PushBack(_static as *ASTDeclaration);
+                extern_block->declarations.PushBack(_static);
             } else {
                 Logger::Log("Only function and static declarations allowed in extern block.", this.Current(), LogSeverity::Error);
                 this.Advance();

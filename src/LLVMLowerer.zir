@@ -130,9 +130,9 @@ class LLVMLowerer {
         if declaration->kind == MIRDeclarationKind::Constant {
             this.LowerConstantDeclarationFirstPass(declaration as *MIRConstantDeclaration);
         } else if declaration->kind == MIRDeclarationKind::Static {
-            this.LowerStaticDeclarationFirstPass((declaration as *MIRLinkableDeclaration) as *MIRStaticDeclaration);
+            this.LowerStaticDeclarationFirstPass(declaration as *MIRStaticDeclaration);
         } else if declaration->kind == MIRDeclarationKind::Function {
-            this.LowerFunctionDeclarationFirstPass((declaration as *MIRLinkableDeclaration) as *MIRFunctionDeclaration);
+            this.LowerFunctionDeclarationFirstPass(declaration as *MIRFunctionDeclaration);
         }
     }
 
@@ -140,13 +140,13 @@ class LLVMLowerer {
         if declaration->kind == MIRDeclarationKind::Constant {
             this.LowerConstantDeclarationSecondPass(declaration as *MIRConstantDeclaration);
         } else if declaration->kind == MIRDeclarationKind::Static {
-            this.LowerStaticDeclarationSecondPass((declaration as *MIRLinkableDeclaration) as *MIRStaticDeclaration);
+            this.LowerStaticDeclarationSecondPass(declaration as *MIRStaticDeclaration);
         }
     }
 
     fn LowerDeclarationFifthPass(&mut this, declaration: *MIRDeclaration) {
         if declaration->kind == MIRDeclarationKind::Function {
-            this.LowerFunctionDeclarationSecondPass((declaration as *MIRLinkableDeclaration) as *MIRFunctionDeclaration);
+            this.LowerFunctionDeclarationSecondPass(declaration as *MIRFunctionDeclaration);
         }
     }
 
@@ -192,28 +192,26 @@ class LLVMLowerer {
     }
 
     fn LowerStaticDeclarationFirstPass(&mut this, _static: *MIRStaticDeclaration) {
-        let linkable_declaration = _static as *MIRLinkableDeclaration;
-        let declaration = linkable_declaration as *MIRDeclaration;
+        let declaration = _static as *MIRDeclaration;
         let _type = this.LowerType(declaration->_type);
         if _type == null { return; }
 
         let global = LLVMAddGlobal(this.module, _type, declaration->name.Data());
-        LLVMSetLinkage(global, this.LowerLinkage(linkable_declaration->linkage));
+        LLVMSetLinkage(global, this.LowerLinkage((_static as *MIRLinkableDeclaration)->linkage));
         LLVMSetGlobalConstant(global, !_static->mutable ? 1 : 0);
         this.declarations[declaration] = global;
     }
 
     fn LowerStaticDeclarationSecondPass(&mut this, _static: *MIRStaticDeclaration) {
         if _static->initializer == null { return; }
+        let declaration = _static as *MIRDeclaration;
         let initializer = this.LowerValue(_static->initializer);
         if initializer == null { return; }
-        let declaration = (_static as *MIRLinkableDeclaration) as *MIRDeclaration;
         LLVMSetInitializer(this.declarations[declaration], initializer);
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *MIRFunctionDeclaration) {
-        let linkable_declaration = function as *MIRLinkableDeclaration;
-        let declaration = linkable_declaration as *MIRDeclaration;
+        let declaration = function as *MIRDeclaration;
         let mut parameters = Vector<LLVMTypeRef>();
 
         for parameter in function->parameters {
@@ -225,7 +223,7 @@ class LLVMLowerer {
         let _return = this.LowerType(function->_return);
         if _return == null { return; }
         let value = LLVMAddFunction(this.module, declaration->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0));
-        LLVMSetFunctionCallConv(value, (linkable_declaration->linkage == MIRDeclarationLinkage::Internal ? LLVMCallConv::LLVMFastCallConv : LLVMCallConv::LLVMCCallConv) as u32);
+        LLVMSetFunctionCallConv(value, ((function as *MIRLinkableDeclaration)->linkage == MIRDeclarationLinkage::Internal ? LLVMCallConv::LLVMFastCallConv : LLVMCallConv::LLVMCCallConv) as u32);
         this.declarations[declaration] = value;
 
         if this.freestanding || true {
@@ -246,7 +244,7 @@ class LLVMLowerer {
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *MIRFunctionDeclaration) {
         if function->blocks.Empty() { return; }
-        let declaration = (function as *MIRLinkableDeclaration) as *MIRDeclaration;
+        let declaration = function as *MIRDeclaration;
         let value = this.declarations[declaration];
         this.values.Clear();
 
@@ -375,7 +373,7 @@ class LLVMLowerer {
 
     fn LowerCastExpression(&mut this, cast: *MIRCastExpression) -> LLVMValueRef {
         let expression = cast as *MIRConstantExpression;
-        let target = this.LowerType(((expression as *MIRConstant) as *MIRValue)->_type);
+        let target = this.LowerType((expression as *MIRValue)->_type);
         if target == null { return null; }
         let value = this.LowerValue(cast->value);
         if value == null { return null; }

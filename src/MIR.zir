@@ -234,9 +234,7 @@ class MIRConstantInteger : MIRConstant {
     }
 
     pub fn ToString(&this) -> String {
-        let value = (this as *MIRConstant) as *MIRValue;
-
-        if (value->_type as *MIRIntegerType)->width == 1 {
+        if ((this as *MIRValue)->_type as *MIRIntegerType)->width == 1 {
             return (this.value != 0 ? "true" : "false").ToString();
         } return String::FromInteger(this.value as i64);
     }
@@ -459,8 +457,7 @@ class MIRCastExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        let value = ((this as *MIRConstantExpression) as *MIRConstant) as *MIRValue;
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + value->_type->ToString();
+        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + (this as *MIRValue)->_type->ToString();
     }
 }
 
@@ -573,8 +570,7 @@ class MIRLoadInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        let value = (this as *MIRInstruction) as *MIRValue;
-        return "load " + value->_type->ToString() + ", " + this.pointer->ToString();
+        return "load " + (this as *MIRValue)->_type->ToString() + ", " + this.pointer->ToString();
     }
 }
 
@@ -672,8 +668,7 @@ class MIRCastInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        let value = (this as *MIRInstruction) as *MIRValue;
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + value->_type->ToString();
+        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + (this as *MIRValue)->_type->ToString();
     }
 }
 
@@ -892,9 +887,9 @@ class MIRDeclaration {
         } else if this.kind == MIRDeclarationKind::Constant {
             return (this as *MIRConstantDeclaration)->ToString();
         } else if this.kind == MIRDeclarationKind::Function {
-            return ((this as *MIRLinkableDeclaration) as *MIRFunctionDeclaration)->ToString();
+            return (this as *MIRFunctionDeclaration)->ToString();
         } else if this.kind == MIRDeclarationKind::Static {
-            return ((this as *MIRLinkableDeclaration) as *MIRStaticDeclaration)->ToString();
+            return (this as *MIRStaticDeclaration)->ToString();
         } else {
             return "<invalid declaration>".ToString();
         }
@@ -979,7 +974,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = (this as *MIRLinkableDeclaration) as *MIRDeclaration;
+        let declaration = this as *MIRDeclaration;
         let mut result = "fn @\"" + declaration->name + "\"(";
 
         for i in 0..this.parameters.Size() {
@@ -1013,7 +1008,7 @@ class MIRStaticDeclaration : MIRLinkableDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = (this as *MIRLinkableDeclaration) as *MIRDeclaration;
+        let declaration = this as *MIRDeclaration;
         let mut result = "static @\"" + declaration->name + "\": " + declaration->_type->ToString();
 
         if this.initializer != null {
@@ -1038,8 +1033,8 @@ class MIRModule {
                 if previous->kind != declaration->kind {
                     result += '\n';
                 } else if declaration->kind == MIRDeclarationKind::Function {
-                    let current = (declaration as *MIRLinkableDeclaration) as *MIRFunctionDeclaration;
-                    let previous = (previous as *MIRLinkableDeclaration) as *MIRFunctionDeclaration;
+                    let current = declaration as *MIRFunctionDeclaration;
+                    let previous = previous as *MIRFunctionDeclaration;
 
                     if !current->blocks.Empty() || !previous->blocks.Empty() {
                         result += '\n';
@@ -1172,42 +1167,42 @@ class MIRBuilder {
 
     pub fn BuildArrayGEP(&mut this, name: String, pointer: *MIRValue, index: *MIRValue) -> *mut MIRValue {
         if this.GetCurrentBlock() == null {
-            return (this.ConstantArrayGEP(pointer, index) as *MIRConstantExpression) as *mut MIRConstant;
+            return this.ConstantArrayGEP(pointer, index);
         }
 
         let gep = this.context->arena.New<MIRArrayGEPInstruction>(name, pointer, index, pointer->_type);
         this.block->AddInstruction(gep);
-        return gep as *mut MIRInstruction;
+        return gep;
     }
 
     pub fn BuildStructGEP(&mut this, name: String, pointer: *MIRValue, index: u32, _type: *MIRType) -> *mut MIRValue {
         if this.GetCurrentBlock() == null {
-            return (this.ConstantStructGEP(pointer, index, _type) as *MIRConstantExpression) as *mut MIRConstant;
+            return this.ConstantStructGEP(pointer, index, _type);
         }
 
         let gep = this.context->arena.New<MIRStructGEPInstruction>(name, pointer, index, _type);
         this.block->AddInstruction(gep);
-        return gep as *mut MIRInstruction;
+        return gep;
     }
 
     pub fn BuildUnary(&mut this, name: String, kind: MIRUnaryKind, operand: *MIRValue) -> *mut MIRValue {
         if this.GetCurrentBlock() == null {
-            return (this.ConstantUnary(kind, operand) as *MIRConstantExpression) as *mut MIRConstant;
+            return this.ConstantUnary(kind, operand);
         }
 
         let unary = this.context->arena.New<MIRUnaryInstruction>(name, kind, operand, operand->_type);
         this.block->AddInstruction(unary);
-        return unary as *mut MIRInstruction;
+        return unary;
     }
 
     pub fn BuildBinary(&mut this, name: String, kind: MIRBinaryKind, left: *MIRValue, right: *MIRValue, _type: *MIRType) -> *mut MIRValue {
         if this.GetCurrentBlock() == null {
-            return (this.ConstantBinary(kind, left, right, _type) as *MIRConstantExpression) as *mut MIRConstant;
+            return this.ConstantBinary(kind, left, right, _type);
         }
 
         let binary = this.context->arena.New<MIRBinaryInstruction>(name, kind, left, right, _type);
         this.block->AddInstruction(binary);
-        return binary as *mut MIRInstruction;
+        return binary;
     }
 
     pub fn BuildCall(&mut this, name: String, callee: *MIRValue, arguments: Vector<*MIRValue>) -> *mut MIRCallInstruction {
@@ -1218,12 +1213,12 @@ class MIRBuilder {
 
     pub fn BuildCast(&mut this, name: String, kind: MIRCastKind, value: *MIRValue, _type: *MIRType) -> *mut MIRValue {
         if this.GetCurrentBlock() == null {
-            return (this.ConstantCast(kind, value, _type) as *MIRConstantExpression) as *mut MIRConstant;
+            return this.ConstantCast(kind, value, _type);
         }
 
         let cast = this.context->arena.New<MIRCastInstruction>(name, kind, value, _type);
         this.block->AddInstruction(cast);
-        return cast as *mut MIRInstruction;
+        return cast;
     }
 
     pub fn BuildSelect(&mut this, name: String, condition: *MIRValue, then_value: *MIRValue, else_value: *MIRValue, _type: *MIRType) -> *mut MIRSelectInstruction {
@@ -1309,7 +1304,7 @@ class MIRBuilder {
         for parameter in parameters { parameter_types.PushBack((parameter as *MIRValue)->_type); }
         let _type = this.context->FunctionType(parameter_types, _return);
         let function = this.context->arena.New<MIRFunctionDeclaration>(name, parameters, _return, _type, linkage);
-        this.module->declarations.PushBack(function as *MIRLinkableDeclaration);
+        this.module->declarations.PushBack(function);
         return function;
     }
 
@@ -1323,7 +1318,7 @@ class MIRBuilder {
 
     pub fn BuildStatic(&mut this, name: String, _type: *MIRType, mutable: bool, initializer: *MIRValue, linkage: MIRDeclarationLinkage) -> *mut MIRStaticDeclaration {
         let _static = this.context->arena.New<MIRStaticDeclaration>(name, _type, mutable, initializer, linkage);
-        this.module->declarations.PushBack(_static as *MIRLinkableDeclaration);
+        this.module->declarations.PushBack(_static);
         return _static;
     }
 }

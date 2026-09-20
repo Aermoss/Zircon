@@ -147,7 +147,7 @@ class HIRLowerer {
     }
 
     fn LowerTypeDeclaration(&mut this, type_definition: *ASTTypeDeclaration) {
-        this.scope_manager.current->Set(type_definition->name, this.LowerType(type_definition->_type), type_definition as *ASTDeclaration);
+        this.scope_manager.current->Set(type_definition->name, this.LowerType(type_definition->_type), type_definition);
     }
 
     fn LowerDeclarationThirdPass(&mut this, declaration: *ASTDeclaration) -> bool {
@@ -303,7 +303,7 @@ class HIRLowerer {
         }
 
         let declaration = this.builder.BuildConstantDeclaration(constant->name, _type, initializer);
-        this.scope_manager.current->Set(constant->name, declaration, false, constant as *ASTDeclaration);
+        this.scope_manager.current->Set(constant->name, declaration, false, constant);
     }
 
     fn LowerStaticDeclaration(&mut this, _static: *ASTStaticDeclaration) {
@@ -322,25 +322,25 @@ class HIRLowerer {
             if alignment == null { return; }
 
             if !alignment->_type->IsIntegerPointer() || alignment->_type->IsSigned() {
-                Logger::Log("Static alignment must be of type 'usize'.", _static as *ASTDeclaration, LogSeverity::Error);
+                Logger::Log("Static alignment must be of type 'usize'.", _static, LogSeverity::Error);
                 return;
             }
         }
 
         let declaration = this.builder.BuildStaticDeclaration(_static->name, _type, initializer, alignment, _static->mutable, this.linkage);
-        this.scope_manager.current->Set(_static->name, declaration, false, _static as *ASTDeclaration);
+        this.scope_manager.current->Set(_static->name, declaration, false, _static);
     }
 
     pub fn LowerFunctionDeclarationFirstPass(&mut this, function: *ASTFunctionDeclaration, instance: *mut GenericInstance) -> *mut HIRFunctionDeclaration {
         if (function->generic || !function->pack_name.Empty()) && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(function);
-            this.scope_manager.current->Set(function->name, generic, function as *ASTDeclaration);
+            this.scope_manager.current->Set(function->name, generic, function);
             this.generics.PushBack(generic);
             return null;
         }
 
         if (this.current_type == null || !this.current_type->IsClass()) && !function->constructors.Empty() {
-            Logger::Log("Constructors can only be declared inside classes.", function as *ASTDeclaration, LogSeverity::Error);
+            Logger::Log("Constructors can only be declared inside classes.", function, LogSeverity::Error);
             return null;
         }
 
@@ -349,7 +349,7 @@ class HIRLowerer {
 
         if function->instance_kind != ASTInstanceKind::None {
             if this.current_type == null {
-                Logger::Log("Recievers are only allowed in methods.", function as *ASTDeclaration, LogSeverity::Error);
+                Logger::Log("Recievers are only allowed in methods.", function, LogSeverity::Error);
                 return null;
             }
 
@@ -386,7 +386,7 @@ class HIRLowerer {
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
 
         if instance == null {
-            this.scope_manager.current->Set(function->name, declaration, this.abi == HIRDeclarationABI::Native && !function->no_mangle, function as *ASTDeclaration);
+            this.scope_manager.current->Set(function->name, declaration, this.abi == HIRDeclarationABI::Native && !function->no_mangle, function);
         } return declaration;
     }
 
@@ -397,7 +397,7 @@ class HIRLowerer {
 
         for parameter in declaration->parameters {
             let declaration = parameter as *HIRDeclaration;
-            this.scope_manager.current->Set(declaration->name, parameter, false, function as *ASTDeclaration);
+            this.scope_manager.current->Set(declaration->name, parameter, false, function);
 
             if declaration->_type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
@@ -411,7 +411,7 @@ class HIRLowerer {
     pub fn LowerClassDeclarationFirstPass(&mut this, _class: *ASTClassDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRClassDeclaration, *mut Scope> {
         if _class->generic && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(_class);
-            this.scope_manager.current->Set(_class->name, generic, _class as *ASTDeclaration);
+            this.scope_manager.current->Set(_class->name, generic, _class);
             this.generics.PushBack(generic);
             return Pair<*mut HIRClassDeclaration, *mut Scope>(null, null);
         }
@@ -422,7 +422,7 @@ class HIRLowerer {
         _type->declaration = declaration;
 
         if instance == null {
-            this.scope_manager.current->Set(_class->name, _type, _class as *ASTDeclaration);
+            this.scope_manager.current->Set(_class->name, _type, _class);
             this.scope_manager.PushScope(_class->name, true);
             scope = this.scope_manager.current;
             this.scope_manager.PopScope();
@@ -467,7 +467,7 @@ class HIRLowerer {
         }
 
         let function = this.builder.BuildFunctionDeclaration(name, parameters, _return, this.context.FunctionType(parameter_types, _return), false, true, HIRDeclarationABI::Native);
-        this.scope_manager.current->Set(name, function, true, _class as *ASTDeclaration);
+        this.scope_manager.current->Set(name, function, true, _class);
         return function;
     }
 
@@ -573,7 +573,7 @@ class HIRLowerer {
 
         for parameter in declaration->parameters {
             let declaration = parameter as *HIRDeclaration;
-            this.scope_manager.current->Set(declaration->name, parameter, false, function as *ASTDeclaration);
+            this.scope_manager.current->Set(declaration->name, parameter, false, function);
 
             if declaration->_type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
@@ -593,7 +593,7 @@ class HIRLowerer {
             if _type == null { continue; }
 
             if !_type->IsClass() {
-                Logger::Log("Constructor target must be a class.", constructor as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Constructor target must be a class.", constructor, LogSeverity::Error);
                 continue;
             }
 
@@ -603,7 +603,7 @@ class HIRLowerer {
                 values.PushBack(this.builder.Cast(this_reference, this.context.ReferenceType(parent, true)));
 
                 let mut invalid = false;
-                values += this.LowerCallArguments(constructor->arguments, constructor as *ASTExpression, &mut invalid);
+                values += this.LowerCallArguments(constructor->arguments, constructor, &mut invalid);
                 if invalid { break; }
 
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
@@ -666,7 +666,7 @@ class HIRLowerer {
 
         for parameter in declaration->parameters {
             let declaration = parameter as *HIRDeclaration;
-            this.scope_manager.current->Set(declaration->name, parameter, false, function as *ASTDeclaration);
+            this.scope_manager.current->Set(declaration->name, parameter, false, function);
 
             if declaration->_type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
@@ -753,9 +753,9 @@ class HIRLowerer {
                         candidates.PushBack(candidate);
                     }
 
-                    let function = this.ResolveOverload(candidates, values, _class as *ASTDeclaration, false);
+                    let function = this.ResolveOverload(candidates, values, _class, false);
                     if function == null { continue; }
-                    let call = this.LowerResolvedCallExpression(function, values, _class as *ASTDeclaration);
+                    let call = this.LowerResolvedCallExpression(function, values, _class);
                     if call == null { continue; }
                     this.builder.BuildExpressionStatement(call);
                 } else {
@@ -827,11 +827,11 @@ class HIRLowerer {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(this_field));
                     values.PushBack(this.ImplicitAddressOf(other_field));
-                    let candidates = field_type->GetCandidates("operator=".ToString(), _class as *ASTDeclaration, false);
+                    let candidates = field_type->GetCandidates("operator=".ToString(), _class, false);
                     if candidates.Empty() { continue; }
-                    let function = this.ResolveOverload(candidates, values, _class as *ASTDeclaration, false);
+                    let function = this.ResolveOverload(candidates, values, _class, false);
                     if function == null { continue; }
-                    let call = this.LowerResolvedCallExpression(function, values, _class as *ASTDeclaration);
+                    let call = this.LowerResolvedCallExpression(function, values, _class);
                     if call == null { continue; }
                     this.builder.BuildExpressionStatement(call);
                 } else {
@@ -849,7 +849,7 @@ class HIRLowerer {
     pub fn LowerStructureDeclarationFirstPass(&mut this, structure: *ASTStructureDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRStructureDeclaration, *mut Scope> {
         if structure->generic && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(structure);
-            this.scope_manager.current->Set(structure->name, generic, structure as *ASTDeclaration);
+            this.scope_manager.current->Set(structure->name, generic, structure);
             this.generics.PushBack(generic);
             return Pair<*mut HIRStructureDeclaration, *mut Scope>(null, null);
         }
@@ -860,7 +860,7 @@ class HIRLowerer {
         _type->declaration = declaration;
 
         if instance == null {
-            this.scope_manager.current->Set(structure->name, _type, structure as *ASTDeclaration);
+            this.scope_manager.current->Set(structure->name, _type, structure);
             this.scope_manager.PushScope(structure->name, true);
             scope = this.scope_manager.current;
             this.scope_manager.PopScope();
@@ -919,7 +919,7 @@ class HIRLowerer {
         if underlying_type == null { return; }
 
         if !underlying_type->IsInteger() {
-            Logger::Log("Expected an integer type.", enumeration as *ASTDeclaration, LogSeverity::Error);
+            Logger::Log("Expected an integer type.", enumeration, LogSeverity::Error);
             return;
         }
 
@@ -927,8 +927,8 @@ class HIRLowerer {
         let declaration = this.builder.BuildEnumerationDeclaration(enumeration->name, _type);
         _type->declaration = declaration;
 
-        let mut value: *HIRExpression = this.builder.IntegerLiteral(0, _type) as *HIRLiteral;
-        this.scope_manager.current->Set(enumeration->name, _type, enumeration as *ASTDeclaration);
+        let mut value: *HIRExpression = this.builder.IntegerLiteral(0, _type);
+        this.scope_manager.current->Set(enumeration->name, _type, enumeration);
         this.scope_manager.PushScope(enumeration->name, true);
 
         for member in enumeration->members {
@@ -947,8 +947,8 @@ class HIRLowerer {
             }
 
             let member_declaration = this.builder.BuildMemberDeclaration(member->name, value, _type);
-            value = this.builder.Binary(HIRBinaryKind::Add, value, this.builder.IntegerLiteral(1, _type) as *HIRLiteral, _type);
-            this.scope_manager.current->Set(member->name, member_declaration, false, enumeration as *ASTDeclaration);
+            value = this.builder.Binary(HIRBinaryKind::Add, value, this.builder.IntegerLiteral(1, _type), _type);
+            this.scope_manager.current->Set(member->name, member_declaration, false, enumeration);
             declaration->members.PushBack(member_declaration);
         }
 
@@ -991,12 +991,12 @@ class HIRLowerer {
 
     fn LowerExternDeclarationFirstPass(&mut this, _extern: *ASTExternDeclaration) {
         if this.abi != HIRDeclarationABI::Native {
-            Logger::Log("Already in an extern block.", _extern as *ASTDeclaration, LogSeverity::Error);
+            Logger::Log("Already in an extern block.", _extern, LogSeverity::Error);
             return;
         }
 
         if _extern->linkage != "C" {
-            Logger::Log("Unknown linkage '" + _extern->linkage + "'.", _extern as *ASTDeclaration, LogSeverity::Error);
+            Logger::Log("Unknown linkage '" + _extern->linkage + "'.", _extern, LogSeverity::Error);
             return;
         }
 
@@ -1095,7 +1095,7 @@ class HIRLowerer {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(value));
                 let arguments = Vector<*HIRExpression>(values);
-                values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
+                values.Insert(0, this.builder.NullLiteral());
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (value->_type as *HIRClassType)->declaration->constructors {
@@ -1104,7 +1104,7 @@ class HIRLowerer {
 
                 let function = this.ResolveOverload(candidates, values, _return->expression, false);
                 if function == null { return; }
-                let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                let callee = this.builder.ReferenceDeclaration(function, false);
                 value = this.builder.Constructor(callee, arguments, value->_type);
             }
 
@@ -1206,37 +1206,37 @@ class HIRLowerer {
             let mut end_function: *HIRFunctionDeclaration = null;
 
             if iterable->_type->HasMethods() {
-                let begin_candidates = iterable->_type->GetCandidates("Begin".ToString(), _for as *ASTStatement, true);
-                begin_function = this.ResolveOverload(begin_candidates, values, _for as *ASTStatement, true);
+                let begin_candidates = iterable->_type->GetCandidates("Begin".ToString(), _for, true);
+                begin_function = this.ResolveOverload(begin_candidates, values, _for, true);
 
-                let end_candidates = iterable->_type->GetCandidates("End".ToString(), _for as *ASTStatement, true);
-                end_function = this.ResolveOverload(end_candidates, values, _for as *ASTStatement, true);
+                let end_candidates = iterable->_type->GetCandidates("End".ToString(), _for, true);
+                end_function = this.ResolveOverload(end_candidates, values, _for, true);
             }
 
             if begin_function == null || end_function == null {
-                Logger::Log("For loop iterable must provide 'Begin()' and 'End()' methods.", _for as *ASTStatement, LogSeverity::Error);
+                Logger::Log("For loop iterable must provide 'Begin()' and 'End()' methods.", _for, LogSeverity::Error);
                 return;
             }
 
-            start = this.LowerResolvedCallExpression(begin_function, values, _for as *ASTStatement);
-            end = this.LowerResolvedCallExpression(end_function, values, _for as *ASTStatement);
+            start = this.LowerResolvedCallExpression(begin_function, values, _for);
+            end = this.LowerResolvedCallExpression(end_function, values, _for);
             if start == null || end == null { return; }
         }
 
         if *start->_type != *end->_type {
-            Logger::Log("Start and end expressions of a for loop must have the same type.", _for as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Start and end expressions of a for loop must have the same type.", _for, LogSeverity::Error);
             return;
         }
 
         let iterator_type = start->_type;
 
         if is_range && !iterator_type->IsInteger() && !iterator_type->IsFloat() {
-            Logger::Log("For loop ranges require an integer or floating point type.", _for as *ASTStatement, LogSeverity::Error);
+            Logger::Log("For loop ranges require an integer or floating point type.", _for, LogSeverity::Error);
             return;
         }
 
         if !is_range && !iterator_type->IsPointer() && !iterator_type->HasMethods() {
-            Logger::Log("For loop requires a pointer iterator or an iterator class.", _for as *ASTStatement, LogSeverity::Error);
+            Logger::Log("For loop requires a pointer iterator or an iterator class.", _for, LogSeverity::Error);
             return;
         }
 
@@ -1248,16 +1248,16 @@ class HIRLowerer {
             let mut one: *HIRExpression = null;
 
             if iterator_type->IsFloat() {
-                one = this.builder.FloatLiteral(1.0, iterator_type) as *HIRLiteral;
+                one = this.builder.FloatLiteral(1.0, iterator_type);
             } else {
-                one = this.builder.IntegerLiteral(1, iterator_type) as *HIRLiteral;
+                one = this.builder.IntegerLiteral(1, iterator_type);
             }
 
             alias = iterator_reference;
             condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, end, this.context.BooleanType());
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
         } else if iterator_type->IsPointer() {
-            let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
+            let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
             condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, end, this.context.BooleanType());
             alias = this.builder.Dereference(iterator_reference);
@@ -1265,23 +1265,23 @@ class HIRLowerer {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(iterator_reference);
             values.PushBack(end);
-            let condition_candidates = iterator_type->GetCandidates("operator!=".ToString(), _for as *ASTStatement, false);
+            let condition_candidates = iterator_type->GetCandidates("operator!=".ToString(), _for, false);
             if condition_candidates.Empty() { return; }
-            let condition_call = this.LowerResolvedCallExpression(condition_candidates, values, _for as *ASTStatement);
+            let condition_call = this.LowerResolvedCallExpression(condition_candidates, values, _for);
             if condition_call == null { return; }
             condition = condition_call;
 
-            values.Back() = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false)) as *HIRLiteral;
-            let step_candidates = iterator_type->GetCandidates("operator+=".ToString(), _for as *ASTStatement, false);
+            values.Back() = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
+            let step_candidates = iterator_type->GetCandidates("operator+=".ToString(), _for, false);
             if step_candidates.Empty() { return; }
-            let step_call = this.LowerResolvedCallExpression(step_candidates, values, _for as *ASTStatement);
+            let step_call = this.LowerResolvedCallExpression(step_candidates, values, _for);
             if step_call == null { return; }
             step = step_call;
 
             values.PopBack();
-            let dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for as *ASTStatement, false);
+            let dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for, false);
             if dereference_candidates.Empty() { return; }
-            let dereference_call = this.LowerResolvedCallExpression(dereference_candidates, values, _for as *ASTStatement);
+            let dereference_call = this.LowerResolvedCallExpression(dereference_candidates, values, _for);
             if dereference_call == null { return; }
             alias = dereference_call;
         }
@@ -1290,7 +1290,7 @@ class HIRLowerer {
 
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
-        this.scope_manager.current->Set(_for->variable, alias, _for as *ASTStatement);
+        this.scope_manager.current->Set(_for->variable, alias, _for);
         let body = this.LowerBlockStatement(_for->body);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
@@ -1320,7 +1320,7 @@ class HIRLowerer {
 
             if instance == exception { continue; }
             let function = (instance->_type as *HIRClassType)->declaration->destructor;
-            let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+            let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
             destructors.Insert(0, destructor);
         }
@@ -1335,7 +1335,7 @@ class HIRLowerer {
         for instance in this.temporaries.Reverse() {
             if instance == exception { continue; }
             let function = (instance->_type as *HIRClassType)->declaration->destructor;
-            let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+            let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
             destructors.PushBack(destructor);
         }
@@ -1365,7 +1365,7 @@ class HIRLowerer {
                 }
 
                 let function = (instance->_type as *HIRClassType)->declaration->destructor;
-                let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                let callee = this.builder.ReferenceDeclaration(function, false);
                 let destructor = this.builder.Destructor(this.builder.AddressOf(instance, true), callee);
                 destructors.PushBack(destructor);
             }
@@ -1383,7 +1383,7 @@ class HIRLowerer {
 
     fn LowerContinueStatement(&mut this, _continue: *ASTContinueStatement) {
         if this.loop_scopes.Empty() {
-            Logger::Log("Continue statement outside of loop.", _continue as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Continue statement outside of loop.", _continue, LogSeverity::Error);
             return;
         }
 
@@ -1393,7 +1393,7 @@ class HIRLowerer {
 
     fn LowerBreakStatement(&mut this, _break: *ASTBreakStatement) {
         if this.loop_scopes.Empty() {
-            Logger::Log("Break statement outside of loop.", _break as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Break statement outside of loop.", _break, LogSeverity::Error);
             return;
         }
 
@@ -1403,7 +1403,7 @@ class HIRLowerer {
 
     fn LowerUnsafeStatement(&mut this, _unsafe: *ASTUnsafeStatement) {
         if this._unsafe {
-            Logger::Log("Already in an unsafe statement.", _unsafe as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Already in an unsafe statement.", _unsafe, LogSeverity::Error);
             return;
         }
 
@@ -1448,17 +1448,17 @@ class HIRLowerer {
                     }
 
                     if !_type->IsCompatible(initializer->_type) {
-                        Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable as *ASTStatement, LogSeverity::Error);
+                        Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable, LogSeverity::Error);
                         return;
                     }
 
                     if !_type->IsMutabilityCompatible(initializer->_type) {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable as *ASTStatement, LogSeverity::Error);
+                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable, LogSeverity::Error);
                         return;
                     }
 
                     if same && !this.LiteralNeedsExplicitType(variable->initializer, _type) {
-                        Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", variable as *ASTStatement, LogSeverity::Warning);
+                        Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", variable, LogSeverity::Warning);
                     }
 
                     initializer = this.MakeCompatible(initializer, _type);
@@ -1468,13 +1468,13 @@ class HIRLowerer {
             initializer = this.Coerce(this.LowerExpression(variable->initializer));
             _type = initializer->_type;
         } else {
-            Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable, LogSeverity::Error);
         }
 
         if _type != null {
             let construct = _type->IsClass() && (initializer != null ? initializer->_type->IsClass() && initializer->category == HIRExpressionCategory::Place : true);
             let statement = this.builder.BuildVariableStatement(variable->name, _type, !construct ? initializer : null, variable->mutable);
-            this.scope_manager.current->Set(variable->name, statement, variable as *ASTStatement);
+            this.scope_manager.current->Set(variable->name, statement, variable);
             this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
             if construct {
@@ -1490,11 +1490,11 @@ class HIRLowerer {
                     candidates.PushBack(candidate);
                 }
 
-                let function = this.ResolveOverload(candidates, values, variable as *ASTStatement, initializer == null);
+                let function = this.ResolveOverload(candidates, values, variable, initializer == null);
                 if initializer != null && function == null { return; }
 
                 if function != null {
-                    let call = this.LowerResolvedCallExpression(function, values, variable as *ASTStatement);
+                    let call = this.LowerResolvedCallExpression(function, values, variable);
 
                     if call != null {
                         this.builder.BuildExpressionStatement(call);
@@ -1517,7 +1517,7 @@ class HIRLowerer {
 
     fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
         if assembly->outputs.Size() > 1 {
-            Logger::Log("Multiple outputs are not supported.", assembly as *ASTStatement, LogSeverity::Error);
+            Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
         }
     }
 
@@ -1646,9 +1646,9 @@ class HIRLowerer {
 
     fn LowerLiteral(&mut this, literal: *ASTLiteral) -> *HIRExpression {
         if literal->kind == ASTLiteralKind::Boolean {
-            return this.builder.BooleanLiteral((literal as *ASTBooleanLiteral)->value, this.context.BooleanType()) as *HIRLiteral;
+            return this.builder.BooleanLiteral((literal as *ASTBooleanLiteral)->value, this.context.BooleanType());
         } else if literal->kind == ASTLiteralKind::Character {
-            return this.builder.CharacterLiteral((literal as *ASTCharacterLiteral)->value, this.context.IntegerType(8, true)) as *HIRLiteral;
+            return this.builder.CharacterLiteral((literal as *ASTCharacterLiteral)->value, this.context.IntegerType(8, true));
         } else if literal->kind == ASTLiteralKind::Integer {
             let integer = literal as *ASTIntegerLiteral;
             let mut _type = this.context.IntegerLiteralType();
@@ -1665,13 +1665,13 @@ class HIRLowerer {
                     if width == 128 || width == 64 || width == 32 || width == 16 || width == 8 {
                         _type = this.context.IntegerType(width, signed);
                     } else {
-                        Logger::Log("Invalid integer suffix '" + integer->suffix +  "'.", literal as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid integer suffix '" + integer->suffix +  "'.", literal, LogSeverity::Error);
                         return null;
                     }
                 }
             }
 
-            return this.builder.IntegerLiteral(integer->value, _type) as *HIRLiteral;
+            return this.builder.IntegerLiteral(integer->value, _type);
         } else if literal->kind == ASTLiteralKind::Float {
             let float = literal as *ASTFloatLiteral;
             let mut _type = this.context.FloatLiteralType();
@@ -1682,14 +1682,14 @@ class HIRLowerer {
                 if width == 64 || width == 32 {
                     _type = this.context.FloatType(width);
                 } else {
-                    Logger::Log("Invalid float suffix '" + float->suffix +  "'.", literal as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Invalid float suffix '" + float->suffix +  "'.", literal, LogSeverity::Error);
                     return null;
                 }
             }
 
-            return this.builder.FloatLiteral(float->value, _type) as *HIRLiteral;
+            return this.builder.FloatLiteral(float->value, _type);
         } else if literal->kind == ASTLiteralKind::String {
-            return this.builder.StringLiteral((literal as *ASTStringLiteral)->value, this.context.PointerType(this.context.IntegerType(8, true), false)) as *HIRLiteral;
+            return this.builder.StringLiteral((literal as *ASTStringLiteral)->value, this.context.PointerType(this.context.IntegerType(8, true), false));
         } else if literal->kind == ASTLiteralKind::Array {
             let mut elements = Vector<*HIRExpression>();
             let mut _type: *HIRType = null;
@@ -1707,12 +1707,12 @@ class HIRLowerer {
                 }
             }
 
-            return this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size())) as *HIRLiteral;
+            return this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
         } else if literal->kind == ASTLiteralKind::Structure {
             let structure = literal as *ASTStructureLiteral;
 
             if structure->expression->kind != ASTExpressionKind::Path {
-                Logger::Log("Structure initializer target must be a path.", literal as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Structure initializer target must be a path.", literal, LogSeverity::Error);
                 return null;
             }
 
@@ -1720,7 +1720,7 @@ class HIRLowerer {
             if _type == null { return null; }
 
             if !_type->IsStructure() {
-                Logger::Log("Structure initializer target must be a structure.", literal as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Structure initializer target must be a structure.", literal, LogSeverity::Error);
                 return null;
             }
 
@@ -1729,7 +1729,7 @@ class HIRLowerer {
             values.Resize(fields.Size());
 
             if structure->fields.Size() != fields.Size() {
-                Logger::Log("Structure '" + ((_type as *HIRStructureType)->declaration as *HIRDeclaration)->name + "' argument count mismatch.", literal as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Structure '" + ((_type as *HIRStructureType)->declaration as *HIRDeclaration)->name + "' argument count mismatch.", literal, LogSeverity::Error);
                 return null;
             }
 
@@ -1737,7 +1737,7 @@ class HIRLowerer {
                 let index = _type->Index(field.left);
 
                 if index == -1 {
-                    Logger::Log("Unknown field '" + field.left + "' for structure '" + ((_type as *HIRStructureType)->declaration as *HIRDeclaration)->name + "'.", literal as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Unknown field '" + field.left + "' for structure '" + ((_type as *HIRStructureType)->declaration as *HIRDeclaration)->name + "'.", literal, LogSeverity::Error);
                     return null;
                 }
 
@@ -1747,11 +1747,11 @@ class HIRLowerer {
                 values[index as usize] = value;
             }
 
-            return this.builder.StructureLiteral(values, _type) as *HIRLiteral;
+            return this.builder.StructureLiteral(values, _type);
         } else if literal->kind == ASTLiteralKind::Null {
-            return this.builder.NullLiteral() as *HIRLiteral;
+            return this.builder.NullLiteral();
         } else {
-            Logger::Log("Unknown literal type '" + literal->kind.ToString() + "'.", literal as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Unknown literal type '" + literal->kind.ToString() + "'.", literal, LogSeverity::Error);
             return null;
         }
     }
@@ -1788,25 +1788,25 @@ class HIRLowerer {
             values.PushBack(right);
 
             let name = "operator" + assignment->kind.ToString();
-            let candidates = left->_type->GetCandidates(name, assignment as *ASTExpression, false);
+            let candidates = left->_type->GetCandidates(name, assignment, false);
             if candidates.Empty() { return null; }
-            let function = this.ResolveOverload(candidates, values, assignment as *ASTExpression, false);
+            let function = this.ResolveOverload(candidates, values, assignment, false);
             if function == null { return null; }
-            return this.LowerResolvedCallExpression(function, values, assignment as *ASTExpression);
+            return this.LowerResolvedCallExpression(function, values, assignment);
         }
 
         if left->category != HIRExpressionCategory::Place {
-            Logger::Log("Cannot assign to non-place value.", assignment as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Cannot assign to non-place value.", assignment, LogSeverity::Error);
             return null;
         }
 
         if !left->mutable {
-            Logger::Log("Cannot assign to immutable value.", assignment as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Cannot assign to immutable value.", assignment, LogSeverity::Error);
             return null;
         }
 
         if assignment->kind != ASTAssignmentKind::Assign {
-            right = this.LowerResolvedBinaryExpression(this.AssignmentToBinaryKind(assignment->kind), left, right, assignment as *ASTExpression);
+            right = this.LowerResolvedBinaryExpression(this.AssignmentToBinaryKind(assignment->kind), left, right, assignment);
             if right == null { return null; }
         }
 
@@ -1815,12 +1815,12 @@ class HIRLowerer {
         }
 
         if !left->_type->IsCompatible(right->_type) {
-            Logger::Log("Incompatible assignment types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", assignment as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Incompatible assignment types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", assignment, LogSeverity::Error);
             return null;
         }
 
         if !left->_type->IsMutabilityCompatible(right->_type) {
-            Logger::Log("Cannot assign immutable pointer to mutable pointer.", assignment as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Cannot assign immutable pointer to mutable pointer.", assignment, LogSeverity::Error);
             return null;
         }
 
@@ -1935,7 +1935,7 @@ class HIRLowerer {
             if !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() {
                 if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" {
                     if call->arguments.Size() != 1 {
-                        Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -1966,25 +1966,25 @@ class HIRLowerer {
                             return null;
                         }
                     } else {
-                        Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
                     }
 
                     return this.builder.Intrinsic(path->segments[0].name == "sizeof" ? HIRIntrinsicKind::SizeOf : HIRIntrinsicKind::AlignOf, _type);
                 } else if path->segments[0].name == "construct" {
                     if call->arguments.Size() == 0 {
-                        Logger::Log("Invalid number of arguments for 'construct'.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid number of arguments for 'construct'.", call, LogSeverity::Error);
                         return null;
                     }
 
                     let mut invalid = false;
-                    let mut values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+                    let mut values = this.LowerCallArguments(call->arguments, call, &mut invalid);
                     if invalid { return null; }
 
                     let target = this.ImplicitDereference(values[0]);
 
                     if !target->_type->IsPointer() {
-                        Logger::Log("Construct target must be a pointer.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Construct target must be a pointer.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -1997,16 +1997,16 @@ class HIRLowerer {
                             candidates.PushBack(candidate);
                         }
 
-                        let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
+                        let function = this.ResolveOverload(candidates, values, call, false);
                         if function == null { return null; }
-                        let call = this.LowerResolvedCallExpression(function, values, call as *ASTExpression);
+                        let call = this.LowerResolvedCallExpression(function, values, call);
                         if call == null { return null; }
                         this.builder.BuildExpressionStatement(call);
                     } else {
                         values.RemoveAt(0);
 
                         if values.Size() > 1 {
-                            Logger::Log("Primitive type initialization accepts at most 1 argument.", call as *ASTExpression, LogSeverity::Error);
+                            Logger::Log("Primitive type initialization accepts at most 1 argument.", call, LogSeverity::Error);
                             return null;
                         }
 
@@ -2017,29 +2017,29 @@ class HIRLowerer {
                                 if target_type->IsMutabilityCompatible(value->_type) {
                                     this.builder.BuildExpressionStatement(this.builder.Assignment(target, this.MakeCompatible(value, target_type)));
                                 } else {
-                                    Logger::Log("Cannot assign immutable pointer to mutable pointer.", call as *ASTExpression, LogSeverity::Error);
+                                    Logger::Log("Cannot assign immutable pointer to mutable pointer.", call, LogSeverity::Error);
                                     return null;
                                 }
                             } else {
-                                Logger::Log("Incompatible primitive type initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", call as *ASTExpression, LogSeverity::Error);
+                                Logger::Log("Incompatible primitive type initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", call, LogSeverity::Error);
                                 return null;
                             }
                         }
                     } return target;
                 } else if path->segments[0].name == "destruct" {
                     if call->arguments.Size() != 1 {
-                        Logger::Log("Invalid number of arguments for 'destruct'.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid number of arguments for 'destruct'.", call, LogSeverity::Error);
                         return null;
                     }
 
                     let mut invalid = false;
-                    let values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+                    let values = this.LowerCallArguments(call->arguments, call, &mut invalid);
                     if invalid { return null; }
 
                     let target = this.ImplicitDereference(values[0]);
 
                     if !target->_type->IsPointer() {
-                        Logger::Log("Destruct target must be a pointer.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Destruct target must be a pointer.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -2055,7 +2055,7 @@ class HIRLowerer {
         }
 
         let mut invalid = false;
-        let mut values = this.LowerCallArguments(call->arguments, call as *ASTExpression, &mut invalid);
+        let mut values = this.LowerCallArguments(call->arguments, call, &mut invalid);
         if invalid { return null; }
 
         if call->expression->kind == ASTExpressionKind::MemberAccess {
@@ -2068,29 +2068,29 @@ class HIRLowerer {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(instance));
 
-                    let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access as *ASTExpression, false);
+                    let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                     if candidates.Empty() { return null; }
 
-                    instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access as *ASTExpression));
+                    instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access));
                 } else if instance->_type->IsPointer() {
                     instance = this.builder.Dereference(instance);
                 } else {
-                    Logger::Log("Expected a pointer type for arrow operator.", member_access as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Expected a pointer type for arrow operator.", member_access, LogSeverity::Error);
                     return null;
                 }
             }
 
             if !instance->_type->HasFields() && !instance->_type->HasMethods() {
                 values.Insert(0, this.ImplicitAddressOf(instance));
-                let mut candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call as *ASTExpression, true);
-                candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call as *ASTExpression);
+                let mut candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call, true);
+                candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call);
 
                 if candidates.Empty() {
-                    Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
                     return null;
                 }
 
-                return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
+                return this.LowerResolvedCallExpression(candidates, values, call);
             } else {
                 let index = instance->_type->HasFields() ? instance->_type->Index(member_access->member) : -1;
 
@@ -2098,22 +2098,22 @@ class HIRLowerer {
                     let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
 
                     if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
-                        Logger::Log("Field '" + member_access->member + "' is private.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Field '" + member_access->member + "' is private.", call, LogSeverity::Error);
                         return null;
                     }
 
-                    return this.LowerResolvedCallExpression(this.builder.FieldAccess(instance, field), values, call as *ASTExpression);
+                    return this.LowerResolvedCallExpression(this.builder.FieldAccess(instance, field), values, call);
                 } else {
                     values.Insert(0, this.ImplicitAddressOf(instance));
-                    let mut candidates = instance->_type->GetCandidates(member_access->member, call as *ASTExpression, true);
-                    candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call as *ASTExpression);
+                    let mut candidates = instance->_type->GetCandidates(member_access->member, call, true);
+                    candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call);
 
                     if candidates.Empty() {
-                        Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
                         return null;
                     }
 
-                    return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
+                    return this.LowerResolvedCallExpression(candidates, values, call);
                 }
             }
         } else {
@@ -2128,11 +2128,11 @@ class HIRLowerer {
                             candidates.PushBack(candidate);
                         }
 
-                        values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
-                        let function = this.ResolveOverload(candidates, values, call as *ASTExpression, false);
+                        values.Insert(0, this.builder.NullLiteral());
+                        let function = this.ResolveOverload(candidates, values, call, false);
                         if function == null { return null; }
-                        let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
-                        if !this.ValidateCallArguments(callee, values, call as *ASTExpression) { return null; }
+                        let callee = this.builder.ReferenceDeclaration(function, false);
+                        if !this.ValidateCallArguments(callee, values, call) { return null; }
                         values.RemoveAt(0);
                         let constructor = this.builder.Constructor(callee, values, symbol->_type);
                         this.temporaries.PushBack(constructor);
@@ -2143,14 +2143,14 @@ class HIRLowerer {
                 let candidates = this.scope_manager.ResolveCandidates(path, values, true);
 
                 if !candidates.Empty() {
-                    return this.LowerResolvedCallExpression(candidates, values, call as *ASTExpression);
+                    return this.LowerResolvedCallExpression(candidates, values, call);
                 }
             }
 
             let value = this.LowerExpression(call->expression);
 
             if value != null {
-                return this.LowerResolvedCallExpression(value, values, call as *ASTExpression);
+                return this.LowerResolvedCallExpression(value, values, call);
             } else {
                 return null;
             }
@@ -2222,7 +2222,7 @@ class HIRLowerer {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(value));
                     let arguments = Vector<*HIRExpression>(values);
-                    values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
+                    values.Insert(0, this.builder.NullLiteral());
                     let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                     for candidate in (value->_type as *HIRClassType)->declaration->constructors {
@@ -2231,7 +2231,7 @@ class HIRLowerer {
 
                     let function = this.ResolveOverload(candidates, values, node, false);
                     if function == null { return false; }
-                    let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                    let callee = this.builder.ReferenceDeclaration(function, false);
                     value = this.builder.Constructor(callee, arguments, value->_type);
                 } else {
                     this.temporaries.Remove(value);
@@ -2263,7 +2263,7 @@ class HIRLowerer {
     }
 
     fn LowerResolvedCallExpression(&mut this, function: *HIRFunctionDeclaration, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
-        return this.LowerResolvedCallExpression(this.builder.ReferenceDeclaration(function as *HIRDeclaration, false), values, node);
+        return this.LowerResolvedCallExpression(this.builder.ReferenceDeclaration(function, false), values, node);
     }
 
     fn LowerResolvedCallExpression(&mut this, callee: *HIRExpression, mut values: Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
@@ -2287,47 +2287,47 @@ class HIRLowerer {
             if size == null { return null; }
 
             if !size->_type->IsIntegerPointer() || size->_type->IsSigned() {
-                Logger::Log("Array size must be of type 'usize'.", _new as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Array size must be of type 'usize'.", _new, LogSeverity::Error);
                 return null;
             }
 
             if _type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
-                values.PushBack(this.builder.NullLiteral() as *HIRLiteral);
+                values.PushBack(this.builder.NullLiteral());
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (_type as *HIRClassType)->declaration->constructors {
                     candidates.PushBack(candidate);
                 }
 
-                let function = this.ResolveOverload(candidates, values, _new as *ASTExpression, false);
+                let function = this.ResolveOverload(candidates, values, _new, false);
                 if function == null { return null; }
-                let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                let callee = this.builder.ReferenceDeclaration(function, false);
                 return this.builder.New(_type, size, false, callee, Vector<*HIRExpression>());
             } else {
                 return this.builder.New(_type, size, false, null, Vector<*HIRExpression>());
             }
         } else if _new->initialized {
             let mut invalid = false;
-            let mut values = this.LowerCallArguments(_new->arguments, _new as *ASTExpression, &mut invalid);
+            let mut values = this.LowerCallArguments(_new->arguments, _new, &mut invalid);
             if invalid { return null; }
 
             if _type->IsClass() {
                 let arguments = Vector<*HIRExpression>(values);
-                values.Insert(0, this.builder.NullLiteral() as *HIRLiteral);
+                values.Insert(0, this.builder.NullLiteral());
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (_type as *HIRClassType)->declaration->constructors {
                     candidates.PushBack(candidate);
                 }
 
-                let function = this.ResolveOverload(candidates, values, _new as *ASTExpression, false);
+                let function = this.ResolveOverload(candidates, values, _new, false);
                 if function == null { return null; }
-                let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+                let callee = this.builder.ReferenceDeclaration(function, false);
                 return this.builder.New(_type, null, true, callee, arguments);
             } else {
                 if values.Size() != 1 {
-                    Logger::Log("Primitive type initialization requires exactly 1 argument.", _new as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Primitive type initialization requires exactly 1 argument.", _new, LogSeverity::Error);
                     return null;
                 }
 
@@ -2338,11 +2338,11 @@ class HIRLowerer {
                         values[0] = this.MakeCompatible(value, _type);
                         return this.builder.New(_type, null, true, null, values);
                     } else {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", _new as *ASTExpression, LogSeverity::Error);
+                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", _new, LogSeverity::Error);
                         return null;
                     }
                 } else {
-                    Logger::Log("Incompatible primitive type initialization types. ('" + _type->ToString() + "' != '" + value->_type->ToString() + "').", _new as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Incompatible primitive type initialization types. ('" + _type->ToString() + "' != '" + value->_type->ToString() + "').", _new, LogSeverity::Error);
                     return null;
                 }
             }
@@ -2356,15 +2356,15 @@ class HIRLowerer {
         if pointer == null { return null; }
 
         if !pointer->_type->IsPointer() {
-            Logger::Log("Delete value must be a pointer.", _delete as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Delete value must be a pointer.", _delete, LogSeverity::Error);
             return null;
         }
 
         if pointer->_type->Pointee().IsClass() {
             let mut values = Vector<*HIRExpression>();
-            values.PushBack(this.builder.NullLiteral() as *HIRLiteral);
+            values.PushBack(this.builder.NullLiteral());
             let function = (pointer->_type->Pointee() as *HIRClassType)->declaration->destructor;
-            let callee = this.builder.ReferenceDeclaration(function as *HIRDeclaration, false);
+            let callee = this.builder.ReferenceDeclaration(function, false);
             return this.builder.Delete(pointer, _delete->array, callee, Vector<*HIRExpression>());
         } else {
             return this.builder.Delete(pointer, _delete->array, null, Vector<*HIRExpression>());
@@ -2396,7 +2396,7 @@ class HIRLowerer {
             return value;
         }
 
-        return this.LowerResolvedCastExpression(value, target, cast as *ASTExpression);
+        return this.LowerResolvedCastExpression(value, target, cast);
     }
 
     fn LowerResolvedCastExpression(&mut this, mut value: *HIRExpression, target: *HIRType, node: *ASTNode) -> *HIRExpression {
@@ -2497,19 +2497,18 @@ class HIRLowerer {
             values.PushBack(this.ImplicitAddressOf(value));
             values.PushBack(index);
 
-            let candidates = value->_type->GetCandidates("operator[]".ToString(), index_access as *ASTExpression, false);
+            let candidates = value->_type->GetCandidates("operator[]".ToString(), index_access, false);
             if candidates.Empty() { return null; }
-
-            return this.LowerResolvedCallExpression(candidates, values, index_access as *ASTExpression);
+            return this.LowerResolvedCallExpression(candidates, values, index_access);
         }
 
         if !value->_type->IsPointer() && !value->_type->IsArray() {
-            Logger::Log("Indexed value must be a pointer or an array.", index_access as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Indexed value must be a pointer or an array.", index_access, LogSeverity::Error);
             return null;
         }
 
         if !index->_type->IsIntegerPointer() || index->_type->IsSigned() {
-            Logger::Log("Index must be of type 'usize'.", index_access as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Index must be of type 'usize'.", index_access, LogSeverity::Error);
             return null;
         }
 
@@ -2528,20 +2527,20 @@ class HIRLowerer {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(instance));
 
-                let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access as *ASTExpression, false);
+                let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                 if candidates.Empty() { return null; }
 
-                instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access as *ASTExpression));
+                instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access));
             } else if instance->_type->IsPointer() {
                 instance = this.builder.Dereference(instance);
             } else {
-                Logger::Log("Expected a pointer type for arrow operator.", member_access as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Expected a pointer type for arrow operator.", member_access, LogSeverity::Error);
                 return null;
             }
         }
 
         if !instance->_type->HasFields() {
-            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->ToString() + "'.", member_access as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
             return null;
         }
 
@@ -2551,13 +2550,13 @@ class HIRLowerer {
             let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
 
             if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
-                Logger::Log("Field '" + member_access->member + "' is private.", member_access as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Field '" + member_access->member + "' is private.", member_access, LogSeverity::Error);
                 return null;
             }
 
             return this.builder.FieldAccess(instance, field);
         } else {
-            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access as *ASTExpression, LogSeverity::Error);
+            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
             return null;
         }
     }
@@ -2571,37 +2570,37 @@ class HIRLowerer {
         values.PushBack(this.ImplicitAddressOf(value));
 
         let name = "operator" + unary->kind.ToString();
-        let candidates = this.extension_registry.GetCandidates(value->_type, name, unary as *ASTExpression, true);
-        let function = this.ResolveOverload(candidates, values, unary as *ASTExpression, true);
+        let candidates = this.extension_registry.GetCandidates(value->_type, name, unary, true);
+        let function = this.ResolveOverload(candidates, values, unary, true);
 
         if function != null {
-            return this.LowerResolvedCallExpression(function, values, unary as *ASTExpression);
+            return this.LowerResolvedCallExpression(function, values, unary);
         }
 
         if value->_type->HasMethods() {
-            let candidates = value->_type->GetCandidates(name, unary as *ASTExpression, true);
-            let function = this.ResolveOverload(candidates, values, unary as *ASTExpression, true);
+            let candidates = value->_type->GetCandidates(name, unary, true);
+            let function = this.ResolveOverload(candidates, values, unary, true);
 
             if function != null {
-                return this.LowerResolvedCallExpression(function, values, unary as *ASTExpression);
+                return this.LowerResolvedCallExpression(function, values, unary);
             }
         }
 
         if unary->kind == ASTUnaryKind::AddressOf {
             if raw->category != HIRExpressionCategory::Place {
-                Logger::Log("Cannot take reference to non-place value.", unary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Cannot take reference to non-place value.", unary, LogSeverity::Error);
                 return null;
             }
 
             if unary->mutable && !raw->mutable {
-                Logger::Log("Cannot take mutable reference to immutable value.", unary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Cannot take mutable reference to immutable value.", unary, LogSeverity::Error);
                 return null;
             }
 
             return this.builder.AddressOf(raw, unary->mutable);
         } else if unary->kind == ASTUnaryKind::Dereference {
             if !raw->_type->IsPointer() {
-                Logger::Log("Cannot dereference non-pointer type '" + raw->_type->ToString() + "'.", unary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Cannot dereference non-pointer type '" + raw->_type->ToString() + "'.", unary, LogSeverity::Error);
                 return null;
             }
 
@@ -2627,25 +2626,25 @@ class HIRLowerer {
 
             if unary->kind == ASTUnaryKind::Negate {
                 if !value->_type->IsInteger() && !value->_type->IsFloat() {
-                    Logger::Log("Cannot negate type '" + value->_type->ToString() + "'.", unary as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Cannot negate type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
                     return null;
                 }
 
                 if value->_type->IsInteger() && !value->_type->IsSigned() {
-                    Logger::Log("Cannot negate unsigned type '" + value->_type->ToString() + "'.", unary as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Cannot negate unsigned type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
                     return null;
                 }
 
                 return this.builder.Unary(HIRUnaryKind::Negate, value);
             } else if unary->kind == ASTUnaryKind::Not {
                 if !value->_type->IsInteger() && !value->_type->IsBoolean() {
-                    Logger::Log("Cannot invert type '" + value->_type->ToString() + "'.", unary as *ASTExpression, LogSeverity::Error);
+                    Logger::Log("Cannot invert type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
                     return null;
                 }
 
                 return this.builder.Unary(HIRUnaryKind::Not, value);
             } else {
-                Logger::Log("Invalid unary operation '" + unary->kind.ToString() + "'.", unary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Invalid unary operation '" + unary->kind.ToString() + "'.", unary, LogSeverity::Error);
                 return null;
             }
         }
@@ -2690,7 +2689,7 @@ class HIRLowerer {
 
         if binary->kind == ASTBinaryKind::LogicalAnd || binary->kind == ASTBinaryKind::LogicalOr {
             if !left->_type->IsBoolean() {
-                Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
                 return null;
             }
 
@@ -2700,7 +2699,7 @@ class HIRLowerer {
             if right == null { return null; }
 
             if !right->_type->IsBoolean() {
-                Logger::Log("Invalid type '" + right->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary as *ASTExpression, LogSeverity::Error);
+                Logger::Log("Invalid type '" + right->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
                 return null;
             }
 
@@ -2714,7 +2713,7 @@ class HIRLowerer {
             right = this.Coerce(right, operand_target);
         }
 
-        return this.LowerResolvedBinaryExpression(binary->kind, left, right, binary as *ASTExpression);
+        return this.LowerResolvedBinaryExpression(binary->kind, left, right, binary);
     }
 
     fn LowerResolvedBinaryExpression(&mut this, kind: ASTBinaryKind, mut left: *HIRExpression, mut right: *HIRExpression, node: *ASTNode) -> *HIRExpression {
@@ -2989,7 +2988,7 @@ class HIRLowerer {
                     return null;
                 }
 
-                return this.context.ArrayType(element, ((length as *HIRLiteral) as *HIRIntegerLiteral)->value as usize);
+                return this.context.ArrayType(element, (length as *HIRIntegerLiteral)->value as usize);
             } else {
                 return this.context.PointerType(element, true);
             }
