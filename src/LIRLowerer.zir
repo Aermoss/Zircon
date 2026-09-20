@@ -264,7 +264,9 @@ class LIRLowerer {
     }
 
     fn EnsureRegister(&mut this, operand: *LIROperand) -> *LIROperand {
-        if operand->kind == LIROperandKind::Register {
+        if operand == null {
+            return null;
+        } else if operand->kind == LIROperandKind::Register {
             return operand;
         } else if operand->kind == LIROperandKind::Immediate {
             return this.EmitIType(LIROpcode::Addi, this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand, operand);
@@ -281,11 +283,15 @@ class LIRLowerer {
     }
 
     fn EnsureMemory(&mut this, operand: *LIROperand) -> *LIROperand {
-        if operand->kind != LIROperandKind::Memory {
+        if operand == null {
+            return null;
+        } else if operand->kind == LIROperandKind::Memory {
+            return operand;
+        } else {
             let base = this.EnsureRegister(operand);
             if base == null { return null; }
             return this.builder.MemoryOperand(base, 0);
-        } return operand;
+        }
     }
 
     fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
@@ -335,7 +341,16 @@ class LIRLowerer {
     }
 
     fn LowerUnaryInstruction(&mut this, unary: *MIRUnaryInstruction) -> *LIROperand {
-        return null;
+        let operand = this.EnsureRegister(this.LowerValue(unary->operand));
+        if operand == null { return null; }
+
+        if unary->kind == MIRUnaryKind::Neg {
+            return this.EmitRType(LIROpcode::Sub, this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand, operand);
+        } else if unary->kind == MIRUnaryKind::Not {
+            return this.EmitIType(LIROpcode::Xori, operand, this.builder.ImmediateOperand(-1) as *LIROperand);
+        } else {
+            return null;
+        }
     }
 
     fn LowerBinaryInstruction(&mut this, binary: *MIRBinaryInstruction) -> *LIROperand {
@@ -343,7 +358,35 @@ class LIRLowerer {
     }
 
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> *LIROperand {
-        return null;
+        for i in 0..call->arguments.Size() {
+            if i >= 8 { break; }
+            let source = this.EnsureRegister(this.LowerValue(call->arguments[i]));
+            if source == null { continue; }
+            let destination = this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64)) as *LIRRegisterOperand;
+            this.EmitMove(destination, source);
+        }
+
+        let defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(this.builder.PhysicalRegister(1, "ra".ToString()) as *LIRRegisterOperand);
+
+        if call->callee->kind == MIRValueKind::DeclarationReference {
+            uses.PushBack(this.builder.SymbolOperand((call->callee as *MIRDeclarationReference)->declaration->name));
+            this.builder.BuildInstruction(LIROpcode::Bl, defines, uses);
+        } else {
+            let callee = this.EnsureRegister(this.LowerValue(call->callee));
+            if callee == null { return null; }
+            uses.PushBack(callee);
+            this.builder.BuildInstruction(LIROpcode::Blr, defines, uses);
+        }
+
+        if ((call as *MIRInstruction) as *MIRValue)->_type->kind == MIRTypeKind::Void {
+            return null;
+        }
+
+        let result = this.builder.VirtualRegister() as *LIRRegisterOperand;
+        this.EmitMove(result, this.builder.PhysicalRegister(24, "a0".ToString()) as *LIRRegisterOperand);
+        return result;
     }
 
     fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> *LIROperand {
