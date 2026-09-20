@@ -2462,10 +2462,12 @@ class HIRLowerer {
 
         if value->_type->IsPointer() && target->IsPointer() {
             if value->_type->Pointee().IsClass() && target->Pointee().IsClass() {
-                if !value->_type->Pointee().IsDerivedFrom(target->Pointee()) && !target->Pointee().IsDerivedFrom(value->_type->Pointee()) {
-                    let target_name = ((target->Pointee() as *HIRClassType)->declaration as *HIRDeclaration)->name;
-                    let source_name = ((value->_type->Pointee() as *HIRClassType)->declaration as *HIRDeclaration)->name;
-                    Logger::Log("Cannot cast class '" + source_name + "' to unrelated class '" + target_name + "'.", node, LogSeverity::Error);
+                let (source, destination) = (value->_type->Pointee(), target->Pointee());
+
+                if !destination.IsDerivedFrom(source) && !source.IsDerivedFrom(destination) {
+                    let source_name = ((source as *HIRClassType)->declaration as *HIRDeclaration)->name;
+                    let destination_name = ((destination as *HIRClassType)->declaration as *HIRDeclaration)->name;
+                    Logger::Log("Cannot cast class '" + source_name + "' to unrelated class '" + destination_name + "'.", node, LogSeverity::Error);
                     return null;
                 }
             }

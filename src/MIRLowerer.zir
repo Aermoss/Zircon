@@ -958,6 +958,14 @@ class MIRLowerer {
         return null;
     }
 
+    fn UpcastPointer(&mut this, mut value: *MIRValue, mut source: *HIRType, path: &Vector<u32>) -> *MIRValue {
+        for index in path {
+            let destination: *HIRType = (source as *HIRClassType)->declaration->parents[index as usize];
+            value = this.builder.BuildStructGEP("cast.base".ToString(), value, index, this.context.PointerType(this.LowerType(destination)));
+            source = destination;
+        } return value;
+    }
+
     fn LowerCastExpression(&mut this, cast: *HIRCastExpression) -> *MIRValue {
         let mut lowered: *MIRInstruction = null;
         let expression = cast as *HIRExpression;
@@ -1032,32 +1040,23 @@ class MIRLowerer {
 
             if target_type->IsPointer() {
                 if value_type->Pointee().IsClass() && target_type->Pointee().IsClass() {
-                    let (source_class, target_class) = (value_type->Pointee(), target_type->Pointee());
-                    let (source_parents, target_parents) = ((source_class as *HIRClassType)->declaration->parents, (target_class as *HIRClassType)->declaration->parents);
-                    let (mut related, mut index: u32) = (false, 0);
+                    let (source, destination) = (value_type->Pointee(), target_type->Pointee());
+                    let mut path = Vector<u32>();
 
-                    for i in 0..source_parents.Size() {
-                        let source_parent: *HIRType = source_parents[i];
+                    if source.FindParentPath(destination, path) {
+                        return this.UpcastPointer(value, source, path);
+                    } else {
+                        path.Clear();
 
-                        if *source_parent == target_class {
-                            (related, index) = (true, i as u32);
-                            break;
+                        if destination.FindParentPath(source, path) {
+                            let result_type = this.context.PointerType(this.LowerType(destination));
+                            let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+                            let base = this.UpcastPointer(this.builder.ConstantNull(result_type) as *MIRConstant, destination, path);
+                            let offset = this.builder.BuildCast("cast.offset".ToString(), MIRCastKind::PtrToInt, base, size_type);
+                            let address = this.builder.BuildCast("cast.address".ToString(), MIRCastKind::PtrToInt, value, size_type);
+                            let adjusted = this.builder.BuildBinary("cast.adjust".ToString(), MIRBinaryKind::Sub, address, offset, size_type);
+                            return this.builder.BuildCast("cast.derived".ToString(), MIRCastKind::IntToPtr, adjusted, result_type);
                         }
-                    }
-
-                    if !related {
-                        for i in 0..target_parents.Size() {
-                            let target_parent: *HIRType = target_parents[i];
-
-                            if *target_parent == source_class {
-                                (related, index) = (true, -(i as isize) as u32);
-                                break;
-                            }
-                        }
-                    }
-
-                    if index != 0 {
-                        value = this.builder.BuildStructGEP("cast.base".ToString(), value, index, this.LowerType(target_type));
                     }
                 }
 

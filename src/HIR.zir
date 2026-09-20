@@ -87,9 +87,24 @@ class HIRType {
         } return false;
     }
 
+    pub fn FindParentPath(&this, other: &HIRType, path: &mut Vector<u32>) -> bool {
+        let parents = (this as *HIRClassType)->declaration->parents;
+
+        for i in 0..parents.Size() {
+            let parent: *HIRType = parents[i];
+            path.PushBack(i as u32);
+
+            if *parent == *other || parent->FindParentPath(other, path) {
+                return true;
+            }
+
+            path.PopBack();
+        } return false;
+    }
+
     pub fn IsDerivedFrom(&this, other: &HIRType) -> bool {
         for parent in (this as *HIRClassType)->declaration->parents {
-            if *parent == *other {
+            if *parent == *other || parent->IsDerivedFrom(other) {
                 return true;
             }
         } return false;
