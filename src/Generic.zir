@@ -36,13 +36,13 @@ class GenericDeclaration {
 
     pub declaration: *ASTDeclaration,
     pub scope: *mut Scope,
-    pub _class: *HIRType,
+    pub _type: *HIRType,
 
     pub name: String,
     pub types: Vector<String>;
 
     GenericDeclaration(&mut this, declaration: *ASTDeclaration) {
-        (this.declaration, this.scope, this._class) = (declaration, hir_lowerer->scope_manager.current, hir_lowerer->current_type);
+        (this.declaration, this.scope, this._type) = (declaration, hir_lowerer->scope_manager.current, hir_lowerer->current_type);
 
         if declaration->kind == ASTDeclarationKind::Class {
             let _class = declaration as *ASTClassDeclaration;
@@ -71,7 +71,7 @@ class GenericDeclaration {
         hir_lowerer->builder.SetCurrentBlock(null);
         hir_lowerer->builder.SetCurrentFunction(null);
         (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (this.scope, this);
-        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (false, this._class);
+        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (false, this._type);
         hir_lowerer->scope_manager.PushScope("<generic>".ToString(), true);
 
         for i in 0..this.types.Size() {

@@ -1860,7 +1860,7 @@ class HIRLowerer {
         } return values;
     }
 
-    fn ResolveGenericMembers(&mut this, _class: *HIRType, name: &String, types: &Vector<*ASTType>, values: &Vector<*HIRExpression>, node: *ASTNode) -> Vector<*HIRFunctionDeclaration> {
+    fn ResolveGenericMethods(&mut this, _type: *HIRType, name: &String, types: &Vector<*ASTType>, values: &Vector<*HIRExpression>, node: *ASTNode) -> Vector<*HIRFunctionDeclaration> {
         let mut result = Vector<*HIRFunctionDeclaration>();
         let mut lowered_types = Vector<*HIRType>();
 
@@ -1871,7 +1871,7 @@ class HIRLowerer {
         }
 
         for generic in this.generics {
-            if generic->declaration->kind != ASTDeclarationKind::Function || generic->_class == null || *generic->_class != *_class {
+            if generic->declaration->kind != ASTDeclarationKind::Function || generic->_type == null || *generic->_type != *_type {
                 continue;
             }
 
@@ -1881,7 +1881,7 @@ class HIRLowerer {
                 continue;
             }
 
-            if !function->public && (this.current_type == null || *this.current_type != *_class) {
+            if !function->public && (this.current_type == null || *this.current_type != *_type) {
                 continue;
             }
 
@@ -1909,6 +1909,12 @@ class HIRLowerer {
 
             if instance != null && instance->declaration != null && instance->declaration->kind == HIRDeclarationKind::Function {
                 result.PushBack(instance->declaration as *HIRFunctionDeclaration);
+            }
+        }
+
+        if result.Empty() && _type->IsClass() {
+            for parent in (_type as *HIRClassType)->declaration->parents {
+                result += this.ResolveGenericMethods(parent, name, types, values, node);
             }
         } return result;
     }
@@ -2068,7 +2074,7 @@ class HIRLowerer {
             if !instance->_type->HasFields() && !instance->_type->HasMethods() {
                 values.Insert(0, this.ImplicitAddressOf(instance));
                 let mut candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call, true);
-                candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call);
+                candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
 
                 if candidates.Empty() {
                     Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
@@ -2091,7 +2097,7 @@ class HIRLowerer {
                 } else {
                     values.Insert(0, this.ImplicitAddressOf(instance));
                     let mut candidates = instance->_type->GetCandidates(member_access->member, call, true);
-                    candidates += this.ResolveGenericMembers(instance->_type, member_access->member, member_access->types, values, call);
+                    candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
 
                     if candidates.Empty() {
                         Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
