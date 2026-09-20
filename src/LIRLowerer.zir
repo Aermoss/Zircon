@@ -478,7 +478,37 @@ class LIRLowerer {
     }
 
     fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> *LIROperand {
-        return null;
+        let value = this.EnsureRegister(this.LowerValue(cast->value));
+        if value == null { return null; }
+        let destination_type = ((cast as *MIRInstruction) as *MIRValue)->_type;
+        let source_type = cast->value->_type;
+
+        if cast->kind == MIRCastKind::Trunc {
+            if destination_type->kind != MIRTypeKind::Integer { return null; }
+            let destination_width = (destination_type as *MIRIntegerType)->width;
+            if destination_width >= 32 { return null; }
+            let shift = (32 - destination_width) as i64;
+            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
+            return this.EmitIType(LIROpcode::Srli, shifted, this.builder.ImmediateOperand(shift));
+        } else if cast->kind == MIRCastKind::ZExt {
+            if source_type->kind != MIRTypeKind::Integer { return null; }
+            let source_width = (source_type as *MIRIntegerType)->width;
+            if source_width >= 32 { return null; }
+            let shift = (32 - source_width) as i64;
+            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
+            return this.EmitIType(LIROpcode::Srli, shifted, this.builder.ImmediateOperand(shift));
+        } else if cast->kind == MIRCastKind::SExt {
+            if source_type->kind != MIRTypeKind::Integer { return null; }
+            let source_width = (source_type as *MIRIntegerType)->width;
+            if source_width >= 32 { return null; }
+            let shift = (32 - source_width) as i64;
+            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
+            return this.EmitIType(LIROpcode::Srai, shifted, this.builder.ImmediateOperand(shift));
+        } else if cast->kind == MIRCastKind::Bitcast || cast->kind == MIRCastKind::PtrToInt || cast->kind == MIRCastKind::IntToPtr {
+            return value;
+        } else {
+            return null;
+        }
     }
 
     fn LowerSelectInstruction(&mut this, select: *MIRSelectInstruction) -> *LIROperand {
