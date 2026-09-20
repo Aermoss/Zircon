@@ -58,21 +58,45 @@ fn Write(text: *i8) {
 }
 
 fn WriteLine(text: &String) {
+    Write(text);
 #[if WINDOWS]
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.Data(), text.Length() as u32, null, null);
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
-    write(STDOUT_FILENO, text.Data(), text.Length());
     write(STDOUT_FILENO, "\n", 1);
 #[endif]
 }
 
 fn WriteLine(text: *i8) {
+    Write(text);
 #[if WINDOWS]
-    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, strlen(text) as u32, null, null);
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
-    write(STDOUT_FILENO, text, strlen(text));
     write(STDOUT_FILENO, "\n", 1);
 #[endif]
+}
+
+fn WriteRest() {
+    Write("\n");
+}
+
+fn WriteRest(arg: *i8, args...) {
+    Write(" ");
+    Write(arg);
+    WriteRest(args...);
+}
+
+fn WriteRest(arg: &String, args...) {
+    Write(" ");
+    Write(arg);
+    WriteRest(args...);
+}
+
+fn WriteAll(arg: *i8, args...) {
+    Write(arg);
+    WriteRest(args...);
+}
+
+fn WriteAll(arg: &String, args...) {
+    Write(arg);
+    WriteRest(args...);
 }
