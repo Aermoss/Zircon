@@ -56,7 +56,16 @@ class LIRLowerer {
             this.blocks[block] = this.builder.BuildBlock(block->name);
         }
 
+        this.builder.SetCurrentBlock(this.blocks[function->blocks[0]]);
         this.values.Clear();
+
+        for i in 0..function->parameters.Size() {
+            if i >= 8 { break; }
+            let parameter: *MIRParameter = function->parameters[i];
+            let destination = this.builder.VirtualRegister() as *LIRRegisterOperand;
+            this.EmitMove(destination, this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64)) as *LIRRegisterOperand);
+            this.values[parameter as *MIRValue] = destination;
+        }
 
         for block in function->blocks {
             this.builder.SetCurrentBlock(this.blocks[block]);
@@ -76,6 +85,8 @@ class LIRLowerer {
             return this.LowerConstant(value as *MIRConstant);
         } else if value->kind == MIRValueKind::Instruction || value->kind == MIRValueKind::Parameter {
             return this.values.Get(value, null);
+        } else if value->kind == MIRValueKind::DeclarationReference {
+            return this.builder.SymbolOperand((value as *MIRDeclarationReference)->declaration->name);
         } else {
             return null;
         }
@@ -221,8 +232,52 @@ class LIRLowerer {
         } return value;
     }
 
+    fn EmitRType(&mut this, opcode: LIROpcode, rs1: *LIROperand, rs2: *LIROperand) -> *LIROperand {
+        let destination = this.builder.VirtualRegister() as *LIRRegisterOperand;
+        let mut defines = Vector<*LIROperand>();
+        defines.PushBack(destination);
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(rs1);
+        uses.PushBack(rs2);
+        this.builder.BuildInstruction(opcode, defines, uses);
+        return destination;
+    }
+
+    fn EmitIType(&mut this, opcode: LIROpcode, rs1: *LIROperand, immediate: *LIROperand) -> *LIROperand {
+        let destination = this.builder.VirtualRegister() as *LIRRegisterOperand;
+        let mut defines = Vector<*LIROperand>();
+        defines.PushBack(destination);
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(rs1);
+        uses.PushBack(immediate);
+        this.builder.BuildInstruction(opcode, defines, uses);
+        return destination;
+    }
+
+    fn EmitMove(&mut this, destination: *LIROperand, source: *LIROperand) {
+        let mut defines = Vector<*LIROperand>();
+        defines.PushBack(destination);
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(source);
+        uses.PushBack(this.builder.ImmediateOperand(0) as *LIROperand);
+        this.builder.BuildInstruction(LIROpcode::Addi, defines, uses);
+    }
+
     fn EnsureRegister(&mut this, operand: *LIROperand) -> *LIROperand {
-        return null;
+        if operand->kind == LIROperandKind::Register {
+            return operand;
+        } else if operand->kind == LIROperandKind::Immediate {
+            return this.EmitIType(LIROpcode::Addi, this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand, operand);
+        } else if operand->kind == LIROperandKind::Memory {
+            let memory = operand as *LIRMemoryOperand;
+            let base = this.EnsureRegister(memory->base);
+
+            if memory->offset != 0 {
+                return this.EmitIType(LIROpcode::Addi, base, this.builder.ImmediateOperand(memory->offset as i64));
+            } return base;
+        } else {
+            return null;
+        }
     }
 
     fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
@@ -268,6 +323,12 @@ class LIRLowerer {
     }
 
     fn LowerSelectInstruction(&mut this, select: *MIRSelectInstruction) -> *LIROperand {
+        let condition = this.LowerValue(select->condition);
+        if condition == null { return null; }
+        let then_value = this.LowerValue(select->then_value);
+        if then_value == null { return null; }
+        let else_value = this.LowerValue(select->else_value);
+        if else_value == null { return null; }
         return null;
     }
 
@@ -290,6 +351,14 @@ class LIRLowerer {
     }
 
     fn LowerReturnInstruction(&mut this, _return: *MIRReturnInstruction) -> *LIROperand {
+        if _return->value != null {
+            let value = this.LowerValue(_return->value);
+
+            if value != null {
+                this.EmitMove(this.builder.PhysicalRegister(24, "a0".ToString()) as *LIRRegisterOperand, this.EnsureRegister(value));
+            }
+        }
+
         let defines = Vector<*LIROperand>();
         let mut uses = Vector<*LIROperand>();
         uses.PushBack(this.builder.PhysicalRegister(1, "ra".ToString()) as *LIRRegisterOperand);
