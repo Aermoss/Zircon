@@ -392,7 +392,57 @@ class LIRLowerer {
     }
 
     fn LowerBinaryInstruction(&mut this, binary: *MIRBinaryInstruction) -> *LIROperand {
-        return null;
+        let left = this.EnsureRegister(this.LowerValue(binary->left));
+        let right = this.EnsureRegister(this.LowerValue(binary->right));
+        if left == null || right == null { return null; }
+
+        if binary->kind == MIRBinaryKind::Add {
+            return this.EmitRType(LIROpcode::Add, left, right);
+        } else if binary->kind == MIRBinaryKind::Sub {
+            return this.EmitRType(LIROpcode::Sub, left, right);
+        } else if binary->kind == MIRBinaryKind::Mul {
+            return this.EmitRType(LIROpcode::Mul, left, right);
+        } else if binary->kind == MIRBinaryKind::SDiv {
+            return this.EmitRType(LIROpcode::Div, left, right);
+        } else if binary->kind == MIRBinaryKind::UDiv {
+            return this.EmitRType(LIROpcode::Divu, left, right);
+        } else if binary->kind == MIRBinaryKind::SRem {
+            return this.EmitRType(LIROpcode::Rem, left, right);
+        } else if binary->kind == MIRBinaryKind::URem {
+            return this.EmitRType(LIROpcode::Remu, left, right);
+        } else if binary->kind == MIRBinaryKind::And {
+            return this.EmitRType(LIROpcode::And, left, right);
+        } else if binary->kind == MIRBinaryKind::Or {
+            return this.EmitRType(LIROpcode::Or, left, right);
+        } else if binary->kind == MIRBinaryKind::Xor {
+            return this.EmitRType(LIROpcode::Xor, left, right);
+        } else if binary->kind == MIRBinaryKind::Shl {
+            return this.EmitRType(LIROpcode::Sll, left, right);
+        } else if binary->kind == MIRBinaryKind::LShr {
+            return this.EmitRType(LIROpcode::Srl, left, right);
+        } else if binary->kind == MIRBinaryKind::AShr {
+            return this.EmitRType(LIROpcode::Sra, left, right);
+        } else if binary->kind == MIRBinaryKind::ICmpSlt {
+            return this.EmitRType(LIROpcode::Slt, left, right);
+        } else if binary->kind == MIRBinaryKind::ICmpSgt {
+            return this.EmitRType(LIROpcode::Slt, right, left);
+        } else if binary->kind == MIRBinaryKind::ICmpSge {
+            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Slt, left, right), this.builder.ImmediateOperand(1));
+        } else if binary->kind == MIRBinaryKind::ICmpSle {
+            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Slt, right, left), this.builder.ImmediateOperand(1));
+        } else if binary->kind == MIRBinaryKind::ICmpUlt {
+            return this.EmitRType(LIROpcode::Sltu, left, right);
+        } else if binary->kind == MIRBinaryKind::ICmpUgt {
+            return this.EmitRType(LIROpcode::Sltu, right, left);
+        } else if binary->kind == MIRBinaryKind::ICmpUge {
+            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Sltu, left, right), this.builder.ImmediateOperand(1));
+        } else if binary->kind == MIRBinaryKind::ICmpUle {
+            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Sltu, right, left), this.builder.ImmediateOperand(1));
+        } else if binary->kind == MIRBinaryKind::ICmpEq {
+            return this.EmitIType(LIROpcode::Sltiu, this.EmitRType(LIROpcode::Xor, left, right), this.builder.ImmediateOperand(1));
+        } else if binary->kind == MIRBinaryKind::ICmpNe {
+            return this.EmitRType(LIROpcode::Sltu, this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand, this.EmitRType(LIROpcode::Xor, left, right));
+        } else { return null; }
     }
 
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> *LIROperand {
