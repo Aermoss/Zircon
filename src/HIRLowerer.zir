@@ -2544,10 +2544,21 @@ class HIRLowerer {
             return null;
         }
 
-        let index = instance->_type->Index(member_access->member);
+        let (mut path, mut ambiguous) = (Vector<u32>(), false);
+        let field = instance->_type->FindField(member_access->member, path, ambiguous);
 
-        if index != -1 {
-            let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
+        if ambiguous {
+            Logger::Log("Field '" + member_access->member + "' is ambiguous in type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
+            return null;
+        }
+
+        if field != null {
+            for index in path {
+                let parent: *HIRType = (instance->_type as *HIRClassType)->declaration->parents[index as usize];
+                let address = this.builder.AddressOf(instance, instance->mutable);
+                let cast = this.builder.Cast(address, this.context.ReferenceType(parent, instance->mutable));
+                instance = this.builder.Dereference(cast);
+            }
 
             if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
                 Logger::Log("Field '" + member_access->member + "' is private.", member_access, LogSeverity::Error);

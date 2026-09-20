@@ -87,6 +87,29 @@ class HIRType {
         } return false;
     }
 
+    pub fn FindField(&this, name: &String, path: &mut Vector<u32>, ambiguous: &mut bool) -> *HIRFieldDeclaration {
+        let parents = (this as *HIRClassType)->declaration->parents;
+        let (index, mut result: *HIRFieldDeclaration) = (this.Index(name), null);
+        if index != -1 { return this.Fields()[index as usize]; }
+
+        for i in 0..parents.Size() {
+            let parent: *HIRType = parents[i];
+            let mut parent_path = Vector<u32>();
+            let field = parent->FindField(name, &mut parent_path, ambiguous);
+            if field == null { continue; }
+
+            if result != null {
+                *ambiguous = true;
+                return result;
+            }
+            
+            path.Clear();
+            path.PushBack(i as u32);
+            path += parent_path;
+            result = field;
+        } return result;
+    }
+
     pub fn FindParentPath(&this, other: &HIRType, path: &mut Vector<u32>) -> bool {
         let parents = (this as *HIRClassType)->declaration->parents;
 
