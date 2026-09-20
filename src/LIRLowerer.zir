@@ -573,17 +573,17 @@ class LIRLowerer {
         let else_target = this.blocks.Get(branch->else_target, null);
         if else_target == null { return null; }
 
-        let bne_defines = Vector<*LIROperand>();
-        let mut bne_uses = Vector<*LIROperand>();
-        bne_uses.PushBack(this.EnsureRegister(condition));
-        bne_uses.PushBack(this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand);
-        bne_uses.PushBack(this.builder.BlockOperand(then_target));
-        this.builder.BuildInstruction(LIROpcode::Bne, bne_defines, bne_uses);
+        let then_defines = Vector<*LIROperand>();
+        let mut then_uses = Vector<*LIROperand>();
+        then_uses.PushBack(this.EnsureRegister(condition));
+        then_uses.PushBack(this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand);
+        then_uses.PushBack(this.builder.BlockOperand(then_target));
+        this.builder.BuildInstruction(LIROpcode::Bne, then_defines, then_uses);
 
-        let b_defines = Vector<*LIROperand>();
-        let mut b_uses = Vector<*LIROperand>();
-        b_uses.PushBack(this.builder.BlockOperand(else_target));
-        this.builder.BuildInstruction(LIROpcode::B, b_defines, b_uses);
+        let else_defines = Vector<*LIROperand>();
+        let mut else_uses = Vector<*LIROperand>();
+        else_uses.PushBack(this.builder.BlockOperand(else_target));
+        this.builder.BuildInstruction(LIROpcode::B, else_defines, else_uses);
         return null;
     }
 
