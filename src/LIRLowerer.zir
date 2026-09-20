@@ -27,7 +27,7 @@ class LIRLowerer {
     LIRLowerer(&mut this) {}
 
     pub fn Lower(&mut this, module: *MIRModule) -> *LIRModule {
-        this.module = this.context->arena.New<LIRModule>();
+        this.module = this.context.arena.New<LIRModule>();
         this.builder = LIRBuilder(&mut this.context, this.module);
         this.LowerModule(module);
         return this.module;
@@ -161,9 +161,11 @@ class LIRLowerer {
 
     fn AlignOf(&this, _type: *MIRType) -> u32 {
         if _type->kind == MIRTypeKind::Integer {
-            return (_type as *MIRIntegerType)->width / 8;
+            let width = (_type as *MIRIntegerType)->width;
+            return width <= 8 ? 1 : width / 8;
         } else if _type->kind == MIRTypeKind::Float {
-            return (_type as *MIRFloatType)->width / 8;
+            let width = (_type as *MIRFloatType)->width;
+            return width <= 8 ? 1 : width / 8;
         } else if _type->kind == MIRTypeKind::Pointer {
             return 4;
         } else if _type->kind == MIRTypeKind::Array {
@@ -185,9 +187,11 @@ class LIRLowerer {
 
     fn SizeOf(&this, _type: *MIRType) -> u32 {
         if _type->kind == MIRTypeKind::Integer {
-            return (_type as *MIRIntegerType)->width / 8;
+            let width = (_type as *MIRIntegerType)->width;
+            return width <= 8 ? 1 : width / 8;
         } else if _type->kind == MIRTypeKind::Float {
-            return (_type as *MIRFloatType)->width / 8;
+            let width = (_type as *MIRFloatType)->width;
+            return width <= 8 ? 1 : width / 8;
         } else if _type->kind == MIRTypeKind::Pointer {
             return 4;
         } else if _type->kind == MIRTypeKind::Array {
@@ -215,6 +219,10 @@ class LIRLowerer {
         if remainder != 0 {
             value += alignment - remainder;
         } return value;
+    }
+
+    fn EnsureRegister(&mut this, operand: *LIROperand) -> *LIROperand {
+        return null;
     }
 
     fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
@@ -282,18 +290,49 @@ class LIRLowerer {
     }
 
     fn LowerReturnInstruction(&mut this, _return: *MIRReturnInstruction) -> *LIROperand {
+        let defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(this.builder.PhysicalRegister(1, "ra".ToString()) as *LIRRegisterOperand);
+        this.builder.BuildInstruction(LIROpcode::Br, defines, uses);
         return null;
     }
 
     fn LowerBranchInstruction(&mut this, branch: *MIRBranchInstruction) -> *LIROperand {
+        let target = this.blocks.Get(branch->target, null);
+        if target == null { return null; }
+        let defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(this.builder.BlockOperand(target));
+        this.builder.BuildInstruction(LIROpcode::B, defines, uses);
         return null;
     }
 
     fn LowerConditionalBranchInstruction(&mut this, branch: *MIRConditionalBranchInstruction) -> *LIROperand {
+        let condition = this.LowerValue(branch->condition);
+        if condition == null { return null; }
+        let then_target = this.blocks.Get(branch->then_target, null);
+        if then_target == null { return null; }
+        let else_target = this.blocks.Get(branch->else_target, null);
+        if else_target == null { return null; }
+
+        let bne_defines = Vector<*LIROperand>();
+        let mut bne_uses = Vector<*LIROperand>();
+        bne_uses.PushBack(this.EnsureRegister(condition));
+        bne_uses.PushBack(this.builder.PhysicalRegister(0, "zero".ToString()) as *LIRRegisterOperand);
+        bne_uses.PushBack(this.builder.BlockOperand(then_target));
+        this.builder.BuildInstruction(LIROpcode::Bne, bne_defines, bne_uses);
+
+        let b_defines = Vector<*LIROperand>();
+        let mut b_uses = Vector<*LIROperand>();
+        b_uses.PushBack(this.builder.BlockOperand(else_target));
+        this.builder.BuildInstruction(LIROpcode::B, b_defines, b_uses);
         return null;
     }
 
     fn LowerUnreachableInstruction(&mut this, unreachable: *MIRUnreachableInstruction) -> *LIROperand {
+        let defines = Vector<*LIROperand>();
+        let uses = Vector<*LIROperand>();
+        this.builder.BuildInstruction(LIROpcode::Hlt, defines, uses);
         return null;
     }
 }

@@ -270,6 +270,7 @@ class LIRBlock {
 class LIRFunction {
     pub name: String,
     pub blocks: Vector<*LIRBlock>,
+    pub register_index: u32 = 0,
     pub frame_size: u32 = 0;
 
     LIRFunction(&mut this, name: String) {
@@ -325,8 +326,7 @@ class LIRBuilder {
     context: *mut LIRContext,
     module: *mut LIRModule,
     function: *mut LIRFunction = null,
-    block: *mut LIRBlock = null,
-    register_index: u32 = 0;
+    block: *mut LIRBlock = null;
 
     LIRBuilder(&mut this) {}
 
@@ -335,8 +335,8 @@ class LIRBuilder {
     }
 
     pub fn VirtualRegister(&mut this) -> *mut LIRVirtualRegister {
-        let register = this.context->arena.New<LIRVirtualRegister>(this.register_index);
-        this.register_index += 1;
+        let register = this.context->arena.New<LIRVirtualRegister>(this.function->register_index);
+        this.function->register_index += 1;
         return register;
     }
 
