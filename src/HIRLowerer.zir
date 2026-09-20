@@ -1812,7 +1812,7 @@ class HIRLowerer {
         return this.builder.Assignment(left, this.MakeCompatible(right, left->_type));
     }
 
-    fn LowerCallArguments(&mut this, arguments: &Vector<*ASTExpression>, node: *ASTNode, invalid: *mut bool) -> Vector<*HIRExpression> {
+    fn LowerCallArguments(&mut this, arguments: &Vector<*ASTExpression>, node: *ASTNode, invalid: &mut bool) -> Vector<*HIRExpression> {
         let mut values = Vector<*HIRExpression>();
 
         for argument in arguments {
@@ -1820,7 +1820,7 @@ class HIRLowerer {
                 let value = this.LowerExpression(argument);
 
                 if value == null {
-                    *invalid = true;
+                    invalid = true;
                     return Vector<*HIRExpression>();
                 }
 
@@ -1854,7 +1854,7 @@ class HIRLowerer {
 
             if !expanded {
                 Logger::Log("Pack splat can only expand the current function's parameter pack.", node, LogSeverity::Error);
-                *invalid = true;
+                invalid = true;
                 return Vector<*HIRExpression>();
             }
         } return values;
@@ -2046,10 +2046,38 @@ class HIRLowerer {
         }
 
         let mut invalid = false;
-        let mut values = this.LowerCallArguments(call->arguments, call, &mut invalid);
+        let mut values = this.LowerCallArguments(call->arguments, call, invalid);
         if invalid { return null; }
 
-        if call->expression->kind == ASTExpressionKind::MemberAccess {
+        if call->expression->kind == ASTExpressionKind::Path {
+            let path = (call->expression as *ASTPathExpression)->path;
+
+            for symbol in this.scope_manager.ResolveType(path, true) {
+                if symbol->kind == SymbolKind::Type && symbol->_type->IsClass() {
+                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                    for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
+                        candidates.PushBack(candidate);
+                    }
+
+                    values.Insert(0, this.builder.NullLiteral());
+                    let function = this.ResolveOverload(candidates, values, call, false);
+                    if function == null { return null; }
+                    let callee = this.builder.ReferenceDeclaration(function, false);
+                    if !this.ValidateCallArguments(callee, values, call) { return null; }
+                    values.RemoveAt(0);
+                    let constructor = this.builder.Constructor(callee, values, symbol->_type);
+                    this.temporaries.PushBack(constructor);
+                    return constructor;
+                }
+            }
+
+            let candidates = this.scope_manager.ResolveCandidates(path, values, true);
+
+            if !candidates.Empty() {
+                return this.LowerResolvedCallExpression(candidates, values, call);
+            }
+        } else if call->expression->kind == ASTExpressionKind::MemberAccess {
             let member_access = call->expression as *ASTMemberAccessExpression;
             let mut instance = this.ImplicitDereference(this.LowerExpression(member_access->expression));
             if instance == null { return null; }
@@ -2071,81 +2099,25 @@ class HIRLowerer {
                 }
             }
 
-            if !instance->_type->HasFields() && !instance->_type->HasMethods() {
-                values.Insert(0, this.ImplicitAddressOf(instance));
-                let mut candidates = this.extension_registry.GetCandidates(instance->_type, member_access->member, call, true);
-                candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
+            let mut candidates = Vector<*HIRFunctionDeclaration>();
+            values.Insert(0, this.ImplicitAddressOf(instance));
 
-                if candidates.Empty() {
-                    Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
-                    return null;
-                }
+            if !instance->_type->HasMethods() {
+                candidates += this.extension_registry.GetCandidates(instance->_type, member_access->member, call, true);
+            } else {
+                candidates += instance->_type->GetCandidates(member_access->member, call, true);
+            }
 
+            candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
+
+            if !candidates.Empty() {
                 return this.LowerResolvedCallExpression(candidates, values, call);
-            } else {
-                let index = instance->_type->HasFields() ? instance->_type->Index(member_access->member) : -1;
-
-                if index != -1 {
-                    let field: *HIRFieldDeclaration = instance->_type->Fields()[index as usize];
-
-                    if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
-                        Logger::Log("Field '" + member_access->member + "' is private.", call, LogSeverity::Error);
-                        return null;
-                    }
-
-                    return this.LowerResolvedCallExpression(this.builder.FieldAccess(instance, field), values, call);
-                } else {
-                    values.Insert(0, this.ImplicitAddressOf(instance));
-                    let mut candidates = instance->_type->GetCandidates(member_access->member, call, true);
-                    candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
-
-                    if candidates.Empty() {
-                        Logger::Log("Invalid arguments for method: '" + member_access->member + "'.", call, LogSeverity::Error);
-                        return null;
-                    }
-
-                    return this.LowerResolvedCallExpression(candidates, values, call);
-                }
-            }
-        } else {
-            if call->expression->kind == ASTExpressionKind::Path {
-                let path = (call->expression as *ASTPathExpression)->path;
-
-                for symbol in this.scope_manager.ResolveType(path, true) {
-                    if symbol->kind == SymbolKind::Type && symbol->_type->IsClass() {
-                        let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                        for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
-                            candidates.PushBack(candidate);
-                        }
-
-                        values.Insert(0, this.builder.NullLiteral());
-                        let function = this.ResolveOverload(candidates, values, call, false);
-                        if function == null { return null; }
-                        let callee = this.builder.ReferenceDeclaration(function, false);
-                        if !this.ValidateCallArguments(callee, values, call) { return null; }
-                        values.RemoveAt(0);
-                        let constructor = this.builder.Constructor(callee, values, symbol->_type);
-                        this.temporaries.PushBack(constructor);
-                        return constructor;
-                    }
-                }
-
-                let candidates = this.scope_manager.ResolveCandidates(path, values, true);
-
-                if !candidates.Empty() {
-                    return this.LowerResolvedCallExpression(candidates, values, call);
-                }
-            }
-
-            let value = this.LowerExpression(call->expression);
-
-            if value != null {
-                return this.LowerResolvedCallExpression(value, values, call);
-            } else {
-                return null;
-            }
+            } values.RemoveAt(0);
         }
+
+        let value = this.LowerExpression(call->expression);
+        if value == null { return null; }
+        return this.LowerResolvedCallExpression(value, values, call);
     }
 
     fn ResolveOverload(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode, test: bool) -> *HIRFunctionDeclaration {
