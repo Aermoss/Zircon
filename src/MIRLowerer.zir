@@ -120,11 +120,10 @@ class MIRLowerer {
     }
 
     fn LowerConstantDeclarationFirstPass(&mut this, constant: *HIRConstantDeclaration) {
-        let declaration = constant as *HIRDeclaration;
-        let _type = this.LowerType(declaration->_type);
+        let _type = this.LowerType(constant->_type);
         if _type == null { return; }
-        let lowered = this.builder.BuildConstant(declaration->name, _type, null);
-        this.declarations[declaration] = lowered;
+        let lowered = this.builder.BuildConstant(constant->name, _type, null);
+        this.declarations[constant as *HIRDeclaration] = lowered;
     }
 
     fn LowerConstantDeclarationSecondPass(&mut this, constant: *HIRConstantDeclaration) {
@@ -141,11 +140,10 @@ class MIRLowerer {
     }
 
     fn LowerStaticDeclarationFirstPass(&mut this, _static: *HIRStaticDeclaration) {
-        let declaration = _static as *HIRDeclaration;
-        let _type = this.LowerType(declaration->_type);
+        let _type = this.LowerType(_static->_type);
         if _type == null { return; }
-        let lowered = this.builder.BuildStatic(declaration->name, _type, _static->mutable, null, this.LowerLinkage(declaration->linkage));
-        this.declarations[declaration] = lowered;
+        let lowered = this.builder.BuildStatic(_static->name, _type, _static->mutable, null, this.LowerLinkage(_static->linkage));
+        this.declarations[_static as *HIRDeclaration] = lowered;
     }
 
     fn LowerStaticDeclarationSecondPass(&mut this, _static: *HIRStaticDeclaration) {
@@ -180,13 +178,12 @@ class MIRLowerer {
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *HIRFunctionDeclaration) {
-        let declaration = function as *HIRDeclaration;
-        let mut name = declaration->name;
+        let mut name = function->name;
 
-        if declaration->abi == HIRDeclarationABI::Native && !function->no_mangle {
+        if function->abi == HIRDeclarationABI::Native && !function->no_mangle {
             let mut types = Vector<*HIRType>();
             if function->instance != null { types = function->instance->types; }
-            name = Mangler::MangleFunction(name, declaration->_type, types, this.namespaces);
+            name = Mangler::MangleFunction(name, function->_type, types, this.namespaces);
         }
 
         let mut parameters = Vector<*MIRParameter>();
@@ -199,12 +196,11 @@ class MIRLowerer {
         }
 
         for parameter in function->parameters {
-            let declaration = parameter as *HIRDeclaration;
-            parameters.PushBack(this.builder.BuildParameter(declaration->name, parameters.Size() as u32, this.LowerAggregateType(declaration->_type)));
+            parameters.PushBack(this.builder.BuildParameter(parameter->name, parameters.Size() as u32, this.LowerAggregateType(parameter->_type)));
         }
 
-        let lowered = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(declaration->linkage));
-        this.declarations[declaration] = lowered;
+        let lowered = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));
+        this.declarations[function as *HIRDeclaration] = lowered;
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
@@ -224,21 +220,20 @@ class MIRLowerer {
 
         for i in 0..function->parameters.Size() {
             let parameter: *HIRParameterDeclaration = function->parameters[i];
-            let lowered_parameter: *MIRParameter = this.builder.GetCurrentFunction()->parameters[(indirect_return ? 1 : 0) + i];
-            let declaration = parameter as *HIRDeclaration;
+            let lowered: *MIRParameter = this.builder.GetCurrentFunction()->parameters[(indirect_return ? 1 : 0) + i];
 
-            if this.IsIndirectAggregate(declaration->_type) {
-                this.parameters[declaration] = lowered_parameter;
-            } else if this.IsAggregate(declaration->_type) {
-                let alloca = this.builder.BuildAlloca(declaration->name, this.LowerType(declaration->_type));
-                let target = this.context.PointerType(this.LowerAggregateType(declaration->_type));
+            if this.IsIndirectAggregate(parameter->_type) {
+                this.parameters[parameter as *HIRDeclaration] = lowered;
+            } else if this.IsAggregate(parameter->_type) {
+                let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
+                let target = this.context.PointerType(this.LowerAggregateType(parameter->_type));
                 let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
-                this.builder.BuildStore(lowered_parameter, pointer);
-                this.parameters[declaration] = alloca;
+                this.builder.BuildStore(lowered, pointer);
+                this.parameters[parameter as *HIRDeclaration] = alloca;
             } else {
-                let alloca = this.builder.BuildAlloca(declaration->name, this.LowerType(declaration->_type));
-                this.builder.BuildStore(lowered_parameter, alloca);
-                this.parameters[declaration] = alloca;
+                let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
+                this.builder.BuildStore(lowered, alloca);
+                this.parameters[parameter as *HIRDeclaration] = alloca;
             }
         }
 
@@ -252,14 +247,12 @@ class MIRLowerer {
     }
 
     fn LowerClassDeclarationFirstPass(&mut this, _class: *HIRClassDeclaration) {
-        let declaration = _class as *HIRDeclaration;
-        let lowered = this.builder.BuildType(declaration->name, this.context.StructureType(declaration->name));
-        this.types[declaration->_type] = lowered;
+        let lowered = this.builder.BuildType(_class->name, this.context.StructureType(_class->name));
+        this.types[_class->_type] = lowered;
     }
 
     fn LowerClassDeclarationSecondPass(&mut this, _class: *HIRClassDeclaration) {
-        let declaration = _class as *HIRDeclaration;
-        let lowered: *mut MIRDeclaration = this.types[declaration->_type];
+        let lowered: *mut MIRDeclaration = this.types[_class->_type];
         let mut fields = Vector<*MIRType>();
 
         for parent in _class->parents {
@@ -269,8 +262,7 @@ class MIRLowerer {
         }
 
         for field in _class->fields {
-            let declaration = field as *HIRDeclaration;
-            let lowered_field = this.LowerType(declaration->_type);
+            let lowered_field = this.LowerType(field->_type);
             if lowered_field == null { return; }
             fields.PushBack(lowered_field);
         }
@@ -281,7 +273,7 @@ class MIRLowerer {
     fn LowerClassDeclarationThirdPass(&mut this, _class: *HIRClassDeclaration) {
         let mut types = Vector<*HIRType>();
         if _class->instance != null { types = _class->instance->types; }
-        this.namespaces.PushBack(Mangler::MangleName((_class as *HIRDeclaration)->name, types, this.namespaces));
+        this.namespaces.PushBack(Mangler::MangleName(_class->name, types, this.namespaces));
 
         for constructor in _class->constructors {
             this.LowerFunctionDeclarationFirstPass(constructor);
@@ -313,19 +305,16 @@ class MIRLowerer {
     }
 
     fn LowerStructureDeclarationFirstPass(&mut this, structure: *HIRStructureDeclaration) {
-        let declaration = structure as *HIRDeclaration;
-        let lowered = this.builder.BuildType(declaration->name, this.context.StructureType(declaration->name));
-        this.types[declaration->_type] = lowered;
+        let lowered = this.builder.BuildType(structure->name, this.context.StructureType(structure->name));
+        this.types[structure->_type] = lowered;
     }
 
     fn LowerStructureDeclarationSecondPass(&mut this, structure: *HIRStructureDeclaration) {
-        let declaration = structure as *HIRDeclaration;
-        let lowered: *mut MIRDeclaration = this.types[declaration->_type];
+        let lowered: *mut MIRDeclaration = this.types[structure->_type];
         let mut fields = Vector<*MIRType>();
 
         for field in structure->fields {
-            let declaration = field as *HIRDeclaration;
-            let lowered_field = this.LowerType(declaration->_type);
+            let lowered_field = this.LowerType(field->_type);
             if lowered_field == null { return; }
             fields.PushBack(lowered_field);
         }
@@ -336,7 +325,7 @@ class MIRLowerer {
     fn LowerStructureDeclarationThirdPass(&mut this, structure: *HIRStructureDeclaration) {
         let mut types = Vector<*HIRType>();
         if structure->instance != null { types = structure->instance->types; }
-        this.namespaces.PushBack(Mangler::MangleName((structure as *HIRDeclaration)->name, types, this.namespaces));
+        this.namespaces.PushBack(Mangler::MangleName(structure->name, types, this.namespaces));
 
         for method in structure->methods {
             this.LowerFunctionDeclarationFirstPass(method);
@@ -352,7 +341,7 @@ class MIRLowerer {
     }
 
     fn LowerExtendDeclarationFirstPass(&mut this, _extend: *HIRExtendDeclaration) {
-        this.namespaces.PushBack(Mangler::MangleName((_extend as *HIRDeclaration)->name, Vector<*HIRType>(), this.namespaces));
+        this.namespaces.PushBack(Mangler::MangleName(_extend->name, Vector<*HIRType>(), this.namespaces));
 
         for method in _extend->methods {
             this.LowerFunctionDeclarationFirstPass(method);
@@ -671,7 +660,7 @@ class MIRLowerer {
     }
 
     fn LowerLiteral(&mut this, literal: *HIRLiteral) -> *MIRValue {
-        let _type = this.LowerType((literal as *HIRExpression)->_type);
+        let _type = this.LowerType(literal->_type);
 
         if literal->kind == HIRLiteralKind::Boolean {
             return this.builder.ConstantInteger((literal as *HIRBooleanLiteral)->value ? 1 : 0, _type);
@@ -962,8 +951,7 @@ class MIRLowerer {
 
     fn LowerCastExpression(&mut this, cast: *HIRCastExpression) -> *MIRValue {
         let mut lowered: *MIRInstruction = null;
-        let expression = cast as *HIRExpression;
-        let target_type = expression->_type;
+        let target_type = cast->_type;
 
         let value_type = cast->value->_type;
         let mut value = this.LowerExpression(cast->value);
@@ -1079,10 +1067,9 @@ class MIRLowerer {
     }
 
     fn LowerFieldAccessExpression(&mut this, field_access: *HIRFieldAccessExpression) -> *MIRValue {
-        let expression = field_access as *HIRExpression;
         let instance = this.LowerPlaceExpression(field_access->instance);
         if instance == null { return null; }
-        let field_type = this.context.PointerType(this.LowerType((field_access->field as *HIRDeclaration)->_type));
+        let field_type = this.context.PointerType(this.LowerType(field_access->field->_type));
         return this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type);
     }
 
@@ -1108,8 +1095,7 @@ class MIRLowerer {
     }
 
     fn LowerBinaryExpression(&mut this, binary: *HIRBinaryExpression) -> *MIRValue {
-        let expression = binary as *HIRExpression;
-        let result_type = this.LowerType(expression->_type);
+        let result_type = this.LowerType(binary->_type);
         if result_type == null { return null; }
 
         let left_type = binary->left->_type;
@@ -1295,7 +1281,6 @@ class MIRLowerer {
     }
 
     fn LowerTernaryExpression(&mut this, ternary: *HIRTernaryExpression) -> *MIRValue {
-        let expression = ternary as *HIRExpression;
         let condition = this.LowerExpression(ternary->condition);
         if condition == null { return null; }
 
@@ -1327,7 +1312,7 @@ class MIRLowerer {
         this.builder.BuildBranch(merge_block);
 
         this.builder.SetCurrentBlock(merge_block);
-        let _type = this.LowerType(expression->_type);
+        let _type = this.LowerType(ternary->_type);
         if _type == null { return null; }
         let phi = this.builder.BuildPhi("ternary".ToString(), _type);
         phi->AddIncoming(then_value, then_block);

@@ -46,8 +46,7 @@ class LIRLowerer {
     }
 
     fn LowerFunctionDeclaration(&mut this, function: *MIRFunctionDeclaration) {
-        let declaration = function as *MIRDeclaration;
-        let lowered = this.builder.BuildFunction(declaration->name);
+        let lowered = this.builder.BuildFunction(function->name);
         if function->blocks.Empty() { return; }
         this.builder.SetCurrentFunction(lowered);
         this.blocks.Clear();
@@ -307,7 +306,7 @@ class LIRLowerer {
     fn LowerLoadInstruction(&mut this, load: *MIRLoadInstruction) -> *LIROperand {
         let pointer = this.LowerValue(load->pointer);
         if pointer == null { return null; }
-        let size = this.SizeOf((load as *MIRValue)->_type);
+        let size = this.SizeOf(load->_type);
         let opcode = size > 2 ? LIROpcode::Lw : (size > 1 ? LIROpcode::Lhu : LIROpcode::Lbu);
         let destination = this.builder.VirtualRegister();
         let mut defines = Vector<*LIROperand>();
@@ -468,7 +467,7 @@ class LIRLowerer {
             this.builder.BuildInstruction(LIROpcode::Blr, defines, uses);
         }
 
-        if (call as *MIRValue)->_type->kind == MIRTypeKind::Void {
+        if call->_type->kind == MIRTypeKind::Void {
             return null;
         }
 
@@ -480,8 +479,8 @@ class LIRLowerer {
     fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> *LIROperand {
         let value = this.EnsureRegister(this.LowerValue(cast->value));
         if value == null { return null; }
-        let destination_type = (cast as *MIRValue)->_type;
         let source_type = cast->value->_type;
+        let destination_type = cast->_type;
 
         if cast->kind == MIRCastKind::Trunc {
             if destination_type->kind != MIRTypeKind::Integer { return null; }

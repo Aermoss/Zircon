@@ -234,7 +234,7 @@ class MIRConstantInteger : MIRConstant {
     }
 
     pub fn ToString(&this) -> String {
-        if ((this as *MIRValue)->_type as *MIRIntegerType)->width == 1 {
+        if (this._type as *MIRIntegerType)->width == 1 {
             return (this.value != 0 ? "true" : "false").ToString();
         } return String::FromInteger(this.value as i64);
     }
@@ -457,7 +457,7 @@ class MIRCastExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + (this as *MIRValue)->_type->ToString();
+        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString();
     }
 }
 
@@ -510,7 +510,7 @@ class MIRInstruction : MIRValue {
     pub fn ToDefinitionString(&this) -> String {
         let mut result = String();
 
-        if (this as *MIRValue)->_type->kind != MIRTypeKind::Void {
+        if this._type->kind != MIRTypeKind::Void {
             result += '%' + this.name + " = ";
         }
 
@@ -570,7 +570,7 @@ class MIRLoadInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return "load " + (this as *MIRValue)->_type->ToString() + ", " + this.pointer->ToString();
+        return "load " + this._type->ToString() + ", " + this.pointer->ToString();
     }
 }
 
@@ -668,7 +668,7 @@ class MIRCastInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + (this as *MIRValue)->_type->ToString();
+        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString();
     }
 }
 
@@ -846,7 +846,7 @@ class MIRBlock {
             Logger::Log("Appending instruction after block terminator!", LogSeverity::Fatal);
         }
 
-        if (instruction as *MIRValue)->_type->kind != MIRTypeKind::Void {
+        if instruction->_type->kind != MIRTypeKind::Void {
             instruction->name = this.parent->GetUniqueName(instruction->name);
         } this.instructions.PushBack(instruction);
     }
@@ -980,7 +980,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
             let parameter: *MIRParameter = this.parameters[i];
-            result += '%' + parameter->name + ": " + (parameter as *MIRValue)->_type->ToString();
+            result += '%' + parameter->name + ": " + parameter->_type->ToString();
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {
@@ -1008,8 +1008,7 @@ class MIRStaticDeclaration : MIRLinkableDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *MIRDeclaration;
-        let mut result = "static @\"" + declaration->name + "\": " + declaration->_type->ToString();
+        let mut result = "static @\"" + this.name + "\": " + this._type->ToString();
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
@@ -1301,7 +1300,7 @@ class MIRBuilder {
 
     pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage) -> *mut MIRFunctionDeclaration {
         let mut parameter_types = Vector<*MIRType>();
-        for parameter in parameters { parameter_types.PushBack((parameter as *MIRValue)->_type); }
+        for parameter in parameters { parameter_types.PushBack(parameter->_type); }
         let _type = this.context->FunctionType(parameter_types, _return);
         let function = this.context->arena.New<MIRFunctionDeclaration>(name, parameters, _return, _type, linkage);
         this.module->declarations.PushBack(function);

@@ -62,7 +62,7 @@ class HIRType {
 
         if this.HasFields() {
             for field in this.Fields() {
-                if !(field as *HIRDeclaration)->_type->IsTrivial() {
+                if !field->_type->IsTrivial() {
                     return false;
                 }
             }
@@ -277,7 +277,7 @@ class HIRType {
             }
 
             for field in this.Fields() {
-                let field_alignment = (field as *HIRDeclaration)->_type->Alignment();
+                let field_alignment = field->_type->Alignment();
                 if field_alignment > alignment { alignment = field_alignment; }
             } return alignment;
         } else {
@@ -310,7 +310,7 @@ class HIRType {
             }
 
             for field in this.Fields() {
-                let field_type = (field as *HIRDeclaration)->_type;
+                let field_type = field->_type;
                 let field_alignment = field_type->Alignment();
                 let remainder = size % field_alignment;
                 if remainder != 0 { size += field_alignment - remainder; }
@@ -371,7 +371,7 @@ class HIRType {
         for i in 0..fields.Size() {
             let field: *HIRFieldDeclaration = fields[i];
 
-            if (field as *HIRDeclaration)->name == name {
+            if field->name == name {
                 return i as isize;
             }
         } return -1;
@@ -400,18 +400,18 @@ class HIRType {
         if this.IsClass() {
             let declaration = (this as *HIRClassType)->declaration;
 
-            if (declaration as *HIRDeclaration)->name == name {
+            if declaration->name == name {
                 for constructor in declaration->constructors {
                     result.PushBack(constructor);
                 } return result;
-            } else if ('~' + (declaration as *HIRDeclaration)->name) == name {
+            } else if ('~' + declaration->name) == name {
                 result.PushBack(declaration->destructor);
                 return result;
             }
         }
 
         for method in this.Methods() {
-            if (method as *HIRDeclaration)->name != name {
+            if method->name != name {
                 continue;
             }
 
@@ -662,7 +662,7 @@ class HIRClassType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + (this.declaration as *HIRDeclaration)->name;
+        return '%' + this.declaration->name;
     }
 }
 
@@ -674,7 +674,7 @@ class HIRStructureType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + (this.declaration as *HIRDeclaration)->name;
+        return '%' + this.declaration->name;
     }
 }
 
@@ -687,7 +687,7 @@ class HIREnumerationType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + (this.declaration as *HIRDeclaration)->name;
+        return '%' + this.declaration->name;
     }
 }
 
@@ -1021,10 +1021,10 @@ class HIRUnaryExpression : HIRExpression {
     pub fn ToString(&this) -> String {
         let mut result = this.kind.ToString();
 
-        if this.kind == HIRUnaryKind::AddressOf && (this as *HIRExpression)->_type->IsMutable() {
+        if this.kind == HIRUnaryKind::AddressOf && this._type->IsMutable() {
             result += "mut ";
         }
-        
+
         if (this as *HIRExpression)->Precedence() >= this.operand->Precedence() {
             result += '(' + this.operand->ToString() + ')';
         } else {
@@ -1172,7 +1172,7 @@ class HIRCastExpression : HIRExpression {
             result += this.value->ToString();
         }
 
-        return result + " as " + (this as *HIRExpression)->_type->ToString();
+        return result + " as " + this._type->ToString();
     }
 }
 
@@ -1201,7 +1201,7 @@ class HIRFieldAccessExpression : HIRExpression {
     pub instance: *HIRExpression,
     pub field: *HIRFieldDeclaration;
 
-    HIRFieldAccessExpression(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) : HIRExpression(HIRExpressionKind::FieldAccess, (field as *HIRDeclaration)->_type, HIRExpressionCategory::Place, instance->mutable) {
+    HIRFieldAccessExpression(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) : HIRExpression(HIRExpressionKind::FieldAccess, field->_type, HIRExpressionCategory::Place, instance->mutable) {
         (this.instance, this.field) = (instance, field);
     }
 
@@ -1214,7 +1214,7 @@ class HIRFieldAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + '.' + (this.field as *HIRDeclaration)->name;
+        return result + '.' + this.field->name;
     }
 }
 
@@ -1614,8 +1614,7 @@ class HIRParameterDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        return '%' + declaration->name + ": " + declaration->_type->ToString();
+        return '%' + this.name + ": " + this._type->ToString();
     }
 }
 
@@ -1632,8 +1631,7 @@ class HIRFunctionDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this, indent: usize) -> String {
-        let declaration = this as *HIRDeclaration;
-        let mut result = "fn @\"" + declaration->name + "\"(";
+        let mut result = "fn @\"" + this.name + "\"(";
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
@@ -1641,8 +1639,8 @@ class HIRFunctionDeclaration : HIRDeclaration {
             result += parameter->ToString();
         } result += ')';
 
-        if !declaration->_type->Return().IsVoid() {
-            result += " -> " + declaration->_type->Return().ToString();
+        if !this._type->Return().IsVoid() {
+            result += " -> " + this._type->Return().ToString();
         }
 
         if this.body != null {
@@ -1661,8 +1659,7 @@ class HIRFieldDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        let mut result = '%' + declaration->name + ": " + declaration->_type->ToString();
+        let mut result = '%' + this.name + ": " + this._type->ToString();
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
@@ -1681,7 +1678,7 @@ class HIRClassDeclaration : HIRDeclaration {
     HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Class, name, _type) {}
 
     pub fn ToString(&this) -> String {
-        let mut result = "class %" + (this as *HIRDeclaration)->name;
+        let mut result = "class %" + this.name;
 
         if !this.parents.Empty() {
             result += " : ";
@@ -1729,7 +1726,7 @@ class HIRStructureDeclaration : HIRDeclaration {
     HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Structure, name, _type) {}
 
     pub fn ToString(&this) -> String {
-        let mut result = "struct %" + (this as *HIRDeclaration)->name + " {";
+        let mut result = "struct %" + this.name + " {";
 
         if !this.fields.Empty() {
             result += '\n';
@@ -1759,7 +1756,7 @@ class HIRMemberDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = '%' + (this as *HIRDeclaration)->name;
+        let mut result = '%' + this.name;
 
         if this.value != null {
             result += " = " + this.value->ToString();
@@ -1773,8 +1770,7 @@ class HIREnumerationDeclaration : HIRDeclaration {
     HIREnumerationDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Enumeration, name, _type) {}
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        let mut result = "enum %" + declaration->name + " {";
+        let mut result = "enum %" + this.name + " {";
 
         if !this.members.Empty() {
             result += '\n';
@@ -1794,8 +1790,7 @@ class HIRExtendDeclaration : HIRDeclaration {
     HIRExtendDeclaration(&mut this, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Extend, _type->ToString(), _type) {}
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        let mut result = "extend " + declaration->name + " {";
+        let mut result = "extend " + this.name + " {";
 
         for method in this.methods {
             result += "\n    " + method->ToString(1) + '\n';
@@ -1817,12 +1812,12 @@ class HIRExtensionRegistry {
         let mut found = false;
 
         for extension in this.extensions {
-            if *(extension as *HIRDeclaration)->_type != *_type {
+            if *extension->_type != *_type {
                 continue;
             }
 
             for method in extension->methods {
-                if (method as *HIRDeclaration)->name != name {
+                if method->name != name {
                     continue;
                 }
 
@@ -1850,8 +1845,7 @@ class HIRConstantDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        return "const @" + declaration->name + ": " + declaration->_type->ToString() + " = " + this.initializer->ToString();
+        return "const @" + this.name + ": " + this._type->ToString() + " = " + this.initializer->ToString();
     }
 }
 
@@ -1865,8 +1859,7 @@ class HIRStaticDeclaration : HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *HIRDeclaration;
-        let mut result = "static @" + declaration->name + ": " + declaration->_type->ToString();
+        let mut result = "static @" + this.name + ": " + this._type->ToString();
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
@@ -2195,8 +2188,7 @@ class HIRBuilder {
                 : (value as *HIRIntegerLiteral)->value;
 
             if target->IsFloat() {
-                let source = (value as *HIRExpression)->_type;
-                return this.FloatLiteral(source->IsInteger() && source->IsSigned() ? this.SignExtend(raw, source->Width() as u64) as f64 : raw as f64, target);
+                return this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width() as u64) as f64 : raw as f64, target);
             } else {
                 return this.IntegerLiteral(this.MaskToWidth(raw, target->Width() as u64), target);
             }
