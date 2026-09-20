@@ -383,6 +383,9 @@ fn PrintUsage(executable: &String) {
     WriteLine("  -g                       Enable debug information");
     WriteLine("  -c                       Only run preprocess, compile, and assemble steps");
     WriteLine("  -S                       Only run preprocess and compilation steps");
+    WriteLine("  -emit-hir                Emit HIR (High-level intermediate representation)");
+    WriteLine("  -emit-mir                Emit MIR (Mid-level intermediate representation)");
+    WriteLine("  -emit-lir                Emit LIR (Low-level intermediate representation)");
     WriteLine("  -emit-llvm               Emit LLVM intermediate representation");
     WriteLine("  -emit-bc                 Emit LLVM bitcode");
     WriteLine("  -check, -fsyntax-only    Check code for errors, but do not emit code");
@@ -432,6 +435,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut triple = LLVMGetDefaultTargetTriple().ToString();
     let (mut arch, mut code_model) = ("generic".ToString(), "default".ToString());
     let mut opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
+    let (mut emit_hir, mut emit_mir, mut emit_lir) = (false, false, false);
     let (mut emit_object, mut emit_asm, mut emit_llvm, mut emit_bc) = (false, false, false, false);
     let (mut run, mut debug, mut verbose, mut check) = (false, false, false, false);
     let (mut freestanding, mut no_red_zone) = (false, false);
@@ -456,6 +460,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
             emit_object = true;
         } else if arg == "-S" {
             emit_asm = true;
+        } else if arg == "-emit-hir" {
+            emit_hir = true;
+        } else if arg == "-emit-mir" {
+            emit_mir = true;
+        } else if arg == "-emit-lir" {
+            emit_lir = true;
         } else if arg == "-emit-llvm" {
             emit_llvm = true;
         } else if arg == "-emit-bc" {
@@ -660,19 +670,19 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if !check && !Logger::HasError() {
                 WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
-                // _WriteFile(name + ".hir", hir_module->ToString());
+                if emit_hir { _WriteFile(name + ".hir", hir_module->ToString()); }
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
                 let mir_start = timer.Get();
                 let mir_module = mir_lowerer.Lower(hir_module);
                 WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
-                // _WriteFile(name + ".mir", mir_module->ToString());
+                if emit_mir { _WriteFile(name + ".mir", mir_module->ToString()); }
 
                 let mut lir_lowerer = LIRLowerer();
                 let lir_start = timer.Get();
                 let lir_module = lir_lowerer.Lower(mir_module);
                 WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
-                // _WriteFile(name + ".lir", lir_module->ToString());
+                if emit_lir { _WriteFile(name + ".lir", lir_module->ToString()); }
 
                 let llvm_start = timer.Get();
                 module = llvm_lowerer.Lower(mir_module);
