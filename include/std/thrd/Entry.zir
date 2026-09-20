@@ -131,7 +131,7 @@ class Thread {
 
     pub fn Sleep(&this, seconds: i64, nanoseconds: i32) {
 #[if WINDOWS]
-        Sleep((seconds * 1000 + (nanoseconds / 1000000) as i64) as u32);
+        ::Sleep((seconds * 1000 + (nanoseconds / 1000000) as i64) as u32);
 #[else]
         let mut ts: timespec;
         (ts.tv_sec, ts.tv_nsec) = (seconds, nanoseconds);
