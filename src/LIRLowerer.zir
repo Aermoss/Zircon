@@ -333,11 +333,49 @@ class LIRLowerer {
     }
 
     fn LowerArrayGEPInstruction(&mut this, gep: *MIRArrayGEPInstruction) -> *LIROperand {
-        return null;
+        let pointer = this.EnsureRegister(this.LowerValue(gep->pointer));
+        let index = this.EnsureRegister(this.LowerValue(gep->index));
+        if pointer == null || index == null { return null; }
+        let pointee = (gep->pointer->_type as *MIRPointerType)->pointee;
+        let mut element_size: u32 = 0;
+
+        if pointee->kind == MIRTypeKind::Array {
+            element_size = this.SizeOf((pointee as *MIRArrayType)->element);
+        } else {
+            element_size = this.SizeOf(pointee);
+        }
+
+        let mut offset = index;
+
+        if element_size > 1 {
+            offset = this.EmitRType(LIROpcode::Mul, index, this.EnsureRegister(this.builder.ImmediateOperand(element_size as i64)));
+        }
+
+        return this.builder.MemoryOperand(this.EmitRType(LIROpcode::Add, pointer, offset), 0);
+    }
+
+    fn FieldOffset(&this, _type: *MIRStructureType, index: u32) -> u32 {
+        let mut offset: u32 = 0;
+
+        for i in 0..index as usize {
+            let field: *MIRType = _type->fields[i];
+            let field_alignment = this.AlignOf(field);
+            offset = this.AlignUp(offset, field_alignment);
+            offset += this.SizeOf(field);
+        }
+
+        if index as usize < _type->fields.Size() {
+            offset = this.AlignUp(offset, this.AlignOf(_type->fields[index as usize]));
+        } return offset;
     }
 
     fn LowerStructGEPInstruction(&mut this, gep: *MIRStructGEPInstruction) -> *LIROperand {
-        return null;
+        let pointer = this.EnsureMemory(this.LowerValue(gep->pointer));
+        if pointer == null { return null; }
+        let memory = pointer as *LIRMemoryOperand;
+        let _type = (gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType;
+        let offset = this.FieldOffset(_type, gep->index);
+        return this.builder.MemoryOperand(memory->base, memory->offset + offset as i32) as *LIROperand;
     }
 
     fn LowerUnaryInstruction(&mut this, unary: *MIRUnaryInstruction) -> *LIROperand {
