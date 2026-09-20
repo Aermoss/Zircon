@@ -88,10 +88,8 @@ class HIRType {
     }
 
     pub fn IsDerivedFrom(&this, other: &HIRType) -> bool {
-        let declaration = (this as *HIRClassType)->declaration as *HIRDeclaration;
-
-        for field in other.Fields() {
-            if (field as *HIRDeclaration)->name == declaration->name {
+        for parent in (this as *HIRClassType)->declaration->parents {
+            if *parent == *other {
                 return true;
             }
         } return false;
@@ -102,7 +100,7 @@ class HIRType {
             if this.Pointee().IsVoid() || other.IsNullPointer() {
                 return true;
             } else if this.Pointee().IsClass() && other.Pointee().IsClass() {
-                if this.Pointee().IsDerivedFrom(other.Pointee()) {
+                if other.Pointee().IsDerivedFrom(this.Pointee()) {
                     return true;
                 }
             }
@@ -190,7 +188,7 @@ class HIRType {
             if this.Pointee().IsVoid() || other.IsNullPointer() {
                 return this.ScorePointer(other, 30);
             } else if this.Pointee().IsClass() && other.Pointee().IsClass() {
-                if this.Pointee().IsDerivedFrom(other.Pointee()) {
+                if other.Pointee().IsDerivedFrom(this.Pointee()) {
                     return this.ScorePointer(other, 70);
                 }
             }
@@ -233,6 +231,13 @@ class HIRType {
         } else if this.HasFields() {
             let mut alignment: usize = 1;
 
+            if this.IsClass() {
+                for parent in (this as *HIRClassType)->declaration->parents {
+                    let parent_alignment = parent->Alignment();
+                    if parent_alignment > alignment { alignment = parent_alignment; }
+                }
+            }
+
             for field in this.Fields() {
                 let field_alignment = (field as *HIRDeclaration)->_type->Alignment();
                 if field_alignment > alignment { alignment = field_alignment; }
@@ -256,6 +261,15 @@ class HIRType {
         } else if this.HasFields() {
             let mut size: usize = 0;
             let alignment = this.Alignment();
+
+            if this.IsClass() {
+                for parent in (this as *HIRClassType)->declaration->parents {
+                    let parent_alignment = parent->Alignment();
+                    let remainder = size % parent_alignment;
+                    if remainder != 0 { size += parent_alignment - remainder; }
+                    size += parent->Size();
+                }
+            }
 
             for field in this.Fields() {
                 let field_type = (field as *HIRDeclaration)->_type;
@@ -1619,6 +1633,7 @@ class HIRFieldDeclaration : HIRDeclaration {
 }
 
 class HIRClassDeclaration : HIRDeclaration {
+    pub parents: Vector<*HIRType>,
     pub fields: Vector<*HIRFieldDeclaration>,
     pub constructors: Vector<*mut HIRFunctionDeclaration>,
     pub destructor: *mut HIRFunctionDeclaration = null,
@@ -1628,7 +1643,17 @@ class HIRClassDeclaration : HIRDeclaration {
     HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Class, name, _type) {}
 
     pub fn ToString(&this) -> String {
-        let mut result = "class %" + (this as *HIRDeclaration)->name + " {";
+        let mut result = "class %" + (this as *HIRDeclaration)->name;
+
+        if !this.parents.Empty() {
+            result += " : ";
+
+            for i in 0..this.parents.Size() {
+                if i != 0 { result += ", "; }
+                let parent: *HIRType = this.parents[i];
+                result += parent->ToString();
+            }
+        } result += " {";
 
         if !this.fields.Empty() {
             result += '\n';

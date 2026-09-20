@@ -268,6 +268,12 @@ class MIRLowerer {
         let lowered: *mut MIRDeclaration = this.types[declaration->_type];
         let mut fields = Vector<*MIRType>();
 
+        for parent in _class->parents {
+            let lowered_parent = this.LowerType(parent);
+            if lowered_parent == null { return; }
+            fields.PushBack(lowered_parent);
+        }
+
         for field in _class->fields {
             let declaration = field as *HIRDeclaration;
             let lowered_field = this.LowerType(declaration->_type);
@@ -1027,25 +1033,23 @@ class MIRLowerer {
             if target_type->IsPointer() {
                 if value_type->Pointee().IsClass() && target_type->Pointee().IsClass() {
                     let (source_class, target_class) = (value_type->Pointee(), target_type->Pointee());
-                    let (source_fields, target_fields) = (source_class.Fields(), target_class.Fields());
+                    let (source_parents, target_parents) = ((source_class as *HIRClassType)->declaration->parents, (target_class as *HIRClassType)->declaration->parents);
                     let (mut related, mut index: u32) = (false, 0);
 
-                    for i in 0..source_fields.Size() {
-                        let source_field: *HIRFieldDeclaration = source_fields[i];
-                        let target_declaration = (target_class as *HIRClassType)->declaration;
+                    for i in 0..source_parents.Size() {
+                        let source_parent: *HIRType = source_parents[i];
 
-                        if (source_field as *HIRDeclaration)->name == (target_declaration as *HIRDeclaration)->name {
+                        if *source_parent == target_class {
                             (related, index) = (true, i as u32);
                             break;
                         }
                     }
 
                     if !related {
-                        for i in 0..target_fields.Size() {
-                            let target_field: *HIRFieldDeclaration = target_fields[i];
-                            let source_declaration = (source_class as *HIRClassType)->declaration;
+                        for i in 0..target_parents.Size() {
+                            let target_parent: *HIRType = target_parents[i];
 
-                            if (target_field as *HIRDeclaration)->name == (source_declaration as *HIRDeclaration)->name {
+                            if *target_parent == source_class {
                                 (related, index) = (true, -(i as isize) as u32);
                                 break;
                             }

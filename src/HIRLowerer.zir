@@ -286,12 +286,8 @@ class HIRLowerer {
     fn MakeCompatible(&mut this, expression: *HIRExpression, target: *HIRType) -> *HIRExpression {
         if target->IsPointer() && expression->_type->IsPointer() {
             if target->Pointee().IsClass() && expression->_type->Pointee().IsClass() {
-                let declaration = (target->Pointee() as *HIRClassType)->declaration;
-
-                for field in expression->_type->Pointee().Fields() {
-                    if (field as *HIRDeclaration)->name == (declaration as *HIRDeclaration)->name {
-                        return this.builder.Cast(expression, target);
-                    }
+                if expression->_type->Pointee().IsDerivedFrom(target->Pointee()) {
+                    return this.builder.Cast(expression, target);
                 }
             }
         } return expression;
@@ -443,14 +439,14 @@ class HIRLowerer {
         for parent in _class->parents {
             let parent_type = this.LowerType(parent);
             if parent_type == null { continue; }
-            let parent_name = ((parent_type as *HIRClassType)->declaration as *HIRDeclaration)->name;
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(parent_name, parent_type, declaration->fields.Size(), null, false));
+            declaration->parents.PushBack(parent_type);
         }
 
         for field in _class->fields {
             let field_type = this.LowerType(field->_type);
             if field_type == null { continue; }
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Size(), field->initializer, field->public));
+            let index = declaration->parents.Size() + declaration->fields.Size();
+            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, index, field->initializer, field->public));
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -570,7 +566,7 @@ class HIRLowerer {
         }
     }
 
-    pub fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, fields: &Vector<*HIRFieldDeclaration>) {
+    pub fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parents: &Vector<*HIRType>, fields: &Vector<*HIRFieldDeclaration>) {
         if function->body == null { return; }
         this.builder.SetCurrentFunction(declaration);
         this.scope_manager.PushScope(function->name, false);
@@ -584,7 +580,6 @@ class HIRLowerer {
             }
         }
 
-        let mut fields_to_construct = Vector<*HIRFieldDeclaration>(fields);
         let block = this.builder.BuildBlockStatement();
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
@@ -602,15 +597,10 @@ class HIRLowerer {
                 continue;
             }
 
-            for field in fields {
-                if (field as *HIRDeclaration)->name != ((_type as *HIRClassType)->declaration as *HIRDeclaration)->name {
-                    continue;
-                }
-
+            for parent in parents {
+                if *parent != *_type { continue; }
                 let mut values = Vector<*HIRExpression>();
-                let this_field = this.builder.FieldAccess(this_dereferenced, field);
-                values.PushBack(this.ImplicitAddressOf(this_field));
-                fields_to_construct.Remove(field);
+                values.PushBack(this.builder.Cast(this_reference, this.context.ReferenceType(parent, true)));
 
                 let mut invalid = false;
                 values += this.LowerCallArguments(constructor->arguments, constructor as *ASTExpression, &mut invalid);
@@ -631,7 +621,7 @@ class HIRLowerer {
             }
         }
 
-        this.LowerFieldConstructors(this_dereferenced, fields_to_construct);
+        this.LowerFieldConstructors(this_dereferenced, fields);
 
         for statement in function->body->statements {
             this.LowerStatement(statement);
@@ -700,11 +690,12 @@ class HIRLowerer {
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (_type, scope);
+        let parents = (_type as *HIRClassType)->declaration->parents;
         let fields = (_type as *HIRClassType)->declaration->fields;
 
         for i in 0.._class->constructors.Size() {
             let function: *mut HIRFunctionDeclaration = declaration->constructors[i];
-            this.LowerConstructorDeclaration(function, _class->constructors[i], fields);
+            this.LowerConstructorDeclaration(function, _class->constructors[i], parents, fields);
 
             if function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
@@ -2471,29 +2462,7 @@ class HIRLowerer {
 
         if value->_type->IsPointer() && target->IsPointer() {
             if value->_type->Pointee().IsClass() && target->Pointee().IsClass() {
-                let mut related = false;
-
-                for field in value->_type->Pointee().Fields() {
-                    let target_declaration = (target->Pointee() as *HIRClassType)->declaration;
-
-                    if (field as *HIRDeclaration)->name == (target_declaration as *HIRDeclaration)->name {
-                        related = true;
-                        break;
-                    }
-                }
-
-                if !related {
-                    for field in target->Pointee().Fields() {
-                        let source_declaration = (value->_type->Pointee() as *HIRClassType)->declaration;
-
-                        if (field as *HIRDeclaration)->name == (source_declaration as *HIRDeclaration)->name {
-                            related = true;
-                            break;
-                        }
-                    }
-                }
-
-                if !related {
+                if !value->_type->Pointee().IsDerivedFrom(target->Pointee()) && !target->Pointee().IsDerivedFrom(value->_type->Pointee()) {
                     let target_name = ((target->Pointee() as *HIRClassType)->declaration as *HIRDeclaration)->name;
                     let source_name = ((value->_type->Pointee() as *HIRClassType)->declaration as *HIRDeclaration)->name;
                     Logger::Log("Cannot cast class '" + source_name + "' to unrelated class '" + target_name + "'.", node, LogSeverity::Error);
