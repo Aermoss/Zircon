@@ -138,7 +138,7 @@ class LIRSymbolOperand : LIROperand {
     }
 
     pub fn ToString(&this) -> String {
-        return this.name;
+        return "@\"" + this.name + '"';
     }
 }
 
