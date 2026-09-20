@@ -280,6 +280,14 @@ class LIRLowerer {
         }
     }
 
+    fn EnsureMemory(&mut this, operand: *LIROperand) -> *LIROperand {
+        if operand->kind != LIROperandKind::Memory {
+            let base = this.EnsureRegister(operand);
+            if base == null { return null; }
+            return this.builder.MemoryOperand(base, 0);
+        } return operand;
+    }
+
     fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
         let size = this.SizeOf(alloca->_type);
         if size == 0 { return null; }
@@ -291,10 +299,30 @@ class LIRLowerer {
     }
 
     fn LowerLoadInstruction(&mut this, load: *MIRLoadInstruction) -> *LIROperand {
-        return null;
+        let pointer = this.LowerValue(load->pointer);
+        if pointer == null { return null; }
+        let size = this.SizeOf(((load as *MIRInstruction) as *MIRValue)->_type);
+        let opcode = size > 2 ? LIROpcode::Lw : (size > 1 ? LIROpcode::Lhu : LIROpcode::Lbu);
+        let destination = this.builder.VirtualRegister() as *LIRRegisterOperand;
+        let mut defines = Vector<*LIROperand>();
+        defines.PushBack(destination);
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(this.EnsureMemory(pointer));
+        this.builder.BuildInstruction(opcode, defines, uses);
+        return destination;
     }
 
     fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> *LIROperand {
+        let value = this.LowerValue(store->value);
+        let pointer = this.LowerValue(store->pointer);
+        if value == null || pointer == null { return null; }
+        let size = this.SizeOf(store->value->_type);
+        let opcode = size > 2 ? LIROpcode::Sw : (size > 1 ? LIROpcode::Sh : LIROpcode::Sb);
+        let defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(this.EnsureRegister(value));
+        uses.PushBack(this.EnsureMemory(pointer));
+        this.builder.BuildInstruction(opcode, defines, uses);
         return null;
     }
 
