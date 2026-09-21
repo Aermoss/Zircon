@@ -2417,6 +2417,10 @@ class HIRLowerer {
             if target->IsInteger() {
                 return this.builder.Cast(value, target);
             }
+        } else if value->_type->IsFunction() {
+            if target->IsFunction() {
+                return this.builder.Cast(value, target);
+            }
         } else if value->_type->IsEnumeration() {
             if target->IsInteger() {
                 return this.builder.Cast(value, target);

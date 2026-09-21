@@ -1044,6 +1044,10 @@ class MIRLowerer {
 
                 return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, value, this.LowerType(target_type));
             }
+        } else if value_type->IsFunction() {
+            if target_type->IsFunction() {
+                return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, value, this.LowerType(target_type));
+            }
         } else if value_type->IsEnumeration() {
             if target_type->IsInteger() {
                 if value_type->Width() < target_type->Width() {
