@@ -123,13 +123,13 @@ class MIRLowerer {
         let _type = this.LowerType(constant->_type);
         if _type == null { return; }
         let lowered = this.builder.BuildConstant(constant->name, _type, null);
-        this.declarations[constant as *HIRDeclaration] = lowered;
+        this.declarations[constant] = lowered;
     }
 
     fn LowerConstantDeclarationSecondPass(&mut this, constant: *HIRConstantDeclaration) {
         let initializer = this.LowerConstantExpression(constant->initializer);
         if initializer == null { return; }
-        let lowered: *mut MIRDeclaration = this.declarations[constant as *HIRDeclaration];
+        let lowered: *mut MIRDeclaration = this.declarations[constant];
         (lowered as *mut MIRConstantDeclaration)->initializer = initializer;
     }
 
@@ -143,14 +143,14 @@ class MIRLowerer {
         let _type = this.LowerType(_static->_type);
         if _type == null { return; }
         let lowered = this.builder.BuildStatic(_static->name, _type, _static->mutable, null, this.LowerLinkage(_static->linkage));
-        this.declarations[_static as *HIRDeclaration] = lowered;
+        this.declarations[_static] = lowered;
     }
 
     fn LowerStaticDeclarationSecondPass(&mut this, _static: *HIRStaticDeclaration) {
         if _static->initializer == null { return; }
         let initializer = this.LowerConstantExpression(_static->initializer);
         if initializer == null { return; }
-        let lowered: *mut MIRDeclaration = this.declarations[_static as *HIRDeclaration];
+        let lowered: *mut MIRDeclaration = this.declarations[_static];
         (lowered as *mut MIRStaticDeclaration)->initializer = initializer;
     }
 
@@ -200,12 +200,12 @@ class MIRLowerer {
         }
 
         let lowered = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));
-        this.declarations[function as *HIRDeclaration] = lowered;
+        this.declarations[function] = lowered;
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
         if function->body == null { return; }
-        let declaration: *mut MIRDeclaration = this.declarations[function as *HIRDeclaration];
+        let declaration: *mut MIRDeclaration = this.declarations[function];
         this.builder.SetCurrentFunction(declaration as *mut MIRFunctionDeclaration);
         this.builder.SetCurrentBlock(this.builder.BuildBlock("entry".ToString()));
         let indirect_return = this.IsIndirectAggregate(function->_return);
@@ -223,17 +223,17 @@ class MIRLowerer {
             let lowered: *MIRParameter = this.builder.GetCurrentFunction()->parameters[(indirect_return ? 1 : 0) + i];
 
             if this.IsIndirectAggregate(parameter->_type) {
-                this.parameters[parameter as *HIRDeclaration] = lowered;
+                this.parameters[parameter] = lowered;
             } else if this.IsAggregate(parameter->_type) {
                 let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
                 let target = this.context.PointerType(this.LowerAggregateType(parameter->_type));
                 let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
                 this.builder.BuildStore(lowered, pointer);
-                this.parameters[parameter as *HIRDeclaration] = alloca;
+                this.parameters[parameter] = alloca;
             } else {
                 let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
                 this.builder.BuildStore(lowered, alloca);
-                this.parameters[parameter as *HIRDeclaration] = alloca;
+                this.parameters[parameter] = alloca;
             }
         }
 

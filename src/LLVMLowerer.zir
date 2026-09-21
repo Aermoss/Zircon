@@ -170,14 +170,14 @@ class LLVMLowerer {
         let _type = this.LowerType(constant->_type);
         if _type == null { return; }
         let global = LLVMAddGlobal(this.module, _type, constant->name.Data());
-        this.declarations[constant as *MIRDeclaration] = global;
+        this.declarations[constant] = global;
         LLVMSetGlobalConstant(global, 1);
     }
 
     fn LowerConstantDeclarationSecondPass(&mut this, constant: *MIRConstantDeclaration) {
         let initializer = this.LowerValue(constant->initializer);
         if initializer == null { return; }
-        LLVMSetInitializer(this.declarations[constant as *MIRDeclaration], initializer);
+        LLVMSetInitializer(this.declarations[constant], initializer);
     }
 
     fn LowerLinkage(&mut this, linkage: MIRDeclarationLinkage) -> LLVMLinkage {
@@ -192,21 +192,21 @@ class LLVMLowerer {
         let global = LLVMAddGlobal(this.module, _type, _static->name.Data());
         LLVMSetLinkage(global, this.LowerLinkage(_static->linkage));
         LLVMSetGlobalConstant(global, !_static->mutable ? 1 : 0);
-        this.declarations[_static as *MIRDeclaration] = global;
+        this.declarations[_static] = global;
     }
 
     fn LowerStaticDeclarationSecondPass(&mut this, _static: *MIRStaticDeclaration) {
         if _static->initializer == null { return; }
         let initializer = this.LowerValue(_static->initializer);
         if initializer == null { return; }
-        LLVMSetInitializer(this.declarations[_static as *MIRDeclaration], initializer);
+        LLVMSetInitializer(this.declarations[_static], initializer);
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *MIRFunctionDeclaration) {
         let mut parameters = Vector<LLVMTypeRef>();
 
         for parameter in function->parameters {
-            let lowered_parameter_type = this.LowerType((parameter as *MIRValue)->_type);
+            let lowered_parameter_type = this.LowerType(parameter->_type);
             if lowered_parameter_type == null { return; }
             parameters.PushBack(lowered_parameter_type);
         }
@@ -215,7 +215,7 @@ class LLVMLowerer {
         if _return == null { return; }
         let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0));
         LLVMSetFunctionCallConv(value, (function->linkage == MIRDeclarationLinkage::Internal ? LLVMCallConv::LLVMFastCallConv : LLVMCallConv::LLVMCCallConv) as u32);
-        this.declarations[function as *MIRDeclaration] = value;
+        this.declarations[function] = value;
 
         if this.freestanding || true {
             let attribute = LLVMCreateStringAttribute(this.context, "no-stack-arg-probe", 18, "", 0);
@@ -235,7 +235,7 @@ class LLVMLowerer {
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *MIRFunctionDeclaration) {
         if function->blocks.Empty() { return; }
-        let value = this.declarations[function as *MIRDeclaration];
+        let value = this.declarations[function];
         this.values.Clear();
 
         for parameter in function->parameters {
@@ -256,7 +256,7 @@ class LLVMLowerer {
             LLVMPositionBuilderAtEnd(this.builder, this.blocks[block]);
 
             for instruction in block->instructions {
-                this.values[instruction as *MIRValue] = this.LowerInstruction(instruction);
+                this.values[instruction] = this.LowerInstruction(instruction);
             }
 
             if block->terminator != null {
@@ -290,7 +290,7 @@ class LLVMLowerer {
     }
 
     fn LowerConstant(&mut this, constant: *MIRConstant) -> LLVMValueRef {
-        let _type = this.LowerType((constant as *MIRValue)->_type);
+        let _type = this.LowerType(constant->_type);
         if _type == null { return null; }
 
         if constant->kind == MIRConstantKind::Integer {
@@ -309,7 +309,7 @@ class LLVMLowerer {
                 elements.PushBack(lowered_element);
             }
 
-            let _type = this.LowerType(((constant as *MIRValue)->_type as *MIRArrayType)->element);
+            let _type = this.LowerType((constant->_type as *MIRArrayType)->element);
             if _type == null { return null; }
             return LLVMConstArray2(_type, elements.Data(), elements.Size() as u64);
         } else if constant->kind == MIRConstantKind::Structure {

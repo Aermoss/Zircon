@@ -1900,14 +1900,14 @@ class HIRModule {
         let mut result = String();
         let mut previous: *HIRDeclaration = null;
 
-        for declaration in this.declarations {
+        for current in this.declarations {
             if previous != null {
                 result += '\n';
 
-                if previous->kind != declaration->kind || (declaration->kind == HIRDeclarationKind::Class || declaration->kind == HIRDeclarationKind::Structure || declaration->kind == HIRDeclarationKind::Enumeration || declaration->kind == HIRDeclarationKind::Extend) {
+                if previous->kind != current->kind || (current->kind == HIRDeclarationKind::Class || current->kind == HIRDeclarationKind::Structure || current->kind == HIRDeclarationKind::Enumeration || current->kind == HIRDeclarationKind::Extend) {
                     result += '\n';
-                } else if declaration->kind == HIRDeclarationKind::Function {
-                    let current = declaration as *HIRFunctionDeclaration;
+                } else if current->kind == HIRDeclarationKind::Function {
+                    let current = current as *HIRFunctionDeclaration;
                     let previous = previous as *HIRFunctionDeclaration;
 
                     if current->body != null || previous->body != null {
@@ -1916,8 +1916,8 @@ class HIRModule {
                 }
             }
 
-            result += declaration->ToString();
-            previous = declaration;
+            result += current->ToString();
+            previous = current;
         } return result;
     }
 }

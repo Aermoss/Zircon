@@ -63,14 +63,14 @@ class LIRLowerer {
             let parameter: *MIRParameter = function->parameters[i];
             let destination = this.builder.VirtualRegister();
             this.EmitMove(destination, this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64)));
-            this.values[parameter as *MIRValue] = destination;
+            this.values[parameter] = destination;
         }
 
         for block in function->blocks {
             this.builder.SetCurrentBlock(this.blocks[block]);
 
             for instruction in block->instructions {
-                this.values[instruction as *MIRValue] = this.LowerInstruction(instruction);
+                this.values[instruction] = this.LowerInstruction(instruction);
             }
 
             if block->terminator != null {
