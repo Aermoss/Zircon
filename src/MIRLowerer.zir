@@ -1044,8 +1044,12 @@ class MIRLowerer {
 
                 return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, value, this.LowerType(target_type));
             }
-        } else if value_type->IsFunction() {
+
             if target_type->IsFunction() {
+                return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, value, this.LowerType(target_type));
+            }
+        } else if value_type->IsFunction() {
+            if target_type->IsPointer() || target_type->IsFunction() {
                 return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, value, this.LowerType(target_type));
             }
         } else if value_type->IsEnumeration() {
@@ -1225,39 +1229,42 @@ class MIRLowerer {
             } else if binary->kind == HIRBinaryKind::GreaterEqual {
                 return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::FCmpGe, left, right, result_type);
             } else { return null; }
-        } else if left_type->IsPointer() || right_type->IsPointer() {
+        } else if left_type->IsPointer() && right_type->IsPointer() {
+            if binary->kind == HIRBinaryKind::Subtract {
+                let element_type = left_type->IsNullPointer() ? right_type->Pointee() : left_type->Pointee();
+                let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+                let left = this.builder.BuildCast("ptr.diff.left".ToString(), MIRCastKind::PtrToInt, left, size_type);
+                let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, right, size_type);
+                let difference = this.builder.BuildBinary("ptr.diff.bytes".ToString(), MIRBinaryKind::Sub, left, right, size_type);
+                let size_value = this.builder.ConstantInteger(element_type.Size() as u64, size_type);
+                return this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type);
+            } else if binary->kind == HIRBinaryKind::Equal {
+                return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::NotEqual {
+                return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::Greater {
+                return this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::GreaterEqual {
+                return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::Less {
+                return this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::LessEqual {
+                return this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, left, right, result_type);
+            } else { return null; }
+        } else if (left_type->IsPointer() && right_type->IsInteger()) || (left_type->IsInteger() && right_type->IsPointer()) {
             let mut pointer = left_type->IsPointer() ? left : right;
-            let mut other = left_type->IsPointer() ? right : left;
-
-            if left_type->IsPointer() && right_type->IsPointer() {
-                if binary->kind == HIRBinaryKind::Subtract {
-                    let element_type = left_type->IsNullPointer() ? right_type->Pointee() : left_type->Pointee();
-                    let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
-                    let left = this.builder.BuildCast("ptr.diff.left".ToString(), MIRCastKind::PtrToInt, pointer, size_type);
-                    let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, other, size_type);
-                    let difference = this.builder.BuildBinary("ptr.diff.bytes".ToString(), MIRBinaryKind::Sub, left, right, size_type);
-                    let size_value = this.builder.ConstantInteger(element_type.Size() as u64, size_type);
-                    return this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type);
-                } else if binary->kind == HIRBinaryKind::Equal {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, pointer, other, result_type);
-                } else if binary->kind == HIRBinaryKind::NotEqual {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, pointer, other, result_type);
-                } else if binary->kind == HIRBinaryKind::Greater {
-                    return this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, pointer, other, result_type);
-                } else if binary->kind == HIRBinaryKind::GreaterEqual {
-                    return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, pointer, other, result_type);
-                } else if binary->kind == HIRBinaryKind::Less {
-                    return this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, pointer, other, result_type);
-                } else if binary->kind == HIRBinaryKind::LessEqual {
-                    return this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, pointer, other, result_type);
-                } else { return null; }
-            }
+            let mut index = left_type->IsPointer() ? right : left;
 
             if binary->kind == HIRBinaryKind::Add {
-                return this.builder.BuildArrayGEP("ptr.add".ToString(), pointer, other);
+                return this.builder.BuildArrayGEP("ptr.add".ToString(), pointer, index);
             } else if binary->kind == HIRBinaryKind::Subtract && left_type->IsPointer() {
-                let neg = this.builder.BuildUnary("ptr.neg".ToString(), MIRUnaryKind::Neg, other);
-                return this.builder.BuildArrayGEP("ptr.sub".ToString(), pointer, neg);
+                return this.builder.BuildArrayGEP("ptr.sub".ToString(), pointer, this.builder.BuildUnary("ptr.neg".ToString(), MIRUnaryKind::Neg, index));
+            } else { return null; }
+        } else if (left_type->IsFunction() && right_type->IsNullPointer()) || (left_type->IsNullPointer() && right_type->IsFunction()) {
+            if binary->kind == HIRBinaryKind::Equal {
+                return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
+            } else if binary->kind == HIRBinaryKind::NotEqual {
+                return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
             } else { return null; }
         } else if left_type->IsEnumeration() && right_type->IsEnumeration() {
             let signed = left_type->IsSigned();

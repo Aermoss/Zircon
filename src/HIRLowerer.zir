@@ -2414,11 +2414,11 @@ class HIRLowerer {
                 return this.builder.Cast(value, target);
             }
         } else if value->_type->IsPointer() {
-            if target->IsInteger() {
+            if target->IsInteger() || target->IsFunction() {
                 return this.builder.Cast(value, target);
             }
         } else if value->_type->IsFunction() {
-            if target->IsFunction() {
+            if target->IsPointer() || target->IsFunction() {
                 return this.builder.Cast(value, target);
             }
         } else if value->_type->IsEnumeration() {
@@ -2824,6 +2824,18 @@ class HIRLowerer {
                 }
 
                 return this.builder.Binary(this.LowerBinaryKind(kind), left, right, pointer->_type);
+            } else {
+                Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                return null;
+            }
+        } else if (left->_type->IsFunction() && right->_type->IsNullPointer()) || (left->_type->IsNullPointer() && right->_type->IsFunction()) {
+            if *left->_type != *right->_type && !(left->_type->IsNullPointer() || right->_type->IsNullPointer()) {
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                return null;
+            }
+
+            if kind == ASTBinaryKind::Equal || kind == ASTBinaryKind::NotEqual {
+                return this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType());
             } else {
                 Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
                 return null;

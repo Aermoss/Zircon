@@ -567,9 +567,15 @@ class Parser {
                         break;
                     }
 
-                    let _type = this.ParseType();
-                    if _type == null { return null; }
-                    function->parameters.PushBack(_type);
+                    if this.Current()._type == TokenType::MUT || this.Peek(1usize)._type == TokenType::COLON || this.Peek(1usize)._type == TokenType::LBRACKET {
+                        let parameter = this.ParseParameter();
+                        if parameter == null { return null; }
+                        function->parameters.PushBack(parameter->_type);
+                    } else {
+                        let _type = this.ParseType();
+                        if _type == null { return null; }
+                        function->parameters.PushBack(_type);
+                    }
 
                     if !this.Match(TokenType::COMMA) {
                         break;
