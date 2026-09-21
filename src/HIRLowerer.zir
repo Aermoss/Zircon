@@ -483,7 +483,7 @@ class HIRLowerer {
                 if function->parameters.Size() == 2 {
                     let parameter: *HIRParameterDeclaration = function->parameters[1];
 
-                    if *parameter->_type == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
+                    if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
                         has_copy_constructor = true;
                     }
                 }
@@ -517,8 +517,8 @@ class HIRLowerer {
                 if method->name == "operator=" && function->parameters.Size() == 2 {
                     let parameter: *HIRParameterDeclaration = function->parameters[1];
 
-                    if *parameter->_type == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
-                        if *function->_return == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
+                    if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
+                        if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
                             has_copy_assign = true;
                         }
                     }
@@ -691,7 +691,7 @@ class HIRLowerer {
             if function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
 
-                if *parameter->_type == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
+                if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
                     has_copy_constructor = true;
                 }
             }
@@ -784,8 +784,8 @@ class HIRLowerer {
             if method->name == "operator=" && function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
 
-                if *parameter->_type == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
-                    if *function->_return == *(this.context.ReferenceType(declaration->_type, false) as *HIRType) {
+                if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
+                    if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
                         has_copy_assign = true;
                     }
                 }
@@ -926,7 +926,7 @@ class HIRLowerer {
                     value = this.builder.Cast(value, _type);
                 }
 
-                if !(_type as *HIRType)->IsCompatible(value->_type) {
+                if !_type->IsCompatible(value->_type) {
                     Logger::Log("Expected an expression of type '" + underlying_type->ToString() + "'.", member->value, LogSeverity::Error);
                     continue;
                 }
