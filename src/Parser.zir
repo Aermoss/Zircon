@@ -589,6 +589,18 @@ class Parser {
                 function->_return = this.ParseType();
                 if function->_return == null { return null; }
             } node = function;
+        } else if this.Match(TokenType::LPAREN) {
+            let tuple = this.arena.New<ASTTupleType>(token);
+
+            while this.Current()._type != TokenType::RPAREN {
+                let element = this.ParseType();
+                if element == null { return null; }
+                tuple->elements.PushBack(element);
+                if !this.Match(TokenType::COMMA) { break; }
+            }
+
+            if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+            node = tuple;
         } else {
             node = this.arena.New<ASTPathType>(this.ParsePath(), token);
         }

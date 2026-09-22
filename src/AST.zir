@@ -94,7 +94,7 @@ class ASTPath : ASTNode {
 }
 
 enum ASTTypeKind: u8 {
-    Path, Pointer, Reference, Array, Function
+    Path, Pointer, Reference, Array, Tuple, Function
 }
 
 extend ASTTypeKind {
@@ -103,6 +103,7 @@ extend ASTTypeKind {
         else if this == ASTTypeKind::Pointer { return "Pointer".ToString(); }
         else if this == ASTTypeKind::Reference { return "Reference".ToString(); }
         else if this == ASTTypeKind::Array { return "Array".ToString(); }
+        else if this == ASTTypeKind::Tuple { return "Tuple".ToString(); }
         else if this == ASTTypeKind::Function { return "Function".ToString(); }
         else { return "Unknown".ToString(); }
     }
@@ -124,6 +125,8 @@ class ASTType : ASTNode {
             return (this as *ASTReferenceType)->ToString();
         } else if this.kind == ASTTypeKind::Array {
             return (this as *ASTArrayType)->ToString();
+        } else if this.kind == ASTTypeKind::Tuple {
+            return (this as *ASTTupleType)->ToString();
         } else if this.kind == ASTTypeKind::Function {
             return (this as *ASTFunctionType)->ToString();
         } else {
@@ -180,6 +183,22 @@ class ASTArrayType : ASTType {
 
     pub fn ToString(&this) -> String {
         return '[' + this.element->ToString() + "; " + this.length->ToString() + ']';
+    }
+}
+
+class ASTTupleType : ASTType {
+    pub elements: Vector<*ASTType>;
+
+    ASTTupleType(&mut this, start: Token) : ASTType(ASTTypeKind::Tuple, start) {}
+
+    pub fn ToString(&this) -> String {
+        let mut result = '('.ToString();
+
+        for i in 0..this.elements.Size() {
+            if i != 0 { result += ", "; }
+            let element: *ASTType = this.elements[i];
+            result += element->ToString();
+        } return result + ')';
     }
 }
 
