@@ -536,6 +536,119 @@ class Parser {
         } return expression;
     }
 
+    fn ParsePrimaryPattern(&mut this) -> *ASTPattern {
+        let token = this.Current();
+
+        if token._type == TokenType::IDENTIFIER && token.value == "_" {
+            this.Advance();
+            return this.arena.New<ASTWildcardPattern>(token);
+        }
+
+        if this.Match(TokenType::IDENTIFIER) {
+            return this.arena.New<ASTRestPattern>(token);
+        }
+
+        if token._type == TokenType::LPAREN {
+            this.Advance();
+            let tuple = this.arena.New<ASTTuplePattern>(token);
+
+            while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
+                let element = this.ParsePattern();
+                if element == null { return null; }
+                tuple->elements.PushBack(element);
+                if !this.Match(TokenType::COMMA) { break; }
+            }
+
+            if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+            return tuple;
+        }
+
+        if this.Match(TokenType::MUT) {
+            let identifier = this.Expect(TokenType::IDENTIFIER);
+            if identifier._type == TokenType::UNKNOWN { return null; }
+            return this.arena.New<ASTIdentifierPattern>(identifier.value, true, token);
+        }
+
+        if token._type == TokenType::IDENTIFIER && this.Peek(1)._type != TokenType::DOUBLE_COLON && this.Peek(1)._type != TokenType::LPAREN && this.Peek(1)._type != TokenType::LBRACE {
+            this.Advance();
+            return this.arena.New<ASTIdentifierPattern>(token.value, false, token);
+        }
+
+        if token._type == TokenType::IDENTIFIER || token._type == TokenType::DOUBLE_COLON {
+            let path = this.ParsePath();
+            if path == null { return null; }
+
+            if this.Match(TokenType::LBRACE) {
+                let structure = this.arena.New<ASTStructurePattern>(path, token);
+
+                while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+                    if this.Current()._type == TokenType::TWO_DOT {
+                        this.Advance();
+                        structure->rest = true;
+                        break;
+                    }
+
+                    let field_identifier = this.Expect(TokenType::IDENTIFIER);
+                    if field_identifier._type == TokenType::UNKNOWN { return null; }
+                    let mut field: *ASTPattern = null;
+
+                    if this.Match(TokenType::COLON) {
+                        field = this.ParsePattern();
+                        if field == null { return null; }
+                    } else {
+                        field = this.arena.New<ASTIdentifierPattern>(field_identifier.value, false, field_identifier);
+                    }
+
+                    structure->fields.PushBack(this.arena.New<ASTStructureFieldPattern>(field_identifier.value, field));
+                    if !this.Match(TokenType::COMMA) { break; }
+                }
+
+                if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+                return structure;
+            }
+
+            if this.Match(TokenType::LPAREN) {
+                let variant = this.arena.New<ASTVariantPattern>(path, token);
+
+                while this.Current()._type != TokenType::RPAREN {
+                    let argument = this.ParsePattern();
+                    if argument == null { return null; }
+                    variant->arguments.PushBack(argument);
+                    if !this.Match(TokenType::COMMA) { break; }
+                }
+
+                if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                return variant;
+            }
+
+            return this.arena.New<ASTVariantPattern>(path, token);
+        }
+
+        let literal = this.ParsePrimary();
+        if literal == null { return null; }
+        return this.arena.New<ASTLiteralPattern>(literal, token);
+    }
+
+    fn ParsePattern(&mut this) -> *ASTPattern {
+        let mut left = this.ParsePrimaryPattern();
+        if left == null { return null; }
+
+        if this.Match(TokenType::BITWISE_OR) {
+            let or = this.arena.New<ASTOrPattern>(left->start);
+            or->patterns.PushBack(left);
+
+            loop {
+                let right = this.ParsePrimaryPattern();
+                if right == null { return null; }
+                or->patterns.PushBack(right);
+
+                if !this.Match(TokenType::BITWISE_OR) {
+                    break;
+                }
+            } return or;
+        } return left;
+    }
+
     fn ParseType(&mut this) -> *ASTType {
         let mut references = Vector<bool>();
 
