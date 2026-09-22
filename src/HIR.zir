@@ -292,6 +292,15 @@ class HIRType {
                 let field_alignment = field->_type->Alignment();
                 if field_alignment > alignment { alignment = field_alignment; }
             } return alignment;
+        } else if this.IsVariant() {
+            let mut alignment: usize = 1;
+
+            for member in (this as *HIRVariantType)->declaration->members {
+                for field in member->fields {
+                    let field_alignment = field->_type->Alignment();
+                    if field_alignment > alignment { alignment = field_alignment; }
+                }
+            } return alignment;
         } else {
             return 1;
         }
@@ -310,11 +319,12 @@ class HIRType {
             return this.Element().Size() * this.Length();
         } else if this.HasFields() {
             let mut size: usize = 0;
-            let alignment = this.Alignment();
+            let mut alignment: usize = 1;
 
             if this.IsClass() {
                 for parent in (this as *HIRClassType)->declaration->parents {
                     let parent_alignment = parent->Alignment();
+                    if parent_alignment > alignment { alignment = parent_alignment; }
                     let remainder = size % parent_alignment;
                     if remainder != 0 { size += parent_alignment - remainder; }
                     size += parent->Size();
@@ -324,6 +334,7 @@ class HIRType {
             for field in this.Fields() {
                 let field_type = field->_type;
                 let field_alignment = field_type->Alignment();
+                if field_alignment > alignment { alignment = field_alignment; }
                 let remainder = size % field_alignment;
                 if remainder != 0 { size += field_alignment - remainder; }
                 size += field_type->Size();
@@ -332,6 +343,25 @@ class HIRType {
             let remainder = size % alignment;
             if remainder != 0 { size += alignment - remainder; }
             return size;
+        } else if this.IsVariant() {
+            let mut size: usize = 0;
+
+            for member in (this as *HIRVariantType)->declaration->members {
+                let mut member_size: usize = 1;
+                let mut member_alignment: usize = 1;
+
+                for field in member->fields {
+                    let field_alignment = field->_type->Alignment();
+                    if field_alignment > member_alignment { member_alignment = field_alignment; }
+                    let remainder = member_size % field_alignment;
+                    if remainder != 0 { member_size += field_alignment - remainder; }
+                    member_size += field->_type->Size();
+                }
+
+                let remainder = member_size % member_alignment;
+                if remainder != 0 { member_size += member_alignment - remainder; }
+                if member_size > size { size = member_size; }
+            } return size;
         } else {
             return 0;
         }
@@ -1860,10 +1890,13 @@ class HIRVariantField {
 }
 
 class HIRVariantMember : HIRDeclaration {
+    pub structure: bool = false,
     pub fields: Vector<*HIRVariantField>,
-    pub structure: bool = false;
+    pub index: usize;
 
-    HIRVariantMember(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::VariantMember, name, _type) {}
+    HIRVariantMember(&mut this, name: String, _type: *HIRType, index: usize) : HIRDeclaration(HIRDeclarationKind::VariantMember, name, _type) {
+        this.index = index;
+    }
 
     pub fn ToString(&this) -> String {
         return '%' + this.name;
@@ -2476,8 +2509,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRVariantField>(name, _type);
     }
 
-    pub fn BuildVariantMember(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantMember {
-        return this.context->arena.New<HIRVariantMember>(name, _type);
+    pub fn BuildVariantMember(&mut this, name: String, _type: *HIRType, index: usize) -> *mut HIRVariantMember {
+        return this.context->arena.New<HIRVariantMember>(name, _type, index);
     }
 
     pub fn BuildVariantDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantDeclaration {

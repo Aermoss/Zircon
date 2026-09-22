@@ -654,7 +654,19 @@ class LLVMLowerer {
             if element == null { return null; }
             return LLVMArrayType2(element, array->length as u64);
         } else if _type->kind == MIRTypeKind::Structure {
-            return this.types.Get(_type, null);
+            if this.types.Has(_type) {
+                return this.types[_type];
+            } else {
+                let mut fields = Vector<LLVMTypeRef>();
+
+                for field in (_type as *MIRStructureType)->fields {
+                    let lowered_field = this.LowerType(field);
+                    if lowered_field == null { return null; }
+                    fields.PushBack(lowered_field);
+                }
+
+                return LLVMStructTypeInContext(this.context, fields.Data(), fields.Size() as u32, 0);
+            }
         } else if _type->kind == MIRTypeKind::Function {
             return LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0);
         } else {

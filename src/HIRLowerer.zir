@@ -994,9 +994,11 @@ class HIRLowerer {
     pub fn LowerVariantDeclarationSecondPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
+        let mut index: usize = 0;
 
         for member in variant->members {
-            let lowered_member = this.builder.BuildVariantMember(member->name, declaration->_type);
+            let lowered_member = this.builder.BuildVariantMember(member->name, declaration->_type, index);
+            index += 1;
 
             for field in member->fields {
                 lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type)));

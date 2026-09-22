@@ -114,7 +114,7 @@ class MIRStructureType : MIRType {
     }
 
     MIRStructureType(&mut this, fields: Vector<*MIRType>) : MIRType(MIRTypeKind::Structure) {
-        (this.name, this.fields) = ("".ToString(), fields);
+        this.fields = fields;
     }
 
     pub fn SetBody(&mut this, fields: Vector<*MIRType>) {

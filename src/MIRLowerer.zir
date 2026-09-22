@@ -72,6 +72,8 @@ class MIRLowerer {
             this.LowerClassDeclarationFirstPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationFirstPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Variant {
+            this.LowerVariantDeclarationFirstPass(declaration as *HIRVariantDeclaration);
         }
     }
 
@@ -80,6 +82,8 @@ class MIRLowerer {
             this.LowerClassDeclarationSecondPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationSecondPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Variant {
+            this.LowerVariantDeclarationSecondPass(declaration as *HIRVariantDeclaration);
         }
     }
 
@@ -92,6 +96,8 @@ class MIRLowerer {
             this.LowerClassDeclarationThirdPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationThirdPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Variant {
+            this.LowerVariantDeclarationThirdPass(declaration as *HIRVariantDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Extend {
             this.LowerExtendDeclarationFirstPass(declaration as *HIRExtendDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Function {
@@ -112,6 +118,8 @@ class MIRLowerer {
             this.LowerClassDeclarationFourthPass(declaration as *HIRClassDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Structure {
             this.LowerStructureDeclarationFourthPass(declaration as *HIRStructureDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Variant {
+            this.LowerVariantDeclarationFourthPass(declaration as *HIRVariantDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Extend {
             this.LowerExtendDeclarationSecondPass(declaration as *HIRExtendDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Function {
@@ -247,12 +255,10 @@ class MIRLowerer {
     }
 
     fn LowerClassDeclarationFirstPass(&mut this, _class: *HIRClassDeclaration) {
-        let lowered = this.builder.BuildType(_class->name, this.context.StructureType(_class->name));
-        this.types[_class->_type] = lowered;
+        this.types[_class->_type] = this.builder.BuildType(_class->name, this.context.StructureType(_class->name));
     }
 
     fn LowerClassDeclarationSecondPass(&mut this, _class: *HIRClassDeclaration) {
-        let lowered: *mut MIRDeclaration = this.types[_class->_type];
         let mut fields = Vector<*MIRType>();
 
         for parent in _class->parents {
@@ -267,6 +273,7 @@ class MIRLowerer {
             fields.PushBack(lowered_field);
         }
 
+        let lowered: *mut MIRDeclaration = this.types[_class->_type];
         (lowered->_type as *mut MIRStructureType)->SetBody(fields);
     }
 
@@ -305,12 +312,10 @@ class MIRLowerer {
     }
 
     fn LowerStructureDeclarationFirstPass(&mut this, structure: *HIRStructureDeclaration) {
-        let lowered = this.builder.BuildType(structure->name, this.context.StructureType(structure->name));
-        this.types[structure->_type] = lowered;
+        this.types[structure->_type] = this.builder.BuildType(structure->name, this.context.StructureType(structure->name));
     }
 
     fn LowerStructureDeclarationSecondPass(&mut this, structure: *HIRStructureDeclaration) {
-        let lowered: *mut MIRDeclaration = this.types[structure->_type];
         let mut fields = Vector<*MIRType>();
 
         for field in structure->fields {
@@ -319,6 +324,7 @@ class MIRLowerer {
             fields.PushBack(lowered_field);
         }
 
+        let lowered: *mut MIRDeclaration = this.types[structure->_type];
         (lowered->_type as *mut MIRStructureType)->SetBody(fields);
     }
 
@@ -336,6 +342,35 @@ class MIRLowerer {
 
     fn LowerStructureDeclarationFourthPass(&mut this, structure: *HIRStructureDeclaration) {
         for method in structure->methods {
+            this.LowerFunctionDeclarationSecondPass(method);
+        }
+    }
+
+    fn LowerVariantDeclarationFirstPass(&mut this, variant: *HIRVariantDeclaration) {
+        this.types[variant->_type] = this.builder.BuildType(variant->name, this.context.StructureType(variant->name));
+    }
+
+    fn LowerVariantDeclarationSecondPass(&mut this, variant: *HIRVariantDeclaration) {
+        let mut fields = Vector<*MIRType>();
+        fields.PushBack(this.context.ArrayType(this.context.IntegerType(8), variant->_type->Size()));
+        let lowered: *mut MIRDeclaration = this.types[variant->_type];
+        (lowered->_type as *mut MIRStructureType)->SetBody(fields);
+    }
+
+    fn LowerVariantDeclarationThirdPass(&mut this, variant: *HIRVariantDeclaration) {
+        let mut types = Vector<*HIRType>();
+        if variant->instance != null { types = variant->instance->types; }
+        this.namespaces.PushBack(Mangler::MangleName(variant->name, types, this.namespaces));
+
+        for method in variant->methods {
+            this.LowerFunctionDeclarationFirstPass(method);
+        }
+
+        this.namespaces.PopBack();
+    }
+
+    fn LowerVariantDeclarationFourthPass(&mut this, variant: *HIRVariantDeclaration) {
+        for method in variant->methods {
             this.LowerFunctionDeclarationSecondPass(method);
         }
     }
@@ -603,7 +638,10 @@ class MIRLowerer {
     }
 
     fn LowerExpressionTo(&mut this, expression: *HIRExpression, destination: *MIRValue) {
-        if expression->kind == HIRExpressionKind::Call {
+        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Variant {
+            this.LowerVariantLiteral(expression as *HIRVariantLiteral, destination);
+            this.temporaries[expression] = destination;
+        } else if expression->kind == HIRExpressionKind::Call {
             this.LowerCallExpression(expression as *HIRCallExpression, destination);
             this.temporaries[expression] = destination;
         } else if expression->kind == HIRExpressionKind::Constructor {
@@ -617,7 +655,7 @@ class MIRLowerer {
     }
 
     fn LowerExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
-        if expression->kind == HIRExpressionKind::Literal {
+        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
             return this.LowerLiteral(expression as *HIRLiteral);
         } else if expression->kind == HIRExpressionKind::Intrinsic {
             return this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression);
@@ -711,6 +749,29 @@ class MIRLowerer {
         } else {
             return null;
         }
+    }
+
+    fn LowerVariantLiteral(&mut this, literal: *HIRVariantLiteral, destination: *MIRValue) -> *MIRValue {
+        let member = literal->member;
+        let tag_type = this.context.IntegerType(8);
+        let mut fields = Vector<*MIRType>();
+        fields.PushBack(tag_type);
+
+        for field in member->fields {
+            fields.PushBack(this.LowerType(field->_type));
+        }
+
+        let member_type = this.context.StructureType(fields);
+        let pointer = this.builder.BuildCast("variant.cast".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(member_type));
+        let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
+        this.builder.BuildStore(this.builder.ConstantInteger(member->index as u64, tag_type), tag_pointer);
+
+        for i in 0..literal->fields.Size() {
+            let value = this.LowerExpression(literal->fields[i]);
+            if value == null { return null; }
+            let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1]));
+            this.builder.BuildStore(value, field_pointer);
+        } return destination;
     }
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
@@ -1346,7 +1407,7 @@ class MIRLowerer {
             let element = this.LowerType(_type->Element());
             if element == null { return null; }
             return this.context.ArrayType(element, _type->Length());
-        } else if _type->IsClass() || _type->IsStructure() {
+        } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let declaration = this.types.Get(_type, null);
             return declaration != null ? declaration->_type : null;
         } else if _type->IsFunction() {
