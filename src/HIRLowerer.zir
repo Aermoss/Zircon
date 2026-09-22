@@ -1002,6 +1002,8 @@ class HIRLowerer {
                 lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type)));
             }
 
+            lowered_member->structure = member->structure;
+            this.scope_manager.current->Set(member->name, lowered_member, false, variant);
             declaration->members.PushBack(lowered_member);
         }
 
@@ -1685,7 +1687,7 @@ class HIRLowerer {
                         let member = declaration as *HIRVariantMember;
 
                         if !member->fields.Empty() {
-                            Logger::Log("Variant member '" + member->name + "' requires " + String::FromInteger(member->fields.Size() as u64) + " fields, but none were provided.", expression, LogSeverity::Error);
+                            Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Size() as u64) + " argument(s), but none were provided.", expression, LogSeverity::Error);
                             return null;
                         }
 
@@ -1823,7 +1825,7 @@ class HIRLowerer {
                     let index = _type->Index(field.left);
 
                     if index == -1 {
-                        Logger::Log("Unknown field '" + field.left + "' for structure '" + path->ToString() + "'.", literal, LogSeverity::Error);
+                        Logger::Log("Structure '" + path->ToString() + "' doesn't contain any field named '" + field.left + "'.", literal, LogSeverity::Error);
                         return null;
                     }
 
@@ -1844,7 +1846,7 @@ class HIRLowerer {
                 let member = symbol->declaration as *HIRVariantMember;
 
                 if !member->structure {
-                    Logger::Log("Member '" + path->ToString() + "' is not a structure.", literal, LogSeverity::Error);
+                    Logger::Log("Variant member '" + path->ToString() + "' is not a structure.", literal, LogSeverity::Error);
                     return null;
                 }
 
@@ -1852,7 +1854,7 @@ class HIRLowerer {
                 values.Resize(member->fields.Size());
 
                 if structure->fields.Size() != member->fields.Size() {
-                    Logger::Log("Member '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
+                    Logger::Log("Variant member '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
                     return null;
                 }
 
@@ -1867,7 +1869,7 @@ class HIRLowerer {
                     }
 
                     if index == -1 {
-                        Logger::Log("Unknown field '" + field.left + "' for member '" + path->ToString() + "'.", literal, LogSeverity::Error);
+                        Logger::Log("Variant member '" + path->ToString() + "' doesn't contain any field named '" + field.left + "'.", literal, LogSeverity::Error);
                         return null;
                     }
 
@@ -2230,15 +2232,12 @@ class HIRLowerer {
                 let member = symbol->declaration as *HIRVariantMember;
 
                 if member->structure {
-                    Logger::Log("Member '" + path->ToString() + "' is a structure.", call, LogSeverity::Error);
+                    Logger::Log("Variant member '" + path->ToString() + "' is a structure.", call, LogSeverity::Error);
                     return null;
                 }
 
-                let mut values = Vector<*HIRExpression>();
-                values.Resize(member->fields.Size());
-
                 if values.Size() != member->fields.Size() {
-                    Logger::Log("Member '" + path->ToString() + "' argument count mismatch.", call, LogSeverity::Error);
+                    Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Size() as u64) + " argument(s), but " + String::FromInteger(values.Size() as u64) + " were provided.", call, LogSeverity::Error);
                     return null;
                 }
 
