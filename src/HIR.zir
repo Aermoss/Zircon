@@ -99,7 +99,7 @@ class HIRType {
             if field == null { continue; }
 
             if result != null {
-                *ambiguous = true;
+                ambiguous = true;
                 return result;
             }
             
@@ -117,7 +117,7 @@ class HIRType {
             let parent: *HIRType = parents[i];
             path.PushBack(i as u32);
 
-            if *parent == *other || parent->FindParentPath(other, path) {
+            if *parent == other || parent->FindParentPath(other, path) {
                 return true;
             }
 
@@ -127,7 +127,7 @@ class HIRType {
 
     pub fn IsDerivedFrom(&this, other: &HIRType) -> bool {
         for parent in (this as *HIRClassType)->declaration->parents {
-            if *parent == *other || parent->IsDerivedFrom(other) {
+            if *parent == other || parent->IsDerivedFrom(other) {
                 return true;
             }
         } return false;
@@ -444,7 +444,7 @@ class HIRType {
             } found = true;
         }
 
-        if *found || name == "operator=" {
+        if found || name == "operator=" {
             return;
         }
 
@@ -2239,7 +2239,11 @@ class HIRBuilder {
     }
 
     pub fn IndexAccess(&mut this, value: *HIRExpression, index: *HIRExpression) -> *mut HIRIndexAccessExpression {
-        return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->IsArray() ? value->_type->Element() : value->_type->Pointee(), value->_type->IsMutable()));
+        if value->_type->IsArray() {
+            return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Element(), value->mutable));
+        } else {
+            return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Pointee(), value->_type->IsMutable()));
+        }
     }
 
     pub fn FieldAccess(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) -> *mut HIRFieldAccessExpression {

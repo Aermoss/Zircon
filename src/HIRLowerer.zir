@@ -683,10 +683,13 @@ class HIRLowerer {
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
         let parents = (declaration->_type as *HIRClassType)->declaration->parents;
         let fields = (declaration->_type as *HIRClassType)->declaration->fields;
+        let mut index: usize = 0;
 
-        for i in 0.._class->constructors.Size() {
-            let function: *mut HIRFunctionDeclaration = declaration->constructors[i];
-            this.LowerConstructorDeclaration(function, _class->constructors[i], parents, fields);
+        for constructor in _class->constructors {
+            if constructor->generic || !constructor->pack_name.Empty() { continue; }
+            let function: *mut HIRFunctionDeclaration = declaration->constructors[index];
+            this.LowerConstructorDeclaration(function, constructor, parents, fields);
+            index += 1;
 
             if function->parameters.Size() == 2 {
                 let parameter: *HIRParameterDeclaration = function->parameters[1];
@@ -773,7 +776,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        let mut index: usize = 0;
+        index = 0;
 
         for method in _class->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
@@ -1686,7 +1689,7 @@ class HIRLowerer {
 
                 if _type == null {
                     _type = value->_type;
-                } else if *_type != *value->_type {
+                } else if *_type != *value->_type && !(_type->IsPointer() && value->_type->IsNullPointer()) {
                     Logger::Log("Array elements must have the same type.", element, LogSeverity::Error);
                     return null;
                 }
@@ -2086,12 +2089,12 @@ class HIRLowerer {
                 if instance->_type->HasMethods() {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.ImplicitAddressOf(instance));
-
                     let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                     if candidates.Empty() { return null; }
+                    instance = this.LowerResolvedCallExpression(candidates, values, member_access);
+                }
 
-                    instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access));
-                } else if instance->_type->IsPointer() {
+                if instance->_type->IsPointer() {
                     instance = this.builder.Dereference(instance);
                 } else {
                     Logger::Log("Expected a pointer type for arrow operator.", member_access, LogSeverity::Error);
@@ -2493,12 +2496,12 @@ class HIRLowerer {
             if instance->_type->HasMethods() {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.ImplicitAddressOf(instance));
-
                 let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                 if candidates.Empty() { return null; }
+                instance = this.LowerResolvedCallExpression(candidates, values, member_access);
+            }
 
-                instance = this.ImplicitDereference(this.LowerResolvedCallExpression(candidates, values, member_access));
-            } else if instance->_type->IsPointer() {
+            if instance->_type->IsPointer() {
                 instance = this.builder.Dereference(instance);
             } else {
                 Logger::Log("Expected a pointer type for arrow operator.", member_access, LogSeverity::Error);
@@ -2540,8 +2543,7 @@ class HIRLowerer {
     }
 
     fn LowerUnaryExpression(&mut this, unary: *ASTUnaryExpression, target: *HIRType) -> *HIRExpression {
-        let raw = this.LowerExpression(unary->operand);
-        let mut value = this.ImplicitDereference(raw);
+        let mut value = this.ImplicitDereference(this.LowerExpression(unary->operand));
         if value == null { return null; }
 
         let mut values = Vector<*HIRExpression>();
@@ -2565,24 +2567,24 @@ class HIRLowerer {
         }
 
         if unary->kind == ASTUnaryKind::AddressOf {
-            if raw->category != HIRExpressionCategory::Place {
+            if value->category != HIRExpressionCategory::Place {
                 Logger::Log("Cannot take reference to non-place value.", unary, LogSeverity::Error);
                 return null;
             }
 
-            if unary->mutable && !raw->mutable {
+            if unary->mutable && !value->mutable {
                 Logger::Log("Cannot take mutable reference to immutable value.", unary, LogSeverity::Error);
                 return null;
             }
 
-            return this.builder.AddressOf(raw, unary->mutable);
+            return this.builder.AddressOf(value, unary->mutable);
         } else if unary->kind == ASTUnaryKind::Dereference {
-            if !raw->_type->IsPointer() {
-                Logger::Log("Cannot dereference non-pointer type '" + raw->_type->ToString() + "'.", unary, LogSeverity::Error);
+            if !value->_type->IsPointer() {
+                Logger::Log("Cannot dereference non-pointer type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
                 return null;
             }
 
-            return this.builder.Dereference(raw);
+            return this.builder.Dereference(value);
         } else {
             let mut operand_target: *HIRType = null;
 
@@ -2666,13 +2668,15 @@ class HIRLowerer {
         }
 
         if binary->kind == ASTBinaryKind::LogicalAnd || binary->kind == ASTBinaryKind::LogicalOr {
+            left = this.ImplicitDereference(left);
+
             if !left->_type->IsBoolean() {
                 Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
                 return null;
             }
 
             let index = this.temporaries.Size();
-            let right = this.LowerExpression(binary->right);
+            let right = this.ImplicitDereference(this.LowerExpression(binary->right));
             let destructors = this.GetTemporaryDestructorsSince(index, right);
             if right == null { return null; }
 

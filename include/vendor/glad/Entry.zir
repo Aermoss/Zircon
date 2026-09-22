@@ -886,7 +886,7 @@ extern "C" {
     }
 
     fn find_coreGL() {
-        let prefixes[]: *i8 = {
+        let prefixes = {
             "OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES ", null
         };
 
