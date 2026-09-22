@@ -2044,12 +2044,12 @@ class HIRBuilder {
         return this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->VoidType());
     }
 
-    pub fn AddressOf(&mut this, operand: *HIRExpression, mutable: bool) -> *HIRExpression {
+    pub fn AddressOf(&mut this, operand: *HIRExpression) -> *HIRExpression {
         if operand->kind == HIRExpressionKind::Unary && (operand as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference {
             return (operand as *HIRUnaryExpression)->operand;
         }
 
-        return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, mutable), HIRExpressionCategory::Value, false);
+        return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, operand->category == HIRExpressionCategory::Place ? operand->mutable : true), HIRExpressionCategory::Value, false);
     }
 
     pub fn Dereference(&mut this, operand: *HIRExpression) -> *HIRExpression {
