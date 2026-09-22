@@ -1681,6 +1681,15 @@ class HIRLowerer {
 
                     if declaration->kind == HIRDeclarationKind::EnumerationMember {
                         return (declaration as *HIREnumerationMember)->value;
+                    } else if declaration->kind == HIRDeclarationKind::VariantMember {
+                        let member = declaration as *HIRVariantMember;
+
+                        if !member->fields.Empty() {
+                            Logger::Log("Variant member '" + member->name + "' requires " + String::FromInteger(member->fields.Size() as u64) + " fields, but none were provided.", expression, LogSeverity::Error);
+                            return null;
+                        }
+
+                        return this.builder.VariantLiteral(member, Vector<*HIRExpression>());
                     } else if declaration->kind == HIRDeclarationKind::Constant {
                         return (declaration as *HIRConstantDeclaration)->initializer;
                     } else if declaration->kind == HIRDeclarationKind::Static {
@@ -1788,43 +1797,91 @@ class HIRLowerer {
         } else if literal->kind == ASTLiteralKind::Structure {
             let structure = literal as *ASTStructureLiteral;
 
-            if structure->expression->kind != ASTExpressionKind::Path {
-                Logger::Log("Structure initializer target must be a path.", literal, LogSeverity::Error);
+            if structure->target->kind != ASTExpressionKind::Path {
+                Logger::Log("Structure literal target must be a path.", literal, LogSeverity::Error);
                 return null;
             }
 
-            let _type = this.LowerType((structure->expression as *ASTPathExpression)->path);
-            if _type == null { return null; }
+            let path = (structure->target as *ASTPathExpression)->path;
 
-            if !_type->IsStructure() {
-                Logger::Log("Structure initializer target must be a structure.", literal, LogSeverity::Error);
-                return null;
-            }
+            for symbol in this.scope_manager.ResolveType(path, true) {
+                if symbol->kind != SymbolKind::Type || !symbol->_type->IsStructure() {
+                    continue;
+                }
 
-            let fields = _type->Fields();
-            let mut values = Vector<*HIRExpression>();
-            values.Resize(fields.Size());
+                let _type = symbol->_type as *HIRStructureType;
+                let fields = _type->Fields();
+                let mut values = Vector<*HIRExpression>();
+                values.Resize(fields.Size());
 
-            if structure->fields.Size() != fields.Size() {
-                Logger::Log("Structure '" + (_type as *HIRStructureType)->declaration->name + "' argument count mismatch.", literal, LogSeverity::Error);
-                return null;
-            }
-
-            for field in structure->fields {
-                let index = _type->Index(field.left);
-
-                if index == -1 {
-                    Logger::Log("Unknown field '" + field.left + "' for structure '" + (_type as *HIRStructureType)->declaration->name + "'.", literal, LogSeverity::Error);
+                if structure->fields.Size() != fields.Size() {
+                    Logger::Log("Structure '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
                     return null;
                 }
 
-                let declaration: *HIRFieldDeclaration = fields[index as usize];
-                let value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
-                if value == null { return null; }
-                values[index as usize] = value;
+                for field in structure->fields {
+                    let index = _type->Index(field.left);
+
+                    if index == -1 {
+                        Logger::Log("Unknown field '" + field.left + "' for structure '" + path->ToString() + "'.", literal, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let declaration: *HIRFieldDeclaration = fields[index as usize];
+                    let value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    if value == null { return null; }
+                    values[index as usize] = value;
+                }
+
+                return this.builder.StructureLiteral(values, _type);
             }
 
-            return this.builder.StructureLiteral(values, _type);
+            for symbol in this.scope_manager.Resolve(path, false) {
+                if symbol->kind != SymbolKind::Declaration || symbol->declaration->kind != HIRDeclarationKind::VariantMember {
+                    continue;
+                }
+
+                let member = symbol->declaration as *HIRVariantMember;
+
+                if !member->structure {
+                    Logger::Log("Member '" + path->ToString() + "' is not a structure.", literal, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut values = Vector<*HIRExpression>();
+                values.Resize(member->fields.Size());
+
+                if structure->fields.Size() != member->fields.Size() {
+                    Logger::Log("Member '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
+                    return null;
+                }
+
+                for field in structure->fields {
+                    let mut index: isize = -1;
+
+                    for i in 0..member->fields.Size() {
+                        if member->fields[i]->name == field.left {
+                            index = i as isize;
+                            break;
+                        }
+                    }
+
+                    if index == -1 {
+                        Logger::Log("Unknown field '" + field.left + "' for member '" + path->ToString() + "'.", literal, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let declaration: *HIRVariantField = member->fields[index as usize];
+                    let value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    if value == null { return null; }
+                    values[index as usize] = value;
+                }
+
+                return this.builder.VariantLiteral(member, values);
+            }
+
+            Logger::Log("Structure literal target must be a structure.", literal, LogSeverity::Error);
+            return null;
         } else if literal->kind == ASTLiteralKind::Null {
             return this.builder.NullLiteral();
         } else {
@@ -2144,23 +2201,48 @@ class HIRLowerer {
             let path = (call->expression as *ASTPathExpression)->path;
 
             for symbol in this.scope_manager.ResolveType(path, true) {
-                if symbol->kind == SymbolKind::Type && symbol->_type->IsClass() {
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                    for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
-                    }
-
-                    values.Insert(0, this.builder.NullLiteral());
-                    let function = this.ResolveOverload(candidates, values, call, false);
-                    if function == null { return null; }
-                    let callee = this.builder.ReferenceDeclaration(function, false);
-                    if !this.ValidateCallArguments(callee, values, call) { return null; }
-                    values.RemoveAt(0);
-                    let constructor = this.builder.Constructor(callee, values, symbol->_type);
-                    this.temporaries.PushBack(constructor);
-                    return constructor;
+                if symbol->kind != SymbolKind::Type || !symbol->_type->IsClass() {
+                    continue;
                 }
+
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
+                values.Insert(0, this.builder.NullLiteral());
+                let function = this.ResolveOverload(candidates, values, call, false);
+                if function == null { return null; }
+                let callee = this.builder.ReferenceDeclaration(function, false);
+                if !this.ValidateCallArguments(callee, values, call) { return null; }
+                values.RemoveAt(0);
+                let constructor = this.builder.Constructor(callee, values, symbol->_type);
+                this.temporaries.PushBack(constructor);
+                return constructor;
+            }
+
+            for symbol in this.scope_manager.Resolve(path, true) {
+                if symbol->kind != SymbolKind::Declaration || symbol->declaration->kind != HIRDeclarationKind::VariantMember {
+                    continue;
+                }
+
+                let member = symbol->declaration as *HIRVariantMember;
+
+                if member->structure {
+                    Logger::Log("Member '" + path->ToString() + "' is a structure.", call, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut values = Vector<*HIRExpression>();
+                values.Resize(member->fields.Size());
+
+                if values.Size() != member->fields.Size() {
+                    Logger::Log("Member '" + path->ToString() + "' argument count mismatch.", call, LogSeverity::Error);
+                    return null;
+                }
+
+                return this.builder.VariantLiteral(member, values);
             }
 
             let candidates = this.scope_manager.ResolveCandidates(path, values, true);

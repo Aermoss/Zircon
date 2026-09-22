@@ -838,7 +838,7 @@ class HIRExpression {
 }
 
 enum HIRLiteralKind: u8 {
-    Boolean, Character, Integer, Float, String, Array, Structure, Null
+    Boolean, Character, Integer, Float, String, Array, Structure, Variant, Null
 }
 
 class HIRLiteral : HIRExpression {
@@ -863,6 +863,8 @@ class HIRLiteral : HIRExpression {
             return (this as *HIRArrayLiteral)->ToString();
         } else if this.kind == HIRLiteralKind::Structure {
             return (this as *HIRStructureLiteral)->ToString();
+        } else if this.kind == HIRLiteralKind::Variant {
+            return (this as *HIRVariantLiteral)->ToString();
         } else if this.kind == HIRLiteralKind::Null {
             return (this as *HIRNullLiteral)->ToString();
         } else {
@@ -964,6 +966,30 @@ class HIRStructureLiteral : HIRLiteral {
             let field: *HIRExpression = this.fields[i];
             result += field->ToString();
         } return result + '}';
+    }
+}
+
+class HIRVariantLiteral : HIRLiteral {
+    pub member: *HIRVariantMember,
+    pub fields: Vector<*HIRExpression>;
+
+    HIRVariantLiteral(&mut this, member: *HIRVariantMember, fields: Vector<*HIRExpression>) : HIRLiteral(HIRLiteralKind::Variant, member->_type) {
+        (this.member, this.fields) = (member, fields);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = this.member->name + (this.member->structure ? '{' : '(').ToString();
+
+        for i in 0..this.fields.Size() {
+            if i > 0 { result += ", "; }
+
+            if this.member->structure {
+                result += this.member->fields[i]->name + ": ";
+            }
+
+            let field: *HIRExpression = this.fields[i];
+            result += field->ToString();
+        } return result + (this.member->structure ? '}' : ')');
     }
 }
 
@@ -2088,6 +2114,10 @@ class HIRBuilder {
 
     pub fn StructureLiteral(&mut this, fields: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRStructureLiteral {
         return this.context->arena.New<HIRStructureLiteral>(fields, _type);
+    }
+
+    pub fn VariantLiteral(&mut this, member: *HIRVariantMember, fields: Vector<*HIRExpression>) -> *mut HIRVariantLiteral {
+        return this.context->arena.New<HIRVariantLiteral>(member, fields);
     }
 
     pub fn NullLiteral(&mut this) -> *mut HIRNullLiteral {

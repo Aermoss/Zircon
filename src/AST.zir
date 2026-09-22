@@ -523,15 +523,15 @@ class ASTArrayLiteral : ASTLiteral {
 }
 
 class ASTStructureLiteral : ASTLiteral {
-    pub expression: *ASTExpression,
+    pub target: *ASTExpression,
     pub fields: Map<String, *ASTExpression>;
 
-    ASTStructureLiteral(&mut this, expression: *ASTExpression, start: Token) : ASTLiteral(ASTLiteralKind::Structure, start) {
-        this.expression = expression;
+    ASTStructureLiteral(&mut this, target: *ASTExpression, start: Token) : ASTLiteral(ASTLiteralKind::Structure, start) {
+        this.target = target;
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = this.expression->ToString() + " { ";
+        let mut result = this.target->ToString() + " { ";
 
         for i in 0..this.fields.Size() {
             if i > 0 { result += ", "; }
