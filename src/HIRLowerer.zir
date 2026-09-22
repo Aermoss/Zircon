@@ -1449,7 +1449,7 @@ class HIRLowerer {
             }
         } else if variable->initializer != null {
             initializer = this.Coerce(this.LowerExpression(variable->initializer));
-            _type = initializer->_type;
+            if initializer != null { _type = initializer->_type; }
         } else {
             Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable, LogSeverity::Error);
         }

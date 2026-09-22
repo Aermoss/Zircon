@@ -1578,7 +1578,7 @@ class World {
     }
 
     pub fn GeneratorThread(&mut this) {
-        let neighbor_offsets[]: Vector3 = {
+        let neighbor_offsets = {
             Vector3( 1.0, 0.0,  0.0),
             Vector3(-1.0, 0.0,  0.0),
             Vector3( 0.0, 0.0, -1.0),
@@ -1826,7 +1826,7 @@ class World {
     }
 
     fn PropagateSkylightIncrease(&mut this, light_update: bool) {
-        let neighbor_offsets[]: Vector3 = {
+        let neighbor_offsets = {
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
@@ -1888,7 +1888,7 @@ class World {
     }
 
     fn PropagateSkylightDecrease(&mut this, light_update: bool) {
-        let neighbor_offsets[]: Vector3 = {
+        let neighbor_offsets = {
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
@@ -1948,7 +1948,7 @@ class World {
     }
 
     fn PropagateIncrease(&mut this, light_update: bool) {
-        let neighbor_offsets[]: Vector3 = {
+        let neighbor_offsets = {
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
@@ -2001,7 +2001,7 @@ class World {
     }
 
     fn PropagateDecrease(&mut this, light_update: bool) {
-        let neighbor_offsets[]: Vector3 = {
+        let neighbor_offsets = {
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
@@ -2183,7 +2183,7 @@ class World {
 
     pub fn Update(&mut this, delta_time: f64, player: &Player) {
         mtx_lock(&mut this.current_chunk_mutex);
-        this.current_chunk = (player->translation / Vector3(CHUNK_WIDTH as f32, CHUNK_HEIGHT as f32, CHUNK_DEPTH as f32)).Floor();
+        this.current_chunk = (player.translation / Vector3(CHUNK_WIDTH as f32, CHUNK_HEIGHT as f32, CHUNK_DEPTH as f32)).Floor();
         this.current_chunk.y = 0.0;
         mtx_unlock(&mut this.current_chunk_mutex);
 
