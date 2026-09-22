@@ -750,14 +750,16 @@ class Parser {
             return this.ParseIfStatement();
         } else if token._type == TokenType::WHILE && !expression {
             return this.ParseWhileStatement();
-        } else if token._type == TokenType::FOR && !expression {
-            return this.ParseForStatement();
         } else if token._type == TokenType::LOOP && !expression {
             return this.ParseLoopStatement();
+        } else if token._type == TokenType::FOR && !expression {
+            return this.ParseForStatement();
+        } else if token._type == TokenType::MATCH && !expression {
+            return this.ParseMatchStatement();
         } else if token._type == TokenType::UNSAFE && !expression {
             return this.ParseUnsafeStatement();
         } else if (token._type == TokenType::ASSEMBLY || token._type == TokenType::VOLATILE) && !expression {
-            return this.ParseAssembly();
+            return this.ParseAssemblyStatement();
         } else if token._type == TokenType::RETURN {
             return this.ParseReturnStatement(expression);
         } else if token._type == TokenType::BREAK {
@@ -934,17 +936,12 @@ class Parser {
         return this.arena.New<ASTWhileStatement>(expression, _loop, _else, token);
     }
 
-    fn ParseForStatement(&mut this) -> *ASTForStatement {
-        let token = this.Expect(TokenType::FOR);
+    fn ParseLoopStatement(&mut this) -> *ASTLoopStatement {
+        let token = this.Expect(TokenType::LOOP);
         if token._type == TokenType::UNKNOWN { return null; }
-        let identifier = this.Expect(TokenType::IDENTIFIER);
-        if identifier._type == TokenType::UNKNOWN { return null; }
-        if !this.ExpectSuccess(TokenType::IN) { return null; }
-        let iterable = this.ParseForIterable();
-        if iterable == null { return null; }
         let _loop = this.ParseBlockStatement();
         if _loop == null { return null; }
-        return this.arena.New<ASTForStatement>(identifier.value, iterable, _loop, token);
+        return this.arena.New<ASTLoopStatement>(_loop, token);
     }
 
     fn ParseForIterable(&mut this) -> *ASTExpression {
@@ -962,12 +959,50 @@ class Parser {
         } return left;
     }
 
-    fn ParseLoopStatement(&mut this) -> *ASTLoopStatement {
-        let token = this.Expect(TokenType::LOOP);
+    fn ParseForStatement(&mut this) -> *ASTForStatement {
+        let token = this.Expect(TokenType::FOR);
         if token._type == TokenType::UNKNOWN { return null; }
+        let identifier = this.Expect(TokenType::IDENTIFIER);
+        if identifier._type == TokenType::UNKNOWN { return null; }
+        if !this.ExpectSuccess(TokenType::IN) { return null; }
+        let iterable = this.ParseForIterable();
+        if iterable == null { return null; }
         let _loop = this.ParseBlockStatement();
         if _loop == null { return null; }
-        return this.arena.New<ASTLoopStatement>(_loop, token);
+        return this.arena.New<ASTForStatement>(identifier.value, iterable, _loop, token);
+    }
+
+    fn ParseMatchStatement(&mut this) -> *ASTMatchStatement {
+        let token = this.Expect(TokenType::MATCH);
+        if token._type == TokenType::UNKNOWN { return null; }
+        let target = this.ParseExpression();
+        if target == null { return null; }
+        if !this.ExpectSuccess(TokenType::LBRACE) { return null; }
+        let _match = this.arena.New<ASTMatchStatement>(target, token);
+
+        while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+            let pattern = this.ParsePattern();
+            if pattern == null { return null; }
+            let mut guard: *ASTExpression = null;
+
+            if this.Match(TokenType::IF) {
+                guard = this.ParseExpression();
+                if guard == null { return null; }
+            }
+
+            if !this.ExpectSuccess(TokenType::FAT_ARROW) { return null; }
+            let body = this.ParseBlockStatement();
+            if body == null { return null; }
+            let arm = this.arena.New<ASTMatchArm>(pattern, guard, body);
+            _match->arms.PushBack(arm);
+
+            if !this.Match(TokenType::COMMA) {
+                break;
+            }
+        }
+
+        if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+        return _match;
     }
 
     fn ParseUnsafeStatement(&mut this) -> *ASTUnsafeStatement {
@@ -978,7 +1013,7 @@ class Parser {
         return this.arena.New<ASTUnsafeStatement>(body, token);
     }
 
-    fn ParseAssembly(&mut this) -> *ASTAssemblyStatement {
+    fn ParseAssemblyStatement(&mut this) -> *ASTAssemblyStatement {
         let _volatile = this.Match(TokenType::VOLATILE);
         let token = this.Expect(TokenType::ASSEMBLY);
         if token._type == TokenType::UNKNOWN { return null; }

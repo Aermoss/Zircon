@@ -858,7 +858,7 @@ class ASTRangeExpression : ASTExpression {
 }
 
 enum ASTStatementKind: u8 {
-    Variable, Expression, If, While, Loop, For, Return, Break, Continue, Block, Unsafe, Assembly
+    Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue, Block, Unsafe, Assembly
 }
 
 extend ASTStatementKind {
@@ -869,6 +869,7 @@ extend ASTStatementKind {
         else if this == ASTStatementKind::While { return "While".ToString(); }
         else if this == ASTStatementKind::Loop { return "Loop".ToString(); }
         else if this == ASTStatementKind::For { return "For".ToString(); }
+        else if this == ASTStatementKind::Match { return "Match".ToString(); }
         else if this == ASTStatementKind::Return { return "Return".ToString(); }
         else if this == ASTStatementKind::Break { return "Break".ToString(); }
         else if this == ASTStatementKind::Continue { return "Continue".ToString(); }
@@ -940,6 +941,25 @@ class ASTForStatement : ASTStatement {
 
     ASTForStatement(&mut this, variable: String, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
         (this.variable, this.iterable, this.body) = (variable, iterable, body);
+    }
+}
+
+class ASTMatchArm {
+    pub pattern: *ASTPattern,
+    pub guard: *ASTExpression,
+    pub body: *ASTBlockStatement;
+
+    ASTMatchArm(&mut this, pattern: *ASTPattern, guard: *ASTExpression, body: *ASTBlockStatement) {
+        (this.pattern, this.guard, this.body) = (pattern, guard, body);
+    }
+}
+
+class ASTMatchStatement : ASTStatement {
+    pub target: *ASTExpression,
+    pub arms: Vector<*ASTMatchArm>;
+
+    ASTMatchStatement(&mut this, target: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Match, start) {
+        this.target = target;
     }
 }
 
