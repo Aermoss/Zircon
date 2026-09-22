@@ -50,6 +50,9 @@ class GenericDeclaration {
         } else if declaration->kind == ASTDeclarationKind::Structure {
             let structure = declaration as *ASTStructureDeclaration;
             (this.name, this.types) = (structure->name, structure->types);
+        } else if declaration->kind == ASTDeclarationKind::Variant {
+            let variant = declaration as *ASTVariantDeclaration;
+            (this.name, this.types) = (variant->name, variant->types);
         } else {
             let function = declaration as *ASTFunctionDeclaration;
             (this.name, this.types) = (function->name, function->types);
@@ -134,6 +137,35 @@ class GenericDeclaration {
             if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
                 instance->active = HIRLoweringPass::Fourth;
                 hir_lowerer->LowerStructureDeclarationFourthPass(instance->declaration as *mut HIRStructureDeclaration, structure, instance->scope);
+                (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
+            }
+        } else if this.declaration->kind == ASTDeclarationKind::Variant {
+            let variant = this.declaration as *ASTVariantDeclaration;
+
+            if instance->completed < HIRLoweringPass::First && hir_lowerer->current_pass >= HIRLoweringPass::First {
+                instance->active = HIRLoweringPass::First;
+                let pair = hir_lowerer->LowerVariantDeclarationFirstPass(variant, instance);
+                (instance->completed, instance->active) = (HIRLoweringPass::First, HIRLoweringPass::None);
+                (instance->declaration, instance->scope) = (pair.left, hir_lowerer->scope_manager.current);
+                (instance->declaration as *mut HIRVariantDeclaration)->instance = instance;
+                instance->symbol = this.arena.New<Symbol>(instance->declaration->_type);
+            }
+
+            if instance->completed < HIRLoweringPass::Second && hir_lowerer->current_pass >= HIRLoweringPass::Second {
+                instance->active = HIRLoweringPass::Second;
+                hir_lowerer->LowerVariantDeclarationSecondPass(instance->declaration as *mut HIRVariantDeclaration, variant, instance->scope);
+                (instance->completed, instance->active) = (HIRLoweringPass::Second, HIRLoweringPass::None);
+            }
+
+            if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
+                instance->active = HIRLoweringPass::Third;
+                hir_lowerer->LowerVariantDeclarationThirdPass(instance->declaration as *mut HIRVariantDeclaration, variant, instance->scope);
+                (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
+            }
+
+            if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
+                instance->active = HIRLoweringPass::Fourth;
+                hir_lowerer->LowerVariantDeclarationFourthPass(instance->declaration as *mut HIRVariantDeclaration, variant, instance->scope);
                 (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
             }
         } else {

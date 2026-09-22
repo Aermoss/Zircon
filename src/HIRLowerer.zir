@@ -32,6 +32,7 @@ class HIRLowerer {
     pub current_pass: HIRLoweringPass = HIRLoweringPass::None,
     class_data: Map<*ASTNode, Pair<*mut HIRClassDeclaration, *mut Scope>>,
     structure_data: Map<*ASTNode, Pair<*mut HIRStructureDeclaration, *mut Scope>>,
+    variant_data: Map<*ASTNode, Pair<*mut HIRVariantDeclaration, *mut Scope>>,
     extend_data: Map<*ASTNode, Pair<*mut HIRExtendDeclaration, *mut Scope>>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
@@ -95,6 +96,7 @@ class HIRLowerer {
 
         this.class_data.Clear();
         this.structure_data.Clear();
+        this.variant_data.Clear();
         this.extend_data.Clear();
         this.function_data.Clear();
         return this.module;
@@ -114,6 +116,13 @@ class HIRLowerer {
 
             if !structure->generic && pair.left != null && pair.right != null {
                 this.structure_data[declaration] = pair;
+            }
+        } else if declaration->kind == ASTDeclarationKind::Variant {
+            let variant = declaration as *ASTVariantDeclaration;
+            let pair = this.LowerVariantDeclarationFirstPass(variant, null);
+
+            if !variant->generic && pair.left != null && pair.right != null {
+                this.variant_data[declaration] = pair;
             }
         } else {
             return false;
@@ -139,6 +148,13 @@ class HIRLowerer {
             }
         } else if declaration->kind == ASTDeclarationKind::Enumeration {
             this.LowerEnumerationDeclaration(declaration as *ASTEnumerationDeclaration);
+        } else if declaration->kind == ASTDeclarationKind::Variant {
+            let variant = declaration as *ASTVariantDeclaration;
+
+            if !variant->generic {
+                let cache = this.variant_data[declaration];
+                this.LowerVariantDeclarationSecondPass(cache.left, variant, cache.right);
+            }
         } else if declaration->kind == ASTDeclarationKind::Type {
             this.LowerTypeDeclaration(declaration as *ASTTypeDeclaration);
         } else {
@@ -175,6 +191,13 @@ class HIRLowerer {
                 let cache = this.structure_data[declaration];
                 this.LowerStructureDeclarationThirdPass(cache.left, structure, cache.right);
             }
+        } else if declaration->kind == ASTDeclarationKind::Variant {
+            let variant = declaration as *ASTVariantDeclaration;
+
+            if !variant->generic {
+                let cache = this.variant_data[declaration];
+                this.LowerVariantDeclarationThirdPass(cache.left, variant, cache.right);
+            }
         } else if declaration->kind == ASTDeclarationKind::Extend {
             let pair = this.LowerExtendDeclarationFirstPass(declaration as *ASTExtendDeclaration);
 
@@ -210,6 +233,13 @@ class HIRLowerer {
             if !structure->generic {
                 let cache = this.structure_data[declaration];
                 this.LowerStructureDeclarationFourthPass(cache.left, structure, cache.right);
+            }
+        } else if declaration->kind == ASTDeclarationKind::Variant {
+            let variant = declaration as *ASTVariantDeclaration;
+
+            if !variant->generic {
+                let cache = this.variant_data[declaration];
+                this.LowerVariantDeclarationFourthPass(cache.left, variant, cache.right);
             }
         } else if declaration->kind == ASTDeclarationKind::Extend {
             let cache = this.extend_data[declaration];
@@ -929,13 +959,82 @@ class HIRLowerer {
                 }
             }
 
-            let member_declaration = this.builder.BuildMemberDeclaration(member->name, value, _type);
+            let member_declaration = this.builder.BuildEnumerationMember(member->name, value, _type);
             value = this.builder.Binary(HIRBinaryKind::Add, value, this.builder.IntegerLiteral(1, _type), _type);
             this.scope_manager.current->Set(member->name, member_declaration, false, enumeration);
             declaration->members.PushBack(member_declaration);
         }
 
         this.scope_manager.PopScope();
+    }
+
+    pub fn LowerVariantDeclarationFirstPass(&mut this, variant: *ASTVariantDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRVariantDeclaration, *mut Scope> {
+        if variant->generic && instance == null {
+            let generic = this.context.arena.New<GenericDeclaration>(variant);
+            this.scope_manager.current->Set(variant->name, generic, variant);
+            this.generics.PushBack(generic);
+            return Pair<*mut HIRVariantDeclaration, *mut Scope>(null, null);
+        }
+
+        let mut scope: *mut Scope = null;
+        let _type = this.context.VariantType(null);
+        let declaration = this.builder.BuildVariantDeclaration(variant->name, _type);
+        _type->declaration = declaration;
+
+        if instance == null {
+            this.scope_manager.current->Set(variant->name, _type, variant);
+            this.scope_manager.PushScope(variant->name, true);
+            scope = this.scope_manager.current;
+            this.scope_manager.PopScope();
+        }
+
+        return Pair<*mut HIRVariantDeclaration, *mut Scope>(declaration, scope);
+    }
+
+    pub fn LowerVariantDeclarationSecondPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
+
+        for member in variant->members {
+            let lowered_member = this.builder.BuildVariantMember(member->name, declaration->_type);
+
+            for field in member->fields {
+                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type)));
+            }
+
+            declaration->members.PushBack(lowered_member);
+        }
+
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
+    }
+
+    pub fn LowerVariantDeclarationThirdPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
+
+        for method in variant->methods {
+            let function = this.LowerFunctionDeclarationFirstPass(method, null);
+
+            if function != null {
+                declaration->methods.PushBack(function);
+            }
+        }
+
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
+    }
+
+    pub fn LowerVariantDeclarationFourthPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
+        let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
+        (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
+        let mut index: usize = 0;
+
+        for method in variant->methods {
+            if method->generic || !method->pack_name.Empty() { continue; }
+            this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
+            index += 1;
+        }
+
+        (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
     fn LowerExtendDeclarationFirstPass(&mut this, _extend: *ASTExtendDeclaration) -> Pair<*mut HIRExtendDeclaration, *mut Scope> {
@@ -1580,8 +1679,8 @@ class HIRLowerer {
                 } else if symbol->kind == SymbolKind::Declaration {
                     let declaration = symbol->declaration;
 
-                    if declaration->kind == HIRDeclarationKind::Member {
-                        return (declaration as *HIRMemberDeclaration)->value;
+                    if declaration->kind == HIRDeclarationKind::EnumerationMember {
+                        return (declaration as *HIREnumerationMember)->value;
                     } else if declaration->kind == HIRDeclarationKind::Constant {
                         return (declaration as *HIRConstantDeclaration)->initializer;
                     } else if declaration->kind == HIRDeclarationKind::Static {

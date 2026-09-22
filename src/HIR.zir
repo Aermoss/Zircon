@@ -18,9 +18,8 @@
     "src/AST.zir", "src/Generic.zir", "src/Logger.zir" : *]
 
 enum HIRTypeKind: u8 {
-    Void, Boolean, Character,
-    Integer, Float, Pointer, Reference, Array,
-    Function, Class, Structure, Enumeration
+    Void, Boolean, Character, Integer, Float, Pointer, Reference, Array,
+    Function, Class, Structure, Enumeration, Variant
 }
 
 class HIRType {
@@ -50,6 +49,7 @@ class HIRType {
     pub fn IsClass(&this) -> bool { return this.kind == HIRTypeKind::Class; }
     pub fn IsStructure(&this) -> bool { return this.kind == HIRTypeKind::Structure; }
     pub fn IsEnumeration(&this) -> bool { return this.kind == HIRTypeKind::Enumeration; }
+    pub fn IsVariant(&this) -> bool { return this.kind == HIRTypeKind::Variant; }
 
     pub fn IsTrivial(&this) -> bool {
         if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsFunction() {
@@ -396,13 +396,15 @@ class HIRType {
 
         if this.IsClass() {
             return (this as *HIRClassType)->declaration->methods;
-        } else {
+        } else if this.IsStructure() {
             return (this as *HIRStructureType)->declaration->methods;
+        } else {
+            return (this as *HIRVariantType)->declaration->methods;
         }
     }
 
     pub fn HasMethods(&this) -> bool {
-        return this.IsClass() || this.IsStructure();
+        return this.IsClass() || this.IsStructure() || this.IsVariant();
     }
 
     pub fn GetCandidates(&this, name: &String, node: *ASTNode, test: bool) -> Vector<*HIRFunctionDeclaration> {
@@ -444,12 +446,10 @@ class HIRType {
             } found = true;
         }
 
-        if found || name == "operator=" {
-            return;
-        }
-
-        for parent in (this as *HIRClassType)->declaration->parents {
-            parent->CollectMethods(name, result, found);
+        if !found && this.IsClass() && name != "operator=" {
+            for parent in (this as *HIRClassType)->declaration->parents {
+                parent->CollectMethods(name, result, found);
+            }
         }
     }
 
@@ -708,6 +708,18 @@ class HIREnumerationType : HIRType {
 
     HIREnumerationType(&mut this, declaration: *HIREnumerationDeclaration, underlying: *HIRIntegerType) : HIRType(HIRTypeKind::Enumeration) {
         (this.declaration, this.underlying) = (declaration, underlying);
+    }
+
+    pub fn ToString(&this) -> String {
+        return '%' + this.declaration->name;
+    }
+}
+
+class HIRVariantType : HIRType {
+    pub declaration: *HIRVariantDeclaration;
+
+    HIRVariantType(&mut this, declaration: *HIRVariantDeclaration) : HIRType(HIRTypeKind::Variant) {
+        this.declaration = declaration;
     }
 
     pub fn ToString(&this) -> String {
@@ -1573,7 +1585,7 @@ class HIRForStatement : HIRStatement {
 }
 
 enum HIRDeclarationKind: u8 {
-    Parameter, Function, Field, Class, Structure, Member, Enumeration, Extend, Constant, Static
+    Parameter, Function, Field, Class, Structure, EnumerationMember, Enumeration, VariantMember, Variant, Extend, Constant, Static
 }
 
 enum HIRDeclarationABI: u8 {
@@ -1614,10 +1626,14 @@ class HIRDeclaration {
             return (this as *HIRClassDeclaration)->ToString();
         } else if this.kind == HIRDeclarationKind::Structure {
             return (this as *HIRStructureDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Member {
-            return (this as *HIRMemberDeclaration)->ToString();
+        } else if this.kind == HIRDeclarationKind::EnumerationMember {
+            return (this as *HIREnumerationMember)->ToString();
         } else if this.kind == HIRDeclarationKind::Enumeration {
             return (this as *HIREnumerationDeclaration)->ToString();
+        } else if this.kind == HIRDeclarationKind::VariantMember {
+            return (this as *HIRVariantMember)->ToString();
+        } else if this.kind == HIRDeclarationKind::Variant {
+            return (this as *HIRVariantDeclaration)->ToString();
         } else if this.kind == HIRDeclarationKind::Extend {
             return (this as *HIRExtendDeclaration)->ToString();
         } else if this.kind == HIRDeclarationKind::Constant {
@@ -1772,10 +1788,10 @@ class HIRStructureDeclaration : HIRDeclaration {
     }
 }
 
-class HIRMemberDeclaration : HIRDeclaration {
+class HIREnumerationMember : HIRDeclaration {
     pub value: *HIRExpression;
 
-    HIRMemberDeclaration(&mut this, name: String, value: *HIRExpression, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Member, name, _type) {
+    HIREnumerationMember(&mut this, name: String, value: *HIRExpression, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::EnumerationMember, name, _type) {
         this.value = value;
     }
 
@@ -1789,7 +1805,7 @@ class HIRMemberDeclaration : HIRDeclaration {
 }
 
 class HIREnumerationDeclaration : HIRDeclaration {
-    pub members: Vector<*HIRMemberDeclaration>;
+    pub members: Vector<*HIREnumerationMember>;
 
     HIREnumerationDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Enumeration, name, _type) {}
 
@@ -1801,7 +1817,49 @@ class HIREnumerationDeclaration : HIRDeclaration {
 
             for i in 0..this.members.Size() {
                 if i != 0 { result += ",\n"; }
-                let member: *HIRMemberDeclaration = this.members[i];
+                let member: *HIREnumerationMember = this.members[i];
+                result += "    " + member->ToString();
+            } result += '\n';
+        } return result + '}';
+    }
+}
+
+class HIRVariantField {
+    pub name: String,
+    pub _type: *HIRType;
+
+    HIRVariantField(&mut this, name: String, _type: *HIRType) {
+        (this.name, this._type) = (name, _type);
+    }
+}
+
+class HIRVariantMember : HIRDeclaration {
+    pub fields: Vector<*HIRVariantField>,
+    pub structure: bool = false;
+
+    HIRVariantMember(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::VariantMember, name, _type) {}
+
+    pub fn ToString(&this) -> String {
+        return '%' + this.name;
+    }
+}
+
+class HIRVariantDeclaration : HIRDeclaration {
+    pub members: Vector<*HIRVariantMember>,
+    pub methods: Vector<*mut HIRFunctionDeclaration>,
+    pub instance: *GenericInstance = null;
+
+    HIRVariantDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Variant, name, _type) {}
+
+    pub fn ToString(&this) -> String {
+        let mut result = "enum %" + this.name + " {";
+
+        if !this.members.Empty() {
+            result += '\n';
+
+            for i in 0..this.members.Size() {
+                if i != 0 { result += ",\n"; }
+                let member: *HIRVariantMember = this.members[i];
                 result += "    " + member->ToString();
             } result += '\n';
         } return result + '}';
@@ -1985,6 +2043,10 @@ class HIRContext {
 
     pub fn EnumerationType(&mut this, declaration: *HIREnumerationDeclaration, underlying: *HIRIntegerType) -> *mut HIREnumerationType {
         return this.arena.New<HIREnumerationType>(declaration, underlying);
+    }
+
+    pub fn VariantType(&mut this, declaration: *HIRVariantDeclaration) -> *mut HIRVariantType {
+        return this.arena.New<HIRVariantType>(declaration);
     }
 }
 
@@ -2370,12 +2432,26 @@ class HIRBuilder {
         return declaration;
     }
 
-    pub fn BuildMemberDeclaration(&mut this, name: String, value: *HIRExpression, _type: *HIRType) -> *mut HIRMemberDeclaration {
-        return this.context->arena.New<HIRMemberDeclaration>(name, value, _type);
+    pub fn BuildEnumerationMember(&mut this, name: String, value: *HIRExpression, _type: *HIRType) -> *mut HIREnumerationMember {
+        return this.context->arena.New<HIREnumerationMember>(name, value, _type);
     }
 
     pub fn BuildEnumerationDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIREnumerationDeclaration {
         let declaration = this.context->arena.New<HIREnumerationDeclaration>(name, _type);
+        this.module->declarations.PushBack(declaration);
+        return declaration;
+    }
+
+    pub fn BuildVariantField(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantField {
+        return this.context->arena.New<HIRVariantField>(name, _type);
+    }
+
+    pub fn BuildVariantMember(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantMember {
+        return this.context->arena.New<HIRVariantMember>(name, _type);
+    }
+
+    pub fn BuildVariantDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantDeclaration {
+        let declaration = this.context->arena.New<HIRVariantDeclaration>(name, _type);
         this.module->declarations.PushBack(declaration);
         return declaration;
     }
