@@ -1416,7 +1416,7 @@ class HIRLowerer {
         if variable->_type != null {
             _type = this.LowerType(variable->_type);
 
-            if variable->initializer != null {
+            if variable->initializer != null && _type != null {
                 initializer = this.Coerce(this.LowerExpression(variable->initializer), _type);
 
                 if initializer != null {
@@ -1461,20 +1461,18 @@ class HIRLowerer {
             this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
             if construct {
-                let mut values = Vector<*HIRExpression>();
-                let reciever = this.builder.ReferenceVariable(statement);
-                (reciever as *mut HIRExpression)->mutable = true;
-                values.PushBack(reciever);
-
-                if initializer != null { values.PushBack(initializer); }
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (_type as *HIRClassType)->declaration->constructors {
                     candidates.PushBack(candidate);
                 }
 
+                let mut values = Vector<*HIRExpression>();
+                let reciever = this.builder.ReferenceVariable(statement);
+                (reciever as *mut HIRExpression)->mutable = true;
+                values.PushBack(reciever);
+                if initializer != null { values.PushBack(initializer); }
                 let function = this.ResolveOverload(candidates, values, variable, initializer == null);
-                if initializer != null && function == null { return; }
 
                 if function != null {
                     let call = this.LowerResolvedCallExpression(function, values, variable);
