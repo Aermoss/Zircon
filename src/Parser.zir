@@ -358,12 +358,12 @@ class Parser {
                         break;
                     }
 
-                    let field_name = this.Expect(TokenType::IDENTIFIER);
-                    if field_name._type == TokenType::UNKNOWN { return null; }
+                    let field_identifier = this.Expect(TokenType::IDENTIFIER);
+                    if field_identifier._type == TokenType::UNKNOWN { return null; }
                     if !this.ExpectSuccess(TokenType::COLON) { return null; }
                     let expression = this.ParseExpression();
                     if expression == null { return null; }
-                    structure->fields[field_name.value] = expression;
+                    structure->fields[field_identifier.value] = expression;
                     if !this.Match(TokenType::COMMA) { break; }
                 }
 
@@ -824,14 +824,14 @@ class Parser {
     fn ParseForStatement(&mut this) -> *ASTForStatement {
         let token = this.Expect(TokenType::FOR);
         if token._type == TokenType::UNKNOWN { return null; }
-        let name = this.Expect(TokenType::IDENTIFIER);
-        if name._type == TokenType::UNKNOWN { return null; }
+        let identifier = this.Expect(TokenType::IDENTIFIER);
+        if identifier._type == TokenType::UNKNOWN { return null; }
         if !this.ExpectSuccess(TokenType::IN) { return null; }
         let iterable = this.ParseForIterable();
         if iterable == null { return null; }
         let _loop = this.ParseBlockStatement();
         if _loop == null { return null; }
-        return this.arena.New<ASTForStatement>(name.value, iterable, _loop, token);
+        return this.arena.New<ASTForStatement>(identifier.value, iterable, _loop, token);
     }
 
     fn ParseForIterable(&mut this) -> *ASTExpression {
@@ -1033,7 +1033,11 @@ class Parser {
         } else if token._type == TokenType::STRUCTURE {
             return this.ParseStructureDeclaration(attributes);
         } else if token._type == TokenType::ENUMERATION {
-            return this.ParseEnumerationDeclaration(attributes);
+            if this.Peek(2)._type == TokenType::COLON {
+                return this.ParseEnumerationDeclaration(attributes);
+            } else {
+                return this.ParseVariantDeclaration(attributes);
+            }
         } else if token._type == TokenType::EXTEND {
             return this.ParseExtendDeclaration();
         } else if token._type == TokenType::EXTERN {
@@ -1115,9 +1119,9 @@ class Parser {
             function->generic = true;
 
             while this.Current()._type != TokenType::GREATER {
-                let type_name = this.Expect(TokenType::IDENTIFIER);
-                if type_name._type == TokenType::UNKNOWN { return null; }
-                function->types.PushBack(type_name.value);
+                let type_identifier = this.Expect(TokenType::IDENTIFIER);
+                if type_identifier._type == TokenType::UNKNOWN { return null; }
+                function->types.PushBack(type_identifier.value);
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1146,9 +1150,9 @@ class Parser {
             if !has_instance || this.Match(TokenType::COMMA) {
                 while this.Current()._type != TokenType::EOF {
                     if this.Peek(1)._type == TokenType::THREE_DOT {
-                        let pack_name = this.Expect(TokenType::IDENTIFIER);
-                        if pack_name._type == TokenType::UNKNOWN { return null; }
-                        function->pack_name = pack_name.value;
+                        let pack_identifier = this.Expect(TokenType::IDENTIFIER);
+                        if pack_identifier._type == TokenType::UNKNOWN { return null; }
+                        function->pack_name = pack_identifier.value;
                         this.Advance();
                         break;
                     }
@@ -1249,9 +1253,9 @@ class Parser {
             _class->generic = true;
 
             while this.Current()._type != TokenType::GREATER {
-                let type_name = this.Expect(TokenType::IDENTIFIER);
-                if type_name._type == TokenType::UNKNOWN { return null; }
-                _class->types.PushBack(type_name.value);
+                let type_identifier = this.Expect(TokenType::IDENTIFIER);
+                if type_identifier._type == TokenType::UNKNOWN { return null; }
+                _class->types.PushBack(type_identifier.value);
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1341,9 +1345,9 @@ class Parser {
             structure->generic = true;
 
             while this.Current()._type != TokenType::GREATER {
-                let type_name = this.Expect(TokenType::IDENTIFIER);
-                if type_name._type == TokenType::UNKNOWN { return null; }
-                structure->types.PushBack(type_name.value);
+                let type_identifier = this.Expect(TokenType::IDENTIFIER);
+                if type_identifier._type == TokenType::UNKNOWN { return null; }
+                structure->types.PushBack(type_identifier.value);
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1460,6 +1464,79 @@ class Parser {
 
         if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
         return enumeration;
+    }
+
+    fn ParseVariantDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTVariantDeclaration {
+        let token = this.Expect(TokenType::ENUMERATION);
+        if token._type == TokenType::UNKNOWN { return null; }
+
+        for attribute in attributes {
+            Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            return null;
+        }
+
+        let identifier = this.Expect(TokenType::IDENTIFIER);
+        if identifier._type == TokenType::UNKNOWN { return null; }
+        let variant = this.arena.New<ASTVariantDeclaration>(identifier.value, token);
+
+        if this.Match(TokenType::LESS) {
+            variant->generic = true;
+
+            while this.Current()._type != TokenType::GREATER {
+                let type_identifier = this.Expect(TokenType::IDENTIFIER);
+                if type_identifier._type == TokenType::UNKNOWN { return null; }
+                variant->types.PushBack(type_identifier.value);
+                if !this.Match(TokenType::COMMA) { break; }
+            }
+
+            if !this.ExpectSuccess(TokenType::GREATER) {
+                return null;
+            }
+        }
+
+        if !this.ExpectSuccess(TokenType::LBRACE) { 
+            return null; 
+        }
+
+        while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+            let member_identifier = this.Expect(TokenType::IDENTIFIER);
+            if member_identifier._type == TokenType::UNKNOWN { return null; }
+            let member = this.arena.New<ASTVariantMember>(member_identifier.value, member_identifier);
+
+            if this.Match(TokenType::LPAREN) {
+                while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
+                    let field_type = this.ParseType();
+                    if field_type == null { return null; }
+                    member->fields.PushBack(this.arena.New<ASTVariantField>(field_type));
+                    if !this.Match(TokenType::COMMA) { break; }
+                }
+
+                if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+            } else if this.Match(TokenType::LBRACE) {
+                member->structure = true;
+
+                while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+                    let field_identifier = this.Expect(TokenType::IDENTIFIER);
+                    if field_identifier._type == TokenType::UNKNOWN { return null; }
+                    if !this.ExpectSuccess(TokenType::COLON) { return null; }
+                    let field_type = this.ParseType();
+                    if field_type == null { return null; }
+                    member->fields.PushBack(this.arena.New<ASTVariantField>(field_identifier.value, field_type));
+                    if !this.Match(TokenType::COMMA) { break; }
+                }
+
+                if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+            }
+
+            variant->members.PushBack(member);
+
+            if !this.Match(TokenType::COMMA) {
+                break;
+            }
+        }
+
+        if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+        return variant;
     }
 
     fn ParseExtendDeclaration(&mut this) -> *ASTExtendDeclaration {

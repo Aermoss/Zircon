@@ -893,7 +893,7 @@ class ASTAssemblyStatement : ASTStatement {
 }
 
 enum ASTDeclarationKind: u8 {
-    Parameter, Function, Field, Class, Structure, Member, Enumeration, Constant, Static, Extend, Type, Extern, Assembly
+    Parameter, Function, Field, Class, Structure, EnumerationMember, Enumeration, VariantMember, Variant, Constant, Static, Extend, Type, Extern, Assembly
 }
 
 extend ASTDeclarationKind {
@@ -903,8 +903,10 @@ extend ASTDeclarationKind {
         else if this == ASTDeclarationKind::Field { return "Field".ToString(); }
         else if this == ASTDeclarationKind::Class { return "Class".ToString(); }
         else if this == ASTDeclarationKind::Structure { return "Structure".ToString(); }
-        else if this == ASTDeclarationKind::Member { return "Member".ToString(); }
+        else if this == ASTDeclarationKind::EnumerationMember { return "EnumerationMember".ToString(); }
         else if this == ASTDeclarationKind::Enumeration { return "Enumeration".ToString(); }
+        else if this == ASTDeclarationKind::VariantMember { return "VariantMember".ToString(); }
+        else if this == ASTDeclarationKind::Variant { return "Variant".ToString(); }
         else if this == ASTDeclarationKind::Constant { return "Constant".ToString(); }
         else if this == ASTDeclarationKind::Static { return "Static".ToString(); }
         else if this == ASTDeclarationKind::Extend { return "Extend".ToString(); }
@@ -1000,7 +1002,7 @@ class ASTEnumerationMember : ASTDeclaration {
     pub name: String,
     pub value: *ASTExpression = null;
 
-    ASTEnumerationMember(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Member, start) {
+    ASTEnumerationMember(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::EnumerationMember, start) {
         this.name = name;
     }
 }
@@ -1011,6 +1013,41 @@ class ASTEnumerationDeclaration : ASTDeclaration {
     pub members: Vector<*ASTEnumerationMember>;
 
     ASTEnumerationDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Enumeration, start) {
+        this.name = name;
+    }
+}
+
+class ASTVariantField {
+    pub name: String,
+    pub _type: *ASTType;
+
+    ASTVariantField(&mut this, name: String, _type: *ASTType) {
+        (this.name, this._type) = (name, _type);
+    }
+
+    ASTVariantField(&mut this, _type: *ASTType) {
+        this._type = _type;
+    }
+}
+
+class ASTVariantMember : ASTDeclaration {
+    pub name: String,
+    pub fields: Vector<*ASTVariantField>,
+    pub structure: bool = false;
+
+    ASTVariantMember(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::VariantMember, start) {
+        this.name = name;
+    }
+}
+
+class ASTVariantDeclaration : ASTDeclaration {
+    pub name: String,
+    pub members: Vector<*ASTVariantMember>,
+    pub methods: Vector<*ASTFunctionDeclaration>,
+    pub types: Vector<String>,
+    pub generic: bool = false;
+
+    ASTVariantDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Variant, start) {
         this.name = name;
     }
 }
