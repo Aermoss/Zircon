@@ -1485,10 +1485,7 @@ class HIRLowerer {
 
             if _type->IsClass() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceVariable(statement));
-                this.BuildTemporaryDestructors(initializer);
-            } else {
-                this.BuildTemporaryDestructors(null);
-            }
+            } this.BuildTemporaryDestructors(initializer);
         }
 
         if variable->next != null {
