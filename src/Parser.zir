@@ -555,7 +555,7 @@ class Parser {
             while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
                 let element = this.ParsePattern();
                 if element == null { return null; }
-                tuple->elements.PushBack(element);
+                tuple->patterns.PushBack(element);
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -584,7 +584,7 @@ class Parser {
                 while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
                     if this.Current()._type == TokenType::TWO_DOT {
                         this.Advance();
-                        structure->rest = true;
+                        structure->patterns.PushBack(this.arena.New<ASTRestPattern>(token));
                         break;
                     }
 
@@ -599,7 +599,7 @@ class Parser {
                         field = this.arena.New<ASTIdentifierPattern>(field_identifier.value, false, field_identifier);
                     }
 
-                    structure->fields.PushBack(this.arena.New<ASTStructureFieldPattern>(field_identifier.value, field));
+                    structure->patterns.PushBack(this.arena.New<ASTFieldPattern>(field_identifier.value, field, field_identifier));
                     if !this.Match(TokenType::COMMA) { break; }
                 }
 
@@ -613,7 +613,7 @@ class Parser {
                 while this.Current()._type != TokenType::RPAREN {
                     let argument = this.ParsePattern();
                     if argument == null { return null; }
-                    variant->arguments.PushBack(argument);
+                    variant->patterns.PushBack(argument);
                     if !this.Match(TokenType::COMMA) { break; }
                 }
 

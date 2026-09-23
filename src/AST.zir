@@ -232,16 +232,17 @@ class ASTFunctionType : ASTType {
 }
 
 enum ASTPatternKind: u8 {
-    Wildcard, Rest, Identifier, Literal, Tuple, Structure, Variant, Or
+    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Or
 }
 
 extend ASTPatternKind {
     pub fn ToString(this) -> String {
         if this == ASTPatternKind::Wildcard { return "Wildcard".ToString(); }
         else if this == ASTPatternKind::Rest { return "Rest".ToString(); }
-        else if this == ASTPatternKind::Identifier { return "Identifier".ToString(); }
         else if this == ASTPatternKind::Literal { return "Literal".ToString(); }
+        else if this == ASTPatternKind::Identifier { return "Identifier".ToString(); }
         else if this == ASTPatternKind::Tuple { return "Tuple".ToString(); }
+        else if this == ASTPatternKind::Field { return "Field".ToString(); }
         else if this == ASTPatternKind::Structure { return "Structure".ToString(); }
         else if this == ASTPatternKind::Variant { return "Variant".ToString(); }
         else if this == ASTPatternKind::Or { return "Or".ToString(); }
@@ -265,6 +266,14 @@ class ASTRestPattern : ASTPattern {
     ASTRestPattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Rest, start) {}
 }
 
+class ASTLiteralPattern : ASTPattern {
+    pub literal: *ASTExpression;
+
+    ASTLiteralPattern(&mut this, literal: *ASTExpression, start: Token) : ASTPattern(ASTPatternKind::Literal, start) {
+        this.literal = literal;
+    }
+}
+
 class ASTIdentifierPattern : ASTPattern {
     pub name: String,
     pub mutable: bool;
@@ -274,33 +283,24 @@ class ASTIdentifierPattern : ASTPattern {
     }
 }
 
-class ASTLiteralPattern : ASTPattern {
-    pub literal: *ASTExpression;
-
-    ASTLiteralPattern(&mut this, literal: *ASTExpression, start: Token) : ASTPattern(ASTPatternKind::Literal, start) {
-        this.literal = literal;
-    }
-}
-
 class ASTTuplePattern : ASTPattern {
-    pub elements: Vector<*ASTPattern>;
+    pub patterns: Vector<*ASTPattern>;
 
     ASTTuplePattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Tuple, start) {}
 }
 
-class ASTStructureFieldPattern {
+class ASTFieldPattern : ASTPattern {
     pub name: String,
     pub pattern: *ASTPattern;
 
-    ASTStructureFieldPattern(&mut this, name: String, pattern: *ASTPattern) {
+    ASTFieldPattern(&mut this, name: String, pattern: *ASTPattern, start: Token) : ASTPattern(ASTPatternKind::Field, start) {
         (this.name, this.pattern) = (name, pattern);
     }
 }
 
 class ASTStructurePattern : ASTPattern {
     pub path: *ASTPath,
-    pub fields: Vector<*ASTStructureFieldPattern>,
-    pub rest: bool = false;
+    pub patterns: Vector<*ASTPattern>;
 
     ASTStructurePattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Structure, start) {
         this.path = path;
@@ -309,7 +309,7 @@ class ASTStructurePattern : ASTPattern {
 
 class ASTVariantPattern : ASTPattern {
     pub path: *ASTPath,
-    pub arguments: Vector<*ASTPattern>;
+    pub patterns: Vector<*ASTPattern>;
 
     ASTVariantPattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Variant, start) {
         this.path = path;

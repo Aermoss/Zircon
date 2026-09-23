@@ -757,6 +757,86 @@ class HIRVariantType : HIRType {
     }
 }
 
+enum HIRPatternKind: u8 {
+    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Or
+}
+
+class HIRPattern {
+    pub kind: HIRPatternKind;
+
+    HIRPattern(&mut this, kind: HIRPatternKind) {
+        this.kind = kind;
+    }
+}
+
+class HIRWildcardPattern : HIRPattern {
+    HIRWildcardPattern(&mut this) : HIRPattern(HIRPatternKind::Wildcard) {}
+}
+
+class HIRRestPattern : HIRPattern {
+    HIRRestPattern(&mut this) : HIRPattern(HIRPatternKind::Rest) {}
+}
+
+class HIRLiteralPattern : HIRPattern {
+    pub literal: *HIRExpression;
+
+    HIRLiteralPattern(&mut this, literal: *HIRExpression) : HIRPattern(HIRPatternKind::Literal) {
+        this.literal = literal;
+    }
+}
+
+class HIRIdentifierPattern : HIRPattern {
+    pub name: String,
+    pub mutable: bool;
+
+    HIRIdentifierPattern(&mut this, name: String, mutable: bool) : HIRPattern(HIRPatternKind::Identifier) {
+        (this.name, this.mutable) = (name, mutable);
+    }
+}
+
+class HIRTuplePattern : HIRPattern {
+    pub patterns: Vector<*HIRPattern>;
+
+    HIRTuplePattern(&mut this, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Tuple) {
+        this.patterns = patterns;
+    }
+}
+
+class HIRFieldPattern : HIRPattern {
+    pub name: String,
+    pub pattern: *HIRPattern;
+
+    HIRFieldPattern(&mut this, name: String, pattern: *HIRPattern) : HIRPattern(HIRPatternKind::Field) {
+        (this.name, this.pattern) = (name, pattern);
+    }
+}
+
+class HIRStructurePattern : HIRPattern {
+    pub declaration: *HIRStructureDeclaration,
+    pub patterns: Vector<*HIRPattern>;
+
+    HIRStructurePattern(&mut this, declaration: *HIRStructureDeclaration, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Structure) {
+        (this.declaration, this.patterns) = (declaration, patterns);
+    }
+}
+
+class HIRVariantPattern : HIRPattern {
+    pub member: *HIRVariantMember,
+    pub patterns: Vector<*HIRPattern>;
+
+    HIRVariantPattern(&mut this, member: *HIRVariantMember, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Variant) {
+        (this.member, this.patterns) = (member, patterns);
+    }
+}
+
+class HIROrPattern : HIRPattern {
+    pub patterns: Vector<*HIRPattern>;
+
+    HIROrPattern(&mut this, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Or) {
+        this.patterns = patterns;
+    }
+}
+
 enum HIRExpressionKind: u8 {
     Literal,
     VariableReference, DeclarationReference,
@@ -2119,6 +2199,42 @@ class HIRBuilder {
 
     HIRBuilder(&mut this, context: *mut HIRContext, module: *mut HIRModule) {
         (this.context, this.module) = (context, module);
+    }
+
+    pub fn WildcardPattern(&mut this) -> *mut HIRWildcardPattern {
+        return this.context->arena.New<HIRWildcardPattern>();
+    }
+
+    pub fn RestPattern(&mut this) -> *mut HIRRestPattern {
+        return this.context->arena.New<HIRRestPattern>();
+    }
+
+    pub fn LiteralPattern(&mut this, literal: *HIRExpression) -> *mut HIRLiteralPattern {
+        return this.context->arena.New<HIRLiteralPattern>(literal);
+    }
+
+    pub fn IdentifierPattern(&mut this, name: String, mutable: bool) -> *mut HIRIdentifierPattern {
+        return this.context->arena.New<HIRIdentifierPattern>(name, mutable);
+    }
+
+    pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>) -> *mut HIRTuplePattern {
+        return this.context->arena.New<HIRTuplePattern>(patterns);
+    }
+
+    pub fn FieldPattern(&mut this, name: String, pattern: *HIRPattern) -> *mut HIRFieldPattern {
+        return this.context->arena.New<HIRFieldPattern>(name, pattern);
+    }
+
+    pub fn StructurePattern(&mut this, declaration: *HIRStructureDeclaration, patterns: Vector<*HIRPattern>) -> *mut HIRStructurePattern {
+        return this.context->arena.New<HIRStructurePattern>(declaration, patterns);
+    }
+
+    pub fn VariantPattern(&mut this, member: *HIRVariantMember, patterns: Vector<*HIRPattern>) -> *mut HIRVariantPattern {
+        return this.context->arena.New<HIRVariantPattern>(member, patterns);
+    }
+
+    pub fn OrPattern(&mut this, patterns: Vector<*HIRPattern>) -> *mut HIROrPattern {
+        return this.context->arena.New<HIROrPattern>(patterns);
     }
 
     pub fn BooleanLiteral(&mut this, value: bool, _type: *HIRType) -> *mut HIRBooleanLiteral {
