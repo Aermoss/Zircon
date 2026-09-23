@@ -1208,9 +1208,9 @@ class HIRVariableReference : HIRExpression {
 }
 
 class HIRDeclarationReference : HIRExpression {
-    pub declaration: *HIRDeclaration;
+    pub declaration: *HIRTypedDeclaration;
 
-    HIRDeclarationReference(&mut this, declaration: *HIRDeclaration, mutable: bool) : HIRExpression(HIRExpressionKind::DeclarationReference, declaration->_type, HIRExpressionCategory::Place, mutable) {
+    HIRDeclarationReference(&mut this, declaration: *HIRTypedDeclaration, mutable: bool) : HIRExpression(HIRExpressionKind::DeclarationReference, declaration->_type, HIRExpressionCategory::Place, mutable) {
         this.declaration = declaration;
     }
 
@@ -1607,7 +1607,7 @@ class HIRDeferredExpression : HIRExpression {
 }
 
 enum HIRStatementKind: u8 {
-    Block, Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue
+    Block, Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue, Assembly
 }
 
 class HIRStatement {
@@ -1618,7 +1618,7 @@ class HIRStatement {
     }
 
     pub fn HasBlock(&this) -> bool {
-        return this.kind == HIRStatementKind::Block || this.kind == HIRStatementKind::If || this.kind == HIRStatementKind::While || this.kind == HIRStatementKind::Loop || this.kind == HIRStatementKind::For || this.kind == HIRStatementKind::Match;
+        return this.kind == HIRStatementKind::Block || this.kind == HIRStatementKind::If || this.kind == HIRStatementKind::While || this.kind == HIRStatementKind::Loop || this.kind == HIRStatementKind::For || this.kind == HIRStatementKind::Match || this.kind == HIRStatementKind::Assembly;
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -1644,6 +1644,8 @@ class HIRStatement {
             return (' ' * indent * 4) + (this as *HIRBreakStatement)->ToString();
         } else if this.kind == HIRStatementKind::Continue {
             return (' ' * indent * 4) + (this as *HIRContinueStatement)->ToString();
+        } else if this.kind == HIRStatementKind::Assembly {
+            return (' ' * indent * 4) + (this as *HIRAssemblyStatement)->ToString();
         } else {
             return (' ' * indent * 4) + "<invalid statement>".ToString();
         }
@@ -1844,35 +1846,71 @@ class HIRContinueStatement : HIRStatement {
     }
 }
 
+class HIRAssemblyOperand {
+    pub name: String,
+    pub expression: *HIRExpression;
+
+    HIRAssemblyOperand(&mut this, name: String, expression: *HIRExpression) {
+        (this.name, this.expression) = (name, expression);
+    }
+}
+
+class HIRAssemblyStatement : HIRStatement {
+    pub _volatile: bool,
+    pub text: String,
+    pub inputs: Vector<*HIRAssemblyOperand>,
+    pub outputs: Vector<*HIRAssemblyOperand>,
+    pub clobbers: Vector<String>;
+
+    HIRAssemblyStatement(&mut this, _volatile: bool, text: String, inputs: Vector<*HIRAssemblyOperand>, outputs: Vector<*HIRAssemblyOperand>, clobbers: Vector<String>) : HIRStatement(HIRStatementKind::Assembly) {
+        (this._volatile, this.text, this.inputs, this.outputs, this.clobbers) = (_volatile, text, inputs, outputs, clobbers);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = (this._volatile ? "volatile asm " : "asm ").ToString();
+
+        if !this.inputs.Empty() {
+            result += ": ";
+
+            for i in 0..this.inputs.Size() {
+                if i != 0 { result += ", "; }
+                let input: *HIRAssemblyOperand = this.inputs[i]; 
+                result += input->name + '(' + input->expression->ToString() + ')';
+            } result += " -> ";
+        }
+
+        result += '{' + this.text + '}';
+
+        if !this.outputs.Empty() {
+            result += " -> ";
+
+            for i in 0..this.outputs.Size() {
+                if i != 0 { result += ", "; }
+                let output: *HIRAssemblyOperand = this.outputs[i]; 
+                result += output->name + '(' + output->expression->ToString() + ')';
+            }
+        }
+
+        if !this.clobbers.Empty() {
+            result += " : ";
+
+            for i in 0..this.clobbers.Size() {
+                if i != 0 { result += ", "; }
+                result += this.clobbers[i];
+            }
+        } return result;
+    }
+}
+
 enum HIRDeclarationKind: u8 {
-    Parameter, Function, Field, Class, Structure, EnumerationMember, Enumeration, VariantMember, Variant, Extend, Constant, Static
-}
-
-enum HIRDeclarationABI: u8 {
-    Native, C
-}
-
-enum HIRDeclarationLinkage: u8 {
-    Private, Internal, External
+    Parameter, Function, Field, Class, Structure, EnumerationMember, Enumeration, VariantMember, Variant, Extend, Constant, Static, Assembly
 }
 
 class HIRDeclaration {
-    pub kind: HIRDeclarationKind,
-    pub abi: HIRDeclarationABI = ::HIRDeclarationABI::Native,
-    pub linkage: HIRDeclarationLinkage = ::HIRDeclarationLinkage::External,
-    pub name: String,
-    pub _type: *HIRType;
+    pub kind: HIRDeclarationKind;
 
-    HIRDeclaration(&mut this, kind: HIRDeclarationKind, name: String, _type: *HIRType) {
-        (this.kind, this.name, this._type) = (kind, name, _type);
-    }
-
-    HIRDeclaration(&mut this, kind: HIRDeclarationKind, abi: HIRDeclarationABI, name: String, _type: *HIRType) {
-        (this.kind, this.abi, this.name, this._type) = (kind, abi, name, _type);
-    }
-
-    HIRDeclaration(&mut this, kind: HIRDeclarationKind, linkage: HIRDeclarationLinkage, name: String, _type: *HIRType) {
-        (this.kind, this.linkage, this.name, this._type) = (kind, linkage, name, _type);
+    HIRDeclaration(&mut this, kind: HIRDeclarationKind) {
+        this.kind = kind;
     }
 
     pub fn ToString(&this) -> String {
@@ -1900,16 +1938,44 @@ class HIRDeclaration {
             return (this as *HIRConstantDeclaration)->ToString();
         } else if this.kind == HIRDeclarationKind::Static {
             return (this as *HIRStaticDeclaration)->ToString();
+        } else if this.kind == HIRDeclarationKind::Assembly {
+            return (this as *HIRAssemblyDeclaration)->ToString();
         } else {
             return "<invalid declaration>".ToString();
         }
     }
 }
 
-class HIRParameterDeclaration : HIRDeclaration {
+class HIRTypedDeclaration : HIRDeclaration {
+    pub name: String,
+    pub _type: *HIRType;
+
+    HIRTypedDeclaration(&mut this, kind: HIRDeclarationKind, name: String, _type: *HIRType) : HIRDeclaration(kind) {
+        (this.name, this._type) = (name, _type);
+    }
+}
+
+enum HIRDeclarationABI: u8 {
+    Native, C
+}
+
+enum HIRDeclarationLinkage: u8 {
+    Private, Internal, External
+}
+
+class HIRLinkableDeclaration : HIRTypedDeclaration {
+    pub abi: HIRDeclarationABI,
+    pub linkage: HIRDeclarationLinkage;
+
+    HIRLinkableDeclaration(&mut this, kind: HIRDeclarationKind, name: String, _type: *HIRType, abi: HIRDeclarationABI, linkage: HIRDeclarationLinkage) : HIRTypedDeclaration(kind, name, _type) {
+        (this.abi, this.linkage) = (abi, linkage);
+    }
+}
+
+class HIRParameterDeclaration : HIRTypedDeclaration {
     pub mutable: bool;
 
-    HIRParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) : HIRDeclaration(HIRDeclarationKind::Parameter, name, _type) {
+    HIRParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) : HIRTypedDeclaration(HIRDeclarationKind::Parameter, name, _type) {
         this.mutable = mutable;
     }
 
@@ -1918,7 +1984,7 @@ class HIRParameterDeclaration : HIRDeclaration {
     }
 }
 
-class HIRFunctionDeclaration : HIRDeclaration {
+class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub no_mangle: bool,
     pub public: bool,
     pub parameters: Vector<*HIRParameterDeclaration>,
@@ -1926,7 +1992,7 @@ class HIRFunctionDeclaration : HIRDeclaration {
     pub body: *HIRBlockStatement = null,
     pub instance: *GenericInstance = null;
 
-    HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRDeclaration(HIRDeclarationKind::Function, abi, name, _type) {
+    HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRLinkableDeclaration(HIRDeclarationKind::Function, name, _type, abi, HIRDeclarationLinkage::External) {
         (this.parameters, this._return, this.no_mangle, this.public) = (parameters, _return, no_mangle, public);
     }
 
@@ -1949,12 +2015,12 @@ class HIRFunctionDeclaration : HIRDeclaration {
     }
 }
 
-class HIRFieldDeclaration : HIRDeclaration {
+class HIRFieldDeclaration : HIRTypedDeclaration {
     pub index: usize,
     pub initializer: *ASTExpression,
     pub public: bool;
 
-    HIRFieldDeclaration(&mut this, name: String, _type: *HIRType, index: usize, initializer: *ASTExpression, public: bool) : HIRDeclaration(HIRDeclarationKind::Field, name, _type) {
+    HIRFieldDeclaration(&mut this, name: String, _type: *HIRType, index: usize, initializer: *ASTExpression, public: bool) : HIRTypedDeclaration(HIRDeclarationKind::Field, name, _type) {
         (this.index, this.initializer, this.public) = (index, initializer, public);
     }
 
@@ -1967,7 +2033,7 @@ class HIRFieldDeclaration : HIRDeclaration {
     }
 }
 
-class HIRClassDeclaration : HIRDeclaration {
+class HIRClassDeclaration : HIRTypedDeclaration {
     pub parents: Vector<*HIRType>,
     pub fields: Vector<*HIRFieldDeclaration>,
     pub constructors: Vector<*mut HIRFunctionDeclaration>,
@@ -1975,7 +2041,7 @@ class HIRClassDeclaration : HIRDeclaration {
     pub methods: Vector<*mut HIRFunctionDeclaration>,
     pub instance: *GenericInstance = null;
 
-    HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Class, name, _type) {}
+    HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Class, name, _type) {}
 
     pub fn ToString(&this) -> String {
         let mut result = "class %" + this.name;
@@ -2018,12 +2084,12 @@ class HIRClassDeclaration : HIRDeclaration {
     }
 }
 
-class HIRStructureDeclaration : HIRDeclaration {
+class HIRStructureDeclaration : HIRTypedDeclaration {
     pub fields: Vector<*HIRFieldDeclaration>,
     pub methods: Vector<*mut HIRFunctionDeclaration>,
     pub instance: *GenericInstance = null;
 
-    HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Structure, name, _type) {}
+    HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Structure, name, _type) {}
 
     pub fn ToString(&this) -> String {
         let mut result = "struct %" + this.name + " {";
@@ -2048,10 +2114,10 @@ class HIRStructureDeclaration : HIRDeclaration {
     }
 }
 
-class HIREnumerationMember : HIRDeclaration {
+class HIREnumerationMember : HIRTypedDeclaration {
     pub value: *HIRExpression;
 
-    HIREnumerationMember(&mut this, name: String, value: *HIRExpression, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::EnumerationMember, name, _type) {
+    HIREnumerationMember(&mut this, name: String, value: *HIRExpression, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::EnumerationMember, name, _type) {
         this.value = value;
     }
 
@@ -2064,10 +2130,10 @@ class HIREnumerationMember : HIRDeclaration {
     }
 }
 
-class HIREnumerationDeclaration : HIRDeclaration {
+class HIREnumerationDeclaration : HIRTypedDeclaration {
     pub members: Vector<*HIREnumerationMember>;
 
-    HIREnumerationDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Enumeration, name, _type) {}
+    HIREnumerationDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Enumeration, name, _type) {}
 
     pub fn ToString(&this) -> String {
         let mut result = "enum %" + this.name + " {";
@@ -2093,12 +2159,12 @@ class HIRVariantField {
     }
 }
 
-class HIRVariantMember : HIRDeclaration {
+class HIRVariantMember : HIRTypedDeclaration {
     pub structure: bool = false,
     pub fields: Vector<*HIRVariantField>,
     pub index: usize;
 
-    HIRVariantMember(&mut this, name: String, _type: *HIRType, index: usize) : HIRDeclaration(HIRDeclarationKind::VariantMember, name, _type) {
+    HIRVariantMember(&mut this, name: String, _type: *HIRType, index: usize) : HIRTypedDeclaration(HIRDeclarationKind::VariantMember, name, _type) {
         this.index = index;
     }
 
@@ -2107,12 +2173,12 @@ class HIRVariantMember : HIRDeclaration {
     }
 }
 
-class HIRVariantDeclaration : HIRDeclaration {
+class HIRVariantDeclaration : HIRTypedDeclaration {
     pub members: Vector<*HIRVariantMember>,
     pub methods: Vector<*mut HIRFunctionDeclaration>,
     pub instance: *GenericInstance = null;
 
-    HIRVariantDeclaration(&mut this, name: String, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Variant, name, _type) {}
+    HIRVariantDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Variant, name, _type) {}
 
     pub fn ToString(&this) -> String {
         let mut result = "enum %" + this.name + " {";
@@ -2129,10 +2195,10 @@ class HIRVariantDeclaration : HIRDeclaration {
     }
 }
 
-class HIRExtendDeclaration : HIRDeclaration {
+class HIRExtendDeclaration : HIRTypedDeclaration {
     pub methods: Vector<*mut HIRFunctionDeclaration>;
 
-    HIRExtendDeclaration(&mut this, _type: *HIRType) : HIRDeclaration(HIRDeclarationKind::Extend, _type->ToString(), _type) {}
+    HIRExtendDeclaration(&mut this, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Extend, _type->ToString(), _type) {}
 
     pub fn ToString(&this) -> String {
         let mut result = "extend " + this.name + " {";
@@ -2182,10 +2248,10 @@ class HIRExtensionRegistry {
     }
 }
 
-class HIRConstantDeclaration : HIRDeclaration {
+class HIRConstantDeclaration : HIRTypedDeclaration {
     pub initializer: *HIRExpression;
 
-    HIRConstantDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression) : HIRDeclaration(HIRDeclarationKind::Constant, name, _type) {
+    HIRConstantDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression) : HIRTypedDeclaration(HIRDeclarationKind::Constant, name, _type) {
         this.initializer = initializer;
     }
 
@@ -2194,12 +2260,12 @@ class HIRConstantDeclaration : HIRDeclaration {
     }
 }
 
-class HIRStaticDeclaration : HIRDeclaration {
+class HIRStaticDeclaration : HIRLinkableDeclaration {
     pub initializer: *HIRExpression,
     pub alignment: *HIRExpression,
     pub mutable: bool;
 
-    HIRStaticDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, alignment: *HIRExpression, mutable: bool, linkage: HIRDeclarationLinkage) : HIRDeclaration(HIRDeclarationKind::Static, linkage, name, _type) {
+    HIRStaticDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, alignment: *HIRExpression, mutable: bool, linkage: HIRDeclarationLinkage) : HIRLinkableDeclaration(HIRDeclarationKind::Static, name, _type, HIRDeclarationABI::Native, linkage) {
         (this.initializer, this.alignment, this.mutable) = (initializer, alignment, mutable);
     }
 
@@ -2209,6 +2275,14 @@ class HIRStaticDeclaration : HIRDeclaration {
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
         } return result;
+    }
+}
+
+class HIRAssemblyDeclaration : HIRDeclaration {
+    pub text: String;
+
+    HIRAssemblyDeclaration(&mut this, text: String) : HIRDeclaration(HIRDeclarationKind::Assembly) {
+        this.text = text;
     }
 }
 
@@ -2401,7 +2475,7 @@ class HIRBuilder {
         return this.context->arena.New<HIRVariableReference>(variable);
     }
 
-    pub fn ReferenceDeclaration(&mut this, declaration: *HIRDeclaration, mutable: bool) -> *mut HIRDeclarationReference {
+    pub fn ReferenceDeclaration(&mut this, declaration: *HIRTypedDeclaration, mutable: bool) -> *mut HIRDeclarationReference {
         return this.context->arena.New<HIRDeclarationReference>(declaration, mutable);
     }
 
@@ -2713,6 +2787,14 @@ class HIRBuilder {
         return _continue;
     }
 
+    pub fn BuildAssemblyOperand(&mut this, name: String, expression: *HIRExpression) -> *mut HIRAssemblyOperand {
+        return this.context->arena.New<HIRAssemblyOperand>(name, expression);
+    }
+
+    pub fn BuildAssemblyStatement(&mut this, _volatile: bool, text: String, inputs: Vector<*HIRAssemblyOperand>, outputs: Vector<*HIRAssemblyOperand>, clobbers: Vector<String>) -> *mut HIRAssemblyStatement {
+        return this.context->arena.New<HIRAssemblyStatement>(_volatile, text, inputs, outputs, clobbers);
+    }
+
     pub fn BuildParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) -> *mut HIRParameterDeclaration {
         return this.context->arena.New<HIRParameterDeclaration>(name, _type, mutable);
     }
@@ -2783,6 +2865,12 @@ class HIRBuilder {
 
     pub fn BuildStaticDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, alignment: *HIRExpression, mutable: bool, linkage: HIRDeclarationLinkage) -> *mut HIRStaticDeclaration {
         let declaration = this.context->arena.New<HIRStaticDeclaration>(name, _type, initializer, alignment, mutable, linkage);
+        this.module->declarations.PushBack(declaration);
+        return declaration;
+    }
+
+    pub fn BuildAssemblyDeclaration(&mut this, text: String) -> *mut HIRAssemblyDeclaration {
+        let declaration = this.context->arena.New<HIRAssemblyDeclaration>(text);
         this.module->declarations.PushBack(declaration);
         return declaration;
     }

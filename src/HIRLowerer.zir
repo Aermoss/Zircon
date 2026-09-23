@@ -124,6 +124,8 @@ class HIRLowerer {
             if !variant->generic && pair.left != null && pair.right != null {
                 this.variant_data[declaration] = pair;
             }
+        } else if declaration->kind == ASTDeclarationKind::Assembly {
+            this.LowerAssemblyDeclaration(declaration as *ASTAssemblyDeclaration);
         } else {
             return false;
         } return true;
@@ -206,8 +208,6 @@ class HIRLowerer {
             }
         } else if declaration->kind == ASTDeclarationKind::Extern {
             this.LowerExternDeclarationFirstPass(declaration as *ASTExternDeclaration);
-        } else if declaration->kind == ASTDeclarationKind::Assembly {
-            this.LowerAssemblyDeclaration(declaration as *ASTAssemblyDeclaration);
         } else {
             return false;
         } return true;
@@ -1106,7 +1106,9 @@ class HIRLowerer {
         (this.abi, this.linkage) = (previous_abi, previous_linkage);
     }
 
-    fn LowerAssemblyDeclaration(&mut this, assembly: *ASTAssemblyDeclaration) {}
+    fn LowerAssemblyDeclaration(&mut this, assembly: *ASTAssemblyDeclaration) {
+        this.builder.BuildAssemblyDeclaration(assembly->text);
+    }
 
     fn LowerStatement(&mut this, statement: *ASTStatement) {
         if statement->kind == ASTStatementKind::Block {
@@ -1546,9 +1548,27 @@ class HIRLowerer {
     }
 
     fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
-        if assembly->outputs.Size() > 1 {
-            Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
+        let mut inputs = Vector<*HIRAssemblyOperand>();
+
+        for input in assembly->inputs {
+            let expression = this.LowerExpression(input->expression);
+            if expression == null { continue; }
+            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, expression));
         }
+
+        let mut outputs = Vector<*HIRAssemblyOperand>();
+
+        for output in assembly->outputs {
+            if !outputs.Empty() {
+                Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
+            }
+
+            let expression = this.LowerExpression(output->expression);
+            if expression == null { continue; }
+            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, expression));
+        }
+
+        this.builder.BuildAssemblyStatement(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
     }
 
     fn GetTemporaryDestructorsSince(&mut this, index: usize, exception: *HIRExpression) -> Vector<*HIRExpression> {
@@ -1707,7 +1727,12 @@ class HIRLowerer {
                 } else if symbol->kind == SymbolKind::Declaration {
                     let declaration = symbol->declaration;
 
-                    if declaration->kind == HIRDeclarationKind::EnumerationMember {
+                    if declaration->kind == HIRDeclarationKind::Parameter {
+                        let parameter = declaration as *HIRParameterDeclaration;
+                        return this.builder.ReferenceDeclaration(parameter, parameter->mutable);
+                    } else if declaration->kind == HIRDeclarationKind::Function {
+                        return this.builder.ReferenceDeclaration(declaration as *HIRFunctionDeclaration, false);
+                    } else if declaration->kind == HIRDeclarationKind::EnumerationMember {
                         return (declaration as *HIREnumerationMember)->value;
                     } else if declaration->kind == HIRDeclarationKind::VariantMember {
                         let member = declaration as *HIRVariantMember;
@@ -1721,11 +1746,8 @@ class HIRLowerer {
                     } else if declaration->kind == HIRDeclarationKind::Constant {
                         return (declaration as *HIRConstantDeclaration)->initializer;
                     } else if declaration->kind == HIRDeclarationKind::Static {
-                        return this.builder.ReferenceDeclaration(declaration, (declaration as *HIRStaticDeclaration)->mutable);
-                    } else if declaration->kind == HIRDeclarationKind::Parameter {
-                        return this.builder.ReferenceDeclaration(declaration, (declaration as *HIRParameterDeclaration)->mutable);
-                    } else {
-                        return this.builder.ReferenceDeclaration(declaration, false);
+                        let _static = declaration as *HIRStaticDeclaration;
+                        return this.builder.ReferenceDeclaration(_static, _static->mutable);
                     }
                 }
             }
@@ -2121,7 +2143,7 @@ class HIRLowerer {
                             if symbol->kind == SymbolKind::Statement {
                                 _type = (symbol->statement as *HIRVariableStatement)->_type;
                             } else if symbol->kind == SymbolKind::Declaration {
-                                _type = symbol->declaration->_type;
+                                _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
                             } else {
                                 _type = symbol->_type;
                             }

@@ -489,8 +489,8 @@ class MIRStructGEPExpression : MIRConstantExpression {
 
 enum MIRInstructionKind: u8 {
     Alloca, Load, Store, ArrayGEP, StructGEP,
-    Unary, Binary, Call, Cast,
-    Select, Phi, Terminator
+    Unary, Binary, Call, Cast, Select, Phi,
+    Assembly, Terminator
 }
 
 class MIRInstruction : MIRValue {
@@ -536,6 +536,8 @@ class MIRInstruction : MIRValue {
             result += (this as *MIRSelectInstruction)->ToString();
         } else if this.kind == MIRInstructionKind::Phi {
             result += (this as *MIRPhiInstruction)->ToString();
+        } else if this.kind == MIRInstructionKind::Assembly {
+            result += (this as *MIRAssemblyInstruction)->ToString();
         } else if this.kind == MIRInstructionKind::Terminator {
             result += (this as *MIRTerminator)->ToString();
         } else {
@@ -716,6 +718,62 @@ class MIRPhiInstruction : MIRInstruction {
     }
 }
 
+class MIRAssemblyOperand {
+    pub name: String,
+    pub value: *MIRValue;
+
+    MIRAssemblyOperand(&mut this, name: String, value: *MIRValue) {
+        (this.name, this.value) = (name, value);
+    }
+}
+
+class MIRAssemblyInstruction : MIRInstruction {
+    pub _volatile: bool,
+    pub text: String,
+    pub inputs: Vector<*MIRAssemblyOperand>,
+    pub outputs: Vector<*MIRAssemblyOperand>,
+    pub clobbers: Vector<String>;
+
+    MIRAssemblyInstruction(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>) : MIRInstruction(MIRInstructionKind::Assembly, "".ToString(), null) {
+        (this._volatile, this.text, this.inputs, this.outputs, this.clobbers) = (_volatile, text, inputs, outputs, clobbers);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = (this._volatile ? "volatile asm " : "asm ").ToString();
+
+        if !this.inputs.Empty() {
+            result += ": ";
+
+            for i in 0..this.inputs.Size() {
+                if i != 0 { result += ", "; }
+                let input: *MIRAssemblyOperand = this.inputs[i]; 
+                result += input->name + '(' + input->value->ToString() + ')';
+            } result += " -> ";
+        }
+
+        result += '{' + this.text + '}';
+
+        if !this.outputs.Empty() {
+            result += " -> ";
+
+            for i in 0..this.outputs.Size() {
+                if i != 0 { result += ", "; }
+                let output: *MIRAssemblyOperand = this.outputs[i]; 
+                result += output->name + '(' + output->value->ToString() + ')';
+            }
+        }
+
+        if !this.clobbers.Empty() {
+            result += " : ";
+
+            for i in 0..this.clobbers.Size() {
+                if i != 0 { result += ", "; }
+                result += this.clobbers[i];
+            }
+        } return result;
+    }
+}
+
 enum MIRTerminatorKind: u8 {
     Return, Branch, ConditionalBranch, Unreachable
 }
@@ -793,9 +851,9 @@ class MIRUnreachableInstruction : MIRTerminator {
 }
 
 class MIRDeclarationReference : MIRValue {
-    pub declaration: *MIRDeclaration;
+    pub declaration: *MIRTypedDeclaration;
 
-    MIRDeclarationReference(&mut this, declaration: *MIRDeclaration, _type: *MIRType) : MIRValue(MIRValueKind::DeclarationReference, _type) {
+    MIRDeclarationReference(&mut this, declaration: *MIRTypedDeclaration, _type: *MIRType) : MIRValue(MIRValueKind::DeclarationReference, _type) {
         this.declaration = declaration;
     }
 
@@ -869,58 +927,39 @@ class MIRBlock {
 }
 
 enum MIRDeclarationKind: u8 {
-    Type, Constant, Function, Static
+    Type, Function, Constant, Static, Assembly
 }
 
 class MIRDeclaration {
-    pub kind: MIRDeclarationKind,
-    pub name: String,
-    pub _type: *MIRType;
+    pub kind: MIRDeclarationKind;
 
-    MIRDeclaration(&mut this, kind: MIRDeclarationKind, name: String, _type: *MIRType) {
-        (this.kind, this.name, this._type) = (kind, name, _type);
+    MIRDeclaration(&mut this, kind: MIRDeclarationKind) {
+        this.kind = kind;
     }
 
     pub fn ToString(&this) -> String {
         if this.kind == MIRDeclarationKind::Type {
             return (this as *MIRTypeDeclaration)->ToString();
-        } else if this.kind == MIRDeclarationKind::Constant {
-            return (this as *MIRConstantDeclaration)->ToString();
         } else if this.kind == MIRDeclarationKind::Function {
             return (this as *MIRFunctionDeclaration)->ToString();
+        } else if this.kind == MIRDeclarationKind::Constant {
+            return (this as *MIRConstantDeclaration)->ToString();
         } else if this.kind == MIRDeclarationKind::Static {
             return (this as *MIRStaticDeclaration)->ToString();
+        } else if this.kind == MIRDeclarationKind::Assembly {
+            return (this as *MIRAssemblyDeclaration)->ToString();
         } else {
             return "<invalid declaration>".ToString();
         }
     }
 }
 
-class MIRTypeDeclaration : MIRDeclaration {
-    MIRTypeDeclaration(&mut this, name: String, _type: *MIRType) : MIRDeclaration(MIRDeclarationKind::Type, name, _type) {}
+class MIRTypedDeclaration : MIRDeclaration {
+    pub name: String,
+    pub _type: *MIRType;
 
-    pub fn ToString(&this) -> String {
-        let declaration = this as *MIRDeclaration;
-        let mut result = "type %" + declaration->name + " = ";
-
-        if declaration->_type->kind == MIRTypeKind::Structure {
-            result += (declaration->_type as *MIRStructureType)->ToDefinitionString();
-        } else {
-            result += declaration->_type->ToString();
-        } return result;
-    }
-}
-
-class MIRConstantDeclaration : MIRDeclaration {
-    pub initializer: *MIRValue;
-
-    MIRConstantDeclaration(&mut this, name: String, _type: *MIRType, initializer: *MIRValue) : MIRDeclaration(MIRDeclarationKind::Constant, name, _type) {
-        this.initializer = initializer;
-    }
-
-    pub fn ToString(&this) -> String {
-        let declaration = this as *MIRDeclaration;
-        return "const @\"" + declaration->name + "\": " + declaration->_type->ToString() + " = " + this.initializer->ToString();
+    MIRTypedDeclaration(&mut this, kind: MIRDeclarationKind, name: String, _type: *MIRType) : MIRDeclaration(kind) {
+        (this.name, this._type) = (name, _type);
     }
 }
 
@@ -928,11 +967,25 @@ enum MIRDeclarationLinkage: u8 {
     Private, Internal, External
 }
 
-class MIRLinkableDeclaration : MIRDeclaration {
+class MIRLinkableDeclaration : MIRTypedDeclaration {
     pub linkage: MIRDeclarationLinkage;
 
-    MIRLinkableDeclaration(&mut this, kind: MIRDeclarationKind, name: String, _type: *MIRType, linkage: MIRDeclarationLinkage) : MIRDeclaration(kind, name, _type) {
+    MIRLinkableDeclaration(&mut this, kind: MIRDeclarationKind, name: String, _type: *MIRType, linkage: MIRDeclarationLinkage) : MIRTypedDeclaration(kind, name, _type) {
         this.linkage = linkage;
+    }
+}
+
+class MIRTypeDeclaration : MIRTypedDeclaration {
+    MIRTypeDeclaration(&mut this, name: String, _type: *MIRType) : MIRTypedDeclaration(MIRDeclarationKind::Type, name, _type) {}
+
+    pub fn ToString(&this) -> String {
+        let mut result = "type %" + this.name + " = ";
+
+        if this._type->kind == MIRTypeKind::Structure {
+            result += (this._type as *MIRStructureType)->ToDefinitionString();
+        } else {
+            result += this._type->ToString();
+        } return result;
     }
 }
 
@@ -974,8 +1027,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        let declaration = this as *MIRDeclaration;
-        let mut result = "fn @\"" + declaration->name + "\"(";
+        let mut result = "fn @\"" + this.name + "\"(";
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
@@ -999,6 +1051,18 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
     }
 }
 
+class MIRConstantDeclaration : MIRTypedDeclaration {
+    pub initializer: *MIRValue;
+
+    MIRConstantDeclaration(&mut this, name: String, _type: *MIRType, initializer: *MIRValue) : MIRTypedDeclaration(MIRDeclarationKind::Constant, name, _type) {
+        this.initializer = initializer;
+    }
+
+    pub fn ToString(&this) -> String {
+        return "const @\"" + this.name + "\": " + this._type->ToString() + " = " + this.initializer->ToString();
+    }
+}
+
 class MIRStaticDeclaration : MIRLinkableDeclaration {
     pub initializer: *MIRValue,
     pub mutable: bool;
@@ -1013,6 +1077,18 @@ class MIRStaticDeclaration : MIRLinkableDeclaration {
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
         } return result;
+    }
+}
+
+class MIRAssemblyDeclaration : MIRDeclaration {
+    pub text: String;
+
+    MIRAssemblyDeclaration(&mut this, text: String) : MIRDeclaration(MIRDeclarationKind::Assembly) {
+        this.text = text;
+    }
+
+    pub fn ToString(&this) -> String {
+        return "asm {" + this.text + '}';
     }
 }
 
@@ -1232,6 +1308,16 @@ class MIRBuilder {
         return phi;
     }
 
+    pub fn BuildAssemblyOperand(&mut this, name: String, value: *MIRValue) -> *mut MIRAssemblyOperand {
+        return this.context->arena.New<MIRAssemblyOperand>(name, value);
+    }
+
+    pub fn BuildAssembly(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>) -> *mut MIRAssemblyInstruction {
+        let assembly = this.context->arena.New<MIRAssemblyInstruction>(_volatile, text, inputs, outputs, clobbers);
+        this.block->AddInstruction(assembly);
+        return assembly;
+    }
+
     pub fn BuildReturn(&mut this, value: *MIRValue) -> *mut MIRReturnInstruction {
         let _return = this.context->arena.New<MIRReturnInstruction>(value, this.context->VoidType());
         this.block->SetTerminator(_return);
@@ -1256,7 +1342,7 @@ class MIRBuilder {
         return unreachable;
     }
 
-    pub fn ReferenceDeclaration(&mut this, declaration: *MIRDeclaration) -> *mut MIRDeclarationReference {
+    pub fn ReferenceDeclaration(&mut this, declaration: *MIRTypedDeclaration) -> *mut MIRDeclarationReference {
         let mut _type: *MIRType = null;
 
         if declaration->kind == MIRDeclarationKind::Constant || declaration->kind == MIRDeclarationKind::Static {
@@ -1292,12 +1378,6 @@ class MIRBuilder {
         return type_declaration;
     }
 
-    pub fn BuildConstant(&mut this, name: String, _type: *MIRType, initializer: *MIRValue) -> *mut MIRConstantDeclaration {
-        let constant = this.context->arena.New<MIRConstantDeclaration>(name, _type, initializer);
-        this.module->declarations.PushBack(constant);
-        return constant;
-    }
-
     pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage) -> *mut MIRFunctionDeclaration {
         let mut parameter_types = Vector<*MIRType>();
         for parameter in parameters { parameter_types.PushBack(parameter->_type); }
@@ -1315,9 +1395,21 @@ class MIRBuilder {
         return this.function;
     }
 
+    pub fn BuildConstant(&mut this, name: String, _type: *MIRType, initializer: *MIRValue) -> *mut MIRConstantDeclaration {
+        let constant = this.context->arena.New<MIRConstantDeclaration>(name, _type, initializer);
+        this.module->declarations.PushBack(constant);
+        return constant;
+    }
+
     pub fn BuildStatic(&mut this, name: String, _type: *MIRType, mutable: bool, initializer: *MIRValue, linkage: MIRDeclarationLinkage) -> *mut MIRStaticDeclaration {
         let _static = this.context->arena.New<MIRStaticDeclaration>(name, _type, mutable, initializer, linkage);
         this.module->declarations.PushBack(_static);
         return _static;
+    }
+
+    pub fn BuildAssembly(&mut this, text: String) -> *mut MIRAssemblyDeclaration {
+        let assembly = this.context->arena.New<MIRAssemblyDeclaration>(text);
+        this.module->declarations.PushBack(assembly);
+        return assembly;
     }
 }

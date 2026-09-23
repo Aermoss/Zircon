@@ -49,8 +49,7 @@ class Mangler {
             }
         } else if _type->IsClass() {
             let declaration = (_type as *HIRClassType)->declaration;
-            let name = (declaration as *HIRDeclaration)->name;
-            result += String::FromInteger(name.Length() as u64) + name;
+            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
 
             if declaration->instance != null {
                 result += "I";
@@ -61,8 +60,7 @@ class Mangler {
             }
         } else if _type->IsStructure() {
             let declaration = (_type as *HIRStructureType)->declaration;
-            let name = (declaration as *HIRDeclaration)->name;
-            result += String::FromInteger(name.Length() as u64) + name;
+            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
 
             if declaration->instance != null {
                 result += "I";
@@ -73,8 +71,7 @@ class Mangler {
             }
         } else if _type->IsEnumeration() {
             let declaration = (_type as *HIREnumerationType)->declaration;
-            let name = (declaration as *HIRDeclaration)->name;
-            result += String::FromInteger(name.Length() as u64) + name;
+            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
         } else {
             Logger::Log("Mangler", "Unknown type '" + _type->ToString() + "'.", LogSeverity::Error);
         } return result;

@@ -23,8 +23,8 @@ class MIRLowerer {
     namespaces: Vector<String>,
     strings: Map<String, *MIRStaticDeclaration>,
     variables: Map<*HIRVariableStatement, *MIRValue>,
-    declarations: Map<*HIRDeclaration, *mut MIRDeclaration>,
-    types: Map<*HIRType, *mut MIRDeclaration>,
+    declarations: Map<*HIRDeclaration, *mut MIRTypedDeclaration>,
+    types: Map<*HIRType, *mut MIRTypedDeclaration>,
     parameters: Map<*HIRDeclaration, *MIRValue>,
     temporaries: Map<*HIRExpression, *MIRValue>,
     runtime_functions: Map<String, *MIRFunctionDeclaration>,
@@ -74,6 +74,8 @@ class MIRLowerer {
             this.LowerStructureDeclarationFirstPass(declaration as *HIRStructureDeclaration);
         } else if declaration->kind == HIRDeclarationKind::Variant {
             this.LowerVariantDeclarationFirstPass(declaration as *HIRVariantDeclaration);
+        } else if declaration->kind == HIRDeclarationKind::Assembly {
+            this.LowerAssemblyDeclaration(declaration as *HIRAssemblyDeclaration);
         }
     }
 
@@ -137,7 +139,7 @@ class MIRLowerer {
     fn LowerConstantDeclarationSecondPass(&mut this, constant: *HIRConstantDeclaration) {
         let initializer = this.LowerConstantExpression(constant->initializer);
         if initializer == null { return; }
-        let lowered: *mut MIRDeclaration = this.declarations[constant];
+        let lowered: *mut MIRTypedDeclaration = this.declarations[constant];
         (lowered as *mut MIRConstantDeclaration)->initializer = initializer;
     }
 
@@ -158,7 +160,7 @@ class MIRLowerer {
         if _static->initializer == null { return; }
         let initializer = this.LowerConstantExpression(_static->initializer);
         if initializer == null { return; }
-        let lowered: *mut MIRDeclaration = this.declarations[_static];
+        let lowered: *mut MIRTypedDeclaration = this.declarations[_static];
         (lowered as *mut MIRStaticDeclaration)->initializer = initializer;
     }
 
@@ -207,8 +209,7 @@ class MIRLowerer {
             parameters.PushBack(this.builder.BuildParameter(parameter->name, parameters.Size() as u32, this.LowerAggregateType(parameter->_type)));
         }
 
-        let lowered = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));
-        this.declarations[function] = lowered;
+        this.declarations[function] = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
@@ -273,7 +274,7 @@ class MIRLowerer {
             fields.PushBack(lowered_field);
         }
 
-        let lowered: *mut MIRDeclaration = this.types[_class->_type];
+        let lowered: *mut MIRTypedDeclaration = this.types[_class->_type];
         (lowered->_type as *mut MIRStructureType)->SetBody(fields);
     }
 
@@ -324,7 +325,7 @@ class MIRLowerer {
             fields.PushBack(lowered_field);
         }
 
-        let lowered: *mut MIRDeclaration = this.types[structure->_type];
+        let lowered: *mut MIRTypedDeclaration = this.types[structure->_type];
         (lowered->_type as *mut MIRStructureType)->SetBody(fields);
     }
 
@@ -353,7 +354,7 @@ class MIRLowerer {
     fn LowerVariantDeclarationSecondPass(&mut this, variant: *HIRVariantDeclaration) {
         let mut fields = Vector<*MIRType>();
         fields.PushBack(this.context.ArrayType(this.context.IntegerType(8), variant->_type->Size()));
-        let lowered: *mut MIRDeclaration = this.types[variant->_type];
+        let lowered: *mut MIRTypedDeclaration = this.types[variant->_type];
         (lowered->_type as *mut MIRStructureType)->SetBody(fields);
     }
 
@@ -391,11 +392,13 @@ class MIRLowerer {
         }
     }
 
+    fn LowerAssemblyDeclaration(&mut this, assembly: *HIRAssemblyDeclaration) {
+        this.builder.BuildAssembly(assembly->text);
+    }
+
     fn LowerStatement(&mut this, statement: *HIRStatement) {
         if statement->kind == HIRStatementKind::Block {
             this.LowerBlockStatement(statement as *HIRBlockStatement);
-        } else if statement->kind == HIRStatementKind::Return {
-            this.LowerReturnStatement(statement as *HIRReturnStatement);
         } else if statement->kind == HIRStatementKind::Variable {
             this.LowerVariableStatement(statement as *HIRVariableStatement);
         } else if statement->kind == HIRStatementKind::Expression {
@@ -408,10 +411,14 @@ class MIRLowerer {
             this.LowerLoopStatement(statement as *HIRLoopStatement);
         } else if statement->kind == HIRStatementKind::For {
             this.LowerForStatement(statement as *HIRForStatement);
+        } else if statement->kind == HIRStatementKind::Return {
+            this.LowerReturnStatement(statement as *HIRReturnStatement);
         } else if statement->kind == HIRStatementKind::Break {
             this.LowerBreakStatement(statement as *HIRBreakStatement);
         } else if statement->kind == HIRStatementKind::Continue {
             this.LowerContinueStatement(statement as *HIRContinueStatement);
+        } else if statement->kind == HIRStatementKind::Assembly {
+            this.LowerAssemblyStatement(statement as *HIRAssemblyStatement);
         }
     }
 
@@ -419,35 +426,6 @@ class MIRLowerer {
         for statement in block->statements {
             if this.builder.GetCurrentBlock()->HasTerminator() { break; }
             this.LowerStatement(statement);
-        }
-    }
-
-    fn LowerReturnStatement(&mut this, _return: *HIRReturnStatement) {
-        if this.indirect_return != null {
-            this.LowerExpressionTo(_return->expression, this.indirect_return);
-            for destructor in _return->destructors { this.LowerExpression(destructor); }
-            this.builder.BuildReturn(null);
-        } else if this.IsAggregate(this.current_return) {
-            let _type = this.LowerType(this.current_return);
-            if _type == null { return; }
-            let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), _type);
-            this.LowerExpressionTo(_return->expression, alloca);
-            let target = this.context.PointerType(this.LowerAggregateType(this.current_return));
-            let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
-            let load = this.builder.BuildLoad("abi.value".ToString(), pointer);
-            for destructor in _return->destructors { this.LowerExpression(destructor); }
-            this.builder.BuildReturn(load);
-        } else {
-            let mut value: *MIRValue = null;
-
-            if _return->expression != null {
-                value = this.LowerExpression(_return->expression);
-                if value == null { return; }
-            }
-
-            for destructor in _return->destructors {
-                this.LowerExpression(destructor);
-            } this.builder.BuildReturn(value);
         }
     }
 
@@ -590,6 +568,35 @@ class MIRLowerer {
         }
     }
 
+    fn LowerReturnStatement(&mut this, _return: *HIRReturnStatement) {
+        if this.indirect_return != null {
+            this.LowerExpressionTo(_return->expression, this.indirect_return);
+            for destructor in _return->destructors { this.LowerExpression(destructor); }
+            this.builder.BuildReturn(null);
+        } else if this.IsAggregate(this.current_return) {
+            let _type = this.LowerType(this.current_return);
+            if _type == null { return; }
+            let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), _type);
+            this.LowerExpressionTo(_return->expression, alloca);
+            let target = this.context.PointerType(this.LowerAggregateType(this.current_return));
+            let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
+            let load = this.builder.BuildLoad("abi.value".ToString(), pointer);
+            for destructor in _return->destructors { this.LowerExpression(destructor); }
+            this.builder.BuildReturn(load);
+        } else {
+            let mut value: *MIRValue = null;
+
+            if _return->expression != null {
+                value = this.LowerExpression(_return->expression);
+                if value == null { return; }
+            }
+
+            for destructor in _return->destructors {
+                this.LowerExpression(destructor);
+            } this.builder.BuildReturn(value);
+        }
+    }
+
     fn LowerBreakStatement(&mut this, _break: *HIRBreakStatement) {
         if !this.break_blocks.Empty() {
             this.builder.BuildBranch(this.break_blocks.Back());
@@ -600,6 +607,26 @@ class MIRLowerer {
         if !this.continue_blocks.Empty() {
             this.builder.BuildBranch(this.continue_blocks.Back());
         }
+    }
+
+    fn LowerAssemblyStatement(&mut this, assembly: *HIRAssemblyStatement) {
+        let mut inputs = Vector<*MIRAssemblyOperand>();
+
+        for input in assembly->inputs {
+            let value = this.LowerExpression(input->expression);
+            if value == null { continue; }
+            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, value));
+        }
+
+        let mut outputs = Vector<*MIRAssemblyOperand>();
+
+        for output in assembly->outputs {
+            let value = this.LowerPlaceExpression(output->expression);
+            if value == null { continue; }
+            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, value));
+        }
+
+        this.builder.BuildAssembly(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
     }
 
     fn LowerConstantExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
@@ -864,8 +891,12 @@ class MIRLowerer {
 
     fn LowerRuntimeFunction(&mut this, name: String, parameter_types: &Vector<*MIRType>, _return: *MIRType) -> *MIRFunctionDeclaration {
         for declaration in this.module->declarations {
-            if declaration->kind == MIRDeclarationKind::Function && declaration->name == name {
-                return declaration as *MIRFunctionDeclaration;
+            if declaration->kind == MIRDeclarationKind::Function {
+                let function = declaration as *MIRFunctionDeclaration;
+
+                if function->name == name {
+                    return function;
+                }
             }
         }
 

@@ -1021,28 +1021,28 @@ class Parser {
 
         if this.Match(TokenType::COLON) {
             while this.Current()._type == TokenType::IDENTIFIER {
-                let register = this.Advance().value;
+                let name = this.Advance().value;
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                node->inputs.PushBack(Pair<String, *ASTExpression>(register, expression));
+                node->inputs.PushBack(this.arena.New<ASTAssemblyOperand>(name, expression));
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
             if !this.ExpectSuccess(TokenType::ARROW) { return null; }
         }
 
-        let code = this.Expect(TokenType::ASSEMBLY_CODE);
-        if code._type == TokenType::UNKNOWN { return null; }
-        node->code = code.value;
+        let text = this.Expect(TokenType::ASSEMBLY_TEXT);
+        if text._type == TokenType::UNKNOWN { return null; }
+        node->text = text.value;
 
         if this.Match(TokenType::ARROW) {
             while this.Current()._type == TokenType::IDENTIFIER {
-                let register = this.Advance().value;
+                let name = this.Advance().value;
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                node->outputs.PushBack(Pair<String, *ASTExpression>(register, expression));
+                node->outputs.PushBack(this.arena.New<ASTAssemblyOperand>(name, expression));
                 if !this.Match(TokenType::COMMA) { break; }
             }
         }
@@ -1855,7 +1855,7 @@ class Parser {
     fn ParseAssemblyDeclaration(&mut this) -> *ASTAssemblyDeclaration {
         let token = this.Expect(TokenType::ASSEMBLY);
         if token._type == TokenType::UNKNOWN { return null; }
-        let code = this.Expect(TokenType::ASSEMBLY_CODE);
+        let code = this.Expect(TokenType::ASSEMBLY_TEXT);
         if code._type == TokenType::UNKNOWN { return null; }
         return this.arena.New<ASTAssemblyDeclaration>(code.value, token);
     }

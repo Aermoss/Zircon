@@ -20,7 +20,7 @@
 class GenericInstance {
     pub symbol: *Symbol = null,
     pub scope: *mut Scope = null,
-    pub declaration: *mut HIRDeclaration = null,
+    pub declaration: *mut HIRTypedDeclaration = null,
     pub completed: HIRLoweringPass = ::HIRLoweringPass::None,
     pub active: HIRLoweringPass = ::HIRLoweringPass::None,
     pub types: Vector<*HIRType>;

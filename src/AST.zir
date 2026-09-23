@@ -993,10 +993,20 @@ class ASTUnsafeStatement : ASTStatement {
     }
 }
 
+class ASTAssemblyOperand {
+    pub name: String,
+    pub expression: *ASTExpression;
+
+    ASTAssemblyOperand(&mut this, name: String, expression: *ASTExpression) {
+        (this.name, this.expression) = (name, expression);
+    }
+}
+
 class ASTAssemblyStatement : ASTStatement {
-    pub _volatile: bool, pub code: String,
-    pub inputs: Vector<Pair<String, *ASTExpression>>,
-    pub outputs: Vector<Pair<String, *ASTExpression>>,
+    pub _volatile: bool,
+    pub text: String,
+    pub inputs: Vector<*ASTAssemblyOperand>,
+    pub outputs: Vector<*ASTAssemblyOperand>,
     pub clobbers: Vector<String>;
 
     ASTAssemblyStatement(&mut this, _volatile: bool, start: Token) : ASTStatement(ASTStatementKind::Assembly, start) {
@@ -1215,10 +1225,10 @@ class ASTExternDeclaration : ASTDeclaration {
 }
 
 class ASTAssemblyDeclaration : ASTDeclaration {
-    pub code: String;
+    pub text: String;
 
-    ASTAssemblyDeclaration(&mut this, code: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Assembly, start) {
-        this.code = code;
+    ASTAssemblyDeclaration(&mut this, text: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Assembly, start) {
+        this.text = text;
     }
 }
 

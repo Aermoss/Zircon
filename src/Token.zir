@@ -24,7 +24,7 @@ enum TokenType: i32 {
     NEW, DELETE, ASYNC, AWAIT, AS, THIS, OPERATOR,
     IF, ELSE, FOR, IN, WHILE, LOOP, MATCH, RETURN, BREAK, CONTINUE,
     FUNCTION, CLASS, STRUCTURE, ENUMERATION, EXTEND, TYPE, EXTERN, LET, MUT, CONST, STATIC,
-    PUBLIC, ASSEMBLY, ASSEMBLY_CODE, VOLATILE, UNSAFE,
+    PUBLIC, ASSEMBLY, ASSEMBLY_TEXT, VOLATILE, UNSAFE,
 
     ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,
     LSHIFT_ASSIGN, RSHIFT_ASSIGN, AND_ASSIGN, OR_ASSIGN, XOR_ASSIGN,
@@ -83,7 +83,7 @@ extend TokenType {
         else if this == TokenType::STATIC { return "STATIC".ToString(); }
         else if this == TokenType::PUBLIC { return "PUBLIC".ToString(); }
         else if this == TokenType::ASSEMBLY { return "ASSEMBLY".ToString(); }
-        else if this == TokenType::ASSEMBLY_CODE { return "ASSEMBLY_CODE".ToString(); }
+        else if this == TokenType::ASSEMBLY_TEXT { return "ASSEMBLY_TEXT".ToString(); }
         else if this == TokenType::VOLATILE { return "VOLATILE".ToString(); }
         else if this == TokenType::UNSAFE { return "UNSAFE".ToString(); }
         else if this == TokenType::ASSIGN { return "ASSIGN".ToString(); }

@@ -551,7 +551,7 @@ class Lexer {
 
     fn LexAssembly(&mut this) -> Token {
         let mut token: Token;
-        (token._type, token.row, token.column, token.file) = (TokenType::ASSEMBLY_CODE, this.row, this.column, this.file);
+        (token._type, token.row, token.column, token.file) = (TokenType::ASSEMBLY_TEXT, this.row, this.column, this.file);
         let (mut state, mut indent: usize) = (true, 1);
         let mut accumulator = String();
         this.Advance(1);

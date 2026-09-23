@@ -117,6 +117,8 @@ class LLVMLowerer {
     fn LowerDeclarationFirstPass(&mut this, declaration: *MIRDeclaration) {
         if declaration->kind == MIRDeclarationKind::Type {
             this.LowerTypeDeclarationFirstPass(declaration as *MIRTypeDeclaration);
+        } else if declaration->kind == MIRDeclarationKind::Assembly {
+            this.LowerAssemblyDeclaration(declaration as *MIRAssemblyDeclaration);
         }
     }
 
@@ -164,42 +166,6 @@ class LLVMLowerer {
         }
 
         LLVMStructSetBody(this.types[_type->_type], fields.Data(), fields.Size() as u32, 0);
-    }
-
-    fn LowerConstantDeclarationFirstPass(&mut this, constant: *MIRConstantDeclaration) {
-        let _type = this.LowerType(constant->_type);
-        if _type == null { return; }
-        let global = LLVMAddGlobal(this.module, _type, constant->name.Data());
-        this.declarations[constant] = global;
-        LLVMSetGlobalConstant(global, 1);
-    }
-
-    fn LowerConstantDeclarationSecondPass(&mut this, constant: *MIRConstantDeclaration) {
-        let initializer = this.LowerValue(constant->initializer);
-        if initializer == null { return; }
-        LLVMSetInitializer(this.declarations[constant], initializer);
-    }
-
-    fn LowerLinkage(&mut this, linkage: MIRDeclarationLinkage) -> LLVMLinkage {
-        if linkage == MIRDeclarationLinkage::Private { return LLVMLinkage::LLVMPrivateLinkage; }
-        else if linkage == MIRDeclarationLinkage::Internal { return LLVMLinkage::LLVMInternalLinkage; }
-        else { return LLVMLinkage::LLVMExternalLinkage; }
-    }
-
-    fn LowerStaticDeclarationFirstPass(&mut this, _static: *MIRStaticDeclaration) {
-        let _type = this.LowerType(_static->_type);
-        if _type == null { return; }
-        let global = LLVMAddGlobal(this.module, _type, _static->name.Data());
-        LLVMSetLinkage(global, this.LowerLinkage(_static->linkage));
-        LLVMSetGlobalConstant(global, !_static->mutable ? 1 : 0);
-        this.declarations[_static] = global;
-    }
-
-    fn LowerStaticDeclarationSecondPass(&mut this, _static: *MIRStaticDeclaration) {
-        if _static->initializer == null { return; }
-        let initializer = this.LowerValue(_static->initializer);
-        if initializer == null { return; }
-        LLVMSetInitializer(this.declarations[_static], initializer);
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *MIRFunctionDeclaration) {
@@ -275,6 +241,46 @@ class LLVMLowerer {
                 LLVMAddIncoming(lowered, &mut value, &mut block, 1);
             }
         }
+    }
+
+    fn LowerConstantDeclarationFirstPass(&mut this, constant: *MIRConstantDeclaration) {
+        let _type = this.LowerType(constant->_type);
+        if _type == null { return; }
+        let global = LLVMAddGlobal(this.module, _type, constant->name.Data());
+        this.declarations[constant] = global;
+        LLVMSetGlobalConstant(global, 1);
+    }
+
+    fn LowerConstantDeclarationSecondPass(&mut this, constant: *MIRConstantDeclaration) {
+        let initializer = this.LowerValue(constant->initializer);
+        if initializer == null { return; }
+        LLVMSetInitializer(this.declarations[constant], initializer);
+    }
+
+    fn LowerLinkage(&mut this, linkage: MIRDeclarationLinkage) -> LLVMLinkage {
+        if linkage == MIRDeclarationLinkage::Private { return LLVMLinkage::LLVMPrivateLinkage; }
+        else if linkage == MIRDeclarationLinkage::Internal { return LLVMLinkage::LLVMInternalLinkage; }
+        else { return LLVMLinkage::LLVMExternalLinkage; }
+    }
+
+    fn LowerStaticDeclarationFirstPass(&mut this, _static: *MIRStaticDeclaration) {
+        let _type = this.LowerType(_static->_type);
+        if _type == null { return; }
+        let global = LLVMAddGlobal(this.module, _type, _static->name.Data());
+        LLVMSetLinkage(global, this.LowerLinkage(_static->linkage));
+        LLVMSetGlobalConstant(global, !_static->mutable ? 1 : 0);
+        this.declarations[_static] = global;
+    }
+
+    fn LowerStaticDeclarationSecondPass(&mut this, _static: *MIRStaticDeclaration) {
+        if _static->initializer == null { return; }
+        let initializer = this.LowerValue(_static->initializer);
+        if initializer == null { return; }
+        LLVMSetInitializer(this.declarations[_static], initializer);
+    }
+
+    fn LowerAssemblyDeclaration(&mut this, assembly: *MIRAssemblyDeclaration) {
+        LLVMAppendModuleInlineAsm(this.module, assembly->text.Data(), assembly->text.Length());
     }
 
     fn LowerValue(&mut this, value: *MIRValue) -> LLVMValueRef {
@@ -410,6 +416,8 @@ class LLVMLowerer {
             return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
         } else if instruction->kind == MIRInstructionKind::Phi {
             return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
+        } else if instruction->kind == MIRInstructionKind::Assembly {
+            return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
         } else if instruction->kind == MIRInstructionKind::Terminator {
             return this.LowerTerminator(instruction as *MIRTerminator);
         } else {
@@ -572,6 +580,47 @@ class LLVMLowerer {
         let lowered = LLVMBuildPhi(this.builder, _type, phi->name.Data());
         this.phis[phi] = lowered;
         return lowered;
+    }
+
+    fn LowerAssemblyInstruction(&mut this, assembly: *MIRAssemblyInstruction) -> LLVMValueRef {
+        let mut constraints = String();
+        let mut parameters = Vector<LLVMTypeRef>();
+        let mut _return = LLVMVoidTypeInContext(this.context);
+        let mut inputs = Vector<LLVMValueRef>();
+        let mut output: LLVMValueRef = null;
+
+        for input in assembly->inputs {
+            if !constraints.Empty() { constraints += ","; }
+            constraints += '{' + input->name + '}';
+            let _type = this.LowerType(input->value->_type);
+            if _type == null { return null; }
+            parameters.PushBack(_type);
+            let value = this.LowerValue(input->value);
+            if value == null { return null; }
+            inputs.PushBack(value);
+        }
+
+        for _output in assembly->outputs {
+            if !constraints.Empty() { constraints += ","; }
+            constraints += "={" + _output->name + '}';
+            _return = this.LowerType((_output->value->_type as *MIRPointerType)->pointee);
+            if _return == null { return null; }
+            output = this.LowerValue(_output->value);
+            if output == null { return null; }
+        }
+
+        for clobber in assembly->clobbers {
+            if !constraints.Empty() { constraints += ","; }
+            constraints += "~{" + clobber + '}';
+        }
+
+        let _type = LLVMFunctionType(_return, parameters.Empty() ? null : parameters.Data(), parameters.Size() as u32, 0);
+        let inline = LLVMGetInlineAsm(_type, assembly->text.Data(), assembly->text.Length(), constraints.Data(), constraints.Length(), assembly->_volatile as i32, 0, LLVMInlineAsmDialect::LLVMInlineAsmDialectATT, 0);
+        let result = LLVMBuildCall2(this.builder, _type, inline, inputs.Empty() ? null : inputs.Data(), inputs.Size() as u32, "");
+
+        if output != null {
+            LLVMBuildStore(this.builder, result, output);
+        } return null;
     }
 
     fn LowerTerminator(&mut this, terminator: *MIRTerminator) -> LLVMValueRef {
