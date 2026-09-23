@@ -767,14 +767,46 @@ class HIRPattern {
     HIRPattern(&mut this, kind: HIRPatternKind) {
         this.kind = kind;
     }
+
+    pub fn ToString(&this) -> String {
+        if this.kind == HIRPatternKind::Wildcard {
+            return (this as *HIRWildcardPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Rest {
+            return (this as *HIRRestPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Literal {
+            return (this as *HIRLiteralPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Identifier {
+            return (this as *HIRIdentifierPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Tuple {
+            return (this as *HIRTuplePattern)->ToString();
+        } else if this.kind == HIRPatternKind::Field {
+            return (this as *HIRFieldPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Structure {
+            return (this as *HIRStructurePattern)->ToString();
+        } else if this.kind == HIRPatternKind::Variant {
+            return (this as *HIRVariantPattern)->ToString();
+        } else if this.kind == HIRPatternKind::Or {
+            return (this as *HIROrPattern)->ToString();
+        } else {
+            return "<invalid pattern>".ToString();
+        }
+    }
 }
 
 class HIRWildcardPattern : HIRPattern {
     HIRWildcardPattern(&mut this) : HIRPattern(HIRPatternKind::Wildcard) {}
+
+    pub fn ToString(&this) -> String {
+        return '_'.ToString();
+    }
 }
 
 class HIRRestPattern : HIRPattern {
     HIRRestPattern(&mut this) : HIRPattern(HIRPatternKind::Rest) {}
+
+    pub fn ToString(&this) -> String {
+        return "..".ToString();
+    }
 }
 
 class HIRLiteralPattern : HIRPattern {
@@ -782,6 +814,10 @@ class HIRLiteralPattern : HIRPattern {
 
     HIRLiteralPattern(&mut this, literal: *HIRExpression) : HIRPattern(HIRPatternKind::Literal) {
         this.literal = literal;
+    }
+
+    pub fn ToString(&this) -> String {
+        return this.literal->ToString();
     }
 }
 
@@ -792,6 +828,10 @@ class HIRIdentifierPattern : HIRPattern {
     HIRIdentifierPattern(&mut this, name: String, mutable: bool) : HIRPattern(HIRPatternKind::Identifier) {
         (this.name, this.mutable) = (name, mutable);
     }
+
+    pub fn ToString(&this) -> String {
+        return this.mutable ? "mut " + this.name : this.name;
+    }
 }
 
 class HIRTuplePattern : HIRPattern {
@@ -799,6 +839,16 @@ class HIRTuplePattern : HIRPattern {
 
     HIRTuplePattern(&mut this, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Tuple) {
         this.patterns = patterns;
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = '('.ToString();
+
+        for i in 0..this.patterns.Size() {
+            if i != 0 { result += ", "; }
+            let pattern: *HIRPattern = this.patterns[i];
+            result += pattern->ToString();
+        } return result + ')';
     }
 }
 
@@ -809,6 +859,10 @@ class HIRFieldPattern : HIRPattern {
     HIRFieldPattern(&mut this, name: String, pattern: *HIRPattern) : HIRPattern(HIRPatternKind::Field) {
         (this.name, this.pattern) = (name, pattern);
     }
+
+    pub fn ToString(&this) -> String {
+        return this.name + ": " + this.pattern->ToString();
+    }
 }
 
 class HIRStructurePattern : HIRPattern {
@@ -817,6 +871,16 @@ class HIRStructurePattern : HIRPattern {
 
     HIRStructurePattern(&mut this, declaration: *HIRStructureDeclaration, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Structure) {
         (this.declaration, this.patterns) = (declaration, patterns);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = this.declaration->name + " { ";
+
+        for i in 0..this.patterns.Size() {
+            if i != 0 { result += ", "; }
+            let pattern: *HIRPattern = this.patterns[i];
+            result += pattern->ToString();
+        } return result + " }";
     }
 }
 
@@ -827,6 +891,16 @@ class HIRVariantPattern : HIRPattern {
     HIRVariantPattern(&mut this, member: *HIRVariantMember, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Variant) {
         (this.member, this.patterns) = (member, patterns);
     }
+
+    pub fn ToString(&this) -> String {
+        let mut result = this.member->name + '(';
+
+        for i in 0..this.patterns.Size() {
+            if i != 0 { result += ", "; }
+            let pattern: *HIRPattern = this.patterns[i];
+            result += pattern->ToString();
+        } return result + ')';
+    }
 }
 
 class HIROrPattern : HIRPattern {
@@ -834,6 +908,16 @@ class HIROrPattern : HIRPattern {
 
     HIROrPattern(&mut this, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Or) {
         this.patterns = patterns;
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+
+        for i in 0..this.patterns.Size() {
+            if i != 0 { result += " | "; }
+            let pattern: *HIRPattern = this.patterns[i];
+            result += pattern->ToString();
+        } return result;
     }
 }
 
@@ -1523,7 +1607,7 @@ class HIRDeferredExpression : HIRExpression {
 }
 
 enum HIRStatementKind: u8 {
-    Block, Variable, Expression, Return, Break, Continue, If, While, Loop, For
+    Block, Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue
 }
 
 class HIRStatement {
@@ -1534,7 +1618,7 @@ class HIRStatement {
     }
 
     pub fn HasBlock(&this) -> bool {
-        return this.kind == HIRStatementKind::Block || this.kind == HIRStatementKind::If || this.kind == HIRStatementKind::While || this.kind == HIRStatementKind::Loop || this.kind == HIRStatementKind::For;
+        return this.kind == HIRStatementKind::Block || this.kind == HIRStatementKind::If || this.kind == HIRStatementKind::While || this.kind == HIRStatementKind::Loop || this.kind == HIRStatementKind::For || this.kind == HIRStatementKind::Match;
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -1544,12 +1628,6 @@ class HIRStatement {
             return (' ' * indent * 4) + (this as *HIRVariableStatement)->ToString();
         } else if this.kind == HIRStatementKind::Expression {
             return (' ' * indent * 4) + (this as *HIRExpressionStatement)->ToString();
-        } else if this.kind == HIRStatementKind::Return {
-            return (' ' * indent * 4) + (this as *HIRReturnStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Break {
-            return (' ' * indent * 4) + (this as *HIRBreakStatement)->ToString();
-        } else if this.kind == HIRStatementKind::Continue {
-            return (' ' * indent * 4) + (this as *HIRContinueStatement)->ToString();
         } else if this.kind == HIRStatementKind::If {
             return (' ' * indent * 4) + (this as *HIRIfStatement)->ToString(indent);
         } else if this.kind == HIRStatementKind::While {
@@ -1558,6 +1636,14 @@ class HIRStatement {
             return (' ' * indent * 4) + (this as *HIRLoopStatement)->ToString(indent);
         } else if this.kind == HIRStatementKind::For {
             return (' ' * indent * 4) + (this as *HIRForStatement)->ToString(indent);
+        } else if this.kind == HIRStatementKind::Match {
+            return (' ' * indent * 4) + (this as *HIRMatchStatement)->ToString(indent);
+        } else if this.kind == HIRStatementKind::Return {
+            return (' ' * indent * 4) + (this as *HIRReturnStatement)->ToString(indent);
+        } else if this.kind == HIRStatementKind::Break {
+            return (' ' * indent * 4) + (this as *HIRBreakStatement)->ToString();
+        } else if this.kind == HIRStatementKind::Continue {
+            return (' ' * indent * 4) + (this as *HIRContinueStatement)->ToString();
         } else {
             return (' ' * indent * 4) + "<invalid statement>".ToString();
         }
@@ -1621,43 +1707,6 @@ class HIRExpressionStatement : HIRStatement {
     }
 }
 
-class HIRReturnStatement : HIRStatement {
-    pub expression: *HIRExpression,
-    pub destructors: Vector<*HIRExpression>;
-
-    HIRReturnStatement(&mut this, expression: *HIRExpression, destructors: Vector<*HIRExpression>) : HIRStatement(HIRStatementKind::Return) {
-        (this.expression, this.destructors) = (expression, destructors);
-    }
-
-    pub fn ToString(&this, indent: usize) -> String {
-        let mut result = String();
-
-        for destructor in this.destructors {
-            result += destructor->ToString() + '\n' + (' ' * indent * 4);
-        } result += "return";
-
-        if this.expression != null {
-            result += ' ' + this.expression->ToString();
-        } return result;
-    }
-}
-
-class HIRBreakStatement : HIRStatement {
-    HIRBreakStatement(&mut this) : HIRStatement(HIRStatementKind::Break) {}
-
-    pub fn ToString(&this) -> String {
-        return "break".ToString();
-    }
-}
-
-class HIRContinueStatement : HIRStatement {
-    HIRContinueStatement(&mut this) : HIRStatement(HIRStatementKind::Continue) {}
-
-    pub fn ToString(&this) -> String {
-        return "continue".ToString();
-    }
-}
-
 class HIRIfStatement : HIRStatement {
     pub condition: *HIRExpression,
     pub destructors: Vector<*HIRExpression>,
@@ -1717,6 +1766,81 @@ class HIRForStatement : HIRStatement {
 
     pub fn ToString(&this, indent: usize) -> String {
         return "for " + this.iterator->ToString() + ", " + this.condition->ToString() + ", " + this.step->ToString() + ' ' + this.body->ToString(indent);
+    }
+}
+
+class HIRMatchArm {
+    pub pattern: *HIRPattern,
+    pub guard: *HIRExpression,
+    pub body: *HIRBlockStatement;
+
+    HIRMatchArm(&mut this, pattern: *HIRPattern, guard: *HIRExpression, body: *HIRBlockStatement) {
+        (this.pattern, this.guard, this.body) = (pattern, guard, body);
+    }
+
+    pub fn ToString(&this, indent: usize) -> String {
+        let mut result = this.pattern->ToString();
+        if this.guard != null { result += " if " + this.guard->ToString(); }
+        return result + " => " + this.body->ToString(indent);
+    }
+}
+
+class HIRMatchStatement : HIRStatement {
+    pub target: *HIRExpression,
+    pub arms: Vector<*HIRMatchArm>;
+
+    HIRMatchStatement(&mut this, target: *HIRExpression, arms: Vector<*HIRMatchArm>) : HIRStatement(HIRStatementKind::Match) {
+        (this.target, this.arms) = (target, arms);
+    }
+
+    pub fn ToString(&this, indent: usize) -> String {
+        let mut result = "match " + this.target->ToString() + " {\n";
+
+        for i in 0..this.arms.Size() {
+            if i != 0 { result += ",\n"; }
+            let arm: *HIRMatchArm = this.arms[i];
+            result += ' ' * (indent + 1) * 4;
+            result += arm->ToString(indent + 1);
+        }
+
+        return result + '\n' + (' ' * indent * 4) + '}';
+    }
+}
+
+class HIRReturnStatement : HIRStatement {
+    pub expression: *HIRExpression,
+    pub destructors: Vector<*HIRExpression>;
+
+    HIRReturnStatement(&mut this, expression: *HIRExpression, destructors: Vector<*HIRExpression>) : HIRStatement(HIRStatementKind::Return) {
+        (this.expression, this.destructors) = (expression, destructors);
+    }
+
+    pub fn ToString(&this, indent: usize) -> String {
+        let mut result = String();
+
+        for destructor in this.destructors {
+            result += destructor->ToString() + '\n' + (' ' * indent * 4);
+        } result += "return";
+
+        if this.expression != null {
+            result += ' ' + this.expression->ToString();
+        } return result;
+    }
+}
+
+class HIRBreakStatement : HIRStatement {
+    HIRBreakStatement(&mut this) : HIRStatement(HIRStatementKind::Break) {}
+
+    pub fn ToString(&this) -> String {
+        return "break".ToString();
+    }
+}
+
+class HIRContinueStatement : HIRStatement {
+    HIRContinueStatement(&mut this) : HIRStatement(HIRStatementKind::Continue) {}
+
+    pub fn ToString(&this) -> String {
+        return "continue".ToString();
     }
 }
 
@@ -2537,24 +2661,6 @@ class HIRBuilder {
         return statement;
     }
 
-    pub fn BuildReturnStatement(&mut this, value: *HIRExpression, destructors: Vector<*HIRExpression>) -> *mut HIRReturnStatement {
-        let _return = this.context->arena.New<HIRReturnStatement>(value, destructors);
-        this.block->statements.PushBack(_return);
-        return _return;
-    }
-
-    pub fn BuildBreakStatement(&mut this) -> *mut HIRBreakStatement {
-        let _break = this.context->arena.New<HIRBreakStatement>();
-        this.block->statements.PushBack(_break);
-        return _break;
-    }
-
-    pub fn BuildContinueStatement(&mut this) -> *mut HIRContinueStatement {
-        let _continue = this.context->arena.New<HIRContinueStatement>();
-        this.block->statements.PushBack(_continue);
-        return _continue;
-    }
-
     pub fn BuildIfStatement(&mut this, condition: *HIRExpression, destructors: Vector<*HIRExpression>, then_body: *HIRBlockStatement, else_body: *HIRBlockStatement) -> *mut HIRIfStatement {
         let statement = this.context->arena.New<HIRIfStatement>(condition, destructors, then_body, else_body);
         this.block->statements.PushBack(statement);
@@ -2577,6 +2683,34 @@ class HIRBuilder {
         let statement = this.context->arena.New<HIRForStatement>(iterator, condition, step, destructors, body);
         this.block->statements.PushBack(statement);
         return statement;
+    }
+
+    pub fn BuildMatchArm(&mut this, pattern: *HIRPattern, guard: *HIRExpression, body: *HIRBlockStatement) -> *mut HIRMatchArm {
+        return this.context->arena.New<HIRMatchArm>(pattern, guard, body);
+    }
+
+    pub fn BuildMatchStatement(&mut this, target: *HIRExpression, arms: Vector<*HIRMatchArm>) -> *mut HIRMatchStatement {
+        let statement = this.context->arena.New<HIRMatchStatement>(target, arms);
+        this.block->statements.PushBack(statement);
+        return statement;
+    }
+
+    pub fn BuildReturnStatement(&mut this, value: *HIRExpression, destructors: Vector<*HIRExpression>) -> *mut HIRReturnStatement {
+        let _return = this.context->arena.New<HIRReturnStatement>(value, destructors);
+        this.block->statements.PushBack(_return);
+        return _return;
+    }
+
+    pub fn BuildBreakStatement(&mut this) -> *mut HIRBreakStatement {
+        let _break = this.context->arena.New<HIRBreakStatement>();
+        this.block->statements.PushBack(_break);
+        return _break;
+    }
+
+    pub fn BuildContinueStatement(&mut this) -> *mut HIRContinueStatement {
+        let _continue = this.context->arena.New<HIRContinueStatement>();
+        this.block->statements.PushBack(_continue);
+        return _continue;
     }
 
     pub fn BuildParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) -> *mut HIRParameterDeclaration {

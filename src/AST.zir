@@ -858,12 +858,13 @@ class ASTRangeExpression : ASTExpression {
 }
 
 enum ASTStatementKind: u8 {
-    Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue, Block, Unsafe, Assembly
+    Block, Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue, Unsafe, Assembly
 }
 
 extend ASTStatementKind {
     pub fn ToString(this) -> String {
-        if this == ASTStatementKind::Variable { return "Variable".ToString(); }
+        if this == ASTStatementKind::Block { return "Block".ToString(); }
+        else if this == ASTStatementKind::Variable { return "Variable".ToString(); }
         else if this == ASTStatementKind::Expression { return "Expression".ToString(); }
         else if this == ASTStatementKind::If { return "If".ToString(); }
         else if this == ASTStatementKind::While { return "While".ToString(); }
@@ -873,7 +874,6 @@ extend ASTStatementKind {
         else if this == ASTStatementKind::Return { return "Return".ToString(); }
         else if this == ASTStatementKind::Break { return "Break".ToString(); }
         else if this == ASTStatementKind::Continue { return "Continue".ToString(); }
-        else if this == ASTStatementKind::Block { return "Block".ToString(); }
         else if this == ASTStatementKind::Unsafe { return "Unsafe".ToString(); }
         else if this == ASTStatementKind::Assembly { return "Assembly".ToString(); }
         else { return "Unknown".ToString(); }
@@ -886,6 +886,12 @@ class ASTStatement : ASTNode {
     ASTStatement(&mut this, kind: ASTStatementKind, start: Token) : ASTNode(ASTNodeKind::Statement, start) {
         this.kind = kind;
     }
+}
+
+class ASTBlockStatement : ASTStatement {
+    pub statements: Vector<*ASTStatement>;
+
+    ASTBlockStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Block, start) {}
 }
 
 class ASTVariableStatement : ASTStatement {
@@ -977,12 +983,6 @@ class ASTBreakStatement : ASTStatement {
 
 class ASTContinueStatement : ASTStatement {
     ASTContinueStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Continue, start) {}
-}
-
-class ASTBlockStatement : ASTStatement {
-    pub statements: Vector<*ASTStatement>;
-
-    ASTBlockStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Block, start) {}
 }
 
 class ASTUnsafeStatement : ASTStatement {

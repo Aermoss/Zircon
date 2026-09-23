@@ -1109,8 +1109,10 @@ class HIRLowerer {
     fn LowerAssemblyDeclaration(&mut this, assembly: *ASTAssemblyDeclaration) {}
 
     fn LowerStatement(&mut this, statement: *ASTStatement) {
-        if statement->kind == ASTStatementKind::Return {
-            this.LowerReturnStatement(statement as *ASTReturnStatement);
+        if statement->kind == ASTStatementKind::Block {
+            this.LowerBlockStatement(statement as *ASTBlockStatement);
+        } else if statement->kind == ASTStatementKind::Variable {
+            this.LowerVariableStatement(statement as *ASTVariableStatement);
         } else if statement->kind == ASTStatementKind::Expression {
             let expression = (statement as *ASTExpressionStatement)->expression;
 
@@ -1138,20 +1140,20 @@ class HIRLowerer {
             this.LowerIfStatement(statement as *ASTIfStatement);
         } else if statement->kind == ASTStatementKind::While {
             this.LowerWhileStatement(statement as *ASTWhileStatement);
-        } else if statement->kind == ASTStatementKind::For {
-            this.LowerForStatement(statement as *ASTForStatement);
         } else if statement->kind == ASTStatementKind::Loop {
             this.LowerLoopStatement(statement as *ASTLoopStatement);
-        } else if statement->kind == ASTStatementKind::Unsafe {
-            this.LowerUnsafeStatement(statement as *ASTUnsafeStatement);
-        } else if statement->kind == ASTStatementKind::Block {
-            this.LowerBlockStatement(statement as *ASTBlockStatement);
-        } else if statement->kind == ASTStatementKind::Continue {
-            this.LowerContinueStatement(statement as *ASTContinueStatement);
+        } else if statement->kind == ASTStatementKind::For {
+            this.LowerForStatement(statement as *ASTForStatement);
+        } else if statement->kind == ASTStatementKind::Match {
+            this.LowerMatchStatement(statement as *ASTMatchStatement);
+        } else if statement->kind == ASTStatementKind::Return {
+            this.LowerReturnStatement(statement as *ASTReturnStatement);
         } else if statement->kind == ASTStatementKind::Break {
             this.LowerBreakStatement(statement as *ASTBreakStatement);
-        } else if statement->kind == ASTStatementKind::Variable {
-            this.LowerVariableStatement(statement as *ASTVariableStatement);
+        } else if statement->kind == ASTStatementKind::Continue {
+            this.LowerContinueStatement(statement as *ASTContinueStatement);
+        } else if statement->kind == ASTStatementKind::Unsafe {
+            this.LowerUnsafeStatement(statement as *ASTUnsafeStatement);
         } else if statement->kind == ASTStatementKind::Assembly {
             this.LowerAssemblyStatement(statement as *ASTAssemblyStatement);
         } else {
@@ -1159,56 +1161,102 @@ class HIRLowerer {
         }
     }
 
-    fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
-        let mut value: *HIRExpression = null;
+    fn LowerBlockStatement(&mut this, block: *ASTBlockStatement) -> *HIRBlockStatement {
+        let prev_block = this.builder.GetCurrentBlock();
+        let statement = this.builder.BuildBlockStatement();
+        this.builder.SetCurrentBlock(statement);
 
-        if _return->expression != null {
-            let function = this.builder.GetCurrentFunction();
-            let return_type = function->_return;
-            value = this.Coerce(this.LowerExpression(_return->expression), return_type);
-            if value == null { return; }
+        for statement in block->statements {
+            this.LowerStatement(statement);
+        }
 
-            if return_type->IsReference() && return_type->Pointee().IsCompatible(value->_type) {
-                value = this.builder.AddressOf(value);
+        this.BuildDestructors(this.scope_manager.current, null);
+        this.builder.SetCurrentBlock(prev_block);
+        return statement;
+    }
+
+    fn LowerVariableStatement(&mut this, variable: *ASTVariableStatement) {
+        let mut initializer: *HIRExpression = null;
+        let mut _type: *HIRType = null;
+
+        if variable->_type != null {
+            _type = this.LowerType(variable->_type);
+
+            if variable->initializer != null && _type != null {
+                initializer = this.Coerce(this.LowerExpression(variable->initializer), _type);
+
+                if initializer != null {
+                    let same = _type->IsSame(initializer->_type);
+
+                    if _type->IsReference() && _type->Pointee().IsCompatible(initializer->_type) {
+                        initializer = this.builder.AddressOf(initializer);
+                    }
+
+                    if initializer->_type->IsReference() && _type->IsCompatible(initializer->_type->Pointee()) {
+                        initializer = this.builder.Dereference(initializer);
+                    }
+
+                    if !_type->IsCompatible(initializer->_type) {
+                        Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable, LogSeverity::Error);
+                        return;
+                    }
+
+                    if !_type->IsMutabilityCompatible(initializer->_type) {
+                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable, LogSeverity::Error);
+                        return;
+                    }
+
+                    if same && !this.LiteralNeedsExplicitType(variable->initializer, _type) {
+                        Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", variable, LogSeverity::Warning);
+                    }
+
+                    initializer = this.MakeCompatible(initializer, _type);
+                }
             }
+        } else if variable->initializer != null {
+            initializer = this.Coerce(this.LowerExpression(variable->initializer));
+            if initializer != null { _type = initializer->_type; }
+        } else {
+            Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable, LogSeverity::Error);
+        }
 
-            if value->_type->IsReference() && return_type->IsCompatible(value->_type->Pointee()) {
-                value = this.builder.Dereference(value);
-            }
+        if _type != null {
+            let construct = _type->IsClass() && (initializer != null ? initializer->_type->IsClass() && initializer->category == HIRExpressionCategory::Place : true);
+            let statement = this.builder.BuildVariableStatement(variable->name, _type, !construct ? initializer : null, variable->mutable);
+            this.scope_manager.current->Set(variable->name, statement, variable);
+            this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
-            if value->_type->IsClass() && value->category == HIRExpressionCategory::Place {
+            if construct {
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
-                for candidate in (value->_type as *HIRClassType)->declaration->constructors {
+                for candidate in (_type as *HIRClassType)->declaration->constructors {
                     candidates.PushBack(candidate);
                 }
 
                 let mut values = Vector<*HIRExpression>();
-                values.PushBack(this.builder.AddressOf(value));
-                let arguments = Vector<*HIRExpression>(values);
-                values.Insert(0, this.builder.NullLiteral());
-                let function = this.ResolveOverload(candidates, values, _return->expression, false);
-                if function == null { return; }
-                let callee = this.builder.ReferenceDeclaration(function, false);
-                value = this.builder.Constructor(callee, arguments, value->_type);
+                let reciever = this.builder.ReferenceVariable(statement);
+                (reciever as *mut HIRExpression)->mutable = true;
+                values.PushBack(reciever);
+                if initializer != null { values.PushBack(initializer); }
+                let function = this.ResolveOverload(candidates, values, variable, initializer == null);
+
+                if function != null {
+                    let call = this.LowerResolvedCallExpression(function, values, variable);
+
+                    if call != null {
+                        this.builder.BuildExpressionStatement(call);
+                    }
+                }
             }
 
-            if !return_type->IsCompatible(value->_type) {
-                Logger::Log("Incompatible return types. ('" + return_type->ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
-                return;
-            }
-
-            if !return_type->IsMutabilityCompatible(value->_type) {
-                Logger::Log("Cannot assign immutable pointer to mutable pointer.", _return->expression, LogSeverity::Error);
-                return;
-            }
-
-            value = this.MakeCompatible(value, return_type);
+            if _type->IsClass() {
+                this.scope_manager.current->instances.PushBack(this.builder.ReferenceVariable(statement));
+            } this.BuildTemporaryDestructors(initializer);
         }
 
-        let mut destructors = this.GetTemporaryDestructors(value);
-        destructors += this.GetDestructors(null, value);
-        this.builder.BuildReturnStatement(value, destructors);
+        if variable->next != null {
+            this.LowerVariableStatement(variable->next);
+        }
     }
 
     fn LowerIfStatement(&mut this, _if: *ASTIfStatement) {
@@ -1266,6 +1314,15 @@ class HIRLowerer {
         }
 
         this.builder.BuildWhileStatement(condition, destructors, while_body, else_body);
+    }
+
+    fn LowerLoopStatement(&mut this, _loop: *ASTLoopStatement) {
+        this.scope_manager.PushScope("<loop>".ToString(), false);
+        this.loop_scopes.PushBack(this.scope_manager.current);
+        let body = this.LowerBlockStatement(_loop->body);
+        this.loop_scopes.PopBack();
+        this.scope_manager.PopScope();
+        this.builder.BuildLoopStatement(body);
     }
 
     fn LowerForStatement(&mut this, _for: *ASTForStatement) {
@@ -1383,13 +1440,115 @@ class HIRLowerer {
         this.builder.BuildForStatement(iterator, condition, step, destructors, body);
     }
 
-    fn LowerLoopStatement(&mut this, _loop: *ASTLoopStatement) {
-        this.scope_manager.PushScope("<loop>".ToString(), false);
-        this.loop_scopes.PushBack(this.scope_manager.current);
-        let body = this.LowerBlockStatement(_loop->body);
-        this.loop_scopes.PopBack();
-        this.scope_manager.PopScope();
-        this.builder.BuildLoopStatement(body);
+    fn LowerMatchStatement(&mut this, _match: *ASTMatchStatement) {
+        let target = this.ImplicitDereference(this.LowerExpression(_match->target));
+        let mut arms = Vector<*HIRMatchArm>();
+
+        for arm in _match->arms {
+            let pattern = this.LowerPattern(arm->pattern);
+            if pattern == null { return; }
+            let mut guard: *HIRExpression = null;
+
+            if arm->guard != null {
+                guard = this.LowerExpression(arm->guard);
+                if guard == null { return; }
+            }
+
+            let body = this.LowerBlockStatement(arm->body);
+            if body == null { return; }
+            arms.PushBack(this.builder.BuildMatchArm(pattern, guard, body));
+        }
+
+        this.builder.BuildMatchStatement(target, arms);
+    }
+
+    fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
+        let mut value: *HIRExpression = null;
+
+        if _return->expression != null {
+            let function = this.builder.GetCurrentFunction();
+            let return_type = function->_return;
+            value = this.Coerce(this.LowerExpression(_return->expression), return_type);
+            if value == null { return; }
+
+            if return_type->IsReference() && return_type->Pointee().IsCompatible(value->_type) {
+                value = this.builder.AddressOf(value);
+            }
+
+            if value->_type->IsReference() && return_type->IsCompatible(value->_type->Pointee()) {
+                value = this.builder.Dereference(value);
+            }
+
+            if value->_type->IsClass() && value->category == HIRExpressionCategory::Place {
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                for candidate in (value->_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
+                }
+
+                let mut values = Vector<*HIRExpression>();
+                values.PushBack(this.builder.AddressOf(value));
+                let arguments = Vector<*HIRExpression>(values);
+                values.Insert(0, this.builder.NullLiteral());
+                let function = this.ResolveOverload(candidates, values, _return->expression, false);
+                if function == null { return; }
+                let callee = this.builder.ReferenceDeclaration(function, false);
+                value = this.builder.Constructor(callee, arguments, value->_type);
+            }
+
+            if !return_type->IsCompatible(value->_type) {
+                Logger::Log("Incompatible return types. ('" + return_type->ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
+                return;
+            }
+
+            if !return_type->IsMutabilityCompatible(value->_type) {
+                Logger::Log("Cannot assign immutable pointer to mutable pointer.", _return->expression, LogSeverity::Error);
+                return;
+            }
+
+            value = this.MakeCompatible(value, return_type);
+        }
+
+        let mut destructors = this.GetTemporaryDestructors(value);
+        destructors += this.GetDestructors(null, value);
+        this.builder.BuildReturnStatement(value, destructors);
+    }
+
+    fn LowerBreakStatement(&mut this, _break: *ASTBreakStatement) {
+        if this.loop_scopes.Empty() {
+            Logger::Log("Break statement outside of loop.", _break, LogSeverity::Error);
+            return;
+        }
+
+        this.BuildDestructors(this.loop_scopes.Back(), null);
+        this.builder.BuildBreakStatement();
+    }
+
+    fn LowerContinueStatement(&mut this, _continue: *ASTContinueStatement) {
+        if this.loop_scopes.Empty() {
+            Logger::Log("Continue statement outside of loop.", _continue, LogSeverity::Error);
+            return;
+        }
+
+        this.BuildDestructors(this.loop_scopes.Back(), null);
+        this.builder.BuildContinueStatement();
+    }
+
+    fn LowerUnsafeStatement(&mut this, _unsafe: *ASTUnsafeStatement) {
+        if this._unsafe {
+            Logger::Log("Already in an unsafe statement.", _unsafe, LogSeverity::Error);
+            return;
+        }
+
+        this._unsafe = true;
+        this.builder.GetCurrentBlock()->statements.PushBack(this.LowerBlockStatement(_unsafe->body));
+        this._unsafe = false;
+    }
+
+    fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
+        if assembly->outputs.Size() > 1 {
+            Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
+        }
     }
 
     fn GetTemporaryDestructorsSince(&mut this, index: usize, exception: *HIRExpression) -> Vector<*HIRExpression> {
@@ -1464,141 +1623,6 @@ class HIRLowerer {
     fn BuildDestructors(&mut this, target: *mut Scope, exception: *HIRExpression) {
         for destructor in this.GetDestructors(target, exception) {
             this.builder.BuildExpressionStatement(destructor);
-        }
-    }
-
-    fn LowerContinueStatement(&mut this, _continue: *ASTContinueStatement) {
-        if this.loop_scopes.Empty() {
-            Logger::Log("Continue statement outside of loop.", _continue, LogSeverity::Error);
-            return;
-        }
-
-        this.BuildDestructors(this.loop_scopes.Back(), null);
-        this.builder.BuildContinueStatement();
-    }
-
-    fn LowerBreakStatement(&mut this, _break: *ASTBreakStatement) {
-        if this.loop_scopes.Empty() {
-            Logger::Log("Break statement outside of loop.", _break, LogSeverity::Error);
-            return;
-        }
-
-        this.BuildDestructors(this.loop_scopes.Back(), null);
-        this.builder.BuildBreakStatement();
-    }
-
-    fn LowerUnsafeStatement(&mut this, _unsafe: *ASTUnsafeStatement) {
-        if this._unsafe {
-            Logger::Log("Already in an unsafe statement.", _unsafe, LogSeverity::Error);
-            return;
-        }
-
-        this._unsafe = true;
-        this.builder.GetCurrentBlock()->statements.PushBack(this.LowerBlockStatement(_unsafe->body));
-        this._unsafe = false;
-    }
-
-    fn LowerBlockStatement(&mut this, block: *ASTBlockStatement) -> *HIRBlockStatement {
-        let prev_block = this.builder.GetCurrentBlock();
-        let statement = this.builder.BuildBlockStatement();
-        this.builder.SetCurrentBlock(statement);
-
-        for statement in block->statements {
-            this.LowerStatement(statement);
-        }
-
-        this.BuildDestructors(this.scope_manager.current, null);
-        this.builder.SetCurrentBlock(prev_block);
-        return statement;
-    }
-
-    fn LowerVariableStatement(&mut this, variable: *ASTVariableStatement) {
-        let mut initializer: *HIRExpression = null;
-        let mut _type: *HIRType = null;
-
-        if variable->_type != null {
-            _type = this.LowerType(variable->_type);
-
-            if variable->initializer != null && _type != null {
-                initializer = this.Coerce(this.LowerExpression(variable->initializer), _type);
-
-                if initializer != null {
-                    let same = _type->IsSame(initializer->_type);
-
-                    if _type->IsReference() && _type->Pointee().IsCompatible(initializer->_type) {
-                        initializer = this.builder.AddressOf(initializer);
-                    }
-
-                    if initializer->_type->IsReference() && _type->IsCompatible(initializer->_type->Pointee()) {
-                        initializer = this.builder.Dereference(initializer);
-                    }
-
-                    if !_type->IsCompatible(initializer->_type) {
-                        Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable, LogSeverity::Error);
-                        return;
-                    }
-
-                    if !_type->IsMutabilityCompatible(initializer->_type) {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable, LogSeverity::Error);
-                        return;
-                    }
-
-                    if same && !this.LiteralNeedsExplicitType(variable->initializer, _type) {
-                        Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", variable, LogSeverity::Warning);
-                    }
-
-                    initializer = this.MakeCompatible(initializer, _type);
-                }
-            }
-        } else if variable->initializer != null {
-            initializer = this.Coerce(this.LowerExpression(variable->initializer));
-            if initializer != null { _type = initializer->_type; }
-        } else {
-            Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable, LogSeverity::Error);
-        }
-
-        if _type != null {
-            let construct = _type->IsClass() && (initializer != null ? initializer->_type->IsClass() && initializer->category == HIRExpressionCategory::Place : true);
-            let statement = this.builder.BuildVariableStatement(variable->name, _type, !construct ? initializer : null, variable->mutable);
-            this.scope_manager.current->Set(variable->name, statement, variable);
-            this.builder.GetCurrentBlock()->statements.PushBack(statement);
-
-            if construct {
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
-                let mut values = Vector<*HIRExpression>();
-                let reciever = this.builder.ReferenceVariable(statement);
-                (reciever as *mut HIRExpression)->mutable = true;
-                values.PushBack(reciever);
-                if initializer != null { values.PushBack(initializer); }
-                let function = this.ResolveOverload(candidates, values, variable, initializer == null);
-
-                if function != null {
-                    let call = this.LowerResolvedCallExpression(function, values, variable);
-
-                    if call != null {
-                        this.builder.BuildExpressionStatement(call);
-                    }
-                }
-            }
-
-            if _type->IsClass() {
-                this.scope_manager.current->instances.PushBack(this.builder.ReferenceVariable(statement));
-            } this.BuildTemporaryDestructors(initializer);
-        }
-
-        if variable->next != null {
-            this.LowerVariableStatement(variable->next);
-        }
-    }
-
-    fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
-        if assembly->outputs.Size() > 1 {
-            Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
         }
     }
 
