@@ -3097,7 +3097,7 @@ class HIRLowerer {
                     continue;
                 }
 
-                return this.builder.StructurePattern(symbol->declaration as *HIRStructureDeclaration, patterns);
+                return this.builder.StructurePattern((symbol->_type as *HIRStructureType)->declaration, patterns);
             }
 
             let symbols = this.scope_manager.Resolve(structure->path, false);
