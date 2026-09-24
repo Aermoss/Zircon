@@ -1444,24 +1444,47 @@ class HIRLowerer {
 
     fn LowerMatchStatement(&mut this, _match: *ASTMatchStatement) {
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
+        if target == null { return; }
+
+        if !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() {
+            Logger::Log("Cannot match on a value of type '" + target->_type->ToString() + "'.", _match->target, LogSeverity::Error);
+            return;
+        }
+
+        let destructors = this.GetTemporaryDestructors(target);
         let mut arms = Vector<*HIRMatchArm>();
 
         for arm in _match->arms {
-            let pattern = this.LowerPattern(arm->pattern);
-            if pattern == null { return; }
+            this.scope_manager.PushScope("<match>".ToString(), false);
+            let pattern = this.LowerPattern(arm->pattern, target->_type);
+
+            if pattern == null {
+                this.scope_manager.PopScope();
+                return;
+            }
+
             let mut guard: *HIRExpression = null;
 
             if arm->guard != null {
-                guard = this.LowerExpression(arm->guard);
-                if guard == null { return; }
+                guard = this.ImplicitDereference(this.LowerExpression(arm->guard));
+
+                if guard == null {
+                    this.scope_manager.PopScope();
+                    return;
+                }
+
+                if !guard->_type->IsBoolean() {
+                    Logger::Log("Match guard must be a boolean expression.", arm->guard, LogSeverity::Error);
+                }
             }
 
             let body = this.LowerBlockStatement(arm->body);
+            this.scope_manager.PopScope();
             if body == null { return; }
             arms.PushBack(this.builder.BuildMatchArm(pattern, guard, body));
         }
 
-        this.builder.BuildMatchStatement(target, arms);
+        this.builder.BuildMatchStatement(target, destructors, arms);
     }
 
     fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
@@ -3101,49 +3124,43 @@ class HIRLowerer {
         return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
     }
 
-    fn LowerPattern(&mut this, pattern: *ASTPattern) -> *HIRPattern {
+    fn LowerPattern(&mut this, pattern: *ASTPattern, target_type: *HIRType) -> *HIRPattern {
         if pattern->kind == ASTPatternKind::Wildcard {
             return this.builder.WildcardPattern();
         } else if pattern->kind == ASTPatternKind::Rest {
             return this.builder.RestPattern();
         } else if pattern->kind == ASTPatternKind::Literal {
-            let literal = this.LowerExpression((pattern as *ASTLiteralPattern)->literal);
+            let literal = this.Coerce(this.LowerExpression((pattern as *ASTLiteralPattern)->literal), target_type);
             if literal == null { return null; }
             return this.builder.LiteralPattern(literal);
         } else if pattern->kind == ASTPatternKind::Identifier {
             let identifier = pattern as *ASTIdentifierPattern;
-            return this.builder.IdentifierPattern(identifier->name, identifier->mutable);
-        } else if pattern->kind == ASTPatternKind::Tuple {
-            let mut patterns = Vector<*HIRPattern>();
-
-            for pattern in (pattern as *ASTTuplePattern)->patterns {
-                let lowered_pattern = this.LowerPattern(pattern);
-                if lowered_pattern == null { return null; }
-                patterns.PushBack(lowered_pattern);
-            }
-
-            return this.builder.TuplePattern(patterns);
+            let variable = this.builder.BuildVariableStatement(identifier->name, target_type, null, identifier->mutable);
+            this.scope_manager.current->Set(identifier->name, variable, pattern);
+            return this.builder.IdentifierPattern(variable);
         } else if pattern->kind == ASTPatternKind::Field {
             let field = pattern as *ASTFieldPattern;
-            let lowered_pattern = this.LowerPattern(field->pattern);
+            let lowered_pattern = this.LowerPattern(field->pattern, target_type);
             if lowered_pattern == null { return null; }
             return this.builder.FieldPattern(field->name, lowered_pattern);
         } else if pattern->kind == ASTPatternKind::Structure {
             let structure = pattern as *ASTStructurePattern;
             let mut patterns = Vector<*HIRPattern>();
 
-            for pattern in structure->patterns {
-                let lowered_pattern = this.LowerPattern(pattern);
-                if lowered_pattern == null { return null; }
-                patterns.PushBack(lowered_pattern);
-            }
-
             for symbol in this.scope_manager.ResolveType(structure->path, true) {
                 if symbol->kind != SymbolKind::Type || !symbol->_type->IsStructure() {
                     continue;
                 }
 
-                return this.builder.StructurePattern((symbol->_type as *HIRStructureType)->declaration, patterns);
+                let declaration = (symbol->_type as *HIRStructureType)->declaration;
+
+                for i in 0..structure->patterns.Size() {
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], declaration->fields[i]->_type);
+                    if lowered_pattern == null { return null; }
+                    patterns.PushBack(lowered_pattern);
+                }
+
+                return this.builder.StructurePattern(declaration, patterns);
             }
 
             let symbols = this.scope_manager.Resolve(structure->path, false);
@@ -3154,7 +3171,15 @@ class HIRLowerer {
                     continue;
                 }
 
-                return this.builder.VariantPattern(symbol->declaration as *HIRVariantMember, patterns);
+                let member = symbol->declaration as *HIRVariantMember;
+
+                for i in 0..structure->patterns.Size() {
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], member->fields[i]->_type);
+                    if lowered_pattern == null { return null; }
+                    patterns.PushBack(lowered_pattern);
+                }
+
+                return this.builder.VariantPattern(member, patterns);
             }
 
             Logger::Log("Symbol '" + structure->path->ToString() + "' is not a structure.", pattern, LogSeverity::Error);
@@ -3162,12 +3187,6 @@ class HIRLowerer {
         } else if pattern->kind == ASTPatternKind::Variant {
             let variant = pattern as *ASTVariantPattern;
             let mut patterns = Vector<*HIRPattern>();
-
-            for pattern in variant->patterns {
-                let lowered_pattern = this.LowerPattern(pattern);
-                if lowered_pattern == null { return null; }
-                patterns.PushBack(lowered_pattern);
-            }
 
             let symbols = this.scope_manager.Resolve(variant->path, false);
             if symbols.Empty() { return null; }
@@ -3177,7 +3196,15 @@ class HIRLowerer {
                     continue;
                 }
 
-                return this.builder.VariantPattern(symbol->declaration as *HIRVariantMember, patterns);
+                let member = symbol->declaration as *HIRVariantMember;
+
+                for i in 0..variant->patterns.Size() {
+                    let lowered_pattern = this.LowerPattern(variant->patterns[i], member->fields[i]->_type);
+                    if lowered_pattern == null { return null; }
+                    patterns.PushBack(lowered_pattern);
+                }
+
+                return this.builder.VariantPattern(member, patterns);
             }
 
             Logger::Log("Symbol '" + variant->path->ToString() + "' is not a variant member.", pattern, LogSeverity::Error);
@@ -3186,7 +3213,7 @@ class HIRLowerer {
             let mut patterns = Vector<*HIRPattern>();
 
             for pattern in (pattern as *ASTOrPattern)->patterns {
-                let lowered_pattern = this.LowerPattern(pattern);
+                let lowered_pattern = this.LowerPattern(pattern, target_type);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }

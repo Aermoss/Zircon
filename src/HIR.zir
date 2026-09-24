@@ -576,6 +576,8 @@ class HIRType {
             return (this as *HIRStructureType)->ToString();
         } else if this.kind == HIRTypeKind::Enumeration {
             return (this as *HIREnumerationType)->ToString();
+        } else if this.kind == HIRTypeKind::Variant {
+            return (this as *HIRVariantType)->ToString();
         } else {
             return "<invalid type>".ToString();
         }
@@ -822,15 +824,16 @@ class HIRLiteralPattern : HIRPattern {
 }
 
 class HIRIdentifierPattern : HIRPattern {
-    pub name: String,
-    pub mutable: bool;
+    pub variable: *HIRVariableStatement;
 
-    HIRIdentifierPattern(&mut this, name: String, mutable: bool) : HIRPattern(HIRPatternKind::Identifier) {
-        (this.name, this.mutable) = (name, mutable);
+    HIRIdentifierPattern(&mut this, variable: *HIRVariableStatement) : HIRPattern(HIRPatternKind::Identifier) {
+        this.variable = variable;
     }
 
     pub fn ToString(&this) -> String {
-        return this.mutable ? "mut " + this.name : this.name;
+        let mut result = String();
+        if this.variable->mutable { result += "mut "; }
+        return result + this.variable->name;
     }
 }
 
@@ -1789,10 +1792,11 @@ class HIRMatchArm {
 
 class HIRMatchStatement : HIRStatement {
     pub target: *HIRExpression,
+    pub destructors: Vector<*HIRExpression>,
     pub arms: Vector<*HIRMatchArm>;
 
-    HIRMatchStatement(&mut this, target: *HIRExpression, arms: Vector<*HIRMatchArm>) : HIRStatement(HIRStatementKind::Match) {
-        (this.target, this.arms) = (target, arms);
+    HIRMatchStatement(&mut this, target: *HIRExpression, destructors: Vector<*HIRExpression>, arms: Vector<*HIRMatchArm>) : HIRStatement(HIRStatementKind::Match) {
+        (this.target, this.destructors, this.arms) = (target, destructors, arms);
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2411,8 +2415,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRLiteralPattern>(literal);
     }
 
-    pub fn IdentifierPattern(&mut this, name: String, mutable: bool) -> *mut HIRIdentifierPattern {
-        return this.context->arena.New<HIRIdentifierPattern>(name, mutable);
+    pub fn IdentifierPattern(&mut this, variable: *HIRVariableStatement) -> *mut HIRIdentifierPattern {
+        return this.context->arena.New<HIRIdentifierPattern>(variable);
     }
 
     pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>) -> *mut HIRTuplePattern {
@@ -2763,8 +2767,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRMatchArm>(pattern, guard, body);
     }
 
-    pub fn BuildMatchStatement(&mut this, target: *HIRExpression, arms: Vector<*HIRMatchArm>) -> *mut HIRMatchStatement {
-        let statement = this.context->arena.New<HIRMatchStatement>(target, arms);
+    pub fn BuildMatchStatement(&mut this, target: *HIRExpression, destructors: Vector<*HIRExpression>, arms: Vector<*HIRMatchArm>) -> *mut HIRMatchStatement {
+        let statement = this.context->arena.New<HIRMatchStatement>(target, destructors, arms);
         this.block->statements.PushBack(statement);
         return statement;
     }

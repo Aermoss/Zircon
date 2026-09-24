@@ -411,6 +411,8 @@ class MIRLowerer {
             this.LowerLoopStatement(statement as *HIRLoopStatement);
         } else if statement->kind == HIRStatementKind::For {
             this.LowerForStatement(statement as *HIRForStatement);
+        } else if statement->kind == HIRStatementKind::Match {
+            this.LowerMatchStatement(statement as *HIRMatchStatement);
         } else if statement->kind == HIRStatementKind::Return {
             this.LowerReturnStatement(statement as *HIRReturnStatement);
         } else if statement->kind == HIRStatementKind::Break {
@@ -566,6 +568,48 @@ class MIRLowerer {
         for destructor in _for->destructors {
             this.LowerExpression(destructor);
         }
+    }
+
+    fn LowerMatchStatement(&mut this, _match: *HIRMatchStatement) {
+        let target = this.LowerPlaceExpression(_match->target);
+        if target == null { return; }
+
+        for destructor in _match->destructors {
+            this.LowerExpression(destructor);
+        }
+
+        let merge_block = this.builder.BuildBlock("match.merge".ToString());
+
+        for arm in _match->arms {
+            let result = this.LowerPattern(arm->pattern, target);
+            if result == null { return; }
+            let body_block = this.builder.BuildBlock("match.body".ToString());
+            let next_block = this.builder.BuildBlock("match.next".ToString());
+            this.builder.BuildConditionalBranch(result, body_block, next_block);
+            this.builder.SetCurrentBlock(body_block);
+
+            if arm->guard != null {
+                let guard = this.LowerExpression(arm->guard);
+                if guard == null { return; }
+                let guard_block = this.builder.BuildBlock("match.guard".ToString());
+                this.builder.BuildConditionalBranch(guard, guard_block, next_block);
+                this.builder.SetCurrentBlock(guard_block);
+            }
+
+            this.LowerBlockStatement(arm->body);
+
+            if !this.builder.GetCurrentBlock()->HasTerminator() {
+                this.builder.BuildBranch(merge_block);
+            }
+
+            this.builder.SetCurrentBlock(next_block);
+        }
+
+        if !this.builder.GetCurrentBlock()->HasTerminator() {
+            this.builder.BuildBranch(merge_block);
+        }
+
+        this.builder.SetCurrentBlock(merge_block);
     }
 
     fn LowerReturnStatement(&mut this, _return: *HIRReturnStatement) {
@@ -1421,6 +1465,122 @@ class MIRLowerer {
         phi->AddIncoming(then_value, then_block);
         phi->AddIncoming(else_value, else_block);
         return phi;
+    }
+
+    fn LowerPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
+        if pattern->kind == HIRPatternKind::Identifier {
+            return this.LowerIdentifierPattern(pattern as *HIRIdentifierPattern, target);
+        } else if pattern->kind == HIRPatternKind::Literal {
+            return this.LowerLiteralPattern(pattern as *HIRLiteralPattern, target);
+        } else if pattern->kind == HIRPatternKind::Structure {
+            return this.LowerStructurePattern(pattern as *HIRStructurePattern, target);
+        } else if pattern->kind == HIRPatternKind::Variant {
+            return this.LowerVariantPattern(pattern as *HIRVariantPattern, target);
+        } else if pattern->kind == HIRPatternKind::Or {
+            return this.LowerOrPattern(pattern as *HIROrPattern, target);
+        } else if pattern->kind == HIRPatternKind::Field {
+            return this.LowerPattern((pattern as *HIRFieldPattern)->pattern, target);
+        } else {
+            return this.builder.ConstantInteger(1, this.context.IntegerType(1));
+        }
+    }
+
+    fn LowerIdentifierPattern(&mut this, pattern: *HIRIdentifierPattern, target: *MIRValue) -> *MIRValue {
+        let variable = pattern->variable;
+        let _type = this.LowerType(variable->_type);
+        if _type == null { return null; }
+        let alloca = this.builder.BuildAlloca(variable->name, _type);
+        this.builder.BuildStore(this.builder.BuildLoad("pattern.bind".ToString(), target), alloca);
+        this.variables[variable] = alloca;
+        return this.builder.ConstantInteger(1, this.context.IntegerType(1));
+    }
+
+    fn LowerLiteralPattern(&mut this, pattern: *HIRLiteralPattern, target: *MIRValue) -> *MIRValue {
+        let literal = this.LowerExpression(pattern->literal);
+        if literal == null { return null; }
+        let value = this.builder.BuildLoad("pattern.load".ToString(), target);
+        let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
+        return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
+    }
+
+    fn LowerStructurePattern(&mut this, structure: *HIRStructurePattern, target: *MIRValue) -> *MIRValue {
+        let bool_type = this.context.IntegerType(1);
+        let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
+
+        for pattern in structure->patterns {
+            let field = pattern as *HIRFieldPattern;
+            let mut declaration: *HIRFieldDeclaration = null;
+
+            for candidate in structure->declaration->fields {
+                if candidate->name == field->name {
+                    declaration = candidate;
+                    break;
+                }
+            }
+
+            if declaration == null { return null; }
+            let field_type = this.context.PointerType(this.LowerType(declaration->_type));
+            let place = this.builder.BuildStructGEP("pattern.field".ToString(), target, declaration->index as u32, field_type);
+            let result = this.LowerPattern(field->pattern, place);
+            if result == null { return null; }
+            condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
+        } return condition;
+    }
+
+    fn LowerVariantPattern(&mut this, variant: *HIRVariantPattern, target: *MIRValue) -> *MIRValue {
+        let member = variant->member;
+        let tag_type = this.context.IntegerType(8);
+        let bool_type = this.context.IntegerType(1);
+        let mut fields = Vector<*MIRType>();
+        fields.PushBack(tag_type);
+
+        for field in member->fields {
+            fields.PushBack(this.LowerType(field->_type));
+        }
+
+        let member_type = this.context.StructureType(fields);
+        let pointer = this.builder.BuildCast("variant.cast".ToString(), MIRCastKind::Bitcast, target, this.context.PointerType(member_type));
+        let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
+        let (tag, member_tag) = (this.builder.BuildLoad("variant.tag.load".ToString(), tag_pointer), this.builder.ConstantInteger(member->index as u64, tag_type));
+        let mut condition: *MIRValue = this.builder.BuildBinary("pattern.tag.eq".ToString(), MIRBinaryKind::ICmpEq, tag, member_tag, bool_type);
+
+        if member->structure {
+            for pattern in variant->patterns {
+                let field = pattern as *HIRFieldPattern;
+                let mut index: isize = -1;
+
+                for i in 0..member->fields.Size() {
+                    if member->fields[i]->name == field->name {
+                        index = i as isize;
+                        break;
+                    }
+                }
+
+                if index == -1 { return null; }
+                let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (index + 1) as u32, this.context.PointerType(fields[(index + 1) as usize]));
+                let result = this.LowerPattern(field->pattern, field_pointer);
+                if result == null { return null; }
+                condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
+            }
+        } else {
+            for i in 0..variant->patterns.Size() {
+                let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1]));
+                let result = this.LowerPattern(variant->patterns[i], field_pointer);
+                if result == null { return null; }
+                condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
+            }
+        } return condition;
+    }
+
+    fn LowerOrPattern(&mut this, or: *HIROrPattern, target: *MIRValue) -> *MIRValue {
+        let bool_type = this.context.IntegerType(1);
+        let mut condition: *MIRValue = this.builder.ConstantInteger(0, bool_type);
+
+        for pattern in or->patterns {
+            let result = this.LowerPattern(pattern, target);
+            if result == null { return null; }
+            condition = this.builder.BuildBinary("pattern.or".ToString(), MIRBinaryKind::Or, condition, result, bool_type);
+        } return condition;
     }
 
     pub fn LowerType(&mut this, _type: *HIRType) -> *MIRType {

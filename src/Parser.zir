@@ -544,7 +544,7 @@ class Parser {
             return this.arena.New<ASTWildcardPattern>(token);
         }
 
-        if this.Match(TokenType::IDENTIFIER) {
+        if this.Match(TokenType::TWO_DOT) {
             return this.arena.New<ASTRestPattern>(token);
         }
 
