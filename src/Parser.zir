@@ -569,7 +569,7 @@ class Parser {
             return this.arena.New<ASTIdentifierPattern>(identifier.value, true, token);
         }
 
-        if token._type == TokenType::IDENTIFIER && this.Peek(1)._type != TokenType::DOUBLE_COLON && this.Peek(1)._type != TokenType::LPAREN && this.Peek(1)._type != TokenType::LBRACE {
+        if token._type == TokenType::IDENTIFIER && this.Peek(1)._type != TokenType::DOUBLE_COLON && this.Peek(1)._type != TokenType::LPAREN && this.Peek(1)._type != TokenType::LBRACE && this.Peek(1)._type != TokenType::LESS {
             this.Advance();
             return this.arena.New<ASTIdentifierPattern>(token.value, false, token);
         }
@@ -1680,6 +1680,15 @@ class Parser {
 
             if !this.Match(TokenType::COMMA) {
                 break;
+            }
+        }
+
+        if this.Match(TokenType::SEMICOLON) {
+            while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+                let attributes = this.ParseAttributes();
+                let function = this.ParseFunctionDeclaration(attributes, false);
+                if function == null { return null; }
+                variant->methods.PushBack(function);
             }
         }
 

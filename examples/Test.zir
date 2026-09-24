@@ -24,27 +24,27 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let result = Divide(10.0, 3.0);
 
     match result {
-        Result::Ok(value) => WriteLine("10 / 3 = " + String::FromFloat(value)),
-        Result::Err(message) => WriteLine("Error: " + message.ToString())
+        Result<f64, *i8>::Ok(value) => { WriteLine("10 / 3 = " + String::FromFloat(value)); },
+        Result<f64, *i8>::Err(message) => { WriteLine("Error: " + message.ToString()); }
     }
 
     let error = Divide(1.0, 0.0);
 
     match error {
-        Result::Ok(value) => WriteLine("Result: " + String::FromFloat(value)),
-        Result::Err(message) => WriteLine("Error: " + message.ToString() + " (expected)")
+        Result<f64, *i8>::Ok(value) => { WriteLine("Result: " + String::FromFloat(value)); },
+        Result<f64, *i8>::Err(message) => { WriteLine("Error: " + message.ToString() + " (expected)"); }
     }
 
     let found = Find("hello", 'l');
 
     match found {
-        Option::Some(index) => WriteLine("Found at index: " + String::FromInteger(index as u64)),
-        Option::None => WriteLine("Not found")
+        Option<usize>::Some(index) => { WriteLine("Found at index: " + String::FromInteger(index as u64)); },
+        Option<usize>::None => { WriteLine("Not found"); }
     }
 
     let missing = Find("hello", 'z');
 
-    if let Option::Some(index) = missing {
+    if let Option<usize>::Some(index) = missing {
         WriteLine("Found at: " + String::FromInteger(index as u64));
     } else {
         WriteLine("Not found (expected)");

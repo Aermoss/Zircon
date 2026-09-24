@@ -542,6 +542,8 @@ class HIRType {
             return (this as *HIRStructureType)->declaration == (other as *HIRStructureType)->declaration;
         } else if this.IsEnumeration() && other.IsEnumeration() {
             return (this as *HIREnumerationType)->declaration == (other as *HIREnumerationType)->declaration;
+        } else if this.IsVariant() && other.IsVariant() {
+            return (this as *HIRVariantType)->declaration == (other as *HIRVariantType)->declaration;
         } else {
             return false;
         }
