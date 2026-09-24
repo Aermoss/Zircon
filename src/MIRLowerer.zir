@@ -20,13 +20,14 @@ class MIRLowerer {
     context: MIRContext,
     builder: MIRBuilder,
     target_info: TargetInfo,
-    namespaces: Vector<String>,
-    strings: Map<String, *MIRStaticDeclaration>,
+    bindings: Map<*HIRIdentifierPattern, *MIRValue>,
     variables: Map<*HIRVariableStatement, *MIRValue>,
-    declarations: Map<*HIRDeclaration, *mut MIRTypedDeclaration>,
-    types: Map<*HIRType, *mut MIRTypedDeclaration>,
     parameters: Map<*HIRDeclaration, *MIRValue>,
     temporaries: Map<*HIRExpression, *MIRValue>,
+    namespaces: Vector<String>,
+    strings: Map<String, *MIRStaticDeclaration>,
+    declarations: Map<*HIRDeclaration, *mut MIRTypedDeclaration>,
+    types: Map<*HIRType, *mut MIRTypedDeclaration>,
     runtime_functions: Map<String, *MIRFunctionDeclaration>,
     break_blocks: Vector<*mut MIRBlock>,
     continue_blocks: Vector<*mut MIRBlock>,
@@ -219,7 +220,6 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(this.builder.BuildBlock("entry".ToString()));
         let indirect_return = this.IsIndirectAggregate(function->_return);
         this.current_return = function->_return;
-        this.parameters.Clear();
 
         if indirect_return {
             this.indirect_return = this.builder.GetCurrentFunction()->parameters[0];
@@ -253,6 +253,11 @@ class MIRLowerer {
                 this.builder.BuildReturn(null);
             }
         }
+
+        this.temporaries.Clear();
+        this.parameters.Clear();
+        this.variables.Clear();
+        this.bindings.Clear();
     }
 
     fn LowerClassDeclarationFirstPass(&mut this, _class: *HIRClassDeclaration) {
@@ -686,6 +691,8 @@ class MIRLowerer {
     fn LowerPlaceExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
         if this.temporaries.Has(expression) {
             return this.temporaries[expression];
+        } else if expression->kind == HIRExpressionKind::BindingReference {
+            return this.bindings.Get((expression as *HIRBindingReference)->binding, null);
         } else if expression->kind == HIRExpressionKind::VariableReference {
             return this.variables.Get((expression as *HIRVariableReference)->variable, null);
         } else if expression->kind == HIRExpressionKind::DeclarationReference {
@@ -1486,12 +1493,11 @@ class MIRLowerer {
     }
 
     fn LowerIdentifierPattern(&mut this, pattern: *HIRIdentifierPattern, target: *MIRValue) -> *MIRValue {
-        let variable = pattern->variable;
-        let _type = this.LowerType(variable->_type);
+        let _type = this.LowerType(pattern->_type);
         if _type == null { return null; }
-        let alloca = this.builder.BuildAlloca(variable->name, _type);
+        let alloca = this.builder.BuildAlloca(pattern->name, _type);
         this.builder.BuildStore(this.builder.BuildLoad("pattern.bind".ToString(), target), alloca);
-        this.variables[variable] = alloca;
+        this.bindings[pattern] = alloca;
         return this.builder.ConstantInteger(1, this.context.IntegerType(1));
     }
 

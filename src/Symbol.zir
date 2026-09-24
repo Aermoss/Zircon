@@ -17,12 +17,13 @@
 #[include "std/str", "src/HIR.zir", "src/Generic.zir" : *]
 
 enum SymbolKind: i32 {
-    Type, Expression, Statement, Declaration, Generic
+    Type, Pattern, Expression, Statement, Declaration, Generic
 }
 
 class Symbol {
     pub kind: SymbolKind,
     pub _type: *HIRType = null,
+    pub pattern: *HIRPattern = null,
     pub expression: *HIRExpression = null,
     pub statement: *HIRStatement = null,
     pub declaration: *HIRDeclaration = null,
@@ -30,6 +31,10 @@ class Symbol {
 
     Symbol(&mut this, _type: *HIRType) {
         (this.kind, this._type) = (SymbolKind::Type, _type);
+    }
+
+    Symbol(&mut this, pattern: *HIRPattern) {
+        (this.kind, this.pattern) = (SymbolKind::Pattern, pattern);
     }
 
     Symbol(&mut this, expression: *HIRExpression) {

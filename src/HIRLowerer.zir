@@ -1743,7 +1743,9 @@ class HIRLowerer {
             if symbols.Empty() { return null; }
 
             for symbol in symbols {
-                if symbol->kind == SymbolKind::Expression {
+                if symbol->kind == SymbolKind::Pattern {
+                    return this.builder.ReferenceBinding(symbol->pattern as *HIRIdentifierPattern);
+                } else if symbol->kind == SymbolKind::Expression {
                     return symbol->expression;
                 } else if symbol->kind == SymbolKind::Statement {
                     return this.builder.ReferenceVariable(symbol->statement as *HIRVariableStatement);
@@ -2163,12 +2165,16 @@ class HIRLowerer {
                         if symbols.Empty() { return null; }
 
                         for symbol in symbols {
-                            if symbol->kind == SymbolKind::Statement {
+                            if symbol->kind == SymbolKind::Type {
+                                _type = symbol->_type;
+                            } else if symbol->kind == SymbolKind::Pattern {
+                                _type = (symbol->pattern as *HIRIdentifierPattern)->_type;
+                            } else if symbol->kind == SymbolKind::Expression {
+                                _type = symbol->expression->_type;
+                            } else if symbol->kind == SymbolKind::Statement {
                                 _type = (symbol->statement as *HIRVariableStatement)->_type;
                             } else if symbol->kind == SymbolKind::Declaration {
                                 _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
-                            } else {
-                                _type = symbol->_type;
                             }
 
                             if _type != null {
@@ -3135,9 +3141,9 @@ class HIRLowerer {
             return this.builder.LiteralPattern(literal);
         } else if pattern->kind == ASTPatternKind::Identifier {
             let identifier = pattern as *ASTIdentifierPattern;
-            let variable = this.builder.BuildVariableStatement(identifier->name, target_type, null, identifier->mutable);
-            this.scope_manager.current->Set(identifier->name, variable, pattern);
-            return this.builder.IdentifierPattern(variable);
+            let lowered_identifier = this.builder.IdentifierPattern(identifier->name, target_type, identifier->mutable);
+            this.scope_manager.current->Set(identifier->name, lowered_identifier, pattern);
+            return lowered_identifier;
         } else if pattern->kind == ASTPatternKind::Field {
             let field = pattern as *ASTFieldPattern;
             let lowered_pattern = this.LowerPattern(field->pattern, target_type);
