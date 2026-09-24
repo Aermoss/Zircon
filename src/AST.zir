@@ -912,22 +912,35 @@ class ASTExpressionStatement : ASTStatement {
     }
 }
 
+class ASTCondition {
+    pub pattern: *ASTPattern = null,
+    pub expression: *ASTExpression;
+
+    ASTCondition(&mut this, expression: *ASTExpression) {
+        this.expression = expression;
+    }
+
+    ASTCondition(&mut this, pattern: *ASTPattern, expression: *ASTExpression) {
+        (this.pattern, this.expression) = (pattern, expression);
+    }
+}
+
 class ASTIfStatement : ASTStatement {
-    pub condition: *ASTExpression,
+    pub condition: *ASTCondition,
     pub body: *ASTBlockStatement,
     pub _else: *ASTStatement;
 
-    ASTIfStatement(&mut this, condition: *ASTExpression, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::If, start) {
+    ASTIfStatement(&mut this, condition: *ASTCondition, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::If, start) {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 }
 
 class ASTWhileStatement : ASTStatement {
-    pub condition: *ASTExpression,
+    pub condition: *ASTCondition,
     pub body: *ASTBlockStatement,
     pub _else: *ASTBlockStatement;
 
-    ASTWhileStatement(&mut this, condition: *ASTExpression, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::While, start) {
+    ASTWhileStatement(&mut this, condition: *ASTCondition, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::While, start) {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 }

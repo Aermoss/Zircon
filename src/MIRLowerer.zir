@@ -448,8 +448,17 @@ class MIRLowerer {
     }
 
     fn LowerIfStatement(&mut this, _if: *HIRIfStatement) {
-        let condition = this.LowerExpression(_if->condition);
-        if condition == null { return; }
+        let mut condition: *MIRValue = null;
+
+        if _if->condition->pattern != null {
+            let target = this.LowerPlaceExpression(_if->condition->expression);
+            if target == null { return; }
+            condition = this.LowerPattern(_if->condition->pattern, target);
+            if condition == null { return; }
+        } else {
+            condition = this.LowerExpression(_if->condition->expression);
+            if condition == null { return; }
+        }
 
         for destructor in _if->destructors {
             this.LowerExpression(destructor);
@@ -494,8 +503,17 @@ class MIRLowerer {
         this.builder.BuildBranch(condition_block);
 
         this.builder.SetCurrentBlock(condition_block);
-        let condition = this.LowerExpression(_while->condition);
-        if condition == null { return; }
+        let mut condition: *MIRValue = null;
+
+        if _while->condition->pattern != null {
+            let target = this.LowerPlaceExpression(_while->condition->expression);
+            if target == null { return; }
+            condition = this.LowerPattern(_while->condition->pattern, target);
+            if condition == null { return; }
+        } else {
+            condition = this.LowerExpression(_while->condition->expression);
+            if condition == null { return; }
+        }
 
         for destructor in _while->destructors {
             this.LowerExpression(destructor);

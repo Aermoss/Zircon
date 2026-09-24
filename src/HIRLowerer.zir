@@ -1262,15 +1262,28 @@ class HIRLowerer {
     }
 
     fn LowerIfStatement(&mut this, _if: *ASTIfStatement) {
-        let condition = this.ImplicitDereference(this.LowerExpression(_if->condition));
+        let mut condition: *HIRCondition = null;
+        let expression = this.ImplicitDereference(this.LowerExpression(_if->condition->expression));
+        let destructors = this.GetTemporaryDestructors(expression);
+        this.scope_manager.PushScope("<then>".ToString(), false);
 
-        if condition != null && !condition->_type->IsBoolean() {
-            Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", _if->condition, LogSeverity::Error);
+        if _if->condition->pattern != null {
+            let pattern = this.LowerPattern(_if->condition->pattern, expression->_type);
+
+            if pattern == null {
+                this.scope_manager.PopScope();
+                return;
+            }
+
+            condition = this.builder.BuildCondition(pattern, expression);
+        } else {
+            if expression != null && !expression->_type->IsBoolean() {
+                Logger::Log("Invalid condition type '" + expression->_type->ToString() + "'.", _if->condition->expression, LogSeverity::Error);
+            }
+
+            condition = this.builder.BuildCondition(expression);
         }
 
-        let destructors = this.GetTemporaryDestructors(condition);
-
-        this.scope_manager.PushScope("<then>".ToString(), false);
         let (then_body, mut else_body: *HIRBlockStatement) = (this.LowerBlockStatement(_if->body), null);
         this.scope_manager.PopScope();
 
@@ -1295,15 +1308,28 @@ class HIRLowerer {
     }
 
     fn LowerWhileStatement(&mut this, _while: *ASTWhileStatement) {
-        let condition = this.ImplicitDereference(this.LowerExpression(_while->condition));
+        let mut condition: *HIRCondition = null;
+        let expression = this.ImplicitDereference(this.LowerExpression(_while->condition->expression));
+        let destructors = this.GetTemporaryDestructors(expression);
+        this.scope_manager.PushScope("<while>".ToString(), false);
 
-        if condition != null && !condition->_type->IsBoolean() {
-            Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", _while->condition, LogSeverity::Error);
+        if _while->condition->pattern != null {
+            let pattern = this.LowerPattern(_while->condition->pattern, expression->_type);
+
+            if pattern == null {
+                this.scope_manager.PopScope();
+                return;
+            }
+
+            condition = this.builder.BuildCondition(pattern, expression);
+        } else {
+            if expression != null && !expression->_type->IsBoolean() {
+                Logger::Log("Invalid condition type '" + expression->_type->ToString() + "'.", _while->condition->expression, LogSeverity::Error);
+            }
+
+            condition = this.builder.BuildCondition(expression);
         }
 
-        let destructors = this.GetTemporaryDestructors(condition);
-
-        this.scope_manager.PushScope("<while>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
         let (while_body, mut else_body: *HIRBlockStatement) = (this.LowerBlockStatement(_while->body), null);
         this.loop_scopes.PopBack();
