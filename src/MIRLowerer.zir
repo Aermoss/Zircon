@@ -339,16 +339,40 @@ class MIRLowerer {
         if structure->instance != null { types = structure->instance->types; }
         this.namespaces.PushBack(Mangler::MangleName(structure->name, types, this.namespaces));
 
+        if structure->copy_constructor != null {
+            this.LowerFunctionDeclarationFirstPass(structure->copy_constructor);
+        }
+
+        if structure->destructor != null {
+            this.LowerFunctionDeclarationFirstPass(structure->destructor);
+        }
+
         for method in structure->methods {
             this.LowerFunctionDeclarationFirstPass(method);
+        }
+
+        if structure->copy_assign != null {
+            this.LowerFunctionDeclarationFirstPass(structure->copy_assign);
         }
 
         this.namespaces.PopBack();
     }
 
     fn LowerStructureDeclarationFourthPass(&mut this, structure: *HIRStructureDeclaration) {
+        if structure->copy_constructor != null {
+            this.LowerFunctionDeclarationSecondPass(structure->copy_constructor);
+        }
+
+        if structure->destructor != null {
+            this.LowerFunctionDeclarationSecondPass(structure->destructor);
+        }
+
         for method in structure->methods {
             this.LowerFunctionDeclarationSecondPass(method);
+        }
+
+        if structure->copy_assign != null {
+            this.LowerFunctionDeclarationSecondPass(structure->copy_assign);
         }
     }
 
@@ -368,16 +392,40 @@ class MIRLowerer {
         if variant->instance != null { types = variant->instance->types; }
         this.namespaces.PushBack(Mangler::MangleName(variant->name, types, this.namespaces));
 
+        if variant->copy_constructor != null {
+            this.LowerFunctionDeclarationFirstPass(variant->copy_constructor);
+        }
+
+        if variant->destructor != null {
+            this.LowerFunctionDeclarationFirstPass(variant->destructor);
+        }
+
         for method in variant->methods {
             this.LowerFunctionDeclarationFirstPass(method);
+        }
+
+        if variant->copy_assign != null {
+            this.LowerFunctionDeclarationFirstPass(variant->copy_assign);
         }
 
         this.namespaces.PopBack();
     }
 
     fn LowerVariantDeclarationFourthPass(&mut this, variant: *HIRVariantDeclaration) {
+        if variant->copy_constructor != null {
+            this.LowerFunctionDeclarationSecondPass(variant->copy_constructor);
+        }
+
+        if variant->destructor != null {
+            this.LowerFunctionDeclarationSecondPass(variant->destructor);
+        }
+
         for method in variant->methods {
             this.LowerFunctionDeclarationSecondPass(method);
+        }
+
+        if variant->copy_assign != null {
+            this.LowerFunctionDeclarationSecondPass(variant->copy_assign);
         }
     }
 
@@ -723,6 +771,10 @@ class MIRLowerer {
             }
         } else if expression->kind == HIRExpressionKind::FieldAccess {
             return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
+        } else if expression->kind == HIRExpressionKind::MemberAccess {
+            return this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression);
+        } else if expression->kind == HIRExpressionKind::TagAccess {
+            return this.LowerTagAccessExpression(expression as *HIRTagAccessExpression);
         } else if expression->kind == HIRExpressionKind::Unary && (expression as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference {
             return this.LowerUnaryExpression(expression as *HIRUnaryExpression);
         } else {
@@ -863,10 +915,7 @@ class MIRLowerer {
         this.builder.BuildStore(this.builder.ConstantInteger(member->index as u64, tag_type), tag_pointer);
 
         for i in 0..literal->fields.Size() {
-            let value = this.LowerExpression(literal->fields[i]);
-            if value == null { return null; }
-            let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1]));
-            this.builder.BuildStore(value, field_pointer);
+            this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1])));
         } return destination;
     }
 
@@ -1240,6 +1289,30 @@ class MIRLowerer {
         if instance == null { return null; }
         let field_type = this.context.PointerType(this.LowerType(field_access->field->_type));
         return this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type);
+    }
+
+    fn LowerMemberAccessExpression(&mut this, member_access: *HIRMemberAccessExpression) -> *MIRValue {
+        let member = member_access->member;
+        let tag_type = this.context.IntegerType(8);
+        let mut fields = Vector<*MIRType>();
+        fields.PushBack(tag_type);
+
+        for field in member->fields {
+            fields.PushBack(this.LowerType(field->_type));
+        }
+
+        let member_type = this.context.StructureType(fields);
+        let instance = this.LowerPlaceExpression(member_access->instance);
+        if instance == null { return null; }
+        let pointer = this.builder.BuildCast("member.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(member_type));
+        let index = member_access->field->index + 1;
+        return this.builder.BuildStructGEP("member.access".ToString(), pointer, index as u32, this.context.PointerType(fields[index]));
+    }
+
+    fn LowerTagAccessExpression(&mut this, tag_access: *HIRTagAccessExpression) -> *MIRValue {
+        let instance = this.LowerPlaceExpression(tag_access->instance);
+        if instance == null { return null; }
+        return this.builder.BuildCast("tag.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(this.context.IntegerType(8)));
     }
 
     fn LowerUnaryExpression(&mut this, unary: *HIRUnaryExpression) -> *MIRValue {

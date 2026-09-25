@@ -474,7 +474,7 @@ class HIRLowerer {
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
-    pub fn LowerImplicitDeclaration(&mut this, name: String, _type: *HIRType, _return: *HIRType, other: bool, _class: *ASTClassDeclaration) -> *mut HIRFunctionDeclaration {
+    pub fn LowerImplicitDeclaration(&mut this, name: String, _type: *HIRType, _return: *HIRType, other: bool, node: *ASTNode) -> *mut HIRFunctionDeclaration {
         let mut parameter_types = Vector<*HIRType>();
         let mut parameters = Vector<*HIRParameterDeclaration>();
 
@@ -489,7 +489,7 @@ class HIRLowerer {
         }
 
         let function = this.builder.BuildFunctionDeclaration(name, parameters, _return, this.context.FunctionType(parameter_types, _return), false, true, HIRDeclarationABI::Native);
-        this.scope_manager.current->Set(name, function, true, _class);
+        this.scope_manager.current->Set(name, function, true, node);
         return function;
     }
 
@@ -649,21 +649,6 @@ class HIRLowerer {
         this.scope_manager.PopScope();
     }
 
-    pub fn LowerFieldDestructors(&mut this, this_dereferenced: *HIRExpression, fields: &Vector<*HIRFieldDeclaration>) {
-        for field in fields {
-            let this_field = this.builder.FieldAccess(this_dereferenced, field);
-
-            if field->_type->IsClass() {
-                let mut values = Vector<*HIRExpression>();
-                values.PushBack(this_field);
-                let function = (field->_type as *HIRClassType)->declaration->destructor;
-                let call = this.LowerResolvedCallExpression(function, values, null);
-                if call == null { continue; }
-                this.builder.BuildExpressionStatement(call);
-            }
-        }
-    }
-
     pub fn LowerDestructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, fields: &Vector<*HIRFieldDeclaration>) {
         if function->body == null { return; }
         this.builder.SetCurrentFunction(declaration);
@@ -760,18 +745,27 @@ class HIRLowerer {
                 let this_field = this.builder.FieldAccess(this_dereferenced, field);
                 let other_field = this.builder.FieldAccess(other_dereferenced, field);
 
-                if field->_type->IsClass() {
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                    let mut values = Vector<*HIRExpression>();
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    values.PushBack(this.builder.AddressOf(other_field));
+                    let mut function: *HIRFunctionDeclaration = null;
 
-                    for candidate in (field->_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
+                    if field->_type->IsClass() {
+                        let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                        for candidate in (field->_type as *HIRClassType)->declaration->constructors {
+                            candidates.PushBack(candidate);
+                        }
+
+                        function = this.ResolveOverload(candidates, values, _class, false);
+                        if function == null { continue; }
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->copy_constructor;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->copy_constructor;
                     }
 
-                    let mut values = Vector<*HIRExpression>();
-                    values.PushBack(this_field);
-                    values.PushBack(other_field);
-                    let function = this.ResolveOverload(candidates, values, _class, false);
-                    if function == null { continue; }
                     let call = this.LowerResolvedCallExpression(function, values, _class);
                     if call == null { continue; }
                     this.builder.BuildExpressionStatement(call);
@@ -796,7 +790,29 @@ class HIRLowerer {
             let this_parameter: *HIRParameterDeclaration = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
-            this.LowerFieldDestructors(this_dereferenced, fields);
+
+            for field in fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                    let mut function: *HIRFunctionDeclaration = null;
+
+                    if field->_type->IsClass() {
+                        function = (field->_type as *HIRClassType)->declaration->destructor;
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->destructor;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->destructor;
+                    }
+
+                    let mut values = Vector<*HIRExpression>();
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    let call = this.LowerResolvedCallExpression(function, values, null);
+                    if call == null { continue; }
+                    this.builder.BuildExpressionStatement(call);
+                }
+            }
+
             this.scope_manager.PopScope();
         }
 
@@ -839,14 +855,23 @@ class HIRLowerer {
                 let this_field = this.builder.FieldAccess(this_dereferenced, field);
                 let other_field = this.builder.FieldAccess(other_dereferenced, field);
 
-                if field->_type->IsClass() {
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
                     let mut values = Vector<*HIRExpression>();
-                    values.PushBack(this_field);
-                    values.PushBack(other_field);
-                    let candidates = field->_type->GetCandidates("operator=".ToString(), _class, false);
-                    if candidates.Empty() { continue; }
-                    let function = this.ResolveOverload(candidates, values, _class, false);
-                    if function == null { continue; }
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    values.PushBack(this.builder.AddressOf(other_field));
+                    let mut function: *HIRFunctionDeclaration = null;
+
+                    if field->_type->IsClass() {
+                        let candidates = field->_type->GetCandidates("operator=".ToString(), _class, false);
+                        if candidates.Empty() { continue; }
+                        function = this.ResolveOverload(candidates, values, _class, false);
+                        if function == null { continue; }
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->copy_assign;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->copy_assign;
+                    }
+
                     let call = this.LowerResolvedCallExpression(function, values, _class);
                     if call == null { continue; }
                     this.builder.BuildExpressionStatement(call);
@@ -910,6 +935,9 @@ class HIRLowerer {
             }
         }
 
+        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), true, structure);
+        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.VoidType(), false, structure);
+        declaration->copy_assign = this.LowerImplicitDeclaration("operator=".ToString(), declaration->_type, this.context.ReferenceType(declaration->_type, false), true, structure);
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
@@ -922,6 +950,58 @@ class HIRLowerer {
             if method->generic || !method->pack_name.Empty() { continue; }
             this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
             index += 1;
+        }
+
+        if declaration->copy_constructor != null {
+            let function = declaration->copy_constructor;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+            this.scope_manager.PopScope();
+        }
+
+        if declaration->destructor != null {
+            let function = declaration->destructor;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+            this.scope_manager.PopScope();
+        }
+
+        if declaration->copy_assign != null {
+            let function = declaration->copy_assign;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.scope_manager.PopScope();
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -1001,7 +1081,7 @@ class HIRLowerer {
             index += 1;
 
             for field in member->fields {
-                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type)));
+                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type), lowered_member->fields.Size()));
             }
 
             lowered_member->structure = member->structure;
@@ -1024,6 +1104,9 @@ class HIRLowerer {
             }
         }
 
+        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), true, variant);
+        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.VoidType(), false, variant);
+        declaration->copy_assign = this.LowerImplicitDeclaration("operator=".ToString(), declaration->_type, this.context.ReferenceType(declaration->_type, false), true, variant);
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
@@ -1036,6 +1119,187 @@ class HIRLowerer {
             if method->generic || !method->pack_name.Empty() { continue; }
             this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
             index += 1;
+        }
+
+        if declaration->copy_constructor != null {
+            let function = declaration->copy_constructor;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.TagAccess(this_dereferenced), this.builder.TagAccess(other_dereferenced)));
+
+            for member in declaration->members {
+                let this_tag = this.builder.TagAccess(this_dereferenced);
+                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
+                let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                let prev_block = this.builder.GetCurrentBlock();
+                let then_block = this.builder.BuildBlockStatement();
+                this.builder.SetCurrentBlock(then_block);
+
+                for field in member->fields {
+                    let this_field = this.builder.MemberAccess(this_dereferenced, member, field);
+                    let other_field = this.builder.MemberAccess(other_dereferenced, member, field);
+
+                    if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                        let mut values = Vector<*HIRExpression>();
+                        values.PushBack(this.builder.AddressOf(this_field));
+                        values.PushBack(this.builder.AddressOf(other_field));
+                        let mut function: *HIRFunctionDeclaration = null;
+
+                        if field->_type->IsClass() {
+                            let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                            for candidate in (field->_type as *HIRClassType)->declaration->constructors {
+                                candidates.PushBack(candidate);
+                            }
+
+                            function = this.ResolveOverload(candidates, values, variant, false);
+                            if function == null { continue; }
+                        } else if field->_type->IsStructure() {
+                            function = (field->_type as *HIRStructureType)->declaration->copy_constructor;
+                        } else {
+                            function = (field->_type as *HIRVariantType)->declaration->copy_constructor;
+                        }
+
+                        let call = this.LowerResolvedCallExpression(function, values, null);
+                        if call == null { continue; }
+                        this.builder.BuildExpressionStatement(call);
+                    } else {
+                        this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, other_field));
+                    }
+                }
+
+                this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
+                this.builder.SetCurrentBlock(prev_block);
+                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+            }
+
+            this.scope_manager.PopScope();
+        }
+
+        if declaration->destructor != null {
+            let function = declaration->destructor;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            for member in declaration->members {
+                let this_tag = this.builder.TagAccess(this_dereferenced);
+                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
+                let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                let prev_block = this.builder.GetCurrentBlock();
+                let then_block = this.builder.BuildBlockStatement();
+                this.builder.SetCurrentBlock(then_block);
+
+                for field in member->fields {
+                    let this_field = this.builder.MemberAccess(this_dereferenced, member, field);
+
+                    if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                        let mut function: *HIRFunctionDeclaration = null;
+
+                        if field->_type->IsClass() {
+                            function = (field->_type as *HIRClassType)->declaration->destructor;
+                        } else if field->_type->IsStructure() {
+                            function = (field->_type as *HIRStructureType)->declaration->destructor;
+                        } else {
+                            function = (field->_type as *HIRVariantType)->declaration->destructor;
+                        }
+
+                        let mut values = Vector<*HIRExpression>();
+                        values.PushBack(this.builder.AddressOf(this_field));
+                        let call = this.LowerResolvedCallExpression(function, values, null);
+                        if call == null { continue; }
+                        this.builder.BuildExpressionStatement(call);
+                    }
+                }
+
+                this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
+                this.builder.SetCurrentBlock(prev_block);
+                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+            }
+
+            this.scope_manager.PopScope();
+        }
+
+        if declaration->copy_assign != null {
+            let function = declaration->copy_assign;
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.TagAccess(this_dereferenced), this.builder.TagAccess(other_dereferenced)));
+
+            for member in declaration->members {
+                let this_tag = this.builder.TagAccess(this_dereferenced);
+                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
+                let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                let prev_block = this.builder.GetCurrentBlock();
+                let then_block = this.builder.BuildBlockStatement();
+                this.builder.SetCurrentBlock(then_block);
+
+                for field in member->fields {
+                    let this_field = this.builder.MemberAccess(this_dereferenced, member, field);
+                    let other_field = this.builder.MemberAccess(other_dereferenced, member, field);
+
+                    if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                        let mut values = Vector<*HIRExpression>();
+                        values.PushBack(this.builder.AddressOf(this_field));
+                        values.PushBack(this.builder.AddressOf(other_field));
+                        let mut function: *HIRFunctionDeclaration = null;
+
+                        if field->_type->IsClass() {
+                            let candidates = field->_type->GetCandidates("operator=".ToString(), variant, false);
+                            if candidates.Empty() { continue; }
+                            function = this.ResolveOverload(candidates, values, variant, false);
+                            if function == null { continue; }
+                        } else if field->_type->IsStructure() {
+                            function = (field->_type as *HIRStructureType)->declaration->copy_assign;
+                        } else {
+                            function = (field->_type as *HIRVariantType)->declaration->copy_assign;
+                        }
+
+                        let call = this.LowerResolvedCallExpression(function, values, variant);
+                        if call == null { continue; }
+                        this.builder.BuildExpressionStatement(call);
+                    } else {
+                        this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, other_field));
+                    }
+                }
+
+                this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+                this.builder.SetCurrentBlock(prev_block);
+                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+            }
+
+            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.scope_manager.PopScope();
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -1223,24 +1487,33 @@ class HIRLowerer {
         }
 
         if _type != null {
-            let construct = _type->IsClass() && (initializer != null ? initializer->_type->IsClass() && initializer->category == HIRExpressionCategory::Place : true);
-            let statement = this.builder.BuildVariableStatement(variable->name, _type, !construct ? initializer : null, variable->mutable);
+            let has_constructor = _type->IsClass() || _type->IsStructure() || _type->IsVariant();
+            let call_constructor = has_constructor && (initializer != null ? *_type == *initializer->_type && initializer->category == HIRExpressionCategory::Place : _type->IsClass());
+            let statement = this.builder.BuildVariableStatement(variable->name, _type, !call_constructor ? initializer : null, variable->mutable);
             this.scope_manager.current->Set(variable->name, statement, variable);
             this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
-            if construct {
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
+            if call_constructor {
                 let mut values = Vector<*HIRExpression>();
                 let reciever = this.builder.ReferenceVariable(statement);
                 (reciever as *mut HIRExpression)->mutable = true;
                 values.PushBack(reciever);
                 if initializer != null { values.PushBack(initializer); }
-                let function = this.ResolveOverload(candidates, values, variable, initializer == null);
+                let mut function: *HIRFunctionDeclaration = null;
+
+                if _type->IsClass() {
+                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                    for candidate in (_type as *HIRClassType)->declaration->constructors {
+                        candidates.PushBack(candidate);
+                    }
+
+                    function = this.ResolveOverload(candidates, values, variable, initializer == null);
+                } else if _type->IsStructure() {
+                    function = (_type as *HIRStructureType)->declaration->copy_constructor;
+                } else {
+                    function = (_type as *HIRVariantType)->declaration->copy_constructor;
+                }
 
                 if function != null {
                     let call = this.LowerResolvedCallExpression(function, values, variable);
@@ -1251,7 +1524,7 @@ class HIRLowerer {
                 }
             }
 
-            if _type->IsClass() {
+            if has_constructor {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceVariable(statement));
             } this.BuildTemporaryDestructors(initializer);
         }
@@ -1633,7 +1906,16 @@ class HIRLowerer {
             }
 
             if instance == exception { continue; }
-            let function = (instance->_type as *HIRClassType)->declaration->destructor;
+            let mut function: *HIRFunctionDeclaration = null;
+
+            if instance->_type->IsClass() {
+                function = (instance->_type as *HIRClassType)->declaration->destructor;
+            } else if instance->_type->IsStructure() {
+                function = (instance->_type as *HIRStructureType)->declaration->destructor;
+            } else {
+                function = (instance->_type as *HIRVariantType)->declaration->destructor;
+            }
+
             let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
             destructors.Insert(0, destructor);
@@ -1648,7 +1930,16 @@ class HIRLowerer {
 
         for instance in this.temporaries.Reverse() {
             if instance == exception { continue; }
-            let function = (instance->_type as *HIRClassType)->declaration->destructor;
+            let mut function: *HIRFunctionDeclaration = null;
+
+            if instance->_type->IsClass() {
+                function = (instance->_type as *HIRClassType)->declaration->destructor;
+            } else if instance->_type->IsStructure() {
+                function = (instance->_type as *HIRStructureType)->declaration->destructor;
+            } else {
+                function = (instance->_type as *HIRVariantType)->declaration->destructor;
+            }
+
             let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
             destructors.PushBack(destructor);
@@ -1678,7 +1969,16 @@ class HIRLowerer {
                     }
                 }
 
-                let function = (instance->_type as *HIRClassType)->declaration->destructor;
+                let mut function: *HIRFunctionDeclaration = null;
+
+                if instance->_type->IsClass() {
+                    function = (instance->_type as *HIRClassType)->declaration->destructor;
+                } else if instance->_type->IsStructure() {
+                    function = (instance->_type as *HIRStructureType)->declaration->destructor;
+                } else {
+                    function = (instance->_type as *HIRVariantType)->declaration->destructor;
+                }
+
                 let callee = this.builder.ReferenceDeclaration(function, false);
                 let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
                 destructors.PushBack(destructor);
@@ -1793,7 +2093,9 @@ class HIRLowerer {
                             return null;
                         }
 
-                        return this.builder.VariantLiteral(member, Vector<*HIRExpression>());
+                        let literal = this.builder.VariantLiteral(member, Vector<*HIRExpression>());
+                        this.temporaries.PushBack(literal);
+                        return literal;
                     } else if declaration->kind == HIRDeclarationKind::Constant {
                         return (declaration as *HIRConstantDeclaration)->initializer;
                     } else if declaration->kind == HIRDeclarationKind::Static {
@@ -1934,7 +2236,9 @@ class HIRLowerer {
                     values[index as usize] = value;
                 }
 
-                return this.builder.StructureLiteral(values, _type);
+                let literal = this.builder.StructureLiteral(values, _type);
+                this.temporaries.PushBack(literal);
+                return literal;
             }
 
             let symbols = this.scope_manager.Resolve(path, false);
@@ -1981,7 +2285,9 @@ class HIRLowerer {
                     values[index as usize] = value;
                 }
 
-                return this.builder.VariantLiteral(member, values);
+                let literal = this.builder.VariantLiteral(member, values);
+                this.temporaries.PushBack(literal);
+                return literal;
             }
 
             Logger::Log("Symbol '" + path->ToString() + "' is not a structure.", literal, LogSeverity::Error);
@@ -2020,15 +2326,31 @@ class HIRLowerer {
             right = this.Coerce(right, left->_type);
         }
 
-        if left->_type->HasFields() {
+        if left->_type->IsClass() || left->_type->IsStructure() || left->_type->IsVariant() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(left);
             values.PushBack(right);
-            let name = "operator" + assignment->kind.ToString();
-            let candidates = left->_type->GetCandidates(name, assignment, false);
-            if candidates.Empty() { return null; }
-            let function = this.ResolveOverload(candidates, values, assignment, false);
-            if function == null { return null; }
+            let mut function: *HIRFunctionDeclaration = null;
+
+            if left->_type->IsClass() {
+                let name = "operator" + assignment->kind.ToString();
+                let candidates = left->_type->GetCandidates(name, assignment, false);
+                if candidates.Empty() { return null; }
+                function = this.ResolveOverload(candidates, values, assignment, false);
+                if function == null { return null; }
+            } else {
+                if assignment->kind != ASTAssignmentKind::Assign {
+                    Logger::Log("Cannot perform compound assignment on non-class type.", assignment, LogSeverity::Error);
+                    return null;
+                }
+
+                if left->_type->IsStructure() {
+                    function = (left->_type as *HIRStructureType)->declaration->copy_assign;
+                } else {
+                    function = (left->_type as *HIRVariantType)->declaration->copy_assign;
+                }
+            }
+
             return this.LowerResolvedCallExpression(function, values, assignment);
         }
 
@@ -2347,7 +2669,15 @@ class HIRLowerer {
                     return null;
                 }
 
-                return this.builder.VariantLiteral(member, values);
+                for value in values {
+                    if value->_type->IsClass() && value->category == HIRExpressionCategory::Value {
+                        this.temporaries.Remove(value);
+                    }
+                }
+
+                let literal = this.builder.VariantLiteral(member, values);
+                this.temporaries.PushBack(literal);
+                return literal;
             }
 
             let candidates = this.scope_manager.ResolveCandidates(path, values, true);

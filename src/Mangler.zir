@@ -72,6 +72,17 @@ class Mangler {
         } else if _type->IsEnumeration() {
             let declaration = (_type as *HIREnumerationType)->declaration;
             result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+        } else if _type->IsVariant() {
+            let declaration = (_type as *HIRVariantType)->declaration;
+            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+
+            if declaration->instance != null {
+                result += "I";
+
+                for _type in declaration->instance->types {
+                    result += Mangler::MangleType(_type);
+                } result += "E";
+            }
         } else {
             Logger::Log("Mangler", "Unknown type '" + _type->ToString() + "'.", LogSeverity::Error);
         } return result;

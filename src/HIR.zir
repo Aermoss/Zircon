@@ -931,8 +931,8 @@ class HIROrPattern : HIRPattern {
 enum HIRExpressionKind: u8 {
     Literal,
     BindingReference, VariableReference, DeclarationReference,
-    Assignment, Unary, Binary, Ternary,
-    Call, Cast, IndexAccess, FieldAccess,
+    Assignment, Unary, Binary, Ternary, Call, Cast,
+    IndexAccess, FieldAccess, MemberAccess, TagAccess,
     New, Delete, Constructor, Destructor,
     Intrinsic, Deferred
 }
@@ -990,7 +990,7 @@ class HIRExpression {
             return 130;
         } else if this.kind == HIRExpressionKind::Cast {
             return 140;
-        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::FieldAccess {
+        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::FieldAccess || this.kind == HIRExpressionKind::MemberAccess || this.kind == HIRExpressionKind::TagAccess {
             return 150;
         } else {
             return 160;
@@ -1022,6 +1022,10 @@ class HIRExpression {
             return (this as *HIRIndexAccessExpression)->ToString();
         } else if this.kind == HIRExpressionKind::FieldAccess {
             return (this as *HIRFieldAccessExpression)->ToString();
+        } else if this.kind == HIRExpressionKind::MemberAccess {
+            return (this as *HIRMemberAccessExpression)->ToString();
+        } else if this.kind == HIRExpressionKind::TagAccess {
+            return (this as *HIRTagAccessExpression)->ToString();
         } else if this.kind == HIRExpressionKind::New {
             return (this as *HIRNewExpression)->ToString();
         } else if this.kind == HIRExpressionKind::Delete {
@@ -1492,6 +1496,48 @@ class HIRFieldAccessExpression : HIRExpression {
         }
 
         return result + '.' + this.field->name;
+    }
+}
+
+class HIRMemberAccessExpression : HIRExpression {
+    pub instance: *HIRExpression,
+    pub member: *HIRVariantMember,
+    pub field: *HIRVariantField;
+
+    HIRMemberAccessExpression(&mut this, instance: *HIRExpression, member: *HIRVariantMember, field: *HIRVariantField) : HIRExpression(HIRExpressionKind::MemberAccess, field->_type, HIRExpressionCategory::Place, instance->mutable) {
+        (this.instance, this.member, this.field) = (instance, member, field);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+
+        if this.Precedence() > this.instance->Precedence() {
+            result += '(' + this.instance->ToString() + ')';
+        } else {
+            result += this.instance->ToString();
+        }
+
+        return result + '.' + this.member->name;
+    }
+}
+
+class HIRTagAccessExpression : HIRExpression {
+    pub instance: *HIRExpression;
+
+    HIRTagAccessExpression(&mut this, instance: *HIRExpression, _type: *HIRType) : HIRExpression(HIRExpressionKind::TagAccess, _type, HIRExpressionCategory::Place, instance->mutable) {
+        this.instance = instance;
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+
+        if this.Precedence() > this.instance->Precedence() {
+            result += '(' + this.instance->ToString() + ')';
+        } else {
+            result += this.instance->ToString();
+        }
+
+        return result + ".tag";
     }
 }
 
@@ -2130,6 +2176,9 @@ class HIRClassDeclaration : HIRTypedDeclaration {
 class HIRStructureDeclaration : HIRTypedDeclaration {
     pub fields: Vector<*HIRFieldDeclaration>,
     pub methods: Vector<*mut HIRFunctionDeclaration>,
+    pub copy_constructor: *mut HIRFunctionDeclaration = null,
+    pub copy_assign: *mut HIRFunctionDeclaration = null,
+    pub destructor: *mut HIRFunctionDeclaration = null,
     pub instance: *GenericInstance = null;
 
     HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Structure, name, _type) {}
@@ -2146,13 +2195,25 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
                 result += "    " + field->ToString();
             }
 
-            if !this.methods.Empty() {
+            if this.copy_constructor != null || this.destructor != null || !this.methods.Empty() || this.copy_assign != null {
                 result += ';';
             } result += '\n';
+        }
+        
+        if this.copy_constructor != null {
+            result += "\n    " + this.copy_constructor->ToString(1) + '\n';
+        }
+
+        if this.destructor != null {
+            result += "\n    " + this.destructor->ToString(1) + '\n';
         }
 
         for method in this.methods {
             result += "\n    " + method->ToString(1) + '\n';
+        }
+
+        if this.copy_assign != null {
+            result += "\n    " + this.copy_assign->ToString(1) + '\n';
         } return result + '}';
     }
 }
@@ -2195,10 +2256,19 @@ class HIREnumerationDeclaration : HIRTypedDeclaration {
 
 class HIRVariantField {
     pub name: String,
-    pub _type: *HIRType;
+    pub _type: *HIRType,
+    pub index: usize;
 
-    HIRVariantField(&mut this, name: String, _type: *HIRType) {
-        (this.name, this._type) = (name, _type);
+    HIRVariantField(&mut this, name: String, _type: *HIRType, index: usize) {
+        (this.name, this._type, this.index) = (name, _type, index);
+    }
+
+    pub fn ToString(&this) -> String {
+        if !this.name.Empty() {
+            return this.name + ": " + this._type->ToString();
+        } else {
+            return this._type->ToString();
+        }
     }
 }
 
@@ -2212,13 +2282,26 @@ class HIRVariantMember : HIRTypedDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.name;
+        let mut result = '%' + this.name;
+
+        if !this.fields.Empty() {
+            result += this.structure ? " { " : "(";
+
+            for i in 0..this.fields.Size() {
+                if i != 0 { result += ", "; }
+                let field: *HIRVariantField = this.fields[i];
+                result += field->ToString();
+            } result += this.structure ? " }" : ")";
+        } return result;
     }
 }
 
 class HIRVariantDeclaration : HIRTypedDeclaration {
     pub members: Vector<*HIRVariantMember>,
     pub methods: Vector<*mut HIRFunctionDeclaration>,
+    pub copy_constructor: *mut HIRFunctionDeclaration = null,
+    pub copy_assign: *mut HIRFunctionDeclaration = null,
+    pub destructor: *mut HIRFunctionDeclaration = null,
     pub instance: *GenericInstance = null;
 
     HIRVariantDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Variant, name, _type) {}
@@ -2233,7 +2316,27 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
                 if i != 0 { result += ",\n"; }
                 let member: *HIRVariantMember = this.members[i];
                 result += "    " + member->ToString();
+            }
+
+            if this.copy_constructor != null || this.destructor != null || !this.methods.Empty() || this.copy_assign != null {
+                result += ';';
             } result += '\n';
+        }
+        
+        if this.copy_constructor != null {
+            result += "\n    " + this.copy_constructor->ToString(1) + '\n';
+        }
+
+        if this.destructor != null {
+            result += "\n    " + this.destructor->ToString(1) + '\n';
+        }
+
+        for method in this.methods {
+            result += "\n    " + method->ToString(1) + '\n';
+        }
+
+        if this.copy_assign != null {
+            result += "\n    " + this.copy_assign->ToString(1) + '\n';
         } return result + '}';
     }
 }
@@ -2736,6 +2839,14 @@ class HIRBuilder {
         return this.context->arena.New<HIRFieldAccessExpression>(instance, field);
     }
 
+    pub fn MemberAccess(&mut this, instance: *HIRExpression, member: *HIRVariantMember, field: *HIRVariantField) -> *mut HIRMemberAccessExpression {
+        return this.context->arena.New<HIRMemberAccessExpression>(instance, member, field);
+    }
+
+    pub fn TagAccess(&mut this, instance: *HIRExpression) -> *mut HIRTagAccessExpression {
+        return this.context->arena.New<HIRTagAccessExpression>(instance, this.context->IntegerType(8, false));
+    }
+
     pub fn New(&mut this, _type: *HIRType, size: *HIRExpression, initialized: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRNewExpression {
         return this.context->arena.New<HIRNewExpression>(_type, size, initialized, callee, arguments, this.context->PointerType(_type, true));
     }
@@ -2892,8 +3003,8 @@ class HIRBuilder {
         return declaration;
     }
 
-    pub fn BuildVariantField(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantField {
-        return this.context->arena.New<HIRVariantField>(name, _type);
+    pub fn BuildVariantField(&mut this, name: String, _type: *HIRType, index: usize) -> *mut HIRVariantField {
+        return this.context->arena.New<HIRVariantField>(name, _type, index);
     }
 
     pub fn BuildVariantMember(&mut this, name: String, _type: *HIRType, index: usize) -> *mut HIRVariantMember {
