@@ -807,7 +807,7 @@ class HIRLowerer {
 
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.builder.AddressOf(this_field));
-                    let call = this.LowerResolvedCallExpression(function, values, null);
+                    let call = this.LowerResolvedCallExpression(function, values, _class);
                     if call == null { continue; }
                     this.builder.BuildExpressionStatement(call);
                 }
@@ -967,6 +967,40 @@ class HIRLowerer {
             let other_parameter: *HIRParameterDeclaration = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for field in declaration->fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+                let other_field = this.builder.FieldAccess(other_dereferenced, field);
+
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                    let mut values = Vector<*HIRExpression>();
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    values.PushBack(this.builder.AddressOf(other_field));
+                    let mut function: *HIRFunctionDeclaration = null;
+
+                    if field->_type->IsClass() {
+                        let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                        for candidate in (field->_type as *HIRClassType)->declaration->constructors {
+                            candidates.PushBack(candidate);
+                        }
+
+                        function = this.ResolveOverload(candidates, values, structure, false);
+                        if function == null { continue; }
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->copy_constructor;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->copy_constructor;
+                    }
+
+                    let call = this.LowerResolvedCallExpression(function, values, structure);
+                    if call == null { continue; }
+                    this.builder.BuildExpressionStatement(call);
+                } else {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, other_field));
+                }
+            }
+
             this.scope_manager.PopScope();
         }
 
@@ -981,6 +1015,29 @@ class HIRLowerer {
             let this_parameter: *HIRParameterDeclaration = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
+
+            for field in declaration->fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                    let mut function: *HIRFunctionDeclaration = null;
+
+                    if field->_type->IsClass() {
+                        function = (field->_type as *HIRClassType)->declaration->destructor;
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->destructor;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->destructor;
+                    }
+
+                    let mut values = Vector<*HIRExpression>();
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    let call = this.LowerResolvedCallExpression(function, values, structure);
+                    if call == null { continue; }
+                    this.builder.BuildExpressionStatement(call);
+                }
+            }
+
             this.scope_manager.PopScope();
         }
 
@@ -999,6 +1056,35 @@ class HIRLowerer {
             let other_parameter: *HIRParameterDeclaration = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for field in declaration->fields {
+                let this_field = this.builder.FieldAccess(this_dereferenced, field);
+                let other_field = this.builder.FieldAccess(other_dereferenced, field);
+
+                if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+                    let mut values = Vector<*HIRExpression>();
+                    values.PushBack(this.builder.AddressOf(this_field));
+                    values.PushBack(this.builder.AddressOf(other_field));
+                    let mut function: *HIRFunctionDeclaration = null;
+
+                    if field->_type->IsClass() {
+                        let candidates = field->_type->GetCandidates("operator=".ToString(), structure, false);
+                        if candidates.Empty() { continue; }
+                        function = this.ResolveOverload(candidates, values, structure, false);
+                        if function == null { continue; }
+                    } else if field->_type->IsStructure() {
+                        function = (field->_type as *HIRStructureType)->declaration->copy_assign;
+                    } else {
+                        function = (field->_type as *HIRVariantType)->declaration->copy_assign;
+                    }
+
+                    let call = this.LowerResolvedCallExpression(function, values, structure);
+                    if call == null { continue; }
+                    this.builder.BuildExpressionStatement(call);
+                } else {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, other_field));
+                }
+            }
 
             this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
             this.scope_manager.PopScope();
@@ -1172,7 +1258,7 @@ class HIRLowerer {
                             function = (field->_type as *HIRVariantType)->declaration->copy_constructor;
                         }
 
-                        let call = this.LowerResolvedCallExpression(function, values, null);
+                        let call = this.LowerResolvedCallExpression(function, values, variant);
                         if call == null { continue; }
                         this.builder.BuildExpressionStatement(call);
                     } else {
@@ -1224,7 +1310,7 @@ class HIRLowerer {
 
                         let mut values = Vector<*HIRExpression>();
                         values.PushBack(this.builder.AddressOf(this_field));
-                        let call = this.LowerResolvedCallExpression(function, values, null);
+                        let call = this.LowerResolvedCallExpression(function, values, variant);
                         if call == null { continue; }
                         this.builder.BuildExpressionStatement(call);
                     }
