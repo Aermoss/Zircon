@@ -747,9 +747,31 @@ class MIRLowerer {
     fn LowerConstantExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
         if expression->kind == HIRExpressionKind::Literal {
             let literal = expression as *HIRLiteral;
+            let _type = this.LowerType(literal->_type);
+            if _type == null { return null; }
 
             if literal->kind == HIRLiteralKind::String {
-                return this.builder.ConstantString((literal as *HIRStringLiteral)->value, this.LowerType(expression->_type));
+                return this.builder.ConstantString((literal as *HIRStringLiteral)->value, _type);
+            } else if literal->kind == HIRLiteralKind::Array {
+                let mut elements = Vector<*MIRValue>();
+
+                for element in (literal as *HIRArrayLiteral)->elements {
+                    let lowered_element = this.LowerExpression(element);
+                    if lowered_element == null { return null; }
+                    elements.PushBack(lowered_element);
+                }
+
+                return this.builder.ConstantArray(elements, _type);
+            } else if literal->kind == HIRLiteralKind::Structure {
+                let mut fields = Vector<*MIRValue>();
+
+                for field in (literal as *HIRStructureLiteral)->fields {
+                    let lowered_field = this.LowerExpression(field);
+                    if lowered_field == null { return null; }
+                    fields.PushBack(lowered_field);
+                }
+
+                return this.builder.ConstantStruct(fields, _type);
             }
         } return this.LowerExpression(expression);
     }
@@ -786,7 +808,13 @@ class MIRLowerer {
     }
 
     fn LowerExpressionTo(&mut this, expression: *HIRExpression, destination: *MIRValue) {
-        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Variant {
+        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Array {
+            this.LowerArrayLiteral(expression as *HIRArrayLiteral, destination);
+            this.temporaries[expression] = destination;
+        } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Structure {
+            this.LowerStructureLiteral(expression as *HIRStructureLiteral, destination);
+            this.temporaries[expression] = destination;
+        } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Variant {
             this.LowerVariantLiteral(expression as *HIRVariantLiteral, destination);
             this.temporaries[expression] = destination;
         } else if expression->kind == HIRExpressionKind::Call {
@@ -803,7 +831,7 @@ class MIRLowerer {
     }
 
     fn LowerExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
-        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
+        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
             return this.LowerLiteral(expression as *HIRLiteral);
         } else if expression->kind == HIRExpressionKind::Intrinsic {
             return this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression);
@@ -872,26 +900,6 @@ class MIRLowerer {
 
             let reference = this.builder.ReferenceDeclaration(_static);
             return this.builder.BuildCast("string.cast".ToString(), MIRCastKind::Bitcast, reference, _type);
-        } else if literal->kind == HIRLiteralKind::Array {
-            let mut elements = Vector<*MIRValue>();
-
-            for element in (literal as *HIRArrayLiteral)->elements {
-                let lowered_element = this.LowerExpression(element);
-                if lowered_element == null { return null; }
-                elements.PushBack(lowered_element);
-            }
-
-            return this.builder.ConstantArray(elements, _type);
-        } else if literal->kind == HIRLiteralKind::Structure {
-            let mut fields = Vector<*MIRValue>();
-
-            for field in (literal as *HIRStructureLiteral)->fields {
-                let lowered_field = this.LowerExpression(field);
-                if lowered_field == null { return null; }
-                fields.PushBack(lowered_field);
-            }
-
-            return this.builder.ConstantStruct(fields, _type);
         } else if literal->kind == HIRLiteralKind::Null {
             return this.builder.ConstantNull(_type);
         } else {
@@ -899,7 +907,27 @@ class MIRLowerer {
         }
     }
 
-    fn LowerVariantLiteral(&mut this, literal: *HIRVariantLiteral, destination: *MIRValue) -> *MIRValue {
+    fn LowerArrayLiteral(&mut this, literal: *HIRArrayLiteral, destination: *MIRValue) {
+        let _type = this.LowerType(literal->_type) as *MIRArrayType;
+        if _type == null { return; }
+        let base = this.builder.BuildCast("array.decay".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(_type->element));
+        let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+
+        for i in 0..literal->elements.Size() {
+            this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as u64, size_type)));
+        }
+    }
+
+    fn LowerStructureLiteral(&mut this, literal: *HIRStructureLiteral, destination: *MIRValue) {
+        let _type = this.LowerType(literal->_type) as *MIRStructureType;
+        if _type == null { return; }
+
+        for i in 0..literal->fields.Size() {
+            this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("struct.field".ToString(), destination, i as u32, this.context.PointerType(_type->fields[i])));
+        }
+    }
+
+    fn LowerVariantLiteral(&mut this, literal: *HIRVariantLiteral, destination: *MIRValue) {
         let member = literal->member;
         let tag_type = this.context.IntegerType(8);
         let mut fields = Vector<*MIRType>();
@@ -916,7 +944,7 @@ class MIRLowerer {
 
         for i in 0..literal->fields.Size() {
             this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1])));
-        } return destination;
+        }
     }
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
