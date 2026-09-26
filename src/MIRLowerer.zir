@@ -611,6 +611,7 @@ class MIRLowerer {
 
     fn LowerForStatement(&mut this, _for: *HIRForStatement) {
         this.LowerVariableStatement(_for->iterator);
+        this.LowerVariableStatement(_for->target);
 
         let condition_block = this.builder.BuildBlock("for.cond".ToString());
         let body_block = this.builder.BuildBlock("for.body".ToString());

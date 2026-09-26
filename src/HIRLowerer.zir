@@ -1770,9 +1770,11 @@ class HIRLowerer {
             return;
         }
 
+        let target = this.builder.BuildVariableStatement("target".ToString(), iterator_type, end, false);
         let iterator = this.builder.BuildVariableStatement("iterator".ToString(), iterator_type, start, false);
         let (mut alias: *HIRExpression, mut condition: *HIRExpression, mut step: *HIRExpression) = (null, null, null);
         let iterator_reference = this.builder.ReferenceVariable(iterator);
+        let target_reference = this.builder.ReferenceVariable(target);
 
         if is_range {
             let mut one: *HIRExpression = null;
@@ -1784,17 +1786,17 @@ class HIRLowerer {
             }
 
             alias = iterator_reference;
-            condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, end, this.context.BooleanType());
+            condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, target_reference, this.context.BooleanType());
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
         } else if iterator_type->IsPointer() {
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
-            condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, end, this.context.BooleanType());
+            condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, target_reference, this.context.BooleanType());
             alias = this.builder.Dereference(iterator_reference);
         } else {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(iterator_reference);
-            values.PushBack(end);
+            values.PushBack(target_reference);
             let condition_candidates = iterator_type->GetCandidates("operator!=".ToString(), _for, false);
             if condition_candidates.Empty() { return; }
             let condition_call = this.LowerResolvedCallExpression(condition_candidates, values, _for);
@@ -1824,7 +1826,7 @@ class HIRLowerer {
         let body = this.LowerBlockStatement(_for->body);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
-        this.builder.BuildForStatement(iterator, condition, step, destructors, body);
+        this.builder.BuildForStatement(iterator, target, condition, step, destructors, body);
     }
 
     fn LowerMatchStatement(&mut this, _match: *ASTMatchStatement) {
