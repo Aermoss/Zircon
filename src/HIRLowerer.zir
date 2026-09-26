@@ -422,7 +422,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() {
+            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -561,7 +561,13 @@ class HIRLowerer {
         for field in fields {
             let this_field = this.builder.FieldAccess(this_dereferenced, field);
 
-            if field->_type->IsClass() {
+            if field->initializer != null {
+                let initializer = this.Coerce(this.LowerExpression(field->initializer), field->_type);
+
+                if initializer != null {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, initializer));
+                }
+            } else if field->_type->IsClass() {
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (field->_type as *HIRClassType)->declaration->constructors {
@@ -575,12 +581,6 @@ class HIRLowerer {
                 let call = this.LowerResolvedCallExpression(function, values, null);
                 if call == null { continue; }
                 this.builder.BuildExpressionStatement(call);
-            } else if field->initializer != null {
-                let initializer = this.Coerce(this.LowerExpression(field->initializer), field->_type);
-
-                if initializer != null {
-                    this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, initializer));
-                }
             }
         }
     }
@@ -593,7 +593,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() {
+            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -661,7 +661,7 @@ class HIRLowerer {
         for field in fields {
             let this_field = this.builder.FieldAccess(this_dereferenced, field);
 
-            if field->_type->IsClass() {
+            if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
                 this.scope_manager.current->instances.PushBack(this_field);
             }
         }
@@ -669,7 +669,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() {
+            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -2526,8 +2526,7 @@ class HIRLowerer {
 
                     if declaration != null && start <= declaration->parameters.Size() {
                         for i in start..declaration->parameters.Size() {
-                            let parameter: *HIRParameterDeclaration = declaration->parameters[i];
-                            values.PushBack(this.builder.ReferenceDeclaration(parameter, false));
+                            values.PushBack(this.builder.ReferenceDeclaration(declaration->parameters[i], false));
                         } expanded = true;
                     }
                 }
