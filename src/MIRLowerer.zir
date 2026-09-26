@@ -202,12 +202,19 @@ class MIRLowerer {
         if _return == null { return; }
 
         if this.IsIndirectAggregate(function->_return) {
-            parameters.PushBack(this.builder.BuildParameter("sret".ToString(), 0, _return));
-            _return = this.context.VoidType();
+            let lowered_parameter = this.builder.BuildParameter("sret".ToString(), 0, _return);
+            (_return, lowered_parameter->sret) = (this.context.VoidType(), this.LowerType(function->_return));
+            parameters.PushBack(lowered_parameter);
         }
 
         for parameter in function->parameters {
-            parameters.PushBack(this.builder.BuildParameter(parameter->name, parameters.Size() as u32, this.LowerAggregateType(parameter->_type)));
+            let lowered_type = this.LowerAggregateType(parameter->_type);
+            let lowered_parameter = this.builder.BuildParameter(parameter->name, parameters.Size() as u32, lowered_type);
+            parameters.PushBack(lowered_parameter);
+
+            if this.IsAggregate(parameter->_type) && lowered_type->kind == MIRTypeKind::Pointer && function->abi == HIRDeclarationABI::C {
+                lowered_parameter->byval = this.LowerType(parameter->_type);
+            }
         }
 
         this.declarations[function] = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));

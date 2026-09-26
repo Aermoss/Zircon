@@ -864,10 +864,26 @@ class MIRDeclarationReference : MIRValue {
 
 class MIRParameter : MIRValue {
     pub name: String,
+    pub sret: *MIRType = null,
+    pub byval: *MIRType = null,
     pub index: u32;
 
     MIRParameter(&mut this, name: String, index: u32, _type: *MIRType) : MIRValue(MIRValueKind::Parameter, _type) {
         (this.name, this.index) = (name, index);
+    }
+
+    pub fn ToDefinitionString(&this) -> String {
+        let mut result = '%' + this.name + ": ";
+
+        if this.sret != null {
+            result += "@sret(" + this.sret->ToString() + ") ";
+        }
+
+        if this.byval != null {
+            result += "@byval(" + this.byval->ToString() + ") ";
+        }
+
+        return result + this._type->ToString();
     }
 
     pub fn ToString(&this) -> String {
@@ -1032,7 +1048,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
             let parameter: *MIRParameter = this.parameters[i];
-            result += '%' + parameter->name + ": " + parameter->_type->ToString();
+            result += parameter->ToDefinitionString();
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {

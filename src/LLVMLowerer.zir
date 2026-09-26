@@ -172,16 +172,23 @@ class LLVMLowerer {
         let mut parameters = Vector<LLVMTypeRef>();
 
         for parameter in function->parameters {
-            let lowered_parameter_type = this.LowerType(parameter->_type);
-            if lowered_parameter_type == null { return; }
-            parameters.PushBack(lowered_parameter_type);
+            let lowered_parameter = this.LowerType(parameter->_type);
+            if lowered_parameter == null { return; }
+            parameters.PushBack(lowered_parameter);
         }
 
         let _return = this.LowerType(function->_return);
         if _return == null { return; }
         let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0));
-        LLVMSetFunctionCallConv(value, (function->linkage == MIRDeclarationLinkage::Internal ? LLVMCallConv::LLVMFastCallConv : LLVMCallConv::LLVMCCallConv) as u32);
         this.declarations[function] = value;
+
+        for parameter in function->parameters {
+            if parameter->sret != null {
+                LLVMAddAttributeAtIndex(value, (parameter->index + 1) as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(parameter->sret)));
+            } else if parameter->byval != null {
+                LLVMAddAttributeAtIndex(value, (parameter->index + 1) as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("byval", 5), this.LowerType(parameter->byval)));
+            }
+        }
 
         if this.freestanding || true {
             let attribute = LLVMCreateStringAttribute(this.context, "no-stack-arg-probe", 18, "", 0);
