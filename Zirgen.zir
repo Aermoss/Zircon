@@ -779,12 +779,12 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
     if handle == INVALID_HANDLE_VALUE { return; }
 
     loop {
-        let name = String(find_data->cFileName);
+        let name = String(find_data.cFileName);
 
         if name != "." && name != ".." {
             let path = directory + "\\" + name;
 
-            if (find_data->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
+            if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
                 CollectHeaders(path, headers);
             } else if name.Length() >= 2 && SplitExtension(name).right == ".h" {
                 headers.PushBack(path);

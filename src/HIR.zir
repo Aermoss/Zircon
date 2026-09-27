@@ -52,39 +52,31 @@ class HIRType {
     pub fn IsVariant(&this) -> bool { return this.kind == HIRTypeKind::Variant; }
 
     pub fn IsTrivial(&this) -> bool {
-        if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsFunction() {
+        if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() {
             return true;
-        }
-
-        if this.IsArray() {
+        } else if this.IsArray() {
             return (this as *HIRArrayType)->element->IsTrivial();
-        }
-
-        if this.HasFields() {
-            for field in this.Fields() {
+        } else if this.IsFunction() {
+            return true;
+        } else if this.IsStructure() {
+            for field in (this as *HIRStructureType)->declaration->fields {
                 if !field->_type->IsTrivial() {
                     return false;
                 }
-            }
-        }
-
-        if this.HasMethods() {
-            if !this.Methods().Empty() {
-                return false;
-            }
-        }
-
-        if this.IsClass() {
-            let declaration = (this as *HIRClassType)->declaration;
-
-            if declaration->destructor != null || !declaration->constructors.Empty() {
-                return false;
-            }
-        }
-
-        if this.IsClass() || this.IsStructure() || this.IsEnumeration() {
+            } return true;
+        } else if this.IsEnumeration() {
             return true;
-        } return false;
+        } else if this.IsVariant() {
+            for member in (this as *HIRVariantType)->declaration->members {
+                for field in member->fields {
+                    if !field->_type->IsTrivial() {
+                        return false;
+                    }
+                }
+            } return true;
+        } else {
+            return false;
+        }
     }
 
     pub fn FindField(&this, name: &String, path: &mut Vector<u32>, ambiguous: &mut bool) -> *HIRFieldDeclaration {
