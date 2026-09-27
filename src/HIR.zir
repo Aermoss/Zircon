@@ -1098,7 +1098,7 @@ class HIRExpression {
 }
 
 enum HIRLiteralKind: u8 {
-    Boolean, Character, Integer, Float, String, Array, Structure, Variant, Null
+    Boolean, Character, Integer, Float, String, Array, Tuple, Structure, Variant, Null
 }
 
 class HIRLiteral : HIRExpression {
@@ -1121,6 +1121,8 @@ class HIRLiteral : HIRExpression {
             return (this as *HIRStringLiteral)->ToString();
         } else if this.kind == HIRLiteralKind::Array {
             return (this as *HIRArrayLiteral)->ToString();
+        } else if this.kind == HIRLiteralKind::Tuple {
+            return (this as *HIRTupleLiteral)->ToString();
         } else if this.kind == HIRLiteralKind::Structure {
             return (this as *HIRStructureLiteral)->ToString();
         } else if this.kind == HIRLiteralKind::Variant {
@@ -1208,6 +1210,24 @@ class HIRArrayLiteral : HIRLiteral {
             let element: *HIRExpression = this.elements[i];
             result += element->ToString();
         } return result + ']';
+    }
+}
+
+class HIRTupleLiteral : HIRLiteral {
+    pub elements: Vector<*HIRExpression>;
+
+    HIRTupleLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Tuple, _type) {
+        this.elements = elements;
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = '('.ToString();
+
+        for i in 0..this.elements.Size() {
+            if i > 0 { result += ", "; }
+            let element: *HIRExpression = this.elements[i];
+            result += element->ToString();
+        } return result + ')';
     }
 }
 
@@ -2662,6 +2682,10 @@ class HIRBuilder {
 
     pub fn ArrayLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRArrayLiteral {
         return this.context->arena.New<HIRArrayLiteral>(elements, _type);
+    }
+
+    pub fn TupleLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRTupleLiteral {
+        return this.context->arena.New<HIRTupleLiteral>(elements, _type);
     }
 
     pub fn StructureLiteral(&mut this, fields: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRStructureLiteral {

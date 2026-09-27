@@ -325,7 +325,7 @@ class ASTOrPattern : ASTPattern {
 enum ASTExpressionKind: u8 {
     Literal, Path, Unary, Binary, Ternary, Call,
     PackSplat, MemberAccess, IndexAccess, Cast, New, Delete,
-    Assignment, Await, Tuple, Range
+    Assignment, Await, Range
 }
 
 extend ASTExpressionKind {
@@ -344,7 +344,6 @@ extend ASTExpressionKind {
         else if this == ASTExpressionKind::Delete { return "Delete".ToString(); }
         else if this == ASTExpressionKind::Assignment { return "Assignment".ToString(); }
         else if this == ASTExpressionKind::Await { return "Await".ToString(); }
-        else if this == ASTExpressionKind::Tuple { return "Tuple".ToString(); }
         else if this == ASTExpressionKind::Range { return "Range".ToString(); }
         else { return "Unknown".ToString(); }
     }
@@ -386,8 +385,6 @@ class ASTExpression : ASTNode {
             return (this as *ASTAssignmentExpression)->ToString();
         } else if this.kind == ASTExpressionKind::Await {
             return (this as *ASTAwaitExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Tuple {
-            return (this as *ASTTupleExpression)->ToString();
         } else if this.kind == ASTExpressionKind::Range {
             return (this as *ASTRangeExpression)->ToString();
         } else {
@@ -397,7 +394,7 @@ class ASTExpression : ASTNode {
 }
 
 enum ASTLiteralKind: u8 {
-    Boolean, Character, Integer, Float, String, Array, Structure, Null
+    Boolean, Character, Integer, Float, String, Array, Tuple, Structure, Null
 }
 
 extend ASTLiteralKind {
@@ -408,6 +405,7 @@ extend ASTLiteralKind {
         else if this == ASTLiteralKind::Float { return "Float".ToString(); }
         else if this == ASTLiteralKind::String { return "String".ToString(); }
         else if this == ASTLiteralKind::Array { return "Array".ToString(); }
+        else if this == ASTLiteralKind::Tuple { return "Tuple".ToString(); }
         else if this == ASTLiteralKind::Structure { return "Structure".ToString(); }
         else if this == ASTLiteralKind::Null { return "Null".ToString(); }
         else { return "Unknown".ToString(); }
@@ -434,6 +432,8 @@ class ASTLiteral : ASTExpression {
             return (this as *ASTStringLiteral)->ToString();
         } else if this.kind == ASTLiteralKind::Array {
             return (this as *ASTArrayLiteral)->ToString();
+        } else if this.kind == ASTLiteralKind::Tuple {
+            return (this as *ASTTupleExpression)->ToString();
         } else if this.kind == ASTLiteralKind::Structure {
             return (this as *ASTStructureLiteral)->ToString();
         } else if this.kind == ASTLiteralKind::Null {
@@ -519,6 +519,22 @@ class ASTArrayLiteral : ASTLiteral {
             let element: *ASTExpression = this.elements[i];
             result += element->ToString();
         } return result + '}';
+    }
+}
+
+class ASTTupleExpression : ASTLiteral {
+    pub elements: Vector<*ASTExpression>;
+
+    ASTTupleExpression(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Tuple, start) {}
+
+    pub fn ToString(&this) -> String {
+        let mut result = '('.ToString();
+
+        for i in 0..this.elements.Size() {
+            if i != 0 { result += ", "; }
+            let value: *ASTExpression = this.elements[i];
+            result += value->ToString();
+        } return result + ')';
     }
 }
 
@@ -824,22 +840,6 @@ class ASTAwaitExpression : ASTExpression {
 
     pub fn ToString(&this) -> String {
         return "await " + this.expression->ToString();
-    }
-}
-
-class ASTTupleExpression : ASTExpression {
-    pub values: Vector<*ASTExpression>;
-
-    ASTTupleExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Tuple, start) {}
-
-    pub fn ToString(&this) -> String {
-        let mut result = '('.ToString();
-
-        for i in 0..this.values.Size() {
-            if i != 0 { result += ", "; }
-            let value: *ASTExpression = this.values[i];
-            result += value->ToString();
-        } return result + ')';
     }
 }
 

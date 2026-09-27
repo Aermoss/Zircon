@@ -772,6 +772,16 @@ class MIRLowerer {
                 }
 
                 return this.builder.ConstantArray(elements, _type);
+            } else if literal->kind == HIRLiteralKind::Tuple {
+                let mut elements = Vector<*MIRValue>();
+
+                for element in (literal as *HIRTupleLiteral)->elements {
+                    let lowered_element = this.LowerExpression(element);
+                    if lowered_element == null { return null; }
+                    elements.PushBack(lowered_element);
+                }
+
+                return this.builder.ConstantStruct(elements, _type);
             } else if literal->kind == HIRLiteralKind::Structure {
                 let mut fields = Vector<*MIRValue>();
 
@@ -823,6 +833,9 @@ class MIRLowerer {
         if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Array {
             this.LowerArrayLiteral(expression as *HIRArrayLiteral, destination);
             this.temporaries[expression] = destination;
+        } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple {
+            this.LowerTupleLiteral(expression as *HIRTupleLiteral, destination);
+            this.temporaries[expression] = destination;
         } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Structure {
             this.LowerStructureLiteral(expression as *HIRStructureLiteral, destination);
             this.temporaries[expression] = destination;
@@ -851,7 +864,7 @@ class MIRLowerer {
             }
         }
 
-        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
+        if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Tuple && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
             return this.LowerLiteral(expression as *HIRLiteral);
         } else if expression->kind == HIRExpressionKind::Intrinsic {
             return this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression);
@@ -935,6 +948,15 @@ class MIRLowerer {
 
         for i in 0..literal->elements.Size() {
             this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as u64, size_type)));
+        }
+    }
+
+    fn LowerTupleLiteral(&mut this, literal: *HIRTupleLiteral, destination: *MIRValue) {
+        let _type = this.LowerType(literal->_type) as *MIRStructureType;
+        if _type == null { return; }
+
+        for i in 0..literal->elements.Size() {
+            this.LowerExpressionTo(literal->elements[i], this.builder.BuildStructGEP("tuple.element".ToString(), destination, i as u32, this.context.PointerType(_type->fields[i])));
         }
     }
 

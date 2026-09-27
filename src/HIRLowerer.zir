@@ -2184,6 +2184,18 @@ class HIRLowerer {
             }
 
             return this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
+        } else if literal->kind == ASTLiteralKind::Tuple {
+            let mut elements = Vector<*HIRExpression>();
+            let mut types = Vector<*HIRType>(); 
+
+            for element in (literal as *ASTTupleExpression)->elements {
+                let value = this.LowerExpression(element);
+                if value == null { return null; }
+                types.PushBack(value->_type);
+                elements.PushBack(value);
+            }
+
+            return this.builder.TupleLiteral(elements, this.context.TupleType(types));
         } else if literal->kind == ASTLiteralKind::Structure {
             let structure = literal as *ASTStructureLiteral;
 

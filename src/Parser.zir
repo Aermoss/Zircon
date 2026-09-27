@@ -265,17 +265,15 @@ class Parser {
 
             if this.Match(TokenType::COMMA) {
                 let tuple = this.arena.New<ASTTupleExpression>(token);
-                tuple->values.PushBack(expression);
+                tuple->elements.PushBack(expression);
 
-                if !this.Match(TokenType::RPAREN) {
-                    while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
-                        let expression = this.ParseExpression();
-                        if expression == null { return null; }
-                        tuple->values.PushBack(expression);
+                while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
+                    let expression = this.ParseExpression();
+                    if expression == null { return null; }
+                    tuple->elements.PushBack(expression);
 
-                        if !this.Match(TokenType::COMMA) {
-                            break;
-                        }
+                    if !this.Match(TokenType::COMMA) {
+                        break;
                     }
                 } expression = tuple;
             }
