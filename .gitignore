@@ -8,3 +8,4 @@
 *.ll
 
 !bin/zirconc.exe
+!bin/zirgen.exe
