@@ -42,7 +42,7 @@ class HIRType {
     pub fn IsFloat(&this) -> bool { return this.kind == HIRTypeKind::Float; }
     pub fn IsFloatLiteral(&this) -> bool { return this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal; }
     pub fn IsPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer || this.kind == HIRTypeKind::Reference; }
-    pub fn IsNullPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->pointee->kind == HIRTypeKind::Void; }
+    pub fn IsNullPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->_null == true; }
     pub fn IsReference(&this) -> bool { return this.kind == HIRTypeKind::Reference; }
     pub fn IsArray(&this) -> bool { return this.kind == HIRTypeKind::Array; }
     pub fn IsFunction(&this) -> bool { return this.kind == HIRTypeKind::Function; }
@@ -644,7 +644,8 @@ class HIRFloatType : HIRType {
 
 class HIRPointerType : HIRType {
     pub pointee: *HIRType,
-    pub mutable: bool;
+    pub mutable: bool,
+    pub _null: bool = false;
 
     HIRPointerType(&mut this, pointee: *HIRType, mutable: bool) : HIRType(HIRTypeKind::Pointer) {
         (this.pointee, this.mutable) = (pointee, mutable);
@@ -2608,7 +2609,9 @@ class HIRBuilder {
     }
 
     pub fn NullLiteral(&mut this) -> *mut HIRNullLiteral {
-        return this.context->arena.New<HIRNullLiteral>(this.context->PointerType(this.context->VoidType(), false));
+        let _type = this.context->PointerType(this.context->VoidType(), false);
+        _type->_null = true;
+        return this.context->arena.New<HIRNullLiteral>(_type);
     }
 
     pub fn ReferenceBinding(&mut this, pattern: *HIRIdentifierPattern) -> *mut HIRBindingReference {

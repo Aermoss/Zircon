@@ -6,6 +6,12 @@ default: build
 bin/zirconc2.exe: transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
 	bin/zirconc.exe src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
 
+bin/zirconc3.exe: bin/zirconc2.exe transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
+	$< src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
+
+bin/zirconc4.exe: bin/zirconc3.exe transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
+	$< src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
+
 bin/zircraft.exe: bin/zirconc2.exe Zircraft.zir
 	$^ -o $@ -Llib -L"$(VCPKG_PATH)\lib" -lglfw3dll -lstb_image -lucrt -lmsvcrt -lvcruntime -ldwmapi -g -v
 
@@ -13,6 +19,8 @@ bin/zirgen.exe: Zirgen.zir
 	bin/zirconc.exe $^ -o $@ -L"$(LLVM_PATH)\lib" -llibclang -lDbgHelp -g -v
 
 build: bin/zirconc2.exe
+build-twice: bin/zirconc3.exe
+build-thrice: bin/zirconc4.exe
 build-zircraft: bin/zircraft.exe
 build-zirgen: bin/zirgen.exe
 
@@ -39,13 +47,13 @@ restore:
 	git restore bin/zirconc.exe
 
 bin/Test.exe: bin/zirconc2.exe examples/Test.zir
-	$^ -o $@ -g -v
+	$^ -o $@ -g -v -emit-hir -emit-mir -emit-llvm
 
 test: bin/Test.exe
 	$<
 
 bin/Count.exe: bin/zirconc2.exe scripts/Count.zir
-	$^ -o $@ -g -v
+	$^ -o $@ -L"C:\Users\rencb\Downloads\raylib-6.0_win64_msvc16\lib" -lraylibdll -g -v -emit-hir -emit-mir -emit-llvm
 
 count: bin/Count.exe
 	$<

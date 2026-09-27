@@ -602,7 +602,7 @@ extern "C" {
         }
 
         if cursor.kind == CXCursorKind::CXCursor_InclusionDirective {
-            let file: CXFile = clang_getIncludedFile(cursor);
+            let file = clang_getIncludedFile(cursor);
 
             if file != null {
                 let spelling = clang_getFileName(file);
@@ -876,7 +876,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     EnsureDirectory(output_directory);
-    let index: CXIndex = clang_createIndex(0, 1);
+    let index = clang_createIndex(0, 1);
 
     if index == null {
         WriteLine(executable + ": \x1b[31mError:\x1b[0m Failed to create clang index.");
