@@ -1743,6 +1743,16 @@ class MIRLowerer {
             let element = this.LowerType(_type->Element());
             if element == null { return null; }
             return this.context.ArrayType(element, _type->Length());
+        } else if _type->IsTuple() {
+            let mut elements = Vector<*MIRType>();
+
+            for element in (_type as *HIRTupleType)->elements {
+                let lowered_element = this.LowerType(element);
+                if lowered_element == null { return null; }
+                elements.PushBack(lowered_element);
+            }
+
+            return this.context.StructureType(elements);
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let declaration = this.types.Get(_type, null);
             return declaration != null ? declaration->_type : null;

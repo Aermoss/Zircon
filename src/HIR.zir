@@ -18,8 +18,8 @@
     "src/AST.zir", "src/Generic.zir", "src/Logger.zir" : *]
 
 enum HIRTypeKind: u8 {
-    Void, Boolean, Character, Integer, Float, Pointer, Reference, Array,
-    Function, Class, Structure, Enumeration, Variant
+    Void, Boolean, Character, Integer, Float, Pointer, Reference,
+    Array, Tuple, Function, Class, Structure, Enumeration, Variant
 }
 
 class HIRType {
@@ -45,6 +45,7 @@ class HIRType {
     pub fn IsNullPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->_null == true; }
     pub fn IsReference(&this) -> bool { return this.kind == HIRTypeKind::Reference; }
     pub fn IsArray(&this) -> bool { return this.kind == HIRTypeKind::Array; }
+    pub fn IsTuple(&this) -> bool { return this.kind == HIRTypeKind::Tuple; }
     pub fn IsFunction(&this) -> bool { return this.kind == HIRTypeKind::Function; }
     pub fn IsClass(&this) -> bool { return this.kind == HIRTypeKind::Class; }
     pub fn IsStructure(&this) -> bool { return this.kind == HIRTypeKind::Structure; }
@@ -56,6 +57,12 @@ class HIRType {
             return true;
         } else if this.IsArray() {
             return (this as *HIRArrayType)->element->IsTrivial();
+        } else if this.IsTuple() {
+            for element in (this as *HIRTupleType)->elements {
+                if !element->IsTrivial() {
+                    return false;
+                }
+            } return true;
         } else if this.IsFunction() {
             return true;
         } else if this.IsStructure() {
@@ -270,6 +277,13 @@ class HIRType {
             return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
         } else if this.IsArray() {
             return this.Element().Alignment();
+        } else if this.IsTuple() {
+            let mut alignment: usize = 1;
+
+            for element in (this as *HIRTupleType)->elements {
+                let element_alignment = element->Alignment();
+                if element_alignment > alignment { alignment = element_alignment; }
+            } return alignment;
         } else if this.HasFields() {
             let mut alignment: usize = 1;
 
@@ -309,6 +323,21 @@ class HIRType {
             return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
         } else if this.IsArray() {
             return this.Element().Size() * this.Length();
+        } else if this.IsTuple() {
+            let mut size: usize = 0;
+            let mut alignment: usize = 1;
+
+            for element in (this as *HIRTupleType)->elements {
+                let element_alignment = element->Alignment();
+                if element_alignment > alignment { alignment = element_alignment; }
+                let remainder = size % element_alignment;
+                if remainder != 0 { size += element_alignment - remainder; }
+                size += element->Size();
+            }
+
+            let remainder = size % alignment;
+            if remainder != 0 { size += alignment - remainder; }
+            return size;
         } else if this.HasFields() {
             let mut size: usize = 0;
             let mut alignment: usize = 1;
@@ -506,6 +535,17 @@ class HIRType {
         } else if this.IsArray() && other.IsArray() {
             let (left, right) = (this as *HIRArrayType, other as *HIRArrayType);
             return left->element == right->element && left->length == right->length;
+        } else if this.IsTuple() && other.IsTuple() {
+            let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
+
+            for i in 0..left->elements.Size() {
+                let (left_element: *HIRType, right_element: *HIRType) = (left->elements[i], right->elements[i]);
+
+                if left_element != right_element {
+                    if left_element == null || right_element == null { return false; }
+                    if *left_element != *right_element { return false; }
+                }
+            } return true;
         } else if this.IsFunction() && other.IsFunction() {
             let (left, right) = (this as *HIRFunctionType, other as *HIRFunctionType);
 
@@ -562,6 +602,8 @@ class HIRType {
             return (this as *HIRReferenceType)->ToString();
         } else if this.kind == HIRTypeKind::Array {
             return (this as *HIRArrayType)->ToString();
+        } else if this.kind == HIRTypeKind::Tuple {
+            return (this as *HIRTupleType)->ToString();
         } else if this.kind == HIRTypeKind::Function {
             return (this as *HIRFunctionType)->ToString();
         } else if this.kind == HIRTypeKind::Class {
@@ -679,6 +721,24 @@ class HIRArrayType : HIRType {
 
     pub fn ToString(&this) -> String {
         return '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']';
+    }
+}
+
+class HIRTupleType : HIRType {
+    pub elements: Vector<*HIRType>;
+
+    HIRTupleType(&mut this, elements: Vector<*HIRType>) : HIRType(HIRTypeKind::Tuple) {
+        this.elements = elements;
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = '('.ToString();
+
+        for i in 0..this.elements.Size() {
+            if i != 0 { result += ", "; }
+            let element: *HIRType = this.elements[i];
+            result += element->ToString();
+        } return result + ')';
     }
 }
 
@@ -2505,6 +2565,10 @@ class HIRContext {
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
         return this.arena.New<HIRArrayType>(element, length);
+    }
+
+    pub fn TupleType(&mut this, elements: Vector<*HIRType>) -> *mut HIRTupleType {
+        return this.arena.New<HIRTupleType>(elements);
     }
 
     pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) -> *mut HIRFunctionType {

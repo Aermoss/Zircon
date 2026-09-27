@@ -3686,14 +3686,24 @@ class HIRLowerer {
             } else {
                 return this.context.PointerType(element, true);
             }
+        } else if _type->kind == ASTTypeKind::Tuple {
+            let mut elements = Vector<*HIRType>();
+
+            for element in (_type as *ASTTupleType)->elements {
+                let lowered_element = this.LowerType(element);
+                if lowered_element == null { return null; }
+                elements.PushBack(lowered_element);
+            }
+
+            return this.context.TupleType(elements);
         } else if _type->kind == ASTTypeKind::Function {
             let function = _type as *ASTFunctionType;
             let mut parameters = Vector<*HIRType>();
 
             for parameter in function->parameters {
-                let _type = this.LowerType(parameter);
-                if _type == null { return null; }
-                parameters.PushBack(_type);
+                let lowered_parameter = this.LowerType(parameter);
+                if lowered_parameter == null { return null; }
+                parameters.PushBack(lowered_parameter);
             }
 
             let _return = this.LowerType(function->_return);
