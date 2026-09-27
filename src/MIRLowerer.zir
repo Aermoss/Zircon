@@ -246,10 +246,12 @@ class MIRLowerer {
                 let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
                 this.builder.BuildStore(lowered, pointer);
                 this.parameters[parameter] = alloca;
-            } else {
+            } else if parameter->addressable {
                 let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
                 this.builder.BuildStore(lowered, alloca);
                 this.parameters[parameter] = alloca;
+            } else {
+                this.parameters[parameter] = lowered;
             }
         }
 
@@ -796,10 +798,12 @@ class MIRLowerer {
 
             if this.declarations.Has(declaration) {
                 return this.builder.ReferenceDeclaration(this.declarations[declaration]);
-            } else {
+            } else if declaration->kind == HIRDeclarationKind::Parameter && (declaration as *HIRParameterDeclaration)->addressable {
                 return this.parameters.Get(declaration, null);
             }
-        } else if expression->kind == HIRExpressionKind::FieldAccess {
+        }
+
+        if expression->kind == HIRExpressionKind::FieldAccess {
             return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
         } else if expression->kind == HIRExpressionKind::MemberAccess {
             return this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression);
@@ -839,6 +843,14 @@ class MIRLowerer {
     }
 
     fn LowerExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
+        if expression->kind == HIRExpressionKind::DeclarationReference {
+            let declaration = (expression as *HIRDeclarationReference)->declaration;
+
+            if declaration->kind == HIRDeclarationKind::Parameter && !(declaration as *HIRParameterDeclaration)->addressable {
+                return this.parameters.Get(declaration, null);
+            }
+        }
+
         if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant {
             return this.LowerLiteral(expression as *HIRLiteral);
         } else if expression->kind == HIRExpressionKind::Intrinsic {

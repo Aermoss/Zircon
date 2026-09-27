@@ -2055,7 +2055,8 @@ class HIRLinkableDeclaration : HIRTypedDeclaration {
 }
 
 class HIRParameterDeclaration : HIRTypedDeclaration {
-    pub mutable: bool;
+    pub mutable: bool,
+    pub addressable: bool = false;
 
     HIRParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) : HIRTypedDeclaration(HIRDeclarationKind::Parameter, name, _type) {
         this.mutable = mutable;
@@ -2622,7 +2623,18 @@ class HIRBuilder {
         return this.context->arena.New<HIRDeclarationReference>(declaration, mutable);
     }
 
+    fn SetAddressable(&mut this, mut expression: *HIRExpression) {
+        while expression->kind == HIRExpressionKind::FieldAccess {
+            expression = (expression as *HIRFieldAccessExpression)->instance;
+        }
+
+        if expression->kind == HIRExpressionKind::DeclarationReference && (expression as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Parameter {
+            ((expression as *HIRDeclarationReference)->declaration as *mut HIRParameterDeclaration)->addressable = true;
+        }
+    }
+
     pub fn Assignment(&mut this, left: *HIRExpression, right: *HIRExpression) -> *mut HIRAssignmentExpression {
+        this.SetAddressable(left);
         return this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->VoidType());
     }
 
@@ -2631,6 +2643,7 @@ class HIRBuilder {
             return (operand as *HIRUnaryExpression)->operand;
         }
 
+        this.SetAddressable(operand);
         return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, operand->category == HIRExpressionCategory::Place ? operand->mutable : true), HIRExpressionCategory::Value, false);
     }
 
