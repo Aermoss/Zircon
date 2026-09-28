@@ -264,7 +264,7 @@ class Parser {
             if expression == null { return null; }
 
             if this.Match(TokenType::COMMA) {
-                let tuple = this.arena.New<ASTTupleExpression>(token);
+                let tuple = this.arena.New<ASTTupleLiteral>(token);
                 tuple->elements.PushBack(expression);
 
                 while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {

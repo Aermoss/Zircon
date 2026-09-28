@@ -2171,7 +2171,7 @@ class HIRLowerer {
             let mut _type: *HIRType = null;
 
             for element in (literal as *ASTArrayLiteral)->elements {
-                let value = this.LowerExpression(element);
+                let value = this.Coerce(this.LowerExpression(element));
                 if value == null { return null; }
                 elements.PushBack(value);
 
@@ -2186,16 +2186,18 @@ class HIRLowerer {
             return this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
         } else if literal->kind == ASTLiteralKind::Tuple {
             let mut elements = Vector<*HIRExpression>();
-            let mut types = Vector<*HIRType>(); 
+            let mut types = Vector<*HIRType>();
 
-            for element in (literal as *ASTTupleExpression)->elements {
-                let value = this.LowerExpression(element);
+            for element in (literal as *ASTTupleLiteral)->elements {
+                let value = this.Coerce(this.LowerExpression(element));
                 if value == null { return null; }
                 types.PushBack(value->_type);
                 elements.PushBack(value);
             }
 
-            return this.builder.TupleLiteral(elements, this.context.TupleType(types));
+            let literal = this.builder.TupleLiteral(elements, this.context.TupleType(types));
+            this.temporaries.PushBack(literal);
+            return literal;
         } else if literal->kind == ASTLiteralKind::Structure {
             let structure = literal as *ASTStructureLiteral;
 
@@ -3515,6 +3517,30 @@ class HIRLowerer {
             let lowered_identifier = this.builder.IdentifierPattern(identifier->name, target_type, identifier->mutable);
             this.scope_manager.current->Set(identifier->name, lowered_identifier, pattern);
             return lowered_identifier;
+        } else if pattern->kind == ASTPatternKind::Tuple {
+            let tuple = pattern as *ASTTuplePattern;
+
+            if target_type == null || !target_type->IsTuple() {
+                Logger::Log("Cannot destructure non-tuple type '" + (target_type != null ? target_type->ToString() : "<unknown>".ToString()) + "' with a tuple pattern.", pattern, LogSeverity::Error);
+                return null;
+            }
+
+            let tuple_type = target_type as *HIRTupleType;
+
+            if tuple_type->elements.Size() != tuple->patterns.Size() {
+                Logger::Log("Tuple pattern has " + String::FromInteger(tuple->patterns.Size() as u64) + " element(s), but the tuple type has " + String::FromInteger(tuple_type->elements.Size() as u64) + ".", pattern, LogSeverity::Error);
+                return null;
+            }
+
+            let mut patterns = Vector<*HIRPattern>();
+
+            for i in 0..tuple->patterns.Size() {
+                let lowered_pattern = this.LowerPattern(tuple->patterns[i], tuple_type->elements[i]);
+                if lowered_pattern == null { return null; }
+                patterns.PushBack(lowered_pattern);
+            }
+
+            return this.builder.TuplePattern(patterns, tuple_type);
         } else if pattern->kind == ASTPatternKind::Field {
             let field = pattern as *ASTFieldPattern;
             let lowered_pattern = this.LowerPattern(field->pattern, target_type);

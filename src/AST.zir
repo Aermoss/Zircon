@@ -433,7 +433,7 @@ class ASTLiteral : ASTExpression {
         } else if this.kind == ASTLiteralKind::Array {
             return (this as *ASTArrayLiteral)->ToString();
         } else if this.kind == ASTLiteralKind::Tuple {
-            return (this as *ASTTupleExpression)->ToString();
+            return (this as *ASTTupleLiteral)->ToString();
         } else if this.kind == ASTLiteralKind::Structure {
             return (this as *ASTStructureLiteral)->ToString();
         } else if this.kind == ASTLiteralKind::Null {
@@ -522,10 +522,10 @@ class ASTArrayLiteral : ASTLiteral {
     }
 }
 
-class ASTTupleExpression : ASTLiteral {
+class ASTTupleLiteral : ASTLiteral {
     pub elements: Vector<*ASTExpression>;
 
-    ASTTupleExpression(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Tuple, start) {}
+    ASTTupleLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Tuple, start) {}
 
     pub fn ToString(&this) -> String {
         let mut result = '('.ToString();

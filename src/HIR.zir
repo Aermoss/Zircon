@@ -895,10 +895,11 @@ class HIRIdentifierPattern : HIRPattern {
 }
 
 class HIRTuplePattern : HIRPattern {
-    pub patterns: Vector<*HIRPattern>;
+    pub patterns: Vector<*HIRPattern>,
+    pub _type: *HIRTupleType;
 
-    HIRTuplePattern(&mut this, patterns: Vector<*HIRPattern>) : HIRPattern(HIRPatternKind::Tuple) {
-        this.patterns = patterns;
+    HIRTuplePattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRTupleType) : HIRPattern(HIRPatternKind::Tuple) {
+        (this.patterns, this._type) = (patterns, _type);
     }
 
     pub fn ToString(&this) -> String {
@@ -2640,8 +2641,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRIdentifierPattern>(name, _type, mutable);
     }
 
-    pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>) -> *mut HIRTuplePattern {
-        return this.context->arena.New<HIRTuplePattern>(patterns);
+    pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRTupleType) -> *mut HIRTuplePattern {
+        return this.context->arena.New<HIRTuplePattern>(patterns, _type);
     }
 
     pub fn FieldPattern(&mut this, name: String, pattern: *HIRPattern) -> *mut HIRFieldPattern {

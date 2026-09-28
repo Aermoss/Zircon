@@ -1636,10 +1636,12 @@ class MIRLowerer {
     }
 
     fn LowerPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
-        if pattern->kind == HIRPatternKind::Identifier {
-            return this.LowerIdentifierPattern(pattern as *HIRIdentifierPattern, target);
-        } else if pattern->kind == HIRPatternKind::Literal {
+        if pattern->kind == HIRPatternKind::Literal {
             return this.LowerLiteralPattern(pattern as *HIRLiteralPattern, target);
+        } else if pattern->kind == HIRPatternKind::Identifier {
+            return this.LowerIdentifierPattern(pattern as *HIRIdentifierPattern, target);
+        } else if pattern->kind == HIRPatternKind::Tuple {
+            return this.LowerTuplePattern(pattern as *HIRTuplePattern, target);
         } else if pattern->kind == HIRPatternKind::Structure {
             return this.LowerStructurePattern(pattern as *HIRStructurePattern, target);
         } else if pattern->kind == HIRPatternKind::Variant {
@@ -1653,6 +1655,14 @@ class MIRLowerer {
         }
     }
 
+    fn LowerLiteralPattern(&mut this, pattern: *HIRLiteralPattern, target: *MIRValue) -> *MIRValue {
+        let literal = this.LowerExpression(pattern->literal);
+        if literal == null { return null; }
+        let value = this.builder.BuildLoad("pattern.load".ToString(), target);
+        let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
+        return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
+    }
+
     fn LowerIdentifierPattern(&mut this, pattern: *HIRIdentifierPattern, target: *MIRValue) -> *MIRValue {
         let _type = this.LowerType(pattern->_type);
         if _type == null { return null; }
@@ -1662,12 +1672,19 @@ class MIRLowerer {
         return this.builder.ConstantInteger(1, this.context.IntegerType(1));
     }
 
-    fn LowerLiteralPattern(&mut this, pattern: *HIRLiteralPattern, target: *MIRValue) -> *MIRValue {
-        let literal = this.LowerExpression(pattern->literal);
-        if literal == null { return null; }
-        let value = this.builder.BuildLoad("pattern.load".ToString(), target);
-        let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
-        return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
+    fn LowerTuplePattern(&mut this, tuple: *HIRTuplePattern, target: *MIRValue) -> *MIRValue {
+        let bool_type = this.context.IntegerType(1);
+        let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
+
+        for i in 0..tuple->patterns.Size() {
+            let element_type = this.LowerType(tuple->_type->elements[i]);
+            if element_type == null { return null; }
+            let field_type = this.context.PointerType(element_type);
+            let place = this.builder.BuildStructGEP("pattern.tuple".ToString(), target, i as u32, field_type);
+            let result = this.LowerPattern(tuple->patterns[i], place);
+            if result == null { return null; }
+            condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
+        } return condition;
     }
 
     fn LowerStructurePattern(&mut this, structure: *HIRStructurePattern, target: *MIRValue) -> *MIRValue {
