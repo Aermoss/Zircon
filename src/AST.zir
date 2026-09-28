@@ -324,8 +324,8 @@ class ASTOrPattern : ASTPattern {
 
 enum ASTExpressionKind: u8 {
     Literal, Path, Unary, Binary, Ternary, Call,
-    PackSplat, MemberAccess, IndexAccess, Cast, New, Delete,
-    Assignment, Await, Range
+    PackSplat, MemberAccess, TupleAccess, IndexAccess, Cast,
+    New, Delete, Assignment, Await, Range
 }
 
 extend ASTExpressionKind {
@@ -338,6 +338,7 @@ extend ASTExpressionKind {
         else if this == ASTExpressionKind::Call { return "Call".ToString(); }
         else if this == ASTExpressionKind::PackSplat { return "PackSplat".ToString(); }
         else if this == ASTExpressionKind::MemberAccess { return "MemberAccess".ToString(); }
+        else if this == ASTExpressionKind::TupleAccess { return "TupleAccess".ToString(); }
         else if this == ASTExpressionKind::IndexAccess { return "IndexAccess".ToString(); }
         else if this == ASTExpressionKind::Cast { return "Cast".ToString(); }
         else if this == ASTExpressionKind::New { return "New".ToString(); }
@@ -707,6 +708,20 @@ class ASTMemberAccessExpression : ASTExpression {
 
     pub fn ToString(&this) -> String {
         return this.expression->ToString() + (this.arrow ? "->" : ".") + this.member;
+    }
+}
+
+class ASTTupleAccessExpression : ASTExpression {
+    pub expression: *ASTExpression,
+    pub index: usize,
+    pub arrow: bool;
+
+    ASTTupleAccessExpression(&mut this, expression: *ASTExpression, index: usize, arrow: bool, start: Token) : ASTExpression(ASTExpressionKind::TupleAccess, start) {
+        (this.expression, this.index, this.arrow) = (expression, index, arrow);
+    }
+
+    pub fn ToString(&this) -> String {
+        return this.expression->ToString() + (this.arrow ? "->" : ".") + String::FromInteger(this.index as u64);
     }
 }
 

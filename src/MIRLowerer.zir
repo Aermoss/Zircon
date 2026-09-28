@@ -813,7 +813,9 @@ class MIRLowerer {
             }
         }
 
-        if expression->kind == HIRExpressionKind::FieldAccess {
+        if expression->kind == HIRExpressionKind::TupleAccess {
+            return this.LowerTupleAccessExpression(expression as *HIRTupleAccessExpression);
+        } else if expression->kind == HIRExpressionKind::FieldAccess {
             return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
         } else if expression->kind == HIRExpressionKind::MemberAccess {
             return this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression);
@@ -1354,10 +1356,17 @@ class MIRLowerer {
         return this.builder.BuildArrayGEP("index.access".ToString(), value, index);
     }
 
+    fn LowerTupleAccessExpression(&mut this, tuple_access: *HIRTupleAccessExpression) -> *MIRValue {
+        let instance = this.LowerPlaceExpression(tuple_access->instance);
+        if instance == null { return null; }
+        let element_type = this.context.PointerType(this.LowerType(tuple_access->_type));
+        return this.builder.BuildStructGEP("tuple.access".ToString(), instance, tuple_access->index as u32, element_type);
+    }
+
     fn LowerFieldAccessExpression(&mut this, field_access: *HIRFieldAccessExpression) -> *MIRValue {
         let instance = this.LowerPlaceExpression(field_access->instance);
         if instance == null { return null; }
-        let field_type = this.context.PointerType(this.LowerType(field_access->field->_type));
+        let field_type = this.context.PointerType(this.LowerType(field_access->_type));
         return this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type);
     }
 

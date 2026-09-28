@@ -986,7 +986,7 @@ enum HIRExpressionKind: u8 {
     Literal,
     BindingReference, VariableReference, DeclarationReference,
     Assignment, Unary, Binary, Ternary, Call, Cast,
-    IndexAccess, FieldAccess, MemberAccess, TagAccess,
+    IndexAccess, TupleAccess, FieldAccess, MemberAccess, TagAccess,
     New, Delete, Constructor, Destructor,
     Intrinsic, Deferred
 }
@@ -1044,7 +1044,7 @@ class HIRExpression {
             return 130;
         } else if this.kind == HIRExpressionKind::Cast {
             return 140;
-        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::FieldAccess || this.kind == HIRExpressionKind::MemberAccess || this.kind == HIRExpressionKind::TagAccess {
+        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::TupleAccess || this.kind == HIRExpressionKind::FieldAccess || this.kind == HIRExpressionKind::MemberAccess || this.kind == HIRExpressionKind::TagAccess {
             return 150;
         } else {
             return 160;
@@ -1074,6 +1074,8 @@ class HIRExpression {
             return (this as *HIRCastExpression)->ToString();
         } else if this.kind == HIRExpressionKind::IndexAccess {
             return (this as *HIRIndexAccessExpression)->ToString();
+        } else if this.kind == HIRExpressionKind::TupleAccess {
+            return (this as *HIRTupleAccessExpression)->ToString();
         } else if this.kind == HIRExpressionKind::FieldAccess {
             return (this as *HIRFieldAccessExpression)->ToString();
         } else if this.kind == HIRExpressionKind::MemberAccess {
@@ -1549,6 +1551,27 @@ class HIRIndexAccessExpression : HIRExpression {
         }
 
         return result + '[' + this.index->ToString() + ']';
+    }
+}
+
+class HIRTupleAccessExpression : HIRExpression {
+    pub instance: *HIRExpression,
+    pub index: usize;
+
+    HIRTupleAccessExpression(&mut this, instance: *HIRExpression, index: usize, _type: *HIRType) : HIRExpression(HIRExpressionKind::TupleAccess, _type) {
+        (this.instance, this.index) = (instance, index);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+
+        if this.Precedence() > this.instance->Precedence() {
+            result += '(' + this.instance->ToString() + ')';
+        } else {
+            result += this.instance->ToString();
+        }
+
+        return result + '.' + String::FromInteger(this.index as u64);
     }
 }
 
@@ -2931,6 +2954,10 @@ class HIRBuilder {
         } else {
             return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Pointee(), value->_type->IsMutable()));
         }
+    }
+
+    pub fn TupleAccess(&mut this, instance: *HIRExpression, index: usize) -> *mut HIRTupleAccessExpression {
+        return this.context->arena.New<HIRTupleAccessExpression>(instance, index, (instance->_type as *HIRTupleType)->elements[index]);
     }
 
     pub fn FieldAccess(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) -> *mut HIRFieldAccessExpression {

@@ -595,6 +595,14 @@ class HIRLowerer {
                 let other_element = this.builder.Dereference(this.builder.IndexAccess(other_field, index));
                 this.LowerFieldCopyConstructor(this_element, other_element, array->element, node);
             }
+        } else if _type->IsTuple() {
+            let tuple = _type as *HIRTupleType;
+
+            for i in 0..tuple->elements.Size() {
+                let this_element = this.builder.Dereference(this.builder.TupleAccess(this_field, i));
+                let other_element = this.builder.Dereference(this.builder.TupleAccess(other_field, i));
+                this.LowerFieldCopyConstructor(this_element, other_element, tuple->elements[i], node);
+            }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.AddressOf(this_field));
@@ -634,6 +642,14 @@ class HIRLowerer {
                 let other_element = this.builder.Dereference(this.builder.IndexAccess(other_field, index));
                 this.LowerFieldCopyAssignment(this_element, other_element, array->element, node);
             }
+        } else if _type->IsTuple() {
+            let tuple = _type as *HIRTupleType;
+
+            for i in 0..tuple->elements.Size() {
+                let this_element = this.builder.Dereference(this.builder.TupleAccess(this_field, i));
+                let other_element = this.builder.Dereference(this.builder.TupleAccess(other_field, i));
+                this.LowerFieldCopyAssignment(this_element, other_element, tuple->elements[i], node);
+            }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.AddressOf(this_field));
@@ -667,6 +683,12 @@ class HIRLowerer {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
                 let this_element = this.builder.Dereference(this.builder.IndexAccess(this_field, index));
                 this.LowerFieldDestructor(this_element, array->element, node);
+            }
+        } else if _type->IsTuple() {
+            let tuple = _type as *HIRTupleType;
+
+            for i in 0..tuple->elements.Size() {
+                this.LowerFieldDestructor(this.builder.Dereference(this.builder.TupleAccess(this_field, i)), tuple->elements[i], node);
             }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let mut function: *HIRFunctionDeclaration = null;
@@ -2106,6 +2128,8 @@ class HIRLowerer {
             return this.LowerCastExpression(expression as *ASTCastExpression);
         } else if expression->kind == ASTExpressionKind::IndexAccess {
             return this.LowerIndexAccessExpression(expression as *ASTIndexAccessExpression);
+        } else if expression->kind == ASTExpressionKind::TupleAccess {
+            return this.LowerTupleAccessExpression(expression as *ASTTupleAccessExpression);
         } else if expression->kind == ASTExpressionKind::MemberAccess {
             return this.LowerMemberAccessExpression(expression as *ASTMemberAccessExpression);
         } else if expression->kind == ASTExpressionKind::Unary {
@@ -3073,16 +3097,10 @@ class HIRLowerer {
 
     fn LowerIndexAccessExpression(&mut this, index_access: *ASTIndexAccessExpression) -> *HIRExpression {
         let value = this.ImplicitDereference(this.LowerExpression(index_access->expression));
-
-        if value == null {
-            return null;
-        }
+        if value == null { return null; }
 
         let index = this.Coerce(this.ImplicitDereference(this.LowerExpression(index_access->index)), this.context.IntegerPointerType(false));
-
-        if index == null {
-            return null;
-        }
+        if index == null { return null; }
 
         if value->_type->HasMethods() {
             let mut values = Vector<*HIRExpression>();
@@ -3106,12 +3124,35 @@ class HIRLowerer {
         return this.builder.IndexAccess(value, index);
     }
 
-    fn LowerMemberAccessExpression(&mut this, member_access: *ASTMemberAccessExpression) -> *HIRExpression {
-        let mut instance = this.ImplicitDereference(this.LowerExpression(member_access->expression));
+    fn LowerTupleAccessExpression(&mut this, tuple_access: *ASTTupleAccessExpression) -> *HIRExpression {
+        let mut instance = this.ImplicitDereference(this.LowerExpression(tuple_access->expression));
+        if instance == null { return null; }
 
-        if instance == null {
+        if tuple_access->arrow {
+            if instance->_type->IsPointer() {
+                instance = this.builder.Dereference(instance);
+            } else {
+                Logger::Log("Expected a pointer type for arrow operator.", tuple_access, LogSeverity::Error);
+                return null;
+            }
+        }
+
+        if !instance->_type->IsTuple() {
+            Logger::Log("Cannot access field '" + String::FromInteger(tuple_access->index as u64) + "' of type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
+
+        if tuple_access->index >= (instance->_type as *HIRTupleType)->elements.Size() {
+            Logger::Log("Field '" + String::FromInteger(tuple_access->index as u64) + "' not found in type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
+            return null;
+        }
+
+        return this.builder.TupleAccess(instance, tuple_access->index);
+    }
+
+    fn LowerMemberAccessExpression(&mut this, member_access: *ASTMemberAccessExpression) -> *HIRExpression {
+        let mut instance = this.ImplicitDereference(this.LowerExpression(member_access->expression));
+        if instance == null { return null; }
 
         if member_access->arrow {
             if instance->_type->HasMethods() {

@@ -313,6 +313,12 @@ class Parser {
                 } expression = call;
             } else if token._type == TokenType::DOT || token._type == TokenType::ARROW {
                 this.Advance();
+
+                if this.Current()._type == TokenType::INTEGER {
+                    let value = this.Advance().value;
+                    return this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
+                }
+
                 let member_access = this.arena.New<ASTMemberAccessExpression>(expression, token._type == TokenType::ARROW, token);
 
                 if this.Match(TokenType::OPERATOR) {
