@@ -3520,8 +3520,8 @@ class HIRLowerer {
         } else if pattern->kind == ASTPatternKind::Tuple {
             let tuple = pattern as *ASTTuplePattern;
 
-            if target_type == null || !target_type->IsTuple() {
-                Logger::Log("Cannot destructure non-tuple type '" + (target_type != null ? target_type->ToString() : "<unknown>".ToString()) + "' with a tuple pattern.", pattern, LogSeverity::Error);
+            if !target_type->IsTuple() {
+                Logger::Log("Cannot destructure non-tuple type '" + target_type->ToString() + "' with a tuple pattern.", pattern, LogSeverity::Error);
                 return null;
             }
 
