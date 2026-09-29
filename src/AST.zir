@@ -909,13 +909,13 @@ class ASTBlockStatement : ASTStatement {
     ASTBlockStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Block, start) {}
 }
 
-class ASTVariableStatement : ASTStatement {
-    pub name: String, pub _type: *ASTType,
-    pub initializer: *ASTExpression, pub mutable: bool,
-    pub next: *mut ASTVariableStatement = null;
+class ASTLetStatement : ASTStatement {
+    pub pattern: *ASTPattern,
+    pub _type: *ASTType,
+    pub initializer: *ASTExpression;
 
-    ASTVariableStatement(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, mutable: bool, start: Token) : ASTStatement(ASTStatementKind::Variable, start) {
-        (this.name, this._type, this.initializer, this.mutable) = (name, _type, initializer, mutable);
+    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Variable, start) {
+        (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
     }
 }
 
@@ -969,12 +969,12 @@ class ASTLoopStatement : ASTStatement {
 }
 
 class ASTForStatement : ASTStatement {
-    pub variable: String,
+    pub iterator: String,
     pub iterable: *ASTExpression,
     pub body: *ASTBlockStatement;
 
-    ASTForStatement(&mut this, variable: String, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
-        (this.variable, this.iterable, this.body) = (variable, iterable, body);
+    ASTForStatement(&mut this, iterator: String, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
+        (this.iterator, this.iterable, this.body) = (iterator, iterable, body);
     }
 }
 

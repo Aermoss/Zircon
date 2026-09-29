@@ -21,7 +21,6 @@ class MIRLowerer {
     builder: MIRBuilder,
     target_info: TargetInfo,
     bindings: Map<*HIRIdentifierPattern, *MIRValue>,
-    variables: Map<*HIRVariableStatement, *MIRValue>,
     parameters: Map<*HIRDeclaration, *MIRValue>,
     temporaries: Map<*HIRExpression, *MIRValue>,
     namespaces: Vector<String>,
@@ -265,7 +264,6 @@ class MIRLowerer {
 
         this.temporaries.Clear();
         this.parameters.Clear();
-        this.variables.Clear();
         this.bindings.Clear();
     }
 
@@ -462,7 +460,7 @@ class MIRLowerer {
         if statement->kind == HIRStatementKind::Block {
             this.LowerBlockStatement(statement as *HIRBlockStatement);
         } else if statement->kind == HIRStatementKind::Variable {
-            this.LowerVariableStatement(statement as *HIRVariableStatement);
+            this.LowerLetStatement(statement as *HIRLetStatement);
         } else if statement->kind == HIRStatementKind::Expression {
             this.LowerExpression((statement as *HIRExpressionStatement)->expression);
         } else if statement->kind == HIRStatementKind::If {
@@ -493,15 +491,8 @@ class MIRLowerer {
         }
     }
 
-    fn LowerVariableStatement(&mut this, variable: *HIRVariableStatement) {
-        let _type = this.LowerType(variable->_type);
-        if _type == null { return; }
-        let alloca = this.builder.BuildAlloca(variable->name, _type);
-        this.variables[variable] = alloca;
-
-        if variable->initializer != null {
-            this.LowerExpressionTo(variable->initializer, alloca);
-        }
+    fn LowerLetStatement(&mut this, _let: *HIRLetStatement) {
+        this.BindPattern(_let->pattern);
     }
 
     fn LowerIfStatement(&mut this, _if: *HIRIfStatement) {
@@ -510,7 +501,7 @@ class MIRLowerer {
         if _if->condition->pattern != null {
             let target = this.LowerPlaceExpression(_if->condition->expression);
             if target == null { return; }
-            condition = this.LowerPattern(_if->condition->pattern, target);
+            condition = this.TestPattern(_if->condition->pattern, target);
             if condition == null { return; }
         } else {
             condition = this.LowerExpression(_if->condition->expression);
@@ -540,6 +531,11 @@ class MIRLowerer {
         }
 
         this.builder.SetCurrentBlock(then_block);
+
+        if _if->condition->pattern != null {
+            this.BindPattern(_if->condition->pattern);
+        }
+
         this.LowerBlockStatement(_if->then_body);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
@@ -565,7 +561,7 @@ class MIRLowerer {
         if _while->condition->pattern != null {
             let target = this.LowerPlaceExpression(_while->condition->expression);
             if target == null { return; }
-            condition = this.LowerPattern(_while->condition->pattern, target);
+            condition = this.TestPattern(_while->condition->pattern, target);
             if condition == null { return; }
         } else {
             condition = this.LowerExpression(_while->condition->expression);
@@ -577,8 +573,12 @@ class MIRLowerer {
         }
 
         this.builder.BuildConditionalBranch(condition, body_block, end_block);
-
         this.builder.SetCurrentBlock(body_block);
+
+        if _while->condition->pattern != null {
+            this.BindPattern(_while->condition->pattern);
+        }
+
         this.break_blocks.PushBack(end_block);
         this.continue_blocks.PushBack(condition_block);
         this.LowerBlockStatement(_while->while_body);
@@ -612,8 +612,8 @@ class MIRLowerer {
     }
 
     fn LowerForStatement(&mut this, _for: *HIRForStatement) {
-        this.LowerVariableStatement(_for->iterator);
-        this.LowerVariableStatement(_for->target);
+        this.BindPattern(_for->iterator);
+        this.BindPattern(_for->target);
 
         let condition_block = this.builder.BuildBlock("for.cond".ToString());
         let body_block = this.builder.BuildBlock("for.body".ToString());
@@ -662,12 +662,13 @@ class MIRLowerer {
         let merge_block = this.builder.BuildBlock("match.merge".ToString());
 
         for arm in _match->arms {
-            let result = this.LowerPattern(arm->pattern, target);
+            let result = this.TestPattern(arm->pattern, target);
             if result == null { return; }
             let body_block = this.builder.BuildBlock("match.body".ToString());
             let next_block = this.builder.BuildBlock("match.next".ToString());
             this.builder.BuildConditionalBranch(result, body_block, next_block);
             this.builder.SetCurrentBlock(body_block);
+            this.BindPattern(arm->pattern);
 
             if arm->guard != null {
                 let guard = this.LowerExpression(arm->guard);
@@ -801,8 +802,6 @@ class MIRLowerer {
             return this.temporaries[expression];
         } else if expression->kind == HIRExpressionKind::BindingReference {
             return this.bindings.Get((expression as *HIRBindingReference)->binding, null);
-        } else if expression->kind == HIRExpressionKind::VariableReference {
-            return this.variables.Get((expression as *HIRVariableReference)->variable, null);
         } else if expression->kind == HIRExpressionKind::DeclarationReference {
             let declaration = (expression as *HIRDeclarationReference)->declaration;
 
@@ -1644,27 +1643,25 @@ class MIRLowerer {
         return phi;
     }
 
-    fn LowerPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
+    fn TestPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
         if pattern->kind == HIRPatternKind::Literal {
-            return this.LowerLiteralPattern(pattern as *HIRLiteralPattern, target);
-        } else if pattern->kind == HIRPatternKind::Identifier {
-            return this.LowerIdentifierPattern(pattern as *HIRIdentifierPattern, target);
+            return this.TestLiteralPattern(pattern as *HIRLiteralPattern, target);
         } else if pattern->kind == HIRPatternKind::Tuple {
-            return this.LowerTuplePattern(pattern as *HIRTuplePattern, target);
-        } else if pattern->kind == HIRPatternKind::Structure {
-            return this.LowerStructurePattern(pattern as *HIRStructurePattern, target);
-        } else if pattern->kind == HIRPatternKind::Variant {
-            return this.LowerVariantPattern(pattern as *HIRVariantPattern, target);
-        } else if pattern->kind == HIRPatternKind::Or {
-            return this.LowerOrPattern(pattern as *HIROrPattern, target);
+            return this.TestTuplePattern(pattern as *HIRTuplePattern, target);
         } else if pattern->kind == HIRPatternKind::Field {
-            return this.LowerPattern((pattern as *HIRFieldPattern)->pattern, target);
+            return this.TestPattern((pattern as *HIRFieldPattern)->pattern, target);
+        } else if pattern->kind == HIRPatternKind::Structure {
+            return this.TestStructurePattern(pattern as *HIRStructurePattern, target);
+        } else if pattern->kind == HIRPatternKind::Variant {
+            return this.TestVariantPattern(pattern as *HIRVariantPattern, target);
+        } else if pattern->kind == HIRPatternKind::Or {
+            return this.TestOrPattern(pattern as *HIROrPattern, target);
         } else {
             return this.builder.ConstantInteger(1, this.context.IntegerType(1));
         }
     }
 
-    fn LowerLiteralPattern(&mut this, pattern: *HIRLiteralPattern, target: *MIRValue) -> *MIRValue {
+    fn TestLiteralPattern(&mut this, pattern: *HIRLiteralPattern, target: *MIRValue) -> *MIRValue {
         let literal = this.LowerExpression(pattern->literal);
         if literal == null { return null; }
         let value = this.builder.BuildLoad("pattern.load".ToString(), target);
@@ -1672,16 +1669,7 @@ class MIRLowerer {
         return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
     }
 
-    fn LowerIdentifierPattern(&mut this, pattern: *HIRIdentifierPattern, target: *MIRValue) -> *MIRValue {
-        let _type = this.LowerType(pattern->_type);
-        if _type == null { return null; }
-        let alloca = this.builder.BuildAlloca(pattern->name, _type);
-        this.builder.BuildStore(this.builder.BuildLoad("pattern.bind".ToString(), target), alloca);
-        this.bindings[pattern] = alloca;
-        return this.builder.ConstantInteger(1, this.context.IntegerType(1));
-    }
-
-    fn LowerTuplePattern(&mut this, tuple: *HIRTuplePattern, target: *MIRValue) -> *MIRValue {
+    fn TestTuplePattern(&mut this, tuple: *HIRTuplePattern, target: *MIRValue) -> *MIRValue {
         let bool_type = this.context.IntegerType(1);
         let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
 
@@ -1690,13 +1678,13 @@ class MIRLowerer {
             if element_type == null { return null; }
             let field_type = this.context.PointerType(element_type);
             let place = this.builder.BuildStructGEP("pattern.tuple".ToString(), target, i as u32, field_type);
-            let result = this.LowerPattern(tuple->patterns[i], place);
+            let result = this.TestPattern(tuple->patterns[i], place);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
         } return condition;
     }
 
-    fn LowerStructurePattern(&mut this, structure: *HIRStructurePattern, target: *MIRValue) -> *MIRValue {
+    fn TestStructurePattern(&mut this, structure: *HIRStructurePattern, target: *MIRValue) -> *MIRValue {
         let bool_type = this.context.IntegerType(1);
         let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
 
@@ -1714,13 +1702,13 @@ class MIRLowerer {
             if declaration == null { return null; }
             let field_type = this.context.PointerType(this.LowerType(declaration->_type));
             let place = this.builder.BuildStructGEP("pattern.field".ToString(), target, declaration->index as u32, field_type);
-            let result = this.LowerPattern(field->pattern, place);
+            let result = this.TestPattern(field->pattern, place);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
         } return condition;
     }
 
-    fn LowerVariantPattern(&mut this, variant: *HIRVariantPattern, target: *MIRValue) -> *MIRValue {
+    fn TestVariantPattern(&mut this, variant: *HIRVariantPattern, target: *MIRValue) -> *MIRValue {
         let member = variant->member;
         let tag_type = this.context.IntegerType(8);
         let bool_type = this.context.IntegerType(1);
@@ -1751,29 +1739,57 @@ class MIRLowerer {
 
                 if index == -1 { return null; }
                 let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (index + 1) as u32, this.context.PointerType(fields[(index + 1) as usize]));
-                let result = this.LowerPattern(field->pattern, field_pointer);
+                let result = this.TestPattern(field->pattern, field_pointer);
                 if result == null { return null; }
                 condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
             }
         } else {
             for i in 0..variant->patterns.Size() {
                 let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1]));
-                let result = this.LowerPattern(variant->patterns[i], field_pointer);
+                let result = this.TestPattern(variant->patterns[i], field_pointer);
                 if result == null { return null; }
                 condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
             }
         } return condition;
     }
 
-    fn LowerOrPattern(&mut this, or: *HIROrPattern, target: *MIRValue) -> *MIRValue {
+    fn TestOrPattern(&mut this, or: *HIROrPattern, target: *MIRValue) -> *MIRValue {
         let bool_type = this.context.IntegerType(1);
         let mut condition: *MIRValue = this.builder.ConstantInteger(0, bool_type);
 
         for pattern in or->patterns {
-            let result = this.LowerPattern(pattern, target);
+            let result = this.TestPattern(pattern, target);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.or".ToString(), MIRBinaryKind::Or, condition, result, bool_type);
         } return condition;
+    }
+
+    fn BindPattern(&mut this, pattern: *HIRPattern) {
+        if pattern->kind == HIRPatternKind::Identifier {
+            let identifier = pattern as *HIRIdentifierPattern;
+            let _type = this.LowerType(identifier->_type);
+            if _type == null { return; }
+            let alloca = this.builder.BuildAlloca(identifier->name, _type);
+            this.bindings[identifier] = alloca;
+
+            if identifier->value != null {
+                this.LowerExpressionTo(identifier->value, alloca);
+            }
+        } else if pattern->kind == HIRPatternKind::Tuple {
+            for pattern in (pattern as *HIRTuplePattern)->patterns {
+                this.BindPattern(pattern);
+            }
+        } else if pattern->kind == HIRPatternKind::Field {
+            this.BindPattern((pattern as *HIRFieldPattern)->pattern);
+        } else if pattern->kind == HIRPatternKind::Structure {
+            for pattern in (pattern as *HIRStructurePattern)->patterns {
+                this.BindPattern(pattern);
+            }
+        } else if pattern->kind == HIRPatternKind::Variant {
+            for pattern in (pattern as *HIRVariantPattern)->patterns {
+                this.BindPattern(pattern);
+            }
+        }
     }
 
     pub fn LowerType(&mut this, _type: *HIRType) -> *MIRType {

@@ -1372,7 +1372,7 @@ class HIRLowerer {
         if statement->kind == ASTStatementKind::Block {
             this.LowerBlockStatement(statement as *ASTBlockStatement);
         } else if statement->kind == ASTStatementKind::Variable {
-            this.LowerVariableStatement(statement as *ASTVariableStatement);
+            this.LowerLetStatement(statement as *ASTLetStatement);
         } else if statement->kind == ASTStatementKind::Expression {
             let expression = (statement as *ASTExpressionStatement)->expression;
 
@@ -1435,107 +1435,53 @@ class HIRLowerer {
         return statement;
     }
 
-    fn LowerVariableStatement(&mut this, variable: *ASTVariableStatement) {
-        let mut initializer: *HIRExpression = null;
+    fn LowerLetStatement(&mut this, _let: *ASTLetStatement) {
         let mut _type: *HIRType = null;
 
-        if variable->_type != null {
-            _type = this.LowerType(variable->_type);
-
-            if variable->initializer != null && _type != null {
-                initializer = this.Coerce(this.LowerExpression(variable->initializer), _type);
-
-                if initializer != null {
-                    let same = _type->IsSame(initializer->_type);
-
-                    if _type->IsReference() && _type->Pointee().IsCompatible(initializer->_type) {
-                        initializer = this.builder.AddressOf(initializer);
-                    }
-
-                    if initializer->_type->IsReference() && _type->IsCompatible(initializer->_type->Pointee()) {
-                        initializer = this.builder.Dereference(initializer);
-                    }
-
-                    if !_type->IsCompatible(initializer->_type) {
-                        Logger::Log("Incompatible variable initialization types. ('" + _type->ToString() + "' != '" + initializer->_type->ToString() + "').", variable, LogSeverity::Error);
-                        return;
-                    }
-
-                    if !_type->IsMutabilityCompatible(initializer->_type) {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", variable, LogSeverity::Error);
-                        return;
-                    }
-
-                    if same && !this.LiteralNeedsExplicitType(variable->initializer, _type) {
-                        Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", variable, LogSeverity::Warning);
-                    }
-
-                    initializer = this.MakeCompatible(initializer, _type);
-                }
-            }
-        } else if variable->initializer != null {
-            initializer = this.Coerce(this.LowerExpression(variable->initializer));
-            if initializer != null { _type = initializer->_type; }
-        } else {
-            Logger::Log("Type annotation required for variable '" + variable->name + "' without initializer.", variable, LogSeverity::Error);
+        if _let->_type != null {
+            _type = this.LowerType(_let->_type);
+            if _type == null { return; }
         }
 
-        if _type != null {
-            let has_constructor = _type->IsClass() || _type->IsStructure() || _type->IsVariant();
-            let call_constructor = has_constructor && (initializer != null ? *_type == *initializer->_type && initializer->category == HIRExpressionCategory::Place : _type->IsClass());
-            let statement = this.builder.BuildVariableStatement(variable->name, _type, !call_constructor ? initializer : null, variable->mutable);
-            this.scope_manager.current->Set(variable->name, statement, variable);
-            this.builder.GetCurrentBlock()->statements.PushBack(statement);
+        let mut initializer: *HIRExpression = null;
 
-            if call_constructor {
-                let mut values = Vector<*HIRExpression>();
-                let reciever = this.builder.ReferenceVariable(statement);
-                (reciever as *mut HIRExpression)->mutable = true;
-                values.PushBack(reciever);
-                if initializer != null { values.PushBack(initializer); }
-                let mut function: *HIRFunctionDeclaration = null;
-
-                if _type->IsClass() {
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                    for candidate in (_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
-                    }
-
-                    function = this.ResolveOverload(candidates, values, variable, initializer == null);
-                } else if _type->IsStructure() {
-                    function = (_type as *HIRStructureType)->declaration->copy_constructor;
-                } else {
-                    function = (_type as *HIRVariantType)->declaration->copy_constructor;
-                }
-
-                if function != null {
-                    let call = this.LowerResolvedCallExpression(function, values, variable);
-
-                    if call != null {
-                        this.builder.BuildExpressionStatement(call);
-                    }
-                }
-            }
-
-            if has_constructor {
-                this.scope_manager.current->instances.PushBack(this.builder.ReferenceVariable(statement));
-            } this.BuildTemporaryDestructors(initializer);
+        if _let->initializer != null {
+            initializer = this.ImplicitDereference(this.LowerExpression(_let->initializer));
+            if initializer == null { return; }
+            if _type == null { _type = initializer->_type; }
+        } else if _type == null {
+            Logger::Log("A type annotation is required for a 'let' statement without an initializer.", _let, LogSeverity::Error);
+            return;
+        } else if _let->pattern->kind != ASTPatternKind::Identifier {
+            Logger::Log("A destructuring 'let' statement requires an initializer.", _let->pattern, LogSeverity::Error);
+            return;
         }
 
-        if variable->next != null {
-            this.LowerVariableStatement(variable->next);
+        let pattern = this.LowerPattern(_let->pattern, _type, initializer);
+        if pattern == null { return; }
+
+        if !pattern->IsIrrefutable() {
+            Logger::Log("A refutable pattern cannot be used in a 'let' statement.", _let->pattern, LogSeverity::Error);
+            return;
+        }
+
+        let statement = this.builder.BuildLetStatement(pattern, _type, initializer);
+        this.builder.GetCurrentBlock()->statements.PushBack(statement);
+
+        if initializer != null {
+            this.BuildTemporaryDestructors(initializer);
         }
     }
 
     fn LowerIfStatement(&mut this, _if: *ASTIfStatement) {
         let mut condition: *HIRCondition = null;
         let expression = this.ImplicitDereference(this.LowerExpression(_if->condition->expression));
+        if expression == null { return; }
         let destructors = this.GetTemporaryDestructors(expression);
         this.scope_manager.PushScope("<then>".ToString(), false);
 
         if _if->condition->pattern != null {
-            let pattern = this.LowerPattern(_if->condition->pattern, expression->_type);
+            let pattern = this.LowerPattern(_if->condition->pattern, expression->_type, expression);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -1577,11 +1523,12 @@ class HIRLowerer {
     fn LowerWhileStatement(&mut this, _while: *ASTWhileStatement) {
         let mut condition: *HIRCondition = null;
         let expression = this.ImplicitDereference(this.LowerExpression(_while->condition->expression));
+        if expression == null { return; }
         let destructors = this.GetTemporaryDestructors(expression);
         this.scope_manager.PushScope("<while>".ToString(), false);
 
         if _while->condition->pattern != null {
-            let pattern = this.LowerPattern(_while->condition->pattern, expression->_type);
+            let pattern = this.LowerPattern(_while->condition->pattern, expression->_type, expression);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -1678,11 +1625,11 @@ class HIRLowerer {
             return;
         }
 
-        let target = this.builder.BuildVariableStatement("target".ToString(), iterator_type, end, false);
-        let iterator = this.builder.BuildVariableStatement("iterator".ToString(), iterator_type, start, false);
+        let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
+        let iterator = this.builder.IdentifierPattern("iterator".ToString(), iterator_type, start, false);
         let (mut alias: *HIRExpression, mut condition: *HIRExpression, mut step: *HIRExpression) = (null, null, null);
-        let iterator_reference = this.builder.ReferenceVariable(iterator);
-        let target_reference = this.builder.ReferenceVariable(target);
+        let iterator_reference = this.builder.ReferenceBinding(iterator);
+        let target_reference = this.builder.ReferenceBinding(target);
 
         if is_range {
             let mut one: *HIRExpression = null;
@@ -1730,7 +1677,7 @@ class HIRLowerer {
 
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
-        this.scope_manager.current->Set(_for->variable, alias, _for);
+        this.scope_manager.current->Set(_for->iterator, alias, _for);
         let body = this.LowerBlockStatement(_for->body);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
@@ -1751,7 +1698,7 @@ class HIRLowerer {
 
         for arm in _match->arms {
             this.scope_manager.PushScope("<match>".ToString(), false);
-            let pattern = this.LowerPattern(arm->pattern, target->_type);
+            let pattern = this.LowerPattern(arm->pattern, target->_type, target);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -1803,8 +1750,6 @@ class HIRLowerer {
                 if value->category == HIRExpressionCategory::Place {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.builder.AddressOf(value));
-                    let arguments = Vector<*HIRExpression>(values);
-                    values.Insert(0, this.builder.NullLiteral());
                     let mut function: *HIRFunctionDeclaration = null;
 
                     if value->_type->IsClass() {
@@ -1814,8 +1759,10 @@ class HIRLowerer {
                             candidates.PushBack(candidate);
                         }
 
+                        values.Insert(0, this.builder.NullLiteral());
                         function = this.ResolveOverload(candidates, values, _return->expression, false);
                         if function == null { return; }
+                        values.RemoveAt(0);
                     } else if value->_type->IsStructure() {
                         function = (value->_type as *HIRStructureType)->declaration->copy_constructor;
                     } else {
@@ -1823,7 +1770,7 @@ class HIRLowerer {
                     }
 
                     let callee = this.builder.ReferenceDeclaration(function, false);
-                    value = this.builder.Constructor(callee, arguments, value->_type);
+                    value = this.builder.Constructor(callee, values, value->_type);
                 } else {
                     this.temporaries.Remove(value);
                 }
@@ -1971,8 +1918,8 @@ class HIRLowerer {
         while scope != null && !scope->global {
             for instance in scope->instances.Reverse() {
                 if exception != null {
-                    if instance->kind == HIRExpressionKind::VariableReference && exception->kind == HIRExpressionKind::VariableReference {
-                        if (instance as *HIRVariableReference)->variable == (exception as *HIRVariableReference)->variable { continue; }
+                    if instance->kind == HIRExpressionKind::BindingReference && exception->kind == HIRExpressionKind::BindingReference {
+                        if (instance as *HIRBindingReference)->binding == (exception as *HIRBindingReference)->binding { continue; }
                     } else if instance->kind == HIRExpressionKind::DeclarationReference && exception->kind == HIRExpressionKind::DeclarationReference {
                         if (instance as *HIRDeclarationReference)->declaration == (exception as *HIRDeclarationReference)->declaration { continue; }
                     }
@@ -2082,8 +2029,6 @@ class HIRLowerer {
                     return this.builder.ReferenceBinding(symbol->pattern as *HIRIdentifierPattern);
                 } else if symbol->kind == SymbolKind::Expression {
                     return symbol->expression;
-                } else if symbol->kind == SymbolKind::Statement {
-                    return this.builder.ReferenceVariable(symbol->statement as *HIRVariableStatement);
                 } else if symbol->kind == SymbolKind::Declaration {
                     let declaration = symbol->declaration;
 
@@ -2551,8 +2496,6 @@ class HIRLowerer {
                                 _type = (symbol->pattern as *HIRIdentifierPattern)->_type;
                             } else if symbol->kind == SymbolKind::Expression {
                                 _type = symbol->expression->_type;
-                            } else if symbol->kind == SymbolKind::Statement {
-                                _type = (symbol->statement as *HIRVariableStatement)->_type;
                             } else if symbol->kind == SymbolKind::Declaration {
                                 _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
                             }
@@ -2824,8 +2767,6 @@ class HIRLowerer {
                 if value->category == HIRExpressionCategory::Place {
                     let mut values = Vector<*HIRExpression>();
                     values.PushBack(this.builder.AddressOf(value));
-                    let arguments = Vector<*HIRExpression>(values);
-                    values.Insert(0, this.builder.NullLiteral());
                     let mut function: *HIRFunctionDeclaration = null;
 
                     if value->_type->IsClass() {
@@ -2835,8 +2776,10 @@ class HIRLowerer {
                             candidates.PushBack(candidate);
                         }
 
+                        values.Insert(0, this.builder.NullLiteral());
                         function = this.ResolveOverload(candidates, values, node, false);
                         if function == null { return false; }
+                        values.RemoveAt(0);
                     } else if value->_type->IsStructure() {
                         function = (value->_type as *HIRStructureType)->declaration->copy_constructor;
                     } else {
@@ -2844,7 +2787,7 @@ class HIRLowerer {
                     }
 
                     let callee = this.builder.ReferenceDeclaration(function, false);
-                    value = this.builder.Constructor(callee, arguments, value->_type);
+                    value = this.builder.Constructor(callee, values, value->_type);
                 } else {
                     this.temporaries.Remove(value);
                 }
@@ -3544,7 +3487,7 @@ class HIRLowerer {
         return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
     }
 
-    fn LowerPattern(&mut this, pattern: *ASTPattern, target_type: *HIRType) -> *HIRPattern {
+    fn LowerPattern(&mut this, pattern: *ASTPattern, target_type: *HIRType, mut value: *HIRExpression) -> *HIRPattern {
         if pattern->kind == ASTPatternKind::Wildcard {
             return this.builder.WildcardPattern();
         } else if pattern->kind == ASTPatternKind::Rest {
@@ -3555,9 +3498,70 @@ class HIRLowerer {
             return this.builder.LiteralPattern(literal);
         } else if pattern->kind == ASTPatternKind::Identifier {
             let identifier = pattern as *ASTIdentifierPattern;
-            let lowered_identifier = this.builder.IdentifierPattern(identifier->name, target_type, identifier->mutable);
-            this.scope_manager.current->Set(identifier->name, lowered_identifier, pattern);
-            return lowered_identifier;
+
+            if value != null {
+                value = this.Coerce(value, target_type);
+                if value == null { return null; }
+
+                if target_type->IsReference() && target_type->Pointee().IsCompatible(value->_type) {
+                    value = this.builder.AddressOf(value);
+                }
+
+                if value->_type->IsReference() && target_type->IsCompatible(value->_type->Pointee()) {
+                    value = this.builder.Dereference(value);
+                }
+
+                if !target_type->IsCompatible(value->_type) {
+                    Logger::Log("Incompatible binding initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                if !target_type->IsMutabilityCompatible(value->_type) {
+                    Logger::Log("Cannot assign immutable pointer to mutable pointer.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                value = this.MakeCompatible(value, target_type);
+            }
+
+            let has_constructor = target_type->IsClass() || target_type->IsStructure() || target_type->IsVariant();
+
+            if has_constructor && (value != null ? *target_type == *value->_type && value->category == HIRExpressionCategory::Place : target_type->IsClass()) {
+                let mut values = Vector<*HIRExpression>();
+
+                if value != null {
+                    values.PushBack(this.builder.AddressOf(value));
+                }
+
+                let mut function: *HIRFunctionDeclaration = null;
+
+                if target_type->IsClass() {
+                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+                    for candidate in (target_type as *HIRClassType)->declaration->constructors {
+                        candidates.PushBack(candidate);
+                    }
+
+                    values.Insert(0, this.builder.NullLiteral());
+                    function = this.ResolveOverload(candidates, values, pattern, value == null);
+                    if function == null { return null; }
+                    values.RemoveAt(0);
+                } else if target_type->IsStructure() {
+                    function = (target_type as *HIRStructureType)->declaration->copy_constructor;
+                } else {
+                    function = (target_type as *HIRVariantType)->declaration->copy_constructor;
+                }
+
+                let callee = this.builder.ReferenceDeclaration(function, false);
+                value = this.builder.Constructor(callee, values, target_type);
+            }
+
+            let lowered = this.builder.IdentifierPattern(identifier->name, target_type, value, identifier->mutable);
+            this.scope_manager.current->Set(identifier->name, lowered, pattern);
+
+            if has_constructor {
+                this.scope_manager.current->instances.PushBack(this.builder.ReferenceBinding(lowered));
+            } return lowered;
         } else if pattern->kind == ASTPatternKind::Tuple {
             let tuple = pattern as *ASTTuplePattern;
 
@@ -3576,7 +3580,8 @@ class HIRLowerer {
             let mut patterns = Vector<*HIRPattern>();
 
             for i in 0..tuple->patterns.Size() {
-                let lowered_pattern = this.LowerPattern(tuple->patterns[i], tuple_type->elements[i]);
+                let element = this.builder.TupleAccess(value, i);
+                let lowered_pattern = this.LowerPattern(tuple->patterns[i], tuple_type->elements[i], element);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }
@@ -3584,7 +3589,7 @@ class HIRLowerer {
             return this.builder.TuplePattern(patterns, tuple_type);
         } else if pattern->kind == ASTPatternKind::Field {
             let field = pattern as *ASTFieldPattern;
-            let lowered_pattern = this.LowerPattern(field->pattern, target_type);
+            let lowered_pattern = this.LowerPattern(field->pattern, target_type, value);
             if lowered_pattern == null { return null; }
             return this.builder.FieldPattern(field->name, lowered_pattern);
         } else if pattern->kind == ASTPatternKind::Structure {
@@ -3599,7 +3604,8 @@ class HIRLowerer {
                 let declaration = (symbol->_type as *HIRStructureType)->declaration;
 
                 for i in 0..structure->patterns.Size() {
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], declaration->fields[i]->_type);
+                    let field = this.builder.FieldAccess(value, declaration->fields[i]);
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], declaration->fields[i]->_type, field);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3618,7 +3624,8 @@ class HIRLowerer {
                 let member = symbol->declaration as *HIRVariantMember;
 
                 for i in 0..structure->patterns.Size() {
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], member->fields[i]->_type);
+                    let field = this.builder.MemberAccess(value, member, member->fields[i]);
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], member->fields[i]->_type, field);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3643,7 +3650,8 @@ class HIRLowerer {
                 let member = symbol->declaration as *HIRVariantMember;
 
                 for i in 0..variant->patterns.Size() {
-                    let lowered_pattern = this.LowerPattern(variant->patterns[i], member->fields[i]->_type);
+                    let field = this.builder.MemberAccess(value, member, member->fields[i]);
+                    let lowered_pattern = this.LowerPattern(variant->patterns[i], member->fields[i]->_type, field);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3657,7 +3665,7 @@ class HIRLowerer {
             let mut patterns = Vector<*HIRPattern>();
 
             for pattern in (pattern as *ASTOrPattern)->patterns {
-                let lowered_pattern = this.LowerPattern(pattern, target_type);
+                let lowered_pattern = this.LowerPattern(pattern, target_type, value);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }

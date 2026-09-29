@@ -825,6 +825,38 @@ class HIRPattern {
         this.kind = kind;
     }
 
+    pub fn IsIrrefutable(&this) -> bool {
+        if this.kind == HIRPatternKind::Wildcard || this.kind == HIRPatternKind::Rest || this.kind == HIRPatternKind::Identifier {
+            return true;
+        } else if this.kind == HIRPatternKind::Literal {
+            return false;
+        } else if this.kind == HIRPatternKind::Tuple {
+            for pattern in (this as *HIRTuplePattern)->patterns {
+                if !pattern->IsIrrefutable() { return false; }
+            } return true;
+        } else if this.kind == HIRPatternKind::Field {
+            return (this as *HIRFieldPattern)->pattern->IsIrrefutable();
+        } else if this.kind == HIRPatternKind::Structure {
+            for pattern in (this as *HIRStructurePattern)->patterns {
+                if !pattern->IsIrrefutable() { return false; }
+            } return true;
+        } else if this.kind == HIRPatternKind::Variant {
+            let variant = this as *HIRVariantPattern;
+
+            if (variant->member->_type as *HIRVariantType)->declaration->members.Size() != 1 {
+                return false;
+            }
+
+            for pattern in variant->patterns {
+                if !pattern->IsIrrefutable() { return false; }
+            } return true;
+        } else if this.kind == HIRPatternKind::Or {
+            for pattern in (this as *HIROrPattern)->patterns {
+                if pattern->IsIrrefutable() { return true; }
+            } return false;
+        } return false;
+    }
+
     pub fn ToString(&this) -> String {
         if this.kind == HIRPatternKind::Wildcard {
             return (this as *HIRWildcardPattern)->ToString();
@@ -881,10 +913,11 @@ class HIRLiteralPattern : HIRPattern {
 class HIRIdentifierPattern : HIRPattern {
     pub name: String,
     pub _type: *HIRType,
+    pub value: *HIRExpression,
     pub mutable: bool;
 
-    HIRIdentifierPattern(&mut this, name: String, _type: *HIRType, mutable: bool) : HIRPattern(HIRPatternKind::Identifier) {
-        (this.name, this._type, this.mutable) = (name, _type, mutable);
+    HIRIdentifierPattern(&mut this, name: String, _type: *HIRType, value: *HIRExpression, mutable: bool) : HIRPattern(HIRPatternKind::Identifier) {
+        (this.name, this._type, this.value, this.mutable) = (name, _type, value, mutable);
     }
 
     pub fn ToString(&this) -> String {
@@ -984,7 +1017,7 @@ class HIROrPattern : HIRPattern {
 
 enum HIRExpressionKind: u8 {
     Literal,
-    BindingReference, VariableReference, DeclarationReference,
+    BindingReference, DeclarationReference,
     Assignment, Unary, Binary, Ternary, Call, Cast,
     IndexAccess, TupleAccess, FieldAccess, MemberAccess, TagAccess,
     New, Delete, Constructor, Destructor,
@@ -1056,8 +1089,6 @@ class HIRExpression {
             return (this as *HIRLiteral)->ToString();
         } else if this.kind == HIRExpressionKind::BindingReference {
             return (this as *HIRBindingReference)->ToString();
-        } else if this.kind == HIRExpressionKind::VariableReference {
-            return (this as *HIRVariableReference)->ToString();
         } else if this.kind == HIRExpressionKind::DeclarationReference {
             return (this as *HIRDeclarationReference)->ToString();
         } else if this.kind == HIRExpressionKind::Assignment {
@@ -1293,18 +1324,6 @@ class HIRBindingReference : HIRExpression {
 
     pub fn ToString(&this) -> String {
         return '%' + this.binding->name;
-    }
-}
-
-class HIRVariableReference : HIRExpression {
-    pub variable: *HIRVariableStatement;
-
-    HIRVariableReference(&mut this, variable: *HIRVariableStatement) : HIRExpression(HIRExpressionKind::VariableReference, variable->_type, HIRExpressionCategory::Place, variable->mutable) {
-        this.variable = variable;
-    }
-
-    pub fn ToString(&this) -> String {
-        return '%' + this.variable->name;
     }
 }
 
@@ -1789,7 +1808,7 @@ class HIRStatement {
         if this.kind == HIRStatementKind::Block {
             return (this as *HIRBlockStatement)->ToString(indent);
         } else if this.kind == HIRStatementKind::Variable {
-            return (' ' * indent * 4) + (this as *HIRVariableStatement)->ToString();
+            return (' ' * indent * 4) + (this as *HIRLetStatement)->ToString();
         } else if this.kind == HIRStatementKind::Expression {
             return (' ' * indent * 4) + (this as *HIRExpressionStatement)->ToString();
         } else if this.kind == HIRStatementKind::If {
@@ -1842,18 +1861,17 @@ class HIRBlockStatement : HIRStatement {
     }
 }
 
-class HIRVariableStatement : HIRStatement {
-    pub name: String,
+class HIRLetStatement : HIRStatement {
+    pub pattern: *HIRPattern,
     pub _type: *HIRType,
-    pub initializer: *HIRExpression,
-    pub mutable: bool;
+    pub initializer: *HIRExpression;
 
-    HIRVariableStatement(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, mutable: bool) : HIRStatement(HIRStatementKind::Variable) {
-        (this.name, this._type, this.initializer, this.mutable) = (name, _type, initializer, mutable);
+    HIRLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression) : HIRStatement(HIRStatementKind::Variable) {
+        (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = "let %" + this.name + ": " + this._type->ToString();
+        let mut result = "let " + this.pattern->ToString() + ": " + this._type->ToString();
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
@@ -1941,14 +1959,14 @@ class HIRLoopStatement : HIRStatement {
 }
 
 class HIRForStatement : HIRStatement {
-    pub iterator: *HIRVariableStatement,
-    pub target: *HIRVariableStatement,
+    pub iterator: *HIRPattern,
+    pub target: *HIRPattern,
     pub condition: *HIRExpression,
     pub step: *HIRExpression,
     pub destructors: Vector<*HIRExpression>,
     pub body: *HIRBlockStatement;
 
-    HIRForStatement(&mut this, iterator: *HIRVariableStatement, target: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::For) {
+    HIRForStatement(&mut this, iterator: *HIRPattern, target: *HIRPattern, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) : HIRStatement(HIRStatementKind::For) {
         (this.iterator, this.target, this.condition, this.step, this.destructors, this.body) = (iterator, target, condition, step, destructors, body);
     }
 
@@ -2660,8 +2678,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRLiteralPattern>(literal);
     }
 
-    pub fn IdentifierPattern(&mut this, name: String, _type: *HIRType, mutable: bool) -> *mut HIRIdentifierPattern {
-        return this.context->arena.New<HIRIdentifierPattern>(name, _type, mutable);
+    pub fn IdentifierPattern(&mut this, name: String, _type: *HIRType, value: *HIRExpression, mutable: bool) -> *mut HIRIdentifierPattern {
+        return this.context->arena.New<HIRIdentifierPattern>(name, _type, value, mutable);
     }
 
     pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRTupleType) -> *mut HIRTuplePattern {
@@ -2728,10 +2746,6 @@ class HIRBuilder {
 
     pub fn ReferenceBinding(&mut this, pattern: *HIRIdentifierPattern) -> *mut HIRBindingReference {
         return this.context->arena.New<HIRBindingReference>(pattern);
-    }
-
-    pub fn ReferenceVariable(&mut this, variable: *HIRVariableStatement) -> *mut HIRVariableReference {
-        return this.context->arena.New<HIRVariableReference>(variable);
     }
 
     pub fn ReferenceDeclaration(&mut this, declaration: *HIRTypedDeclaration, mutable: bool) -> *mut HIRDeclarationReference {
@@ -3008,8 +3022,8 @@ class HIRBuilder {
         return this.block;
     }
 
-    pub fn BuildVariableStatement(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, mutable: bool) -> *mut HIRVariableStatement {
-        return this.context->arena.New<HIRVariableStatement>(name, _type, initializer, mutable);
+    pub fn BuildLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression) -> *mut HIRLetStatement {
+        return this.context->arena.New<HIRLetStatement>(pattern, _type, initializer);
     }
 
     pub fn BuildExpressionStatement(&mut this, expression: *HIRExpression) -> *mut HIRExpressionStatement {
@@ -3044,7 +3058,7 @@ class HIRBuilder {
         return statement;
     }
 
-    pub fn BuildForStatement(&mut this, iterator: *HIRVariableStatement, target: *HIRVariableStatement, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) -> *mut HIRForStatement {
+    pub fn BuildForStatement(&mut this, iterator: *HIRPattern, target: *HIRPattern, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockStatement) -> *mut HIRForStatement {
         let statement = this.context->arena.New<HIRForStatement>(iterator, target, condition, step, destructors, body);
         this.block->statements.PushBack(statement);
         return statement;

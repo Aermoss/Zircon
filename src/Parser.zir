@@ -749,7 +749,7 @@ class Parser {
         let token = this.Current();
 
         if token._type == TokenType::LET && !expression {
-            return this.ParseVariableStatement();
+            return this.ParseLetStatement();
         } else if token._type == TokenType::IF && !expression {
             return this.ParseIfStatement();
         } else if token._type == TokenType::WHILE && !expression {
@@ -831,77 +831,27 @@ class Parser {
         }
     }
 
-    fn ParseVariableStatement(&mut this) -> *ASTVariableStatement {
+    fn ParseLetStatement(&mut this) -> *ASTLetStatement {
         let token = this.Expect(TokenType::LET);
         if token._type == TokenType::UNKNOWN { return null; }
-        let multiple = this.Match(TokenType::LPAREN);
-        let mut current: *mut ASTVariableStatement = null;
-        let mut root: *mut ASTVariableStatement = null;
+        let pattern = this.ParsePattern();
+        if pattern == null { return null; }
+        let mut _type: *ASTType = null;
 
-        while root == null || (multiple && root != null && this.Match(TokenType::COMMA)) {
-            let mutable = this.Match(TokenType::MUT);
-            let identifier = this.Expect(TokenType::IDENTIFIER);
-            if identifier._type == TokenType::UNKNOWN { return null; }
-            let mut sizes = Vector<*ASTExpression>();
-
-            while this.Match(TokenType::LBRACKET) {
-                if this.Match(TokenType::RBRACKET) {
-                    sizes.PushBack(null);
-                } else {
-                    let expression = this.ParseExpression();
-                    if expression == null || !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                    sizes.PushBack(expression);
-                }
-            }
-
-            let mut _type = null;
-
-            if this.Match(TokenType::COLON) {
-                _type = this.ParseType();
-                if _type == null { return null; }
-
-                for size in sizes {
-                    _type = this.arena.New<ASTArrayType>(_type, size, token);
-                }
-            } else if !sizes.Empty() {
-                Logger::Log("Array size specified but type is missing.", token, LogSeverity::Error);
-                return null;
-            }
-
-            let declaration = this.arena.New<ASTVariableStatement>(identifier.value, _type, null, mutable, token);
-
-            if root != null {
-                current->next = declaration;
-            } else {
-                root = declaration;
-            } current = declaration;
+        if this.Match(TokenType::COLON) {
+            _type = this.ParseType();
+            if _type == null { return null; }
         }
 
-        if multiple {
-            if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-        }
+        let mut initializer: *ASTExpression = null;
 
         if this.Match(TokenType::ASSIGN) {
-            if multiple {
-                if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
-            } current = root;
-
-            while current != null {
-                current->initializer = this.ParseExpression();
-                if current->initializer == null { return null; }
-
-                if current->next != null {
-                    if !this.ExpectSuccess(TokenType::COMMA) { return null; }
-                } current = current->next;
-            }
-
-            if multiple {
-                if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-            }
+            initializer = this.ParseExpression();
+            if initializer == null { return null; }
         }
 
         if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-        return root;
+        return this.arena.New<ASTLetStatement>(pattern, _type, initializer, token);
     }
 
     fn ParseCondition(&mut this) -> *ASTCondition {
