@@ -192,7 +192,7 @@ struct MaterialMap {
 struct Material {
     pub shader: Shader,
     pub maps: *mut MaterialMap,
-    pub params[4]: f32
+    pub params: [f32; 4]
 }
 
 struct Transform {
@@ -202,7 +202,7 @@ struct Transform {
 }
 
 struct BoneInfo {
-    pub name[32]: i8,
+    pub name: [i8; 32],
     pub parent: i32
 }
 
@@ -225,7 +225,7 @@ struct ModelAnimation {
     pub frameCount: i32,
     pub bones: *mut BoneInfo,
     pub framePoses: *mut *mut Transform,
-    pub name[32]: i8
+    pub name: [i8; 32]
 }
 
 struct Ray {
@@ -287,19 +287,19 @@ struct VrDeviceInfo {
     pub eyeToScreenDistance: f32,
     pub lensSeparationDistance: f32,
     pub interpupillaryDistance: f32,
-    pub lensDistortionValues[4]: f32,
-    pub chromaAbCorrection[4]: f32
+    pub lensDistortionValues: [f32; 4],
+    pub chromaAbCorrection: [f32; 4]
 }
 
 struct VrStereoConfig {
-    pub projection[2]: Matrix,
-    pub viewOffset[2]: Matrix,
-    pub leftLensCenter[2]: f32,
-    pub rightLensCenter[2]: f32,
-    pub leftScreenCenter[2]: f32,
-    pub rightScreenCenter[2]: f32,
-    pub scale[2]: f32,
-    pub scaleIn[2]: f32
+    pub projection: [Matrix; 2],
+    pub viewOffset: [Matrix; 2],
+    pub leftLensCenter: [f32; 2],
+    pub rightLensCenter: [f32; 2],
+    pub leftScreenCenter: [f32; 2],
+    pub rightScreenCenter: [f32; 2],
+    pub scale: [f32; 2],
+    pub scaleIn: [f32; 2]
 }
 
 struct FilePathList {
@@ -311,7 +311,7 @@ struct FilePathList {
 struct AutomationEvent {
     pub frame: u32,
     pub _type: u32,
-    pub params[4]: i32
+    pub params: [i32; 4]
 }
 
 struct AutomationEventList {

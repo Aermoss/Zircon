@@ -124,7 +124,7 @@ class Mangler {
 
         for name in names {
             if Mangler::IsMangled(name) {
-                let (mut start: usize, mut end) = (2, name.Length() - 1);
+                let (mut start, mut end) = (2usize, name.Length() - 1);
 
                 while name[start] == 'N' && name[end] == 'E' {
                     (start, end) = (start + 1, end - 1);
@@ -165,7 +165,7 @@ class Mangler {
 
         for name in names {
             if Mangler::IsMangled(name) {
-                let (mut start: usize, mut end) = (2, name.Length() - 1);
+                let (mut start, mut end) = (2usize, name.Length() - 1);
 
                 while name[start] == 'N' && name[end] == 'E' {
                     (start, end) = (start + 1, end - 1);

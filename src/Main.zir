@@ -202,7 +202,7 @@ fn GetWindowsSDKPath() -> String {
     }
 
     let mut highest_version_string = String();
-    let (mut highest_v1: i64, mut highest_v2: i64, mut highest_v3: i64, mut highest_v4: i64) = (0, 0, 0, 0);
+    let (mut highest_v1, mut highest_v2, mut highest_v3, mut highest_v4) = (0u64, 0u64, 0u64, 0u64);
 
     loop {
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
@@ -210,10 +210,10 @@ fn GetWindowsSDKPath() -> String {
 
             if file_name != "." && file_name != ".." && file_name != "wdf" {
                 let parts = file_name.Split('.');
-                let (mut parsed_v1: i64, mut parsed_v2: i64, mut parsed_v3: i64, mut parsed_v4: i64) = (0, 0, 0, 0);
+                let (mut parsed_v1, mut parsed_v2, mut parsed_v3, mut parsed_v4) = (0u64, 0u64, 0u64, 0u64);
 
                 if parts.Size() == 4 {
-                    (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToInteger(), parts[1].ToInteger(), parts[2].ToInteger(), parts[3].ToInteger());
+                    (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToUnsignedInteger(), parts[1].ToUnsignedInteger(), parts[2].ToUnsignedInteger(), parts[3].ToUnsignedInteger());
                 } else {
                     WriteLine("\x1b[31mFailed to parse Windows SDK version.\x1b[0m");
                     Exit(1);
@@ -322,7 +322,7 @@ fn GetMSVCPath() -> String {
     }
 
     let mut highest_version_string2 = String();
-    let (mut highest_v1: i64, mut highest_v2: i64, mut highest_v3: i64, mut highest_v4: i64) = (0, 0, 0, 0);
+    let (mut highest_v1, mut highest_v2, mut highest_v3, mut highest_v4) = (0u64, 0u64, 0u64, 0u64);
 
     loop {
         if (find_data3.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
@@ -330,10 +330,10 @@ fn GetMSVCPath() -> String {
 
             if file_name != "." && file_name != ".." {
                 let parts = file_name.Split('.');
-                let (mut parsed_v1: i64, mut parsed_v2: i64, mut parsed_v3: i64) = (0, 0, 0);
+                let (mut parsed_v1, mut parsed_v2, mut parsed_v3) = (0u64, 0u64, 0u64);
 
                 if parts.Size() == 3 {
-                    (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToInteger(), parts[1].ToInteger(), parts[2].ToInteger());
+                    (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToUnsignedInteger(), parts[1].ToUnsignedInteger(), parts[2].ToUnsignedInteger());
                 } else {
                     WriteLine("\x1b[31mFailed to parse MSVC version.\x1b[0m");
                     Exit(1);
@@ -662,7 +662,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let tokens = preprocessor.Process(lexer.Lex(source, input_file), input_file);
 
             let mut parser = Parser();
+            let ast_start = timer.Get();
             let ast_module = parser.Parse(tokens);
+            WriteLine("AST module parsed in " + String::FromFloat(timer.Get() - ast_start) + " seconds.");
 
             let mut hir_lowerer = HIRLowerer();
             let hir_start = timer.Get();

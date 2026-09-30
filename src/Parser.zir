@@ -197,7 +197,7 @@ class Parser {
             return this.arena.New<ASTCharacterLiteral>(character as u32, token);
         } else if token._type == TokenType::INTEGER {
             this.Advance();
-            let (mut value, mut suffix, mut base: u64) = (String(), String(), 10);
+            let (mut value, mut suffix, mut base) = (String(), String(), 10u64);
             let mut index = token.value.Find('u');
 
             if index == -1 {
@@ -706,6 +706,14 @@ class Parser {
                 function->_return = this.ParseType();
                 if function->_return == null { return null; }
             } node = function;
+        } else if this.Match(TokenType::LBRACKET) {
+            let element = this.ParseType();
+            if element == null { return null; }
+            if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
+            let length = this.ParseExpression();
+            if length == null { return null; }
+            if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+            node = this.arena.New<ASTArrayType>(element, length, token);
         } else if this.Match(TokenType::LPAREN) {
             let tuple = this.arena.New<ASTTupleType>(token);
 
@@ -1330,26 +1338,9 @@ class Parser {
         let mutable = this.Match(TokenType::MUT);
         let token = this.Expect(TokenType::IDENTIFIER);
         if token._type == TokenType::UNKNOWN { return null; }
-        let mut sizes = Vector<*ASTExpression>();
-
-        while this.Match(TokenType::LBRACKET) {
-            if this.Match(TokenType::RBRACKET) {
-                sizes.PushBack(null);
-            } else {
-                let expression = this.ParseExpression();
-                if expression == null || !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                sizes.PushBack(expression);
-            }
-        }
-
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
-        let mut _type = this.ParseType();
+        let _type = this.ParseType();
         if _type == null { return null; }
-
-        for size in sizes {
-            _type = this.arena.New<ASTArrayType>(_type, size, token);
-        }
-
         return this.arena.New<ASTParameterDeclaration>(token.value, _type, mutable, token);
     }
 
@@ -1516,26 +1507,10 @@ class Parser {
         let public = this.Match(TokenType::PUBLIC);
         let token = this.Expect(TokenType::IDENTIFIER);
         if token._type == TokenType::UNKNOWN { return null; }
-        let mut sizes = Vector<*ASTExpression>();
-
-        while this.Match(TokenType::LBRACKET) {
-            if this.Match(TokenType::RBRACKET) {
-                sizes.PushBack(null);
-            } else {
-                let expression = this.ParseExpression();
-                if expression == null || !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                sizes.PushBack(expression);
-            }
-        }
-
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
-        let mut _type = this.ParseType();
+        let _type = this.ParseType();
         if _type == null { return null; }
         let mut initializer = null;
-
-        for size in sizes {
-            _type = this.arena.New<ASTArrayType>(_type, size, token);
-        }
 
         if this.Match(TokenType::ASSIGN) {
             initializer = this.ParseExpression();
@@ -1729,26 +1704,9 @@ class Parser {
         if token._type == TokenType::UNKNOWN { return null; }
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let mut sizes = Vector<*ASTExpression>();
-
-        while this.Match(TokenType::LBRACKET) {
-            if this.Match(TokenType::RBRACKET) {
-                sizes.PushBack(null);
-            } else {
-                let expression = this.ParseExpression();
-                if expression == null || !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                sizes.PushBack(expression);
-            }
-        }
-
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
-        let mut _type = this.ParseType();
+        let _type = this.ParseType();
         if _type == null { return null; }
-
-        for size in sizes {
-            _type = this.arena.New<ASTArrayType>(_type, size, token);
-        }
-
         if !this.ExpectSuccess(TokenType::ASSIGN) { return null; }
         let initializer = this.ParseExpression();
         if initializer == null || !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
@@ -1782,26 +1740,9 @@ class Parser {
         let mutable = this.Match(TokenType::MUT);
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let mut sizes = Vector<*ASTExpression>();
-
-        while this.Match(TokenType::LBRACKET) {
-            if this.Match(TokenType::RBRACKET) {
-                sizes.PushBack(null);
-            } else {
-                let expression = this.ParseExpression();
-                if expression == null || !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                sizes.PushBack(expression);
-            }
-        }
-
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
-        let mut _type = this.ParseType();
+        let _type = this.ParseType();
         if _type == null { return null; }
-
-        for size in sizes {
-            _type = this.arena.New<ASTArrayType>(_type, size, token);
-        }
-
         let _static = this.arena.New<ASTStaticDeclaration>(identifier.value, _type, mutable, alignment, token);
 
         if this.Match(TokenType::ASSIGN) {

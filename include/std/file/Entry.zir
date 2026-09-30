@@ -36,8 +36,8 @@ class WIN32_FIND_DATAA {
     pub nFileSizeLow: u32,
     pub dwReserved0: u32,
     pub dwReserved1: u32,
-    pub cFileName[MAX_PATH]: i8,
-    pub cAlternateFileName[14]: i8,
+    pub cFileName: [i8; MAX_PATH],
+    pub cAlternateFileName: [i8; 14],
     pub dwFileType: u32,
     pub dwCreatorType: u32,
     pub wFinderFlags: u16
@@ -116,7 +116,7 @@ fn _WriteFile(path: &String, content: &String) -> bool {
 }
 
 fn GetTemporaryPath() -> String {
-    let mut buffer[256]: i8;
+    let mut buffer: [i8; MAX_PATH];
     let length = GetTempPathA(sizeof(buffer) as u32, buffer);
 
     if length > 0 && length < sizeof(buffer) as u32 {
@@ -128,7 +128,7 @@ fn GetTemporaryPath() -> String {
 }
 
 fn AbsolutePath(path: &String) -> String {
-    let mut buffer[MAX_PATH]: i8;
+    let mut buffer: [i8; MAX_PATH];
     let mut filePart: *mut i8 = null;
     let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, buffer, &mut filePart);
 

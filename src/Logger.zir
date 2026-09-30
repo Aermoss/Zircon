@@ -20,7 +20,7 @@
 class SYMBOL_INFO {
     pub SizeOfStruct: u32,
     pub TypeIndex: u32,
-    pub Reserved[2]: u64,
+    pub Reserved: [u64; 2],
     pub Index: u32,
     pub Size: u32,
     pub ModBase: u64,
@@ -32,7 +32,7 @@ class SYMBOL_INFO {
     pub Tag: u32,
     pub NameLen: u32,
     pub MaxNameLen: u32,
-    pub Name[256]: i8
+    pub Name: [i8; 256]
 }
 
 class IMAGEHLP_MODULE64 {
@@ -43,9 +43,9 @@ class IMAGEHLP_MODULE64 {
     pub CheckSum: u32,
     pub NumSyms: u32,
     pub SymType: i32,
-    pub ModuleName[32]: i8,
-    pub ImageName[256]: i8,
-    pub LoadedImageName[256]: i8
+    pub ModuleName: [i8; 32],
+    pub ImageName: [i8; 256],
+    pub LoadedImageName: [i8; 256]
 }
 
 extern "C" {
@@ -61,7 +61,7 @@ static mut sym_initialized: bool = false;
 
 fn StackDump() {
 #[if WINDOWS]
-    let mut backtrace[64]: *mut void;
+    let mut backtrace: [*mut void; 64];
     let frames = RtlCaptureStackBackTrace(2, 62, backtrace, null);
     let longest = String::FromInteger((frames - 1) as i64).Length();
     let process = GetCurrentProcess();

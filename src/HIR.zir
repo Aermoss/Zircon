@@ -88,7 +88,7 @@ class HIRType {
 
     pub fn FindField(&this, name: &String, path: &mut Vector<u32>, ambiguous: &mut bool) -> *HIRFieldDeclaration {
         let parents = (this as *HIRClassType)->declaration->parents;
-        let (index, mut result: *HIRFieldDeclaration) = (this.Index(name), null);
+        let (index, mut result) = (this.Index(name), null as *HIRFieldDeclaration);
         if index != -1 { return this.Fields()[index as usize]; }
 
         for i in 0..parents.Size() {
@@ -513,7 +513,7 @@ class HIRType {
         } else if this.IsFloat() && other.IsFloat() {
             return (this as *HIRFloatType)->width == (other as *HIRFloatType)->width;
         } else if (this.IsPointer() || this.IsArray()) && (other.IsPointer() || other.IsArray()) {
-            let (mut left: *HIRType, mut right: *HIRType) = (null, null);
+            let (mut left, mut right): (*HIRType, *HIRType) = (null, null);
 
             if this.IsArray() {
                 left = (this as *HIRArrayType)->element;
@@ -539,7 +539,7 @@ class HIRType {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
 
             for i in 0..left->elements.Size() {
-                let (left_element: *HIRType, right_element: *HIRType) = (left->elements[i], right->elements[i]);
+                let (left_element, right_element): (*HIRType, *HIRType) = (left->elements[i], right->elements[i]);
 
                 if left_element != right_element {
                     if left_element == null || right_element == null { return false; }
@@ -554,7 +554,7 @@ class HIRType {
             }
 
             for i in 0..left->parameters.Size() {
-                let (left_parameter: *HIRType, right_parameter: *HIRType) = (left->parameters[i], right->parameters[i]);
+                let (left_parameter, right_parameter): (*HIRType, *HIRType) = (left->parameters[i], right->parameters[i]);
 
                 if left_parameter != right_parameter {
                     if left_parameter == null || right_parameter == null { return false; }
@@ -1871,7 +1871,11 @@ class HIRLetStatement : HIRStatement {
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = "let " + this.pattern->ToString() + ": " + this._type->ToString();
+        let mut result = "let " + this.pattern->ToString();
+
+        if this._type != null {
+            result += ": " + this._type->ToString();
+        }
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
