@@ -363,8 +363,8 @@ fn GetMSVCPath() -> String {
 }
 #[endif]
 
-fn PrintVersion(executable: &String) {
-    WriteLine("Unversioned build of " + executable + " (" + LLVMGetDefaultTargetTriple() + ").");
+fn PrintVersion() {
+    WriteLine("Zircon 8.0 \"Octane\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
     WriteLine("Copyright (c) 2025-2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");
     WriteLine("See the LICENSE file for details.");
@@ -448,7 +448,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             PrintUsage(executable);
             return 0;
         } else if arg == "--version" {
-            PrintVersion(executable);
+            PrintVersion();
             return 0;
         } else if arg == "-v" || arg == "--verbose" {
             verbose = true;
