@@ -493,6 +493,191 @@ class HIRLowerer {
         return function;
     }
 
+    fn EnsureArraySpecialMembers(&mut this, _type: *mut HIRArrayType) {
+        let previous_type = this.current_type;
+        let previous_function = this.builder.GetCurrentFunction();
+        let previous_block = this.builder.GetCurrentBlock();
+        let name = (_type as *HIRType)->ToString();
+        this.scope_manager.PushScope(name, true);
+        this.current_type = _type;
+
+        if _type->copy_constructor == null {
+            let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for i in 0.._type->length as u64 {
+                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
+                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_dereferenced, index));
+                this.LowerFieldCopyConstructor(this_element, other_element, _type->element, null);
+            }
+
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->copy_constructor = function;
+        }
+
+        if _type->destructor == null {
+            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            for i in 0.._type->length as u64 {
+                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
+                this.LowerFieldDestructor(this_element, _type->element, null);
+            }
+
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->destructor = function;
+        }
+
+        if _type->copy_assign == null {
+            let function = this.LowerImplicitDeclaration("operator=".ToString(), _type, this.context.ReferenceType(_type, false), true, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for i in 0.._type->length as u64 {
+                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
+                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_dereferenced, index));
+                this.LowerFieldCopyAssignment(this_element, other_element, _type->element, null);
+            }
+
+            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->copy_assign = function;
+        }
+
+        this.scope_manager.PopScope();
+        this.builder.SetCurrentFunction(previous_function);
+        this.builder.SetCurrentBlock(previous_block);
+        this.current_type = previous_type;
+    }
+
+    fn EnsureTupleSpecialMembers(&mut this, _type: *mut HIRTupleType) {
+        let previous_type = this.current_type;
+        let previous_function = this.builder.GetCurrentFunction();
+        let previous_block = this.builder.GetCurrentBlock();
+        let name = (_type as *HIRType)->ToString();
+        this.scope_manager.PushScope(name, true);
+        this.current_type = _type;
+
+        if _type->copy_constructor == null {
+            let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for i in 0.._type->elements.Size() {
+                let this_element = this.builder.TupleAccess(this_dereferenced, i);
+                let other_element = this.builder.TupleAccess(other_dereferenced, i);
+                this.LowerFieldCopyConstructor(this_element, other_element, _type->elements[i], null);
+            }
+
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->copy_constructor = function;
+        }
+
+        if _type->destructor == null {
+            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            for i in 0.._type->elements.Size() {
+                let this_element = this.builder.TupleAccess(this_dereferenced, i);
+                this.LowerFieldDestructor(this_element, _type->elements[i], null);
+            }
+
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->destructor = function;
+        }
+
+        if _type->copy_assign == null {
+            let function = this.LowerImplicitDeclaration("operator=".ToString(), _type, this.context.ReferenceType(_type, false), true, null);
+            this.scope_manager.PushScope(function->name, false);
+            this.builder.SetCurrentFunction(function);
+            let block = this.builder.BuildBlockStatement();
+            this.builder.SetCurrentBlock(block);
+            function->body = block;
+
+            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
+            let this_dereferenced = this.builder.Dereference(this_reference);
+
+            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
+            let other_dereferenced = this.builder.Dereference(other_reference);
+
+            for i in 0.._type->elements.Size() {
+                let this_element = this.builder.TupleAccess(this_dereferenced, i);
+                let other_element = this.builder.TupleAccess(other_dereferenced, i);
+                this.LowerFieldCopyAssignment(this_element, other_element, _type->elements[i], null);
+            }
+
+            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.scope_manager.PopScope();
+            this.module->declarations.PushBack(function);
+            _type->copy_assign = function;
+        }
+
+        this.scope_manager.PopScope();
+        this.builder.SetCurrentFunction(previous_function);
+        this.builder.SetCurrentBlock(previous_block);
+        this.current_type = previous_type;
+    }
+
     pub fn LowerClassDeclarationThirdPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
@@ -599,8 +784,8 @@ class HIRLowerer {
             let tuple = _type as *HIRTupleType;
 
             for i in 0..tuple->elements.Size() {
-                let this_element = this.builder.Dereference(this.builder.TupleAccess(this_field, i));
-                let other_element = this.builder.Dereference(this.builder.TupleAccess(other_field, i));
+                let this_element = this.builder.TupleAccess(this_field, i);
+                let other_element = this.builder.TupleAccess(other_field, i);
                 this.LowerFieldCopyConstructor(this_element, other_element, tuple->elements[i], node);
             }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
@@ -646,8 +831,8 @@ class HIRLowerer {
             let tuple = _type as *HIRTupleType;
 
             for i in 0..tuple->elements.Size() {
-                let this_element = this.builder.Dereference(this.builder.TupleAccess(this_field, i));
-                let other_element = this.builder.Dereference(this.builder.TupleAccess(other_field, i));
+                let this_element = this.builder.TupleAccess(this_field, i);
+                let other_element = this.builder.TupleAccess(other_field, i);
                 this.LowerFieldCopyAssignment(this_element, other_element, tuple->elements[i], node);
             }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
@@ -688,7 +873,7 @@ class HIRLowerer {
             let tuple = _type as *HIRTupleType;
 
             for i in 0..tuple->elements.Size() {
-                this.LowerFieldDestructor(this.builder.Dereference(this.builder.TupleAccess(this_field, i)), tuple->elements[i], node);
+                this.LowerFieldDestructor(this.builder.TupleAccess(this_field, i), tuple->elements[i], node);
             }
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let mut function: *HIRFunctionDeclaration = null;
@@ -2148,7 +2333,9 @@ class HIRLowerer {
                 }
             }
 
-            return this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
+            let literal = this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
+            this.temporaries.PushBack(literal);
+            return literal;
         } else if literal->kind == ASTLiteralKind::Tuple {
             let mut elements = Vector<*HIRExpression>();
             let mut types = Vector<*HIRType>();

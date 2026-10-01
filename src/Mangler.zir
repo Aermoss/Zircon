@@ -40,6 +40,15 @@ class Mangler {
             result += 'f' + String::FromInteger(_type->Width() as u64);
         } else if _type->IsPointer() {
             result += (_type->IsReference() ? 'R' : 'P') + Mangler::MangleType(_type->Pointee());
+        } else if _type->IsArray() {
+            let array = _type as *HIRArrayType;
+            result += 'A' + String::FromInteger(array->length as u64) + '_' + Mangler::MangleType(array->element);
+        } else if _type->IsTuple() {
+            result += 'T';
+
+            for element in (_type as *HIRTupleType)->elements {
+                result += Mangler::MangleType(element);
+            } result += 'E';
         } else if _type->IsFunction() {
             result += 'F';
             result += Mangler::MangleType(_type->Return());

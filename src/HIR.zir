@@ -713,7 +713,10 @@ class HIRReferenceType : HIRType {
 
 class HIRArrayType : HIRType {
     pub element: *HIRType,
-    pub length: usize;
+    pub length: usize,
+    pub copy_constructor: *mut HIRFunctionDeclaration = null,
+    pub copy_assign: *mut HIRFunctionDeclaration = null,
+    pub destructor: *mut HIRFunctionDeclaration = null;
 
     HIRArrayType(&mut this, element: *HIRType, length: usize) : HIRType(HIRTypeKind::Array) {
         (this.element, this.length) = (element, length);
@@ -725,7 +728,10 @@ class HIRArrayType : HIRType {
 }
 
 class HIRTupleType : HIRType {
-    pub elements: Vector<*HIRType>;
+    pub elements: Vector<*HIRType>,
+    pub copy_constructor: *mut HIRFunctionDeclaration = null,
+    pub copy_assign: *mut HIRFunctionDeclaration = null,
+    pub destructor: *mut HIRFunctionDeclaration = null;
 
     HIRTupleType(&mut this, elements: Vector<*HIRType>) : HIRType(HIRTypeKind::Tuple) {
         this.elements = elements;
@@ -1577,7 +1583,7 @@ class HIRTupleAccessExpression : HIRExpression {
     pub instance: *HIRExpression,
     pub index: usize;
 
-    HIRTupleAccessExpression(&mut this, instance: *HIRExpression, index: usize, _type: *HIRType) : HIRExpression(HIRExpressionKind::TupleAccess, _type) {
+    HIRTupleAccessExpression(&mut this, instance: *HIRExpression, index: usize, _type: *HIRType) : HIRExpression(HIRExpressionKind::TupleAccess, _type, HIRExpressionCategory::Place, instance->mutable) {
         (this.instance, this.index) = (instance, index);
     }
 
@@ -2585,7 +2591,9 @@ class HIRModule {
 }
 
 class HIRContext {
-    pub arena: Arena;
+    pub arena: Arena,
+    array_types: Vector<*mut HIRArrayType>,
+    tuple_types: Vector<*mut HIRTupleType>;
 
     HIRContext(&mut this) {}
 
@@ -2630,11 +2638,42 @@ class HIRContext {
     }
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
-        return this.arena.New<HIRArrayType>(element, length);
+        for existing in this.array_types {
+            if existing->length == length && *existing->element == *element {
+                return existing;
+            }
+        }
+
+        let _type = this.arena.New<HIRArrayType>(element, length);
+        this.array_types.PushBack(_type);
+        return _type;
     }
 
     pub fn TupleType(&mut this, elements: Vector<*HIRType>) -> *mut HIRTupleType {
-        return this.arena.New<HIRTupleType>(elements);
+        for existing in this.tuple_types {
+            if existing->elements.Size() != elements.Size() {
+                continue;
+            }
+
+            let mut same = true;
+
+            for i in 0..elements.Size() {
+                let (left, right): (*HIRType, *HIRType) = (existing->elements[i], elements[i]);
+
+                if left != right && (left == null || right == null || *left != *right) {
+                    same = false;
+                    break;
+                }
+            }
+
+            if same {
+                return existing;
+            }
+        }
+
+        let _type = this.arena.New<HIRTupleType>(elements);
+        this.tuple_types.PushBack(_type);
+        return _type;
     }
 
     pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) -> *mut HIRFunctionType {
