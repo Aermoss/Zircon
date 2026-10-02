@@ -428,6 +428,10 @@ class HIRType {
         return this.IsClass() || this.IsStructure();
     }
 
+    pub fn HasSpecialMembers(&this) -> bool {
+        return this.IsClass() || this.IsStructure() || this.IsVariant() || this.IsArray() || this.IsTuple();
+    }
+
     pub fn Index(&this, name: &String) -> isize {
         let fields = this.Fields();
 

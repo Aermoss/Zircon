@@ -422,7 +422,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
+            if parameter->_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -678,6 +678,99 @@ class HIRLowerer {
         this.current_type = previous_type;
     }
 
+    fn GetCopyConstructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        if _type->IsArray() {
+            this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
+            return (_type as *HIRArrayType)->copy_constructor;
+        } else if _type->IsTuple() {
+            this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
+            return (_type as *HIRTupleType)->copy_constructor;
+        } else if _type->IsClass() {
+            let other_type = this.context.ReferenceType(_type, false);
+
+            for candidate in (_type as *HIRClassType)->declaration->constructors {
+                if candidate->parameters.Size() == 2 {
+                    let parameter: *HIRParameterDeclaration = candidate->parameters[1];
+
+                    if *parameter->_type == *other_type {
+                        return candidate;
+                    }
+                }
+            } return null;
+        } else if _type->IsStructure() {
+            return (_type as *HIRStructureType)->declaration->copy_constructor;
+        } else if _type->IsVariant() {
+            return (_type as *HIRVariantType)->declaration->copy_constructor;
+        } else {
+            return null;
+        }
+    }
+
+    fn GetCopyAssign(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        if _type->IsArray() {
+            this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
+            return (_type as *HIRArrayType)->copy_assign;
+        } else if _type->IsTuple() {
+            this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
+            return (_type as *HIRTupleType)->copy_assign;
+        } else if _type->IsClass() {
+            let other_type = this.context.ReferenceType(_type, false);
+            let return_type = this.context.ReferenceType(_type, false);
+
+            for method in (_type as *HIRClassType)->declaration->methods {
+                if method->name == "operator=" && method->parameters.Size() == 2 {
+                    let parameter: *HIRParameterDeclaration = method->parameters[1];
+
+                    if *parameter->_type == *other_type && *method->_return == *return_type {
+                        return method;
+                    }
+                }
+            } return null;
+        } else if _type->IsStructure() {
+            return (_type as *HIRStructureType)->declaration->copy_assign;
+        } else if _type->IsVariant() {
+            return (_type as *HIRVariantType)->declaration->copy_assign;
+        } else {
+            return null;
+        }
+    }
+
+    fn GetDestructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        if _type->IsArray() {
+            this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
+            return (_type as *HIRArrayType)->destructor;
+        } else if _type->IsTuple() {
+            this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
+            return (_type as *HIRTupleType)->destructor;
+        } else if _type->IsClass() {
+            return (_type as *HIRClassType)->declaration->destructor;
+        } else if _type->IsStructure() {
+            return (_type as *HIRStructureType)->declaration->destructor;
+        } else if _type->IsVariant() {
+            return (_type as *HIRVariantType)->declaration->destructor;
+        } else {
+            return null;
+        }
+    }
+
+    fn LowerCopyOrMoveValue(&mut this, value: *HIRExpression) -> *HIRExpression {
+        if !value->_type->HasSpecialMembers() {
+            return value;
+        }
+
+        if value->category == HIRExpressionCategory::Place {
+            let function = this.GetCopyConstructor(value->_type);
+            if function == null { return null; }
+            let mut values = Vector<*HIRExpression>();
+            values.PushBack(this.builder.AddressOf(value));
+            let callee = this.builder.ReferenceDeclaration(function, false);
+            return this.builder.Constructor(callee, values, value->_type);
+        }
+
+        this.temporaries.Remove(value);
+        return value;
+    }
+
     pub fn LowerClassDeclarationThirdPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
@@ -771,44 +864,12 @@ class HIRLowerer {
     }
 
     fn LowerFieldCopyConstructor(&mut this, this_field: *HIRExpression, other_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if _type->IsArray() {
-            let array = _type as *HIRArrayType;
-
-            for i in 0..array->length as u64 {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_field, index));
-                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_field, index));
-                this.LowerFieldCopyConstructor(this_element, other_element, array->element, node);
-            }
-        } else if _type->IsTuple() {
-            let tuple = _type as *HIRTupleType;
-
-            for i in 0..tuple->elements.Size() {
-                let this_element = this.builder.TupleAccess(this_field, i);
-                let other_element = this.builder.TupleAccess(other_field, i);
-                this.LowerFieldCopyConstructor(this_element, other_element, tuple->elements[i], node);
-            }
-        } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
+        if _type->HasSpecialMembers() {
+            let function = this.GetCopyConstructor(_type);
+            if function == null { return; }
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.AddressOf(this_field));
             values.PushBack(this.builder.AddressOf(other_field));
-            let mut function: *HIRFunctionDeclaration = null;
-
-            if _type->IsClass() {
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
-                function = this.ResolveOverload(candidates, values, node, false);
-                if function == null { return; }
-            } else if _type->IsStructure() {
-                function = (_type as *HIRStructureType)->declaration->copy_constructor;
-            } else {
-                function = (_type as *HIRVariantType)->declaration->copy_constructor;
-            }
-
             let call = this.LowerResolvedCallExpression(function, values, node);
             if call == null { return; }
             this.builder.BuildExpressionStatement(call);
@@ -818,40 +879,12 @@ class HIRLowerer {
     }
 
     fn LowerFieldCopyAssignment(&mut this, this_field: *HIRExpression, other_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if _type->IsArray() {
-            let array = _type as *HIRArrayType;
-
-            for i in 0..array->length as u64 {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_field, index));
-                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_field, index));
-                this.LowerFieldCopyAssignment(this_element, other_element, array->element, node);
-            }
-        } else if _type->IsTuple() {
-            let tuple = _type as *HIRTupleType;
-
-            for i in 0..tuple->elements.Size() {
-                let this_element = this.builder.TupleAccess(this_field, i);
-                let other_element = this.builder.TupleAccess(other_field, i);
-                this.LowerFieldCopyAssignment(this_element, other_element, tuple->elements[i], node);
-            }
-        } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
+        if _type->HasSpecialMembers() {
+            let function = this.GetCopyAssign(_type);
+            if function == null { return; }
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.AddressOf(this_field));
             values.PushBack(this.builder.AddressOf(other_field));
-            let mut function: *HIRFunctionDeclaration = null;
-
-            if _type->IsClass() {
-                let candidates = _type->GetCandidates("operator=".ToString(), node, false);
-                if candidates.Empty() { return; }
-                function = this.ResolveOverload(candidates, values, node, false);
-                if function == null { return; }
-            } else if _type->IsStructure() {
-                function = (_type as *HIRStructureType)->declaration->copy_assign;
-            } else {
-                function = (_type as *HIRVariantType)->declaration->copy_assign;
-            }
-
             let call = this.LowerResolvedCallExpression(function, values, node);
             if call == null { return; }
             this.builder.BuildExpressionStatement(call);
@@ -861,37 +894,14 @@ class HIRLowerer {
     }
 
     fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if _type->IsArray() {
-            let array = _type as *HIRArrayType;
-
-            for i in 0..array->length as u64 {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_field, index));
-                this.LowerFieldDestructor(this_element, array->element, node);
-            }
-        } else if _type->IsTuple() {
-            let tuple = _type as *HIRTupleType;
-
-            for i in 0..tuple->elements.Size() {
-                this.LowerFieldDestructor(this.builder.TupleAccess(this_field, i), tuple->elements[i], node);
-            }
-        } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
-            let mut function: *HIRFunctionDeclaration = null;
-
-            if _type->IsClass() {
-                function = (_type as *HIRClassType)->declaration->destructor;
-            } else if _type->IsStructure() {
-                function = (_type as *HIRStructureType)->declaration->destructor;
-            } else {
-                function = (_type as *HIRVariantType)->declaration->destructor;
-            }
-
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(this.builder.AddressOf(this_field));
-            let call = this.LowerResolvedCallExpression(function, values, node);
-            if call == null { return; }
-            this.builder.BuildExpressionStatement(call);
-        }
+        if !_type->HasSpecialMembers() { return; }
+        let function = this.GetDestructor(_type);
+        if function == null { return; }
+        let mut values = Vector<*HIRExpression>();
+        values.PushBack(this.builder.AddressOf(this_field));
+        let call = this.LowerResolvedCallExpression(function, values, node);
+        if call == null { return; }
+        this.builder.BuildExpressionStatement(call);
     }
 
     fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parents: &Vector<*HIRType>, fields: &Vector<*HIRFieldDeclaration>) {
@@ -902,7 +912,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
+            if parameter->_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -970,7 +980,7 @@ class HIRLowerer {
         for field in fields {
             let this_field = this.builder.FieldAccess(this_dereferenced, field);
 
-            if field->_type->IsClass() || field->_type->IsStructure() || field->_type->IsVariant() {
+            if field->_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this_field);
             }
         }
@@ -978,7 +988,7 @@ class HIRLowerer {
         for parameter in declaration->parameters {
             this.scope_manager.current->Set(parameter->name, parameter, false, function);
 
-            if parameter->_type->IsClass() || parameter->_type->IsStructure() || parameter->_type->IsVariant() {
+            if parameter->_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
         }
@@ -1927,35 +1937,8 @@ class HIRLowerer {
                 value = this.builder.Dereference(value);
             }
 
-            if value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant() {
-                if value->category == HIRExpressionCategory::Place {
-                    let mut values = Vector<*HIRExpression>();
-                    values.PushBack(this.builder.AddressOf(value));
-                    let mut function: *HIRFunctionDeclaration = null;
-
-                    if value->_type->IsClass() {
-                        let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                        for candidate in (value->_type as *HIRClassType)->declaration->constructors {
-                            candidates.PushBack(candidate);
-                        }
-
-                        values.Insert(0, this.builder.NullLiteral());
-                        function = this.ResolveOverload(candidates, values, _return->expression, false);
-                        if function == null { return; }
-                        values.RemoveAt(0);
-                    } else if value->_type->IsStructure() {
-                        function = (value->_type as *HIRStructureType)->declaration->copy_constructor;
-                    } else {
-                        function = (value->_type as *HIRVariantType)->declaration->copy_constructor;
-                    }
-
-                    let callee = this.builder.ReferenceDeclaration(function, false);
-                    value = this.builder.Constructor(callee, values, value->_type);
-                } else {
-                    this.temporaries.Remove(value);
-                }
-            }
+            value = this.LowerCopyOrMoveValue(value);
+            if value == null { return; }
 
             if !return_type->IsCompatible(value->_type) {
                 Logger::Log("Incompatible return types. ('" + return_type->ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
@@ -2043,16 +2026,8 @@ class HIRLowerer {
             }
 
             if instance == exception { continue; }
-            let mut function: *HIRFunctionDeclaration = null;
-
-            if instance->_type->IsClass() {
-                function = (instance->_type as *HIRClassType)->declaration->destructor;
-            } else if instance->_type->IsStructure() {
-                function = (instance->_type as *HIRStructureType)->declaration->destructor;
-            } else {
-                function = (instance->_type as *HIRVariantType)->declaration->destructor;
-            }
-
+            let function = this.GetDestructor(instance->_type);
+            if function == null { continue; }
             let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
             destructors.Insert(0, destructor);
@@ -2067,16 +2042,8 @@ class HIRLowerer {
 
         for instance in this.temporaries.Reverse() {
             if instance == exception { continue; }
-            let mut function: *HIRFunctionDeclaration = null;
-
-            if instance->_type->IsClass() {
-                function = (instance->_type as *HIRClassType)->declaration->destructor;
-            } else if instance->_type->IsStructure() {
-                function = (instance->_type as *HIRStructureType)->declaration->destructor;
-            } else {
-                function = (instance->_type as *HIRVariantType)->declaration->destructor;
-            }
-
+            let function = this.GetDestructor(instance->_type);
+            if function == null { continue; }
             let callee = this.builder.ReferenceDeclaration(function, false);
             let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
             destructors.PushBack(destructor);
@@ -2106,16 +2073,8 @@ class HIRLowerer {
                     }
                 }
 
-                let mut function: *HIRFunctionDeclaration = null;
-
-                if instance->_type->IsClass() {
-                    function = (instance->_type as *HIRClassType)->declaration->destructor;
-                } else if instance->_type->IsStructure() {
-                    function = (instance->_type as *HIRStructureType)->declaration->destructor;
-                } else {
-                    function = (instance->_type as *HIRVariantType)->declaration->destructor;
-                }
-
+                let function = this.GetDestructor(instance->_type);
+                if function == null { continue; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
                 let destructor = this.builder.Destructor(this.builder.AddressOf(instance), callee);
                 destructors.PushBack(destructor);
@@ -2343,37 +2302,8 @@ class HIRLowerer {
             for element in (literal as *ASTTupleLiteral)->elements {
                 let mut value = this.Coerce(this.LowerExpression(element));
                 if value == null { return null; }
-
-                if value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant() {
-                    if value->category == HIRExpressionCategory::Place {
-                        let mut values = Vector<*HIRExpression>();
-                        values.PushBack(this.builder.AddressOf(value));
-                        let mut function: *HIRFunctionDeclaration = null;
-
-                        if value->_type->IsClass() {
-                            let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                            for candidate in (value->_type as *HIRClassType)->declaration->constructors {
-                                candidates.PushBack(candidate);
-                            }
-
-                            values.Insert(0, this.builder.NullLiteral());
-                            function = this.ResolveOverload(candidates, values, element, false);
-                            if function == null { return null; }
-                            values.RemoveAt(0);
-                        } else if value->_type->IsStructure() {
-                            function = (value->_type as *HIRStructureType)->declaration->copy_constructor;
-                        } else {
-                            function = (value->_type as *HIRVariantType)->declaration->copy_constructor;
-                        }
-
-                        let callee = this.builder.ReferenceDeclaration(function, false);
-                        value = this.builder.Constructor(callee, values, value->_type);
-                    } else {
-                        this.temporaries.Remove(value);
-                    }
-                }
-
+                value = this.LowerCopyOrMoveValue(value);
+                if value == null { return null; }
                 types.PushBack(value->_type);
                 elements.PushBack(value);
             }
@@ -2419,7 +2349,7 @@ class HIRLowerer {
                     if value == null { return null; }
                     values[index as usize] = value;
 
-                    if (value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant()) && value->category == HIRExpressionCategory::Value {
+                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
                         this.temporaries.Remove(value);
                     }
                 }
@@ -2472,7 +2402,7 @@ class HIRLowerer {
                     if value == null { return null; }
                     values[index as usize] = value;
 
-                    if (value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant()) && value->category == HIRExpressionCategory::Value {
+                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
                         this.temporaries.Remove(value);
                     }
                 }
@@ -2518,7 +2448,7 @@ class HIRLowerer {
             right = this.Coerce(right, left->_type);
         }
 
-        if left->_type->IsClass() || left->_type->IsStructure() || left->_type->IsVariant() {
+        if left->_type->HasSpecialMembers() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(left);
             values.PushBack(right);
@@ -2536,11 +2466,8 @@ class HIRLowerer {
                     return null;
                 }
 
-                if left->_type->IsStructure() {
-                    function = (left->_type as *HIRStructureType)->declaration->copy_assign;
-                } else {
-                    function = (left->_type as *HIRVariantType)->declaration->copy_assign;
-                }
+                function = this.GetCopyAssign(left->_type);
+                if function == null { return null; }
             }
 
             return this.LowerResolvedCallExpression(function, values, assignment);
@@ -2859,7 +2786,7 @@ class HIRLowerer {
                 }
 
                 for value in values {
-                    if (value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant()) && value->category == HIRExpressionCategory::Value {
+                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
                         this.temporaries.Remove(value);
                     }
                 }
@@ -2977,35 +2904,8 @@ class HIRLowerer {
                 value = this.builder.Dereference(value);
             }
 
-            if value->_type->IsClass() || value->_type->IsStructure() || value->_type->IsVariant() {
-                if value->category == HIRExpressionCategory::Place {
-                    let mut values = Vector<*HIRExpression>();
-                    values.PushBack(this.builder.AddressOf(value));
-                    let mut function: *HIRFunctionDeclaration = null;
-
-                    if value->_type->IsClass() {
-                        let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                        for candidate in (value->_type as *HIRClassType)->declaration->constructors {
-                            candidates.PushBack(candidate);
-                        }
-
-                        values.Insert(0, this.builder.NullLiteral());
-                        function = this.ResolveOverload(candidates, values, node, false);
-                        if function == null { return false; }
-                        values.RemoveAt(0);
-                    } else if value->_type->IsStructure() {
-                        function = (value->_type as *HIRStructureType)->declaration->copy_constructor;
-                    } else {
-                        function = (value->_type as *HIRVariantType)->declaration->copy_constructor;
-                    }
-
-                    let callee = this.builder.ReferenceDeclaration(function, false);
-                    value = this.builder.Constructor(callee, values, value->_type);
-                } else {
-                    this.temporaries.Remove(value);
-                }
-            }
+            value = this.LowerCopyOrMoveValue(value);
+            if value == null { return false; }
 
             if !parameter_type->IsCompatible(value->_type) {
                 if callee->kind == HIRExpressionKind::DeclarationReference {
@@ -3042,7 +2942,7 @@ class HIRLowerer {
 
         let call = this.builder.Call(callee, values);
 
-        if callee->_type->Return().HasFields() {
+        if (callee->_type as *HIRFunctionType)->_return->HasSpecialMembers() {
             this.temporaries.PushBack(call);
         } return call;
     }
@@ -3754,18 +3654,12 @@ class HIRLowerer {
                 }
             }
 
-            let has_constructor = target_type->IsClass() || target_type->IsStructure() || target_type->IsVariant();
-
-            if has_constructor && (value != null ? *target_type == *value->_type && value->category == HIRExpressionCategory::Place : target_type->IsClass()) {
-                let mut values = Vector<*HIRExpression>();
-
+            if target_type->HasSpecialMembers() {
                 if value != null {
-                    values.PushBack(this.builder.AddressOf(value));
-                }
-
-                let mut function: *HIRFunctionDeclaration = null;
-
-                if target_type->IsClass() {
+                    value = this.LowerCopyOrMoveValue(value);
+                    if value == null { return null; }
+                } else if target_type->IsClass() {
+                    let mut values = Vector<*HIRExpression>();
                     let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                     for candidate in (target_type as *HIRClassType)->declaration->constructors {
@@ -3773,23 +3667,18 @@ class HIRLowerer {
                     }
 
                     values.Insert(0, this.builder.NullLiteral());
-                    function = this.ResolveOverload(candidates, values, pattern, value == null);
+                    let function = this.ResolveOverload(candidates, values, pattern, true);
                     if function == null { return null; }
                     values.RemoveAt(0);
-                } else if target_type->IsStructure() {
-                    function = (target_type as *HIRStructureType)->declaration->copy_constructor;
-                } else {
-                    function = (target_type as *HIRVariantType)->declaration->copy_constructor;
+                    let callee = this.builder.ReferenceDeclaration(function, false);
+                    value = this.builder.Constructor(callee, values, target_type);
                 }
-
-                let callee = this.builder.ReferenceDeclaration(function, false);
-                value = this.builder.Constructor(callee, values, target_type);
             }
 
             let lowered = this.builder.IdentifierPattern(identifier->name, target_type, value, identifier->mutable);
             this.scope_manager.current->Set(identifier->name, lowered, pattern);
 
-            if has_constructor {
+            if target_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceBinding(lowered));
             } return lowered;
         } else if pattern->kind == ASTPatternKind::Tuple {

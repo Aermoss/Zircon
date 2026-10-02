@@ -165,7 +165,7 @@ class MIRLowerer {
     }
 
     fn IsAggregate(&mut this, _type: *HIRType) -> bool {
-        return _type != null && _type->HasFields();
+        return _type != null && _type->HasSpecialMembers();
     }
 
     fn IsIndirectAggregate(&mut this, _type: *HIRType) -> bool {
