@@ -1468,21 +1468,49 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.TagAccess(this_dereferenced), this.builder.TagAccess(other_dereferenced)));
-
-            for member in declaration->members {
+            for other_member in declaration->members {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
-                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
-                let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                let other_tag = this.builder.TagAccess(other_dereferenced);
+                let member_tag = this.builder.IntegerLiteral(other_member->index as u64, this.context.IntegerType(8, false));
+                let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, other_tag, member_tag, this.context.BooleanType()));
                 let prev_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.BuildBlockStatement();
                 this.builder.SetCurrentBlock(then_block);
 
-                for field in member->fields {
-                    this.LowerFieldCopyAssignment(this.builder.MemberAccess(this_dereferenced, member, field), this.builder.MemberAccess(other_dereferenced, member, field), field->_type, variant);
+                let same_condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                let same_block = this.builder.BuildBlockStatement();
+                this.builder.SetCurrentBlock(same_block);
+
+                for field in other_member->fields {
+                    this.LowerFieldCopyAssignment(this.builder.MemberAccess(this_dereferenced, other_member, field), this.builder.MemberAccess(other_dereferenced, other_member, field), field->_type, variant);
                 }
 
-                this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+                let different_block = this.builder.BuildBlockStatement();
+                this.builder.SetCurrentBlock(different_block);
+
+                for this_member in declaration->members {
+                    if this_member->index == other_member->index { continue; }
+                    let member_tag = this.builder.IntegerLiteral(this_member->index as u64, this.context.IntegerType(8, false));
+                    let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
+                    let prev_block = this.builder.GetCurrentBlock();
+                    let then_block = this.builder.BuildBlockStatement();
+                    this.builder.SetCurrentBlock(then_block);
+
+                    for field in this_member->fields {
+                        this.LowerFieldDestructor(this.builder.MemberAccess(this_dereferenced, this_member, field), field->_type, variant);
+                    }
+
+                    this.builder.SetCurrentBlock(prev_block);
+                    this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+                }
+
+                for field in other_member->fields {
+                    this.LowerFieldCopyConstructor(this.builder.MemberAccess(this_dereferenced, other_member, field), this.builder.MemberAccess(other_dereferenced, other_member, field), field->_type, variant);
+                }
+
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this_tag, member_tag));
+                this.builder.SetCurrentBlock(then_block);
+                this.builder.BuildIfStatement(same_condition, Vector<*HIRExpression>(), same_block, different_block);
                 this.builder.SetCurrentBlock(prev_block);
                 this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
             }
@@ -2280,7 +2308,9 @@ class HIRLowerer {
             let mut _type: *HIRType = null;
 
             for element in (literal as *ASTArrayLiteral)->elements {
-                let value = this.Coerce(this.LowerExpression(element));
+                let mut value = this.Coerce(this.LowerExpression(element));
+                if value == null { return null; }
+                value = this.LowerCopyOrMoveValue(value);
                 if value == null { return null; }
                 elements.PushBack(value);
 
@@ -2345,13 +2375,11 @@ class HIRLowerer {
                     }
 
                     let declaration: *HIRFieldDeclaration = fields[index as usize];
-                    let value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    if value == null { return null; }
+                    value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
                     values[index as usize] = value;
-
-                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
-                        this.temporaries.Remove(value);
-                    }
                 }
 
                 let literal = this.builder.StructureLiteral(values, _type);
@@ -2398,13 +2426,11 @@ class HIRLowerer {
                     }
 
                     let declaration: *HIRVariantField = member->fields[index as usize];
-                    let value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    if value == null { return null; }
+                    value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
                     values[index as usize] = value;
-
-                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
-                        this.temporaries.Remove(value);
-                    }
                 }
 
                 let literal = this.builder.VariantLiteral(member, values);
