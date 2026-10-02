@@ -2643,7 +2643,7 @@ class HIRContext {
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
         for existing in this.array_types {
-            if existing->length == length && *existing->element == *element {
+            if existing->element->IsSame(element) {
                 return existing;
             }
         }
@@ -2662,9 +2662,7 @@ class HIRContext {
             let mut same = true;
 
             for i in 0..elements.Size() {
-                let (left, right): (*HIRType, *HIRType) = (existing->elements[i], elements[i]);
-
-                if left != right && (left == null || right == null || *left != *right) {
+                if !existing->elements[i]->IsSame(elements[i]) {
                     same = false;
                     break;
                 }
