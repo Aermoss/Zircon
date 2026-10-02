@@ -76,8 +76,7 @@ class ASTPath : ASTNode {
                 result += "<";
 
                 for j in 0..segment.types.Size() {
-                    let _type: *ASTType = segment.types[j];
-                    result += _type->kind.ToString();
+                    result += segment.types[j]->kind.ToString();
 
                     if j < segment.types.Size() - 1 {
                         result += ", ";
@@ -197,8 +196,7 @@ class ASTTupleType : ASTType {
 
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
-            let element: *ASTType = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ')';
     }
 }
@@ -215,8 +213,7 @@ class ASTFunctionType : ASTType {
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
-            let parameter: *ASTType = this.parameters[i];
-            result += parameter->ToString();
+            result += this.parameters[i]->ToString();
         }
 
         if this.var_arg {
@@ -517,8 +514,7 @@ class ASTArrayLiteral : ASTLiteral {
 
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
-            let element: *ASTExpression = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ']';
     }
 }
@@ -533,8 +529,7 @@ class ASTTupleLiteral : ASTLiteral {
 
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
-            let value: *ASTExpression = this.elements[i];
-            result += value->ToString();
+            result += this.elements[i]->ToString();
         } return result + ')';
     }
 }
@@ -678,8 +673,7 @@ class ASTCallExpression : ASTExpression {
 
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
-            let argument: *ASTExpression = this.arguments[i];
-            result += argument->ToString();
+            result += this.arguments[i]->ToString();
         } return result + ')';
     }
 }
@@ -771,8 +765,7 @@ class ASTNewExpression : ASTExpression {
 
             for i in 0..this.arguments.Size() {
                 if i != 0 { result += ", "; }
-                let argument: *ASTExpression = this.arguments[i];
-                result += argument->ToString();
+                result += this.arguments[i]->ToString();
             } result += ')';
         } return result;
     }

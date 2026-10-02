@@ -38,15 +38,13 @@ fn Hash(x: i32, y: i32, seed: i32) -> i32 {
         y_index += 256;
     }
 
-    let y_value: u8 = hash[y_index as usize];
-    let mut x_index = (y_value as i32 + x) % 256;
+    let mut x_index = (hash[y_index as usize] as i32 + x) % 256;
 
     if x_index < 0 {
         x_index += 256;
     }
 
-    let x_value: u8 = hash[x_index as usize];
-    return x_value as i32;
+    return hash[x_index as usize] as i32;
 }
 
 fn Lerp(x: f64, y: f64, t: f64) -> f64 {

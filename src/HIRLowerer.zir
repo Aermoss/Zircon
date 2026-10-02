@@ -398,7 +398,7 @@ class HIRLowerer {
             let start = function->types.Size();
 
             for i in start..instance->types.Size() {
-                let _type: *HIRType = instance->types[i];
+                let _type = instance->types[i];
                 let name = function->pack_name + String::FromInteger((i - start) as u64);
                 parameters.PushBack(this.builder.BuildParameterDeclaration(name, _type, false));
                 parameter_types.PushBack(_type);
@@ -509,11 +509,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -537,7 +537,7 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -560,11 +560,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -603,11 +603,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -630,7 +630,7 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -652,11 +652,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -686,15 +686,9 @@ class HIRLowerer {
             this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
             return (_type as *HIRTupleType)->copy_constructor;
         } else if _type->IsClass() {
-            let other_type = this.context.ReferenceType(_type, false);
-
             for candidate in (_type as *HIRClassType)->declaration->constructors {
-                if candidate->parameters.Size() == 2 {
-                    let parameter: *HIRParameterDeclaration = candidate->parameters[1];
-
-                    if *parameter->_type == *other_type {
-                        return candidate;
-                    }
+                if candidate->parameters.Size() == 2 && *candidate->parameters[1]->_type == *this.context.ReferenceType(_type, false) {
+                    return candidate;
                 }
             } return null;
         } else if _type->IsStructure() {
@@ -714,15 +708,12 @@ class HIRLowerer {
             this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
             return (_type as *HIRTupleType)->copy_assign;
         } else if _type->IsClass() {
-            let other_type = this.context.ReferenceType(_type, false);
-            let return_type = this.context.ReferenceType(_type, false);
-
             for method in (_type as *HIRClassType)->declaration->methods {
                 if method->name == "operator=" && method->parameters.Size() == 2 {
-                    let parameter: *HIRParameterDeclaration = method->parameters[1];
-
-                    if *parameter->_type == *other_type && *method->_return == *return_type {
-                        return method;
+                    if *method->parameters[1]->_type == *this.context.ReferenceType(_type, false) {
+                        if *method->_return == *this.context.ReferenceType(_type, false) {
+                            return method;
+                        }
                     }
                 }
             } return null;
@@ -782,12 +773,8 @@ class HIRLowerer {
             if function != null {
                 declaration->constructors.PushBack(function);
 
-                if function->parameters.Size() == 2 {
-                    let parameter: *HIRParameterDeclaration = function->parameters[1];
-
-                    if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
-                        has_copy_constructor = true;
-                    }
+                if function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
+                    has_copy_constructor = true;
                 }
             }
         }
@@ -817,9 +804,7 @@ class HIRLowerer {
                 declaration->methods.PushBack(function);
 
                 if method->name == "operator=" && function->parameters.Size() == 2 {
-                    let parameter: *HIRParameterDeclaration = function->parameters[1];
-
-                    if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
+                    if *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
                         if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
                             has_copy_assign = true;
                         }
@@ -921,7 +906,7 @@ class HIRLowerer {
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
 
-        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
+        let this_parameter = declaration->parameters[0];
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -973,7 +958,7 @@ class HIRLowerer {
         this.builder.SetCurrentFunction(declaration);
         this.scope_manager.PushScope(function->name, false);
 
-        let this_parameter: *HIRParameterDeclaration = declaration->parameters[0];
+        let this_parameter = declaration->parameters[0];
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -1015,29 +1000,25 @@ class HIRLowerer {
 
         for constructor in _class->constructors {
             if constructor->generic || !constructor->pack_name.Empty() { continue; }
-            let function: *mut HIRFunctionDeclaration = declaration->constructors[index];
+            let function = declaration->constructors[index];
             this.LowerConstructorDeclaration(function, constructor, parents, fields);
             index += 1;
 
-            if function->parameters.Size() == 2 {
-                let parameter: *HIRParameterDeclaration = function->parameters[1];
-
-                if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
-                    has_copy_constructor = true;
-                }
+            if function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
+                has_copy_constructor = true;
             }
         }
 
         if _class->constructors.Empty() {
             let index = declaration->constructors.Size() - (has_copy_constructor ? 1 : 2);
-            let function: *mut HIRFunctionDeclaration = declaration->constructors[index];
+            let function = declaration->constructors[index];
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.BuildBlockStatement();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
             this.LowerFieldConstructors(this_dereferenced, fields);
@@ -1052,11 +1033,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -1077,7 +1058,7 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -1092,14 +1073,12 @@ class HIRLowerer {
 
         for method in _class->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
-            let function: *mut HIRFunctionDeclaration = declaration->methods[index];
+            let function = declaration->methods[index];
             this.LowerFunctionDeclarationSecondPass(function, method);
             index += 1;
 
             if method->name == "operator=" && function->parameters.Size() == 2 {
-                let parameter: *HIRParameterDeclaration = function->parameters[1];
-
-                if *parameter->_type == *this.context.ReferenceType(declaration->_type, false) {
+                if *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
                     if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
                         has_copy_assign = true;
                     }
@@ -1115,11 +1094,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -1207,11 +1186,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -1230,7 +1209,7 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -1249,11 +1228,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -1390,11 +1369,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -1428,7 +1407,7 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
@@ -1460,11 +1439,11 @@ class HIRLowerer {
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
-            let this_parameter: *HIRParameterDeclaration = function->parameters[0];
+            let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            let other_parameter: *HIRParameterDeclaration = function->parameters[1];
+            let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
@@ -2046,7 +2025,7 @@ class HIRLowerer {
         let mut carry = Vector<*HIRExpression>();
 
         for i in 0..this.temporaries.Size() {
-            let instance: *HIRExpression = this.temporaries[i];
+            let instance = this.temporaries[i];
 
             if i < index {
                 carry.PushBack(instance);
@@ -2374,7 +2353,7 @@ class HIRLowerer {
                         return null;
                     }
 
-                    let declaration: *HIRFieldDeclaration = fields[index as usize];
+                    let declaration = fields[index as usize];
                     let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
                     if value == null { return null; }
                     value = this.LowerCopyOrMoveValue(value);
@@ -2425,7 +2404,7 @@ class HIRLowerer {
                         return null;
                     }
 
-                    let declaration: *HIRVariantField = member->fields[index as usize];
+                    let declaration = member->fields[index as usize];
                     let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
                     if value == null { return null; }
                     value = this.LowerCopyOrMoveValue(value);
@@ -2649,7 +2628,7 @@ class HIRLowerer {
                     }
 
                     let mut _type: *HIRType;
-                    let argument: *ASTExpression = call->arguments[0];
+                    let argument = call->arguments[0];
 
                     if argument->kind == ASTExpressionKind::Path {
                         let path = (argument as *ASTPathExpression)->path;
@@ -2875,7 +2854,7 @@ class HIRLowerer {
         let mut best: u64 = 0;
 
         for i in 0..candidates.Size() {
-            let function: *HIRFunctionDeclaration = candidates[i];
+            let function = candidates[i];
             let parameters = function->_type->Parameters();
             if values.Size() != parameters.Size() { continue; }
             let (mut _match, mut score) = (true, 1u64);
@@ -2901,8 +2880,7 @@ class HIRLowerer {
         } else {
             if !test {
                 if !candidates.Empty() {
-                    let candidate: *HIRFunctionDeclaration = candidates[0];
-                    Logger::Log("Invalid arguments for: '" + candidate->name + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid arguments for: '" + candidates[0]->name + "'.", node, LogSeverity::Error);
                 } else {
                     Logger::Log("No candidates found for function call!", node, LogSeverity::Fatal);
                 }
@@ -2919,7 +2897,7 @@ class HIRLowerer {
         let parameter_types = callee->_type->Parameters();
 
         for i in 0..parameter_types.Size() {
-            let parameter_type: *HIRType = parameter_types[i];
+            let parameter_type = parameter_types[i];
             let mut value = this.Coerce(values[i], parameter_type);
 
             if parameter_type->IsReference() && parameter_type->Pointee().IsCompatible(value->_type) {
@@ -3189,7 +3167,15 @@ class HIRLowerer {
             values.PushBack(index);
             let candidates = value->_type->GetCandidates("operator[]".ToString(), index_access, false);
             if candidates.Empty() { return null; }
-            return this.LowerResolvedCallExpression(candidates, values, index_access);
+            let call = this.LowerResolvedCallExpression(candidates, values, index_access);
+            if call == null { return null; }
+
+            if !call->_type->IsReference() {
+                Logger::Log("Expected the result of 'operator[]' to be a reference.", index_access, LogSeverity::Error);
+                return null;
+            }
+
+            return this.builder.Dereference(call);
         }
 
         if !value->_type->IsPointer() && !value->_type->IsArray() {
@@ -3267,7 +3253,7 @@ class HIRLowerer {
 
         if field != null {
             for index in path {
-                let parent: *HIRType = (instance->_type as *HIRClassType)->declaration->parents[index as usize];
+                let parent = (instance->_type as *HIRClassType)->declaration->parents[index as usize];
                 instance = this.builder.Dereference(this.builder.Cast(this.builder.AddressOf(instance), this.context.ReferenceType(parent, instance->mutable)));
             }
 

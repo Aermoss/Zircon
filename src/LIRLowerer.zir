@@ -60,10 +60,9 @@ class LIRLowerer {
 
         for i in 0..function->parameters.Size() {
             if i >= 8 { break; }
-            let parameter: *MIRParameter = function->parameters[i];
             let destination = this.builder.VirtualRegister();
             this.EmitMove(destination, this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64)));
-            this.values[parameter] = destination;
+            this.values[function->parameters[i]] = destination;
         }
 
         for block in function->blocks {
@@ -357,7 +356,7 @@ class LIRLowerer {
         let mut offset: u32 = 0;
 
         for i in 0..index as usize {
-            let field: *MIRType = _type->fields[i];
+            let field = _type->fields[i];
             let field_alignment = this.AlignOf(field);
             offset = this.AlignUp(offset, field_alignment);
             offset += this.SizeOf(field);

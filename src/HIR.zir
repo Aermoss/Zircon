@@ -92,9 +92,8 @@ class HIRType {
         if index != -1 { return this.Fields()[index as usize]; }
 
         for i in 0..parents.Size() {
-            let parent: *HIRType = parents[i];
             let mut parent_path = Vector<u32>();
-            let field = parent->FindField(name, &mut parent_path, ambiguous);
+            let field = parents[i]->FindField(name, &mut parent_path, ambiguous);
             if field == null { continue; }
 
             if result != null {
@@ -113,10 +112,9 @@ class HIRType {
         let parents = (this as *HIRClassType)->declaration->parents;
 
         for i in 0..parents.Size() {
-            let parent: *HIRType = parents[i];
             path.PushBack(i as u32);
 
-            if *parent == other || parent->FindParentPath(other, path) {
+            if *parents[i] == other || parents[i]->FindParentPath(other, path) {
                 return true;
             }
 
@@ -537,7 +535,7 @@ class HIRType {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
 
             for i in 0..left->elements.Size() {
-                let (left_element, right_element): (*HIRType, *HIRType) = (left->elements[i], right->elements[i]);
+                let (left_element, right_element) = (left->elements[i], right->elements[i]);
 
                 if left_element != right_element {
                     if left_element == null || right_element == null { return false; }
@@ -552,7 +550,7 @@ class HIRType {
             }
 
             for i in 0..left->parameters.Size() {
-                let (left_parameter, right_parameter): (*HIRType, *HIRType) = (left->parameters[i], right->parameters[i]);
+                let (left_parameter, right_parameter) = (left->parameters[i], right->parameters[i]);
 
                 if left_parameter != right_parameter {
                     if left_parameter == null || right_parameter == null { return false; }
@@ -740,8 +738,7 @@ class HIRTupleType : HIRType {
 
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
-            let element: *HIRType = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ')';
     }
 }
@@ -759,8 +756,7 @@ class HIRFunctionType : HIRType {
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
-            let parameter: *HIRType = this.parameters[i];
-            result += parameter->ToString();
+            result += this.parameters[i]->ToString();
         } result += ')';
 
         if this._return->kind != HIRTypeKind::Void {
@@ -944,8 +940,7 @@ class HIRTuplePattern : HIRPattern {
 
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
-            let pattern: *HIRPattern = this.patterns[i];
-            result += pattern->ToString();
+            result += this.patterns[i]->ToString();
         } return result + ')';
     }
 }
@@ -976,8 +971,7 @@ class HIRStructurePattern : HIRPattern {
 
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
-            let pattern: *HIRPattern = this.patterns[i];
-            result += pattern->ToString();
+            result += this.patterns[i]->ToString();
         } return result + " }";
     }
 }
@@ -995,8 +989,7 @@ class HIRVariantPattern : HIRPattern {
 
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
-            let pattern: *HIRPattern = this.patterns[i];
-            result += pattern->ToString();
+            result += this.patterns[i]->ToString();
         } return result + ')';
     }
 }
@@ -1013,8 +1006,7 @@ class HIROrPattern : HIRPattern {
 
         for i in 0..this.patterns.Size() {
             if i != 0 { result += " | "; }
-            let pattern: *HIRPattern = this.patterns[i];
-            result += pattern->ToString();
+            result += this.patterns[i]->ToString();
         } return result;
     }
 }
@@ -1245,8 +1237,7 @@ class HIRArrayLiteral : HIRLiteral {
 
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
-            let element: *HIRExpression = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ']';
     }
 }
@@ -1263,8 +1254,7 @@ class HIRTupleLiteral : HIRLiteral {
 
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
-            let element: *HIRExpression = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ')';
     }
 }
@@ -1281,8 +1271,7 @@ class HIRStructureLiteral : HIRLiteral {
 
         for i in 0..this.fields.Size() {
             if i > 0 { result += ", "; }
-            let field: *HIRExpression = this.fields[i];
-            result += field->ToString();
+            result += this.fields[i]->ToString();
         } return result + '}';
     }
 }
@@ -1305,8 +1294,7 @@ class HIRVariantLiteral : HIRLiteral {
                 result += this.member->fields[i]->name + ": ";
             }
 
-            let field: *HIRExpression = this.fields[i];
-            result += field->ToString();
+            result += this.fields[i]->ToString();
         } return result + (this.member->structure ? '}' : ')');
     }
 }
@@ -1530,8 +1518,7 @@ class HIRCallExpression : HIRExpression {
 
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
-            let argument: *HIRExpression = this.arguments[i];
-            result += argument->ToString();
+            result += this.arguments[i]->ToString();
         } return result + ')';
     }
 }
@@ -1682,8 +1669,7 @@ class HIRNewExpression : HIRExpression {
 
             for i in 0..this.arguments.Size() {
                 if i != 0 { result += ", "; }
-                let argument: *HIRExpression = this.arguments[i];
-                result += argument->ToString();
+                result += this.arguments[i]->ToString();
             } result += ')';
         } return result;
     }
@@ -1729,8 +1715,7 @@ class HIRConstructorExpression : HIRExpression {
 
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
-            let argument: *HIRExpression = this.arguments[i];
-            result += argument->ToString();
+            result += this.arguments[i]->ToString();
         } return result + ')';
     }
 }
@@ -2013,9 +1998,7 @@ class HIRMatchStatement : HIRStatement {
 
         for i in 0..this.arms.Size() {
             if i != 0 { result += ",\n"; }
-            let arm: *HIRMatchArm = this.arms[i];
-            result += ' ' * (indent + 1) * 4;
-            result += arm->ToString(indent + 1);
+            result += (' ' * (indent + 1) * 4) + this.arms[i]->ToString(indent + 1);
         }
 
         return result + '\n' + (' ' * indent * 4) + '}';
@@ -2087,8 +2070,7 @@ class HIRAssemblyStatement : HIRStatement {
 
             for i in 0..this.inputs.Size() {
                 if i != 0 { result += ", "; }
-                let input: *HIRAssemblyOperand = this.inputs[i]; 
-                result += input->name + '(' + input->expression->ToString() + ')';
+                result += this.inputs[i]->name + '(' + this.inputs[i]->expression->ToString() + ')';
             } result += " -> ";
         }
 
@@ -2099,8 +2081,7 @@ class HIRAssemblyStatement : HIRStatement {
 
             for i in 0..this.outputs.Size() {
                 if i != 0 { result += ", "; }
-                let output: *HIRAssemblyOperand = this.outputs[i]; 
-                result += output->name + '(' + output->expression->ToString() + ')';
+                result += this.outputs[i]->name + '(' + this.outputs[i]->expression->ToString() + ')';
             }
         }
 
@@ -2215,8 +2196,7 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
-            let parameter: *HIRParameterDeclaration = this.parameters[i];
-            result += parameter->ToString();
+            result += this.parameters[i]->ToString();
         } result += ')';
 
         if !this._type->Return().IsVoid() {
@@ -2265,8 +2245,7 @@ class HIRClassDeclaration : HIRTypedDeclaration {
 
             for i in 0..this.parents.Size() {
                 if i != 0 { result += ", "; }
-                let parent: *HIRType = this.parents[i];
-                result += parent->ToString();
+                result += this.parents[i]->ToString();
             }
         } result += " {";
 
@@ -2275,8 +2254,7 @@ class HIRClassDeclaration : HIRTypedDeclaration {
 
             for i in 0..this.fields.Size() {
                 if i != 0 { result += ",\n"; }
-                let field: *HIRFieldDeclaration = this.fields[i];
-                result += "    " + field->ToString();
+                result += "    " + this.fields[i]->ToString();
             }
 
             if !this.constructors.Empty() || this.destructor != null || !this.methods.Empty() {
@@ -2316,8 +2294,7 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
 
             for i in 0..this.fields.Size() {
                 if i != 0 { result += ",\n"; }
-                let field: *HIRFieldDeclaration = this.fields[i];
-                result += "    " + field->ToString();
+                result += "    " + this.fields[i]->ToString();
             }
 
             if this.copy_constructor != null || this.destructor != null || !this.methods.Empty() || this.copy_assign != null {
@@ -2372,8 +2349,7 @@ class HIREnumerationDeclaration : HIRTypedDeclaration {
 
             for i in 0..this.members.Size() {
                 if i != 0 { result += ",\n"; }
-                let member: *HIREnumerationMember = this.members[i];
-                result += "    " + member->ToString();
+                result += "    " + this.members[i]->ToString();
             } result += '\n';
         } return result + '}';
     }
@@ -2414,8 +2390,7 @@ class HIRVariantMember : HIRTypedDeclaration {
 
             for i in 0..this.fields.Size() {
                 if i != 0 { result += ", "; }
-                let field: *HIRVariantField = this.fields[i];
-                result += field->ToString();
+                result += this.fields[i]->ToString();
             } result += this.structure ? " }" : ")";
         } return result;
     }
@@ -2439,8 +2414,7 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
 
             for i in 0..this.members.Size() {
                 if i != 0 { result += ",\n"; }
-                let member: *HIRVariantMember = this.members[i];
-                result += "    " + member->ToString();
+                result += "    " + this.members[i]->ToString();
             }
 
             if this.copy_constructor != null || this.destructor != null || !this.methods.Empty() || this.copy_assign != null {

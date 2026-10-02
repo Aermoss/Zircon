@@ -193,8 +193,7 @@ class Parser {
                 return null;
             }
 
-            let character: i8 = token.value[0];
-            return this.arena.New<ASTCharacterLiteral>(character as u32, token);
+            return this.arena.New<ASTCharacterLiteral>(token.value[0] as u32, token);
         } else if token._type == TokenType::INTEGER {
             this.Advance();
             let (mut value, mut suffix, mut base) = (String(), String(), 10u64);

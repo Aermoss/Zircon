@@ -126,8 +126,7 @@ class MIRStructureType : MIRType {
 
         for i in 0..this.fields.Size() {
             if i != 0 { result += ", "; }
-            let _type: *MIRType = this.fields[i];
-            result += _type->ToString();
+            result += this.fields[i]->ToString();
         } return result + " }";
     }
 
@@ -151,8 +150,7 @@ class MIRFunctionType : MIRType {
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
-            let parameter: *MIRType = this.parameters[i];
-            result += parameter->ToString();
+            result += this.parameters[i]->ToString();
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {
@@ -276,8 +274,7 @@ class MIRConstantArray : MIRConstant {
 
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
-            let element: *MIRValue = this.elements[i];
-            result += element->ToString();
+            result += this.elements[i]->ToString();
         } return result + ']';
     }
 }
@@ -294,8 +291,7 @@ class MIRConstantStructure : MIRConstant {
 
         for i in 0..this.fields.Size() {
             if i != 0 { result += ", "; }
-            let field: *MIRValue = this.fields[i];
-            result += field->ToString();
+            result += this.fields[i]->ToString();
         } return result + '}';
     }
 }
@@ -655,8 +651,7 @@ class MIRCallInstruction : MIRInstruction {
 
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
-            let argument: *MIRValue = this.arguments[i];
-            result += argument->ToString();
+            result += this.arguments[i]->ToString();
         } return result + ')';
     }
 }
@@ -746,8 +741,7 @@ class MIRAssemblyInstruction : MIRInstruction {
 
             for i in 0..this.inputs.Size() {
                 if i != 0 { result += ", "; }
-                let input: *MIRAssemblyOperand = this.inputs[i]; 
-                result += input->name + '(' + input->value->ToString() + ')';
+                result += this.inputs[i]->name + '(' + this.inputs[i]->value->ToString() + ')';
             } result += " -> ";
         }
 
@@ -758,8 +752,7 @@ class MIRAssemblyInstruction : MIRInstruction {
 
             for i in 0..this.outputs.Size() {
                 if i != 0 { result += ", "; }
-                let output: *MIRAssemblyOperand = this.outputs[i]; 
-                result += output->name + '(' + output->value->ToString() + ')';
+                result += this.outputs[i]->name + '(' + this.outputs[i]->value->ToString() + ')';
             }
         }
 
@@ -1047,8 +1040,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
 
         for i in 0..this.parameters.Size() {
             if i != 0 { result += ", "; }
-            let parameter: *MIRParameter = this.parameters[i];
-            result += parameter->ToDefinitionString();
+            result += this.parameters[i]->ToDefinitionString();
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {

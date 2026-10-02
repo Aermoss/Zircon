@@ -225,8 +225,7 @@ class LIRInstruction {
         if !this.defines.Empty() {
             for i in 0..this.defines.Size() {
                 if i > 0 { result += ", "; }
-                let operand: *LIROperand = this.defines[i];
-                result += operand->ToString();
+                result += this.defines[i]->ToString();
             } result += " = ";
         }
 
@@ -237,8 +236,7 @@ class LIRInstruction {
 
             for i in 0..this.uses.Size() {
                 if i > 0 { result += ", "; }
-                let operand: *LIROperand = this.uses[i];
-                result += operand->ToString();
+                result += this.uses[i]->ToString();
             }
         } return result;
     }
@@ -285,8 +283,7 @@ class LIRFunction {
 
             for i in 0..this.blocks.Size() {
                 if i != 0 { result += '\n'; }
-                let block: *LIRBlock = this.blocks[i];
-                result += block->ToDefinitionString() + '\n';
+                result += this.blocks[i]->ToDefinitionString() + '\n';
             } result += '}';
         } return result;
     }
