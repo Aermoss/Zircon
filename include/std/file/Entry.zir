@@ -406,7 +406,7 @@ fn JoinPath(directory: &String, file: &String) -> String {
     }
 }
 
-fn SplitExtension(path: &String) -> Pair<String, String> {
+fn SplitExtension(path: String) -> (String, String) {
     let mut i = path.Length();
     let mut index = path.Length();
 
@@ -424,15 +424,15 @@ fn SplitExtension(path: &String) -> Pair<String, String> {
     }
 
     if index == path.Length() {
-        return Pair<String, String>(path, String());
+        return (path, String());
     }
 
     let name = String(path, 0, index);
     let extension = String(path, index, path.Length());
-    return Pair<String, String>(name, extension);
+    return (name, extension);
 }
 
-fn SplitPath(path: &String) -> Pair<String, String> {
+fn SplitPath(path: String) -> (String, String) {
     let mut i = path.Length();
     let mut index = path.Length();
 
@@ -446,10 +446,10 @@ fn SplitPath(path: &String) -> Pair<String, String> {
     }
 
     if index == path.Length() {
-        return Pair<String, String>(String(), path);
+        return (String(), path);
     }
 
     let directory = String(path, 0, index);
     let file = String(path, index + 1, path.Length());
-    return Pair<String, String>(directory, file);
+    return (directory, file);
 }
