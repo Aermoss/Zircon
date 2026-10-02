@@ -289,7 +289,7 @@ class String {
         }
 
         while i < this.length {
-            let c: i8 = this.data[i];
+            let c = this.data[i];
             let mut value: u64 = 0;
 
             if c >= '0' && c <= '9' {
@@ -350,7 +350,7 @@ class String {
         }
 
         while i < this.length {
-            let c: i8 = this.data[i];
+            let c = this.data[i];
             if c < '0' || c > '9' { break; }
             value *= 10.0;
             value += (c - '0') as f64;
@@ -362,7 +362,7 @@ class String {
             let mut divisor = 10.0;
 
             while i < this.length {
-                let c: i8 = this.data[i];
+                let c = this.data[i];
                 if c < '0' || c > '9' { break; }
                 value += (c - '0') as f64 / divisor;
                 divisor *= 10.0;
@@ -386,7 +386,7 @@ class String {
             let mut exponent: i64 = 0;
 
             while i < this.length {
-                let c: i8 = this.data[i];
+                let c = this.data[i];
                 if c < '0' || c > '9' { break; }
                 exponent *= 10;
                 exponent += (c - '0') as i64;
@@ -412,7 +412,7 @@ class String {
         result.Allocate(this.length);
 
         for i in 0..this.length {
-            let mut c: i8 = this.data[i];
+            let mut c = this.data[i];
             if c >= 'A' && c <= 'Z' { c += 32; }
             result.data[i] = c;
         } return result;
@@ -423,7 +423,7 @@ class String {
         result.Allocate(this.length);
 
         for i in 0..this.length {
-            let mut c: i8 = this.data[i];
+            let mut c = this.data[i];
             if c >= 'a' && c <= 'z' { c -= 32; }
             result.data[i] = c;
         } return result;
@@ -769,7 +769,7 @@ class String {
         let mut hash: u64 = 0xcbf29ce484222325;
 
         for i in 0..this.length {
-            let character: i8 = this.data[i];
+            let character = this.data[i];
             hash = hash ^ (character as u64 & 0xFF);
             hash = hash * 0x100000001b3;
         } return hash;

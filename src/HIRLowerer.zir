@@ -3067,7 +3067,9 @@ class HIRLowerer {
     }
 
     fn LiteralNeedsExplicitType(&mut this, _type: *HIRType, target: *HIRType) -> bool {
-        if _type->IsInteger() {
+        if !_type->IsLiteral() {
+            return false;
+        } else if _type->IsInteger() {
             return target->IsInteger() && !target->IsSame(this.context.IntegerType(32, true));
         } else if _type->IsFloat() {
             return target->IsFloat() && !target->IsSame(this.context.FloatType(64));

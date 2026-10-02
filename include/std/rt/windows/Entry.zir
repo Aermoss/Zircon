@@ -28,7 +28,7 @@ extern "C" {
         let mut in_quotes = false;
 
         while ptr[0] != 0 {
-            let character: i8 = ptr[0];
+            let character = ptr[0];
 
             if character == '\"' {
                 in_quotes = !in_quotes;

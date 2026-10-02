@@ -436,9 +436,7 @@ class HIRType {
         let fields = this.Fields();
 
         for i in 0..fields.Size() {
-            let field: *HIRFieldDeclaration = fields[i];
-
-            if field->name == name {
+            if fields[i]->name == name {
                 return i as isize;
             }
         } return -1;
@@ -2979,7 +2977,13 @@ class HIRBuilder {
             if target->IsFloat() {
                 return this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width() as u64) as f64 : raw as f64, target);
             } else {
-                return this.IntegerLiteral(this.MaskToWidth(raw, target->Width() as u64), target);
+                let mut converted = raw;
+
+                if value->_type->IsInteger() && value->_type->IsSigned() && target->Width() > value->_type->Width() {
+                    converted = this.SignExtend(raw, value->_type->Width() as u64) as u64;
+                }
+
+                return this.IntegerLiteral(this.MaskToWidth(converted, target->Width() as u64), target);
             }
         } else if value->kind == HIRLiteralKind::Float {
             let value = (value as *HIRFloatLiteral)->value;
