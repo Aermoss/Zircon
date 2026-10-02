@@ -317,13 +317,39 @@ class HIRLowerer {
         } return expression;
     }
 
+    fn Validate(&mut this, mut expression: *HIRExpression, target: *HIRType, message: *i8, node: *ASTNode) -> *HIRExpression {
+        expression = this.Coerce(expression, target);
+        if expression == null { return null; }
+
+        if target->IsReference() && target->Pointee().IsCompatible(expression->_type) {
+            expression = this.builder.AddressOf(expression);
+        }
+
+        if expression->_type->IsReference() && target->IsCompatible(expression->_type->Pointee()) {
+            expression = this.builder.Dereference(expression);
+        }
+
+        if !target->IsCompatible(expression->_type) {
+            Logger::Log(message.ToString() + " ('" + target->ToString() + "' != '" + expression->_type->ToString() + "').", node, LogSeverity::Error);
+            return null;
+        }
+
+        if !target->IsMutabilityCompatible(expression->_type) {
+            Logger::Log("Cannot assign immutable pointer to mutable pointer.", node, LogSeverity::Error);
+            return null;
+        }
+
+        return this.MakeCompatible(expression, target);
+    }
+
     fn LowerConstantDeclaration(&mut this, constant: *ASTConstantDeclaration) {
         let mut initializer: *HIRExpression = null;
         let _type = this.LowerType(constant->_type);
         if _type == null { return; }
 
         if constant->initializer != null {
-            initializer = this.Coerce(this.LowerExpression(constant->initializer), _type);
+            initializer = this.Validate(this.LowerExpression(constant->initializer), _type, "Incompatible constant initializer types", constant->initializer);
+            if initializer == null { return; }
         }
 
         let declaration = this.builder.BuildConstantDeclaration(constant->name, _type, initializer);
@@ -336,7 +362,8 @@ class HIRLowerer {
         if _type == null { return; }
 
         if _static->initializer != null && !_static->zero_initializer {
-            initializer = this.Coerce(this.LowerExpression(_static->initializer), _type);
+            initializer = this.Validate(this.LowerExpression(_static->initializer), _type, "Incompatible static initializer types", _static->initializer);
+            if initializer == null { return; }
         }
 
         let mut alignment: *HIRExpression = null;
@@ -825,7 +852,7 @@ class HIRLowerer {
             let this_field = this.builder.FieldAccess(this_dereferenced, field);
 
             if field->initializer != null {
-                let initializer = this.Coerce(this.LowerExpression(field->initializer), field->_type);
+                let initializer = this.Validate(this.LowerExpression(field->initializer), field->_type, "Incompatible field initializer types", field->initializer);
 
                 if initializer != null {
                     this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, initializer));
@@ -1933,31 +1960,10 @@ class HIRLowerer {
         if _return->expression != null {
             let function = this.builder.GetCurrentFunction();
             let return_type = function->_return;
-            value = this.Coerce(this.LowerExpression(_return->expression), return_type);
+            value = this.Validate(this.LowerExpression(_return->expression), return_type, "Incompatible return types", _return->expression);
             if value == null { return; }
-
-            if return_type->IsReference() && return_type->Pointee().IsCompatible(value->_type) {
-                value = this.builder.AddressOf(value);
-            }
-
-            if value->_type->IsReference() && return_type->IsCompatible(value->_type->Pointee()) {
-                value = this.builder.Dereference(value);
-            }
-
             value = this.LowerCopyOrMoveValue(value);
             if value == null { return; }
-
-            if !return_type->IsCompatible(value->_type) {
-                Logger::Log("Incompatible return types. ('" + return_type->ToString() + "' != '" + value->_type->ToString() + "').", _return->expression, LogSeverity::Error);
-                return;
-            }
-
-            if !return_type->IsMutabilityCompatible(value->_type) {
-                Logger::Log("Cannot assign immutable pointer to mutable pointer.", _return->expression, LogSeverity::Error);
-                return;
-            }
-
-            value = this.MakeCompatible(value, return_type);
         }
 
         let mut destructors = this.GetTemporaryDestructors(value);
@@ -2287,7 +2293,7 @@ class HIRLowerer {
             let mut _type: *HIRType = null;
 
             for element in (literal as *ASTArrayLiteral)->elements {
-                let mut value = this.Coerce(this.LowerExpression(element));
+                let mut value = this.LowerExpression(element);
                 if value == null { return null; }
                 value = this.LowerCopyOrMoveValue(value);
                 if value == null { return null; }
@@ -2309,7 +2315,7 @@ class HIRLowerer {
             let mut types = Vector<*HIRType>();
 
             for element in (literal as *ASTTupleLiteral)->elements {
-                let mut value = this.Coerce(this.LowerExpression(element));
+                let mut value = this.LowerExpression(element);
                 if value == null { return null; }
                 value = this.LowerCopyOrMoveValue(value);
                 if value == null { return null; }
@@ -2338,6 +2344,7 @@ class HIRLowerer {
                 let _type = symbol->_type as *HIRStructureType;
                 let fields = _type->Fields();
                 let mut values = Vector<*HIRExpression>();
+                let mut initialized_fields = Vector<usize>();
                 values.Resize(fields.Size());
 
                 if structure->fields.Size() != fields.Size() {
@@ -2354,10 +2361,17 @@ class HIRLowerer {
                     }
 
                     let declaration = fields[index as usize];
-                    let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    let mut value = this.Validate(this.LowerExpression(field.right), declaration->_type, "Incompatible structure field types", field.right);
                     if value == null { return null; }
                     value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
+
+                    if initialized_fields.Contains(index as usize) {
+                        Logger::Log("Structure '" + path->ToString() + "' field '" + field.left + "' was initialized more than once.", literal, LogSeverity::Error);
+                        return null;
+                    }
+
+                    initialized_fields.PushBack(index as usize);
                     values[index as usize] = value;
                 }
 
@@ -2382,6 +2396,7 @@ class HIRLowerer {
                 }
 
                 let mut values = Vector<*HIRExpression>();
+                let mut initialized_fields = Vector<usize>();
                 values.Resize(member->fields.Size());
 
                 if structure->fields.Size() != member->fields.Size() {
@@ -2405,10 +2420,17 @@ class HIRLowerer {
                     }
 
                     let declaration = member->fields[index as usize];
-                    let mut value = this.Coerce(this.LowerExpression(field.right), declaration->_type);
+                    let mut value = this.Validate(this.LowerExpression(field.right), declaration->_type, "Incompatible variant member field types", field.right);
                     if value == null { return null; }
                     value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
+
+                    if initialized_fields.Contains(index as usize) {
+                        Logger::Log("Variant member '" + path->ToString() + "' field '" + field.left + "' was initialized more than once.", literal, LogSeverity::Error);
+                        return null;
+                    }
+
+                    initialized_fields.PushBack(index as usize);
                     values[index as usize] = value;
                 }
 
@@ -2493,21 +2515,9 @@ class HIRLowerer {
             if right == null { return null; }
         }
 
-        if right->_type->IsReference() && left->_type->IsCompatible(right->_type->Pointee()) {
-            right = this.ImplicitDereference(right);
-        }
-
-        if !left->_type->IsCompatible(right->_type) {
-            Logger::Log("Incompatible assignment types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", assignment, LogSeverity::Error);
-            return null;
-        }
-
-        if !left->_type->IsMutabilityCompatible(right->_type) {
-            Logger::Log("Cannot assign immutable pointer to mutable pointer.", assignment, LogSeverity::Error);
-            return null;
-        }
-
-        return this.builder.Assignment(left, this.MakeCompatible(right, left->_type));
+        right = this.Validate(right, left->_type, "Incompatible assignment types", assignment);
+        if right == null { return null; }
+        return this.builder.Assignment(left, right);
     }
 
     fn LowerCallArguments(&mut this, arguments: &Vector<*ASTExpression>, node: *ASTNode, invalid: &mut bool) -> Vector<*HIRExpression> {
@@ -2702,18 +2712,9 @@ class HIRLowerer {
 
                         if values.Size() != 0 {
                             let mut value = this.ImplicitDereference(values[0]);
-
-                            if target_type->IsCompatible(value->_type) {
-                                if target_type->IsMutabilityCompatible(value->_type) {
-                                    this.builder.BuildExpressionStatement(this.builder.Assignment(target, this.MakeCompatible(value, target_type)));
-                                } else {
-                                    Logger::Log("Cannot assign immutable pointer to mutable pointer.", call, LogSeverity::Error);
-                                    return null;
-                                }
-                            } else {
-                                Logger::Log("Incompatible primitive type initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", call, LogSeverity::Error);
-                                return null;
-                            }
+                            value = this.Validate(value, target_type, "Incompatible primitive type initialization types", call);
+                            if value == null { return null; }
+                            this.builder.BuildExpressionStatement(this.builder.Assignment(target, value));
                         }
                     } return target;
                 } else if path->segments[0].name == "destruct" {
@@ -2790,10 +2791,12 @@ class HIRLowerer {
                     return null;
                 }
 
-                for value in values {
-                    if value->_type->HasSpecialMembers() && value->category == HIRExpressionCategory::Value {
-                        this.temporaries.Remove(value);
-                    }
+                for i in 0..values.Size() {
+                    let mut value = this.Validate(values[i], member->fields[i]->_type, "Incompatible variant member argument types", call);
+                    if value == null { return null; }
+                    value = this.LowerCopyOrMoveValue(value);
+                    if value == null { return null; }
+                    values[i] = value;
                 }
 
                 let literal = this.builder.VariantLiteral(member, values);
@@ -2897,35 +2900,19 @@ class HIRLowerer {
         let parameter_types = callee->_type->Parameters();
 
         for i in 0..parameter_types.Size() {
-            let parameter_type = parameter_types[i];
-            let mut value = this.Coerce(values[i], parameter_type);
+            let mut message = String();
 
-            if parameter_type->IsReference() && parameter_type->Pointee().IsCompatible(value->_type) {
-                value = this.builder.AddressOf(value);
+            if callee->kind == HIRExpressionKind::DeclarationReference {
+                message += "Incompatible argument types for function '" + (callee as *HIRDeclarationReference)->declaration->name + '\'';
+            } else {
+                message += "Incompatible function argument types";
             }
 
-            if value->_type->IsReference() && parameter_type->IsCompatible(value->_type->Pointee()) {
-                value = this.builder.Dereference(value);
-            }
-
+            let mut value = this.Validate(values[i], parameter_types[i], message.Data(), node);            
+            if value == null { return false; }
             value = this.LowerCopyOrMoveValue(value);
             if value == null { return false; }
-
-            if !parameter_type->IsCompatible(value->_type) {
-                if callee->kind == HIRExpressionKind::DeclarationReference {
-                    let name = (callee as *HIRDeclarationReference)->declaration->name;
-                    Logger::Log("Incompatible argument types for function '" + name + "'. ('" + parameter_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
-                } else {
-                    Logger::Log("Incompatible argument types for function. ('" + parameter_type->ToString() + "' != '" + value->_type->ToString() + "').", node, LogSeverity::Error);
-                } return false;
-            }
-
-            if !parameter_type->IsMutabilityCompatible(value->_type) {
-                Logger::Log("Cannot assign immutable pointer to mutable pointer.", node, LogSeverity::Error);
-                return false;
-            }
-
-            values[i] = this.MakeCompatible(value, parameter_type);
+            values[i] = value;
         } return true;
     }
 
@@ -3004,20 +2991,9 @@ class HIRLowerer {
                     return null;
                 }
 
-                let value = values[0];
-
-                if _type->IsCompatible(value->_type) {
-                    if _type->IsMutabilityCompatible(value->_type) {
-                        values[0] = this.MakeCompatible(value, _type);
-                        return this.builder.New(_type, null, true, null, values);
-                    } else {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", _new, LogSeverity::Error);
-                        return null;
-                    }
-                } else {
-                    Logger::Log("Incompatible primitive type initialization types. ('" + _type->ToString() + "' != '" + value->_type->ToString() + "').", _new, LogSeverity::Error);
-                    return null;
-                }
+                values[0] = this.Validate(values[0], _type, "Incompatible primitive type initialization types", _new);
+                if values[0] == null { return null; }
+                return this.builder.New(_type, null, true, null, values);
             }
         } else {
             return this.builder.New(_type, null, false, null, Vector<*HIRExpression>());
@@ -3636,57 +3612,35 @@ class HIRLowerer {
                     let original_type = value->_type;
                     value = this.Coerce(value, target_type);
                     if value == null { return null; }
-                    let same = target_type->IsSame(value->_type);
 
-                    if target_type->IsReference() && target_type->Pointee().IsCompatible(value->_type) {
-                        value = this.builder.AddressOf(value);
-                    }
-
-                    if value->_type->IsReference() && target_type->IsCompatible(value->_type->Pointee()) {
-                        value = this.builder.Dereference(value);
-                    }
-
-                    if !target_type->IsCompatible(value->_type) {
-                        Logger::Log("Incompatible binding initialization types. ('" + target_type->ToString() + "' != '" + value->_type->ToString() + "').", pattern, LogSeverity::Error);
-                        return null;
-                    }
-
-                    if !target_type->IsMutabilityCompatible(value->_type) {
-                        Logger::Log("Cannot assign immutable pointer to mutable pointer.", pattern, LogSeverity::Error);
-                        return null;
-                    }
-
-                    if same && !this.LiteralNeedsExplicitType(original_type, target_type) {
+                    if target_type->IsSame(value->_type) && !this.LiteralNeedsExplicitType(original_type, target_type) {
                         Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", pattern, LogSeverity::Warning);
                     }
 
-                    value = this.MakeCompatible(value, target_type);
+                    value = this.Validate(value, target_type, "Incompatible binding initialization types", pattern);
+                    if value == null { return null; }
                 } else {
                     value = this.Coerce(value);
                     if value == null { return null; }
                     target_type = value->_type;
                 }
-            }
 
-            if target_type->HasSpecialMembers() {
-                if value != null {
-                    value = this.LowerCopyOrMoveValue(value);
-                    if value == null { return null; }
-                } else if target_type->IsClass() {
-                    let mut values = Vector<*HIRExpression>();
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
+                value = this.LowerCopyOrMoveValue(value);
+                if value == null { return null; }
+            } else if target_type->IsClass() {
+                let mut values = Vector<*HIRExpression>();
+                let mut candidates = Vector<*HIRFunctionDeclaration>();
 
-                    for candidate in (target_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
-                    }
-
-                    values.Insert(0, this.builder.NullLiteral());
-                    let function = this.ResolveOverload(candidates, values, pattern, true);
-                    if function == null { return null; }
-                    values.RemoveAt(0);
-                    let callee = this.builder.ReferenceDeclaration(function, false);
-                    value = this.builder.Constructor(callee, values, target_type);
+                for candidate in (target_type as *HIRClassType)->declaration->constructors {
+                    candidates.PushBack(candidate);
                 }
+
+                values.Insert(0, this.builder.NullLiteral());
+                let function = this.ResolveOverload(candidates, values, pattern, true);
+                if function == null { return null; }
+                values.RemoveAt(0);
+                let callee = this.builder.ReferenceDeclaration(function, false);
+                value = this.builder.Constructor(callee, values, target_type);
             }
 
             let lowered = this.builder.IdentifierPattern(identifier->name, target_type, value, identifier->mutable);
