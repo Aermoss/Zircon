@@ -516,20 +516,16 @@ class HIRType {
             return left->signed == right->signed && left->width == right->width && left->native == right->native;
         } else if this.IsFloat() && other.IsFloat() {
             return (this as *HIRFloatType)->width == (other as *HIRFloatType)->width;
-        } else if (this.IsPointer() || this.IsArray()) && (other.IsPointer() || other.IsArray()) {
+        } else if this.IsPointer() && other.IsPointer() {
             let (mut left, mut right): (*HIRType, *HIRType) = (null, null);
 
-            if this.IsArray() {
-                left = (this as *HIRArrayType)->element;
-            } else if this.IsReference() {
+            if this.IsReference() {
                 left = (this as *HIRReferenceType)->referent;
             } else {
                 left = (this as *HIRPointerType)->pointee;
             }
 
-            if other.IsArray() {
-                right = (other as *HIRArrayType)->element;
-            } else if other.IsReference() {
+            if other.IsReference() {
                 right = (other as *HIRReferenceType)->referent;
             } else {
                 right = (other as *HIRPointerType)->pointee;
@@ -2643,7 +2639,7 @@ class HIRContext {
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
         for existing in this.array_types {
-            if existing->element->IsSame(element) {
+            if existing->length == length && existing->element->IsSame(element) {
                 return existing;
             }
         }

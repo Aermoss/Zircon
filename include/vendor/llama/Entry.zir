@@ -211,8 +211,8 @@ enum llama_model_meta_key: i32 {
 
 class llama_model_kv_override {
     pub tag: llama_model_kv_override_type,
-    pub key[128]: i8,
-    pub val[128]: i8
+    pub key: [i8; 128],
+    pub val: [i8; 128]
 }
 
 class llama_model_tensor_buft_override {

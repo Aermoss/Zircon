@@ -89,19 +89,19 @@ class ggml_tensor {
     pub _type: ggml_type,
     pub backend: i32,
     pub buffer: *mut void,
-    pub ne[4]: i64,
-    pub nb[4]: u32,
+    pub ne: [i64; 4],
+    pub nb: [u32; 4],
     pub _op: i32,
-    pub op_params[16]: i32,
+    pub op_params: [i32; 16],
     pub flags: i32,
     pub grad: *mut ggml_tensor,
-    pub src[10]: *mut ggml_tensor,
+    pub src: [*mut ggml_tensor; 10],
     pub view_src: *mut ggml_tensor,
     pub view_offs: u32,
     pub data: *mut void,
-    pub name[64]: i8,
+    pub name: [i8; 64],
     pub extra: *mut void,
-    pub padding[8]: i8
+    pub padding: [i8; 8]
 }
 
 class ggml_opt_params {

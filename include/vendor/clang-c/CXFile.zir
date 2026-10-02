@@ -3,7 +3,7 @@
 type CXFile = *mut void;
 
 struct CXFileUniqueID {
-    pub data[3]: u64
+    pub data: [u64; 3]
 }
 
 extern "C" {

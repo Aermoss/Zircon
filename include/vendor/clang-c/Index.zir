@@ -452,7 +452,7 @@ enum CXCursorKind: i32 {
 struct CXCursor {
     pub kind: CXCursorKind,
     pub xdata: i32,
-    pub data[3]: *void
+    pub data: [*void; 3]
 }
 
 enum CXLinkageKind: i32 {
@@ -670,7 +670,7 @@ enum CXCallingConv: i32 {
 
 struct CXType {
     pub kind: CXTypeKind,
-    pub data[2]: *mut void
+    pub data: [*mut void; 2]
 }
 
 enum CXTemplateArgumentKind: i32 {
@@ -852,7 +852,7 @@ enum CXTokenKind: i32 {
 }
 
 struct CXToken {
-    pub int_data[4]: u32,
+    pub int_data: [u32; 4],
     pub ptr_data: *mut void
 }
 
@@ -967,7 +967,7 @@ type CXIdxClientContainer = *mut void;
 type CXIdxClientASTFile = *mut void;
 
 struct CXIdxLoc {
-    pub ptr_data[2]: *mut void,
+    pub ptr_data: [*mut void; 2],
     pub int_data: u32
 }
 

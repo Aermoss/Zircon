@@ -432,8 +432,8 @@ class GLFWimage {
 }
 
 class GLFWgamepadstate {
-    pub buttons[15]: u8,
-    pub axes[6]: f32
+    pub buttons: [u8; 15],
+    pub axes: [f32; 6]
 }
 
 class GLFWallocator {

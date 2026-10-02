@@ -6,25 +6,25 @@ const LLVM_BLAKE3_CHUNK_LEN: i32 = 1024;
 const LLVM_BLAKE3_MAX_DEPTH: i32 = 54;
 
 struct llvm_blake3_chunk_state {
-    pub cv[8]: u32,
+    pub cv: [u32; 8],
     pub chunk_counter: u64,
-    pub buf[64]: u8,
+    pub buf: [u8; 64],
     pub buf_len: u8,
     pub blocks_compressed: u8,
     pub flags: u8
 }
 
 struct llvm_blake3_hasher {
-    pub key[8]: u32,
+    pub key: [u32; 8],
     pub chunk: llvm_blake3_chunk_state,
     pub cv_stack_len: u8,
-    pub cv_stack[1760]: u8
+    pub cv_stack: [u8; 1760]
 }
 
 extern "C" {
     fn llvm_blake3_version() -> *i8;
     fn llvm_blake3_hasher_init(self: *mut llvm_blake3_hasher);
-    fn llvm_blake3_hasher_init_keyed(self: *mut llvm_blake3_hasher, key[32u64]: u8);
+    fn llvm_blake3_hasher_init_keyed(self: *mut llvm_blake3_hasher, key: *u8);
     fn llvm_blake3_hasher_init_derive_key(self: *mut llvm_blake3_hasher, context: *i8);
     fn llvm_blake3_hasher_init_derive_key_raw(self: *mut llvm_blake3_hasher, context: *void, context_len: usize);
     fn llvm_blake3_hasher_update(self: *mut llvm_blake3_hasher, input: *void, input_len: usize);

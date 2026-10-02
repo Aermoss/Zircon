@@ -1,12 +1,12 @@
 #[include "vendor/clang-c/CXFile.zir", "vendor/clang-c/CXString.zir" : *]
 
 struct CXSourceLocation {
-    pub ptr_data[2]: *void,
+    pub ptr_data: [*void; 2],
     pub int_data: u32
 }
 
 struct CXSourceRange {
-    pub ptr_data[2]: *void,
+    pub ptr_data: [*void; 2],
     pub begin_int_data: u32,
     pub end_int_data: u32
 }

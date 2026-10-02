@@ -62,7 +62,7 @@ static mut sym_initialized: bool = false;
 fn StackDump() {
 #[if WINDOWS]
     let mut backtrace: [*mut void; 64];
-    let frames = RtlCaptureStackBackTrace(2, 62, backtrace, null);
+    let frames = RtlCaptureStackBackTrace(2, 62, backtrace[0], null);
     let longest = String::FromInteger((frames - 1) as i64).Length();
     let process = GetCurrentProcess();
 
@@ -93,11 +93,11 @@ fn StackDump() {
         line += address_string;
 
         if SymFromAddr(process, address, null, &mut symbol) != 0 {
-            line += " " + symbol.Name.ToString();
+            line += " " + String(symbol.Name[0] as *i8);
         }
 
         if SymGetModuleInfo64(process, address, &mut module) != 0 {
-            line += " (" + module.ImageName.ToString() + "+0x" + String::FromInteger(address - module.BaseOfImage, 16).ToLower() + ")";
+            line += " (" + String(module.ImageName[0] as *i8) + "+0x" + String::FromInteger(address - module.BaseOfImage, 16).ToLower() + ")";
         }
 
         WriteLine(line);

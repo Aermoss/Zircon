@@ -892,17 +892,7 @@ class MIRLowerer {
         } else {
             let place = this.LowerPlaceExpression(expression);
             if place == null { return null; }
-
-            if place->_type->kind == MIRTypeKind::Pointer {
-                let pointee = (place->_type as *MIRPointerType)->pointee;
-
-                if pointee->kind == MIRTypeKind::Array {
-                    return this.builder.BuildCast("cast".ToString(), MIRCastKind::Bitcast, place, this.context.PointerType((pointee as *MIRArrayType)->element));
-                }
-            } else if place->_type->kind == MIRTypeKind::Function {
-                return place;
-            }
-
+            if place->_type->kind == MIRTypeKind::Function { return place; }
             return this.builder.BuildLoad("load".ToString(), place);
         }
     }
@@ -944,7 +934,7 @@ class MIRLowerer {
     fn LowerArrayLiteral(&mut this, literal: *HIRArrayLiteral, destination: *MIRValue) {
         let _type = this.LowerType(literal->_type) as *MIRArrayType;
         if _type == null { return; }
-        let base = this.builder.BuildCast("array.decay".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(_type->element));
+        let base = this.builder.BuildCast("array.cast".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(_type->element));
         let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
 
         for i in 0..literal->elements.Size() {
@@ -1349,7 +1339,17 @@ class MIRLowerer {
     }
 
     fn LowerIndexAccessExpression(&mut this, index_access: *HIRIndexAccessExpression) -> *MIRValue {
-        let value = this.LowerExpression(index_access->value);
+        let mut value: *MIRValue = null;
+
+        if index_access->value->_type->IsArray() {
+            value = this.LowerPlaceExpression(index_access->value);
+            if value == null { return null; }
+            let array_type = this.LowerType(index_access->value->_type) as *MIRArrayType;
+            value = this.builder.BuildCast("array.cast".ToString(), MIRCastKind::Bitcast, value, this.context.PointerType(array_type->element));
+        } else {
+            value = this.LowerExpression(index_access->value);
+        }
+
         let index = this.LowerExpression(index_access->index);
         if value == null || index == null { return null; }
         return this.builder.BuildArrayGEP("index.access".ToString(), value, index);

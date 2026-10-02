@@ -179,6 +179,8 @@ fn TypeToString(_type: CXType) -> String {
         return string;
     } else if _type.kind == CXTypeKind::CXType_IncompleteArray {
         return "*mut " + TypeToString(clang_getArrayElementType(_type));
+    } else if _type.kind == CXTypeKind::CXType_ConstantArray {
+        return '[' + TypeToString(clang_getArrayElementType(_type)) + "; " + String::FromInteger(clang_getArraySize(_type) as u64) + ']';
     } else {
         return String();
     }
@@ -246,13 +248,7 @@ extern "C" {
         }
 
         let _type = clang_getCursorType(cursor);
-
-        if _type.kind == CXTypeKind::CXType_ConstantArray {
-            file_state->declarations += "    pub " + name + "[" + String::FromInteger(clang_getArraySize(_type)) + "]: " + TypeToString(clang_getArrayElementType(_type)) + ",\n";
-        } else {
-            file_state->declarations += "    pub " + name + ": " + TypeToString(_type) + ",\n";
-        }
-
+        file_state->declarations += "    pub " + name + ": " + TypeToString(_type) + ",\n";
         return CXChildVisitResult::CXChildVisit_Continue;
     }
 }
@@ -405,7 +401,7 @@ fn TranslateMacro(state: *mut GlobalState, file_state: *mut FileState, cursor: C
     state->transpile_states[name] = TranspileState::Defined;
 
     let extent = clang_getCursorExtent(cursor);
-    let (mut tokens: *mut CXToken, mut num_tokens: u32) = (null, 0);
+    let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0u32);
     clang_tokenize(state->translation_unit, extent, &mut tokens, &mut num_tokens);
 
     if num_tokens != 2 || tokens == null {
@@ -485,7 +481,7 @@ fn TranslateExpression(cursor: CXCursor) -> String {
     } else if kind == CXCursorKind::CXCursor_IntegerLiteral || kind == CXCursorKind::CXCursor_FloatingLiteral {
         let extent = clang_getCursorExtent(cursor);
         let translation_unit = clang_Cursor_getTranslationUnit(cursor);
-        let (mut tokens: *mut CXToken, mut num_tokens: u32) = (null, 0);
+        let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0u32);
         clang_tokenize(translation_unit, extent, &mut tokens, &mut num_tokens);
         let mut value = String();
 
@@ -728,7 +724,9 @@ extern "C" {
                 let _type = clang_getCursorType(argument);
 
                 if _type.kind == CXTypeKind::CXType_ConstantArray {
-                    arguments += argument_name + "[" + String::FromInteger(clang_getArraySize(_type)) + "u64]: " + TypeToString(clang_getArrayElementType(_type));
+                    let element_type = clang_getArrayElementType(_type);
+                    let prefix = clang_isConstQualifiedType(element_type) != 0 ? "*" : "*mut ";
+                    arguments += argument_name + ": " + prefix + TypeToString(element_type);
                 } else {
                     arguments += argument_name + ": " + TypeToString(_type);
                 }
@@ -779,7 +777,7 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
     if handle == INVALID_HANDLE_VALUE { return; }
 
     loop {
-        let name = String(find_data.cFileName);
+        let name = String(find_data.cFileName[0] as *i8);
 
         if name != "." && name != ".." {
             let path = directory + "\\" + name;
