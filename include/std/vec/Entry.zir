@@ -132,7 +132,7 @@ class Vector<T> {
     }
 
     pub fn RemoveAt(&mut this, index: usize) -> T {
-        let temp: T = this.data[index];
+        let temp = this.data[index];
 
         for i in (index + 1)..this.size {
             this.data[i - 1] = this.data[i];

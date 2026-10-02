@@ -519,8 +519,8 @@ class HIRLowerer {
 
             for i in 0.._type->length as u64 {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
-                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_dereferenced, index));
+                let this_element = this.builder.IndexAccess(this_dereferenced, index);
+                let other_element = this.builder.IndexAccess(other_dereferenced, index);
                 this.LowerFieldCopyConstructor(this_element, other_element, _type->element, null);
             }
 
@@ -543,7 +543,7 @@ class HIRLowerer {
 
             for i in 0.._type->length as u64 {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
+                let this_element = this.builder.IndexAccess(this_dereferenced, index);
                 this.LowerFieldDestructor(this_element, _type->element, null);
             }
 
@@ -570,8 +570,8 @@ class HIRLowerer {
 
             for i in 0.._type->length as u64 {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.Dereference(this.builder.IndexAccess(this_dereferenced, index));
-                let other_element = this.builder.Dereference(this.builder.IndexAccess(other_dereferenced, index));
+                let this_element = this.builder.IndexAccess(this_dereferenced, index);
+                let other_element = this.builder.IndexAccess(other_dereferenced, index);
                 this.LowerFieldCopyAssignment(this_element, other_element, _type->element, null);
             }
 
@@ -2465,6 +2465,16 @@ class HIRLowerer {
         let mut left = this.ImplicitDereference(this.LowerExpression(assignment->left));
         if left == null { return null; }
 
+        if left->category != HIRExpressionCategory::Place {
+            Logger::Log("Cannot assign to non-place value.", assignment, LogSeverity::Error);
+            return null;
+        }
+
+        if !left->mutable {
+            Logger::Log("Cannot assign to immutable value.", assignment, LogSeverity::Error);
+            return null;
+        }
+
         let mut right = this.LowerExpression(assignment->right);
         if right == null { return null; }
 
@@ -2497,16 +2507,6 @@ class HIRLowerer {
             }
 
             return this.LowerResolvedCallExpression(function, values, assignment);
-        }
-
-        if left->category != HIRExpressionCategory::Place {
-            Logger::Log("Cannot assign to non-place value.", assignment, LogSeverity::Error);
-            return null;
-        }
-
-        if !left->mutable {
-            Logger::Log("Cannot assign to immutable value.", assignment, LogSeverity::Error);
-            return null;
         }
 
         if assignment->kind != ASTAssignmentKind::Assign {

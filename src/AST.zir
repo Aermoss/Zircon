@@ -513,13 +513,13 @@ class ASTArrayLiteral : ASTLiteral {
     ASTArrayLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Array, start) {}
 
     pub fn ToString(&this) -> String {
-        let mut result = '{'.ToString();
+        let mut result = '['.ToString();
 
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
             let element: *ASTExpression = this.elements[i];
             result += element->ToString();
-        } return result + '}';
+        } return result + ']';
     }
 }
 

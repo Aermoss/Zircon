@@ -812,7 +812,9 @@ class MIRLowerer {
             }
         }
 
-        if expression->kind == HIRExpressionKind::TupleAccess {
+        if expression->kind == HIRExpressionKind::IndexAccess {
+            return this.LowerIndexAccessExpression(expression as *HIRIndexAccessExpression);
+        } else if expression->kind == HIRExpressionKind::TupleAccess {
             return this.LowerTupleAccessExpression(expression as *HIRTupleAccessExpression);
         } else if expression->kind == HIRExpressionKind::FieldAccess {
             return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
@@ -881,8 +883,6 @@ class MIRLowerer {
             return this.LowerDeleteExpression(expression as *HIRDeleteExpression);
         } else if expression->kind == HIRExpressionKind::Cast {
             return this.LowerCastExpression(expression as *HIRCastExpression);
-        } else if expression->kind == HIRExpressionKind::IndexAccess {
-            return this.LowerIndexAccessExpression(expression as *HIRIndexAccessExpression);
         } else if expression->kind == HIRExpressionKind::Unary && (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference {
             return this.LowerUnaryExpression(expression as *HIRUnaryExpression);
         } else if expression->kind == HIRExpressionKind::Binary {

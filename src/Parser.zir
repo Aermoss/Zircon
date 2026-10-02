@@ -241,11 +241,11 @@ class Parser {
             return this.arena.New<ASTNullLiteral>(token);
         } else if token._type == TokenType::IDENTIFIER || token._type == TokenType::THIS || token._type == TokenType::OPERATOR || token._type == TokenType::DOUBLE_COLON {
             return this.arena.New<ASTPathExpression>(this.ParsePath(), token);
-        } else if token._type == TokenType::LBRACE {
+        } else if token._type == TokenType::LBRACKET {
             this.Advance();
             let array = this.arena.New<ASTArrayLiteral>(token);
 
-            if !this.Match(TokenType::RBRACE) {
+            if !this.Match(TokenType::RBRACKET) {
                 let expression = this.ParseExpression();
                 if expression == null { return null; }
                 array->elements.PushBack(expression);
@@ -256,7 +256,7 @@ class Parser {
                     array->elements.PushBack(expression);
                 }
 
-                if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+                if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
             } return array;
         } else if token._type == TokenType::LPAREN {
             this.Advance();

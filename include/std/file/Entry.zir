@@ -117,10 +117,10 @@ fn _WriteFile(path: &String, content: &String) -> bool {
 
 fn GetTemporaryPath() -> String {
     let mut buffer: [i8; MAX_PATH];
-    let length = GetTempPathA(sizeof(buffer) as u32, buffer[0]);
+    let length = GetTempPathA(sizeof(buffer) as u32, &buffer[0]);
 
     if length > 0 && length < sizeof(buffer) as u32 {
-        return String(buffer[0] as *i8, 0, length as usize);
+        return String(&buffer[0] as *i8, 0, length as usize);
     } else {
         WriteLine("\x1b[31mFailed to get temporary path.\x1b[0m");
         return String();
@@ -130,10 +130,10 @@ fn GetTemporaryPath() -> String {
 fn AbsolutePath(path: &String) -> String {
     let mut buffer: [i8; MAX_PATH];
     let mut filePart: *mut i8 = null;
-    let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, buffer[0], &mut filePart);
+    let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, &buffer[0], &mut filePart);
 
     if length > 0 && length < MAX_PATH as u32 {
-        return String(buffer[0] as *i8, 0, length as usize);
+        return String(&buffer[0] as *i8, 0, length as usize);
     } return path;
 }
 
@@ -350,10 +350,10 @@ fn GetTemporaryPath() -> String {
 
 fn AbsolutePath(path: &String) -> String {
     let mut buffer: [i8; PATH_MAX];
-    let result = realpath(path.Data(), buffer[0]);
+    let result = realpath(path.Data(), &buffer[0]);
 
     if result != null {
-        return String(buffer[0] as *i8);
+        return String(&buffer[0] as *i8);
     } return path;
 }
 

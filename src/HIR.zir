@@ -1562,7 +1562,7 @@ class HIRIndexAccessExpression : HIRExpression {
     pub value: *HIRExpression,
     pub index: *HIRExpression;
 
-    HIRIndexAccessExpression(&mut this, value: *HIRExpression, index: *HIRExpression, _type: *HIRType) : HIRExpression(HIRExpressionKind::IndexAccess, _type) {
+    HIRIndexAccessExpression(&mut this, value: *HIRExpression, index: *HIRExpression, _type: *HIRType, mutable: bool) : HIRExpression(HIRExpressionKind::IndexAccess, _type, HIRExpressionCategory::Place, mutable) {
         (this.value, this.index) = (value, index);
     }
 
@@ -3005,9 +3005,9 @@ class HIRBuilder {
 
     pub fn IndexAccess(&mut this, value: *HIRExpression, index: *HIRExpression) -> *mut HIRIndexAccessExpression {
         if value->_type->IsArray() {
-            return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Element(), value->mutable));
+            return this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Element(), value->mutable);
         } else {
-            return this.context->arena.New<HIRIndexAccessExpression>(value, index, this.context->ReferenceType(value->_type->Pointee(), value->_type->IsMutable()));
+            return this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Pointee(), value->_type->IsMutable());
         }
     }
 
