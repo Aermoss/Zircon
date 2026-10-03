@@ -1443,8 +1443,16 @@ class MIRLowerer {
         }
 
         let right_type = binary->right->_type;
-        let right = this.LowerExpression(binary->right);
+        let mut right = this.LowerExpression(binary->right);
         if right == null { return null; }
+
+        if (binary->kind == HIRBinaryKind::LeftShift || binary->kind == HIRBinaryKind::RightShift) && right_type->Width() != left_type->Width() {
+            if right_type->Width() < left_type->Width() {
+                right = this.builder.BuildCast("shift.cast".ToString(), right_type->IsSigned() ? MIRCastKind::SExt : MIRCastKind::ZExt, right, result_type);
+            } else {
+                right = this.builder.BuildCast("shift.cast".ToString(), MIRCastKind::Trunc, right, result_type);
+            }
+        }
 
         if left_type->IsBoolean() && right_type->IsBoolean() {
             if binary->kind == HIRBinaryKind::BitwiseAnd {

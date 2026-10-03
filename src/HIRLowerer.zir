@@ -727,7 +727,25 @@ class HIRLowerer {
         }
     }
 
-    fn GetCopyAssign(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+    fn GetDestructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        if _type->IsArray() {
+            this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
+            return (_type as *HIRArrayType)->destructor;
+        } else if _type->IsTuple() {
+            this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
+            return (_type as *HIRTupleType)->destructor;
+        } else if _type->IsClass() {
+            return (_type as *HIRClassType)->declaration->destructor;
+        } else if _type->IsStructure() {
+            return (_type as *HIRStructureType)->declaration->destructor;
+        } else if _type->IsVariant() {
+            return (_type as *HIRVariantType)->declaration->destructor;
+        } else {
+            return null;
+        }
+    }
+
+    fn GetCopyAssignment(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
             return (_type as *HIRArrayType)->copy_assign;
@@ -748,24 +766,6 @@ class HIRLowerer {
             return (_type as *HIRStructureType)->declaration->copy_assign;
         } else if _type->IsVariant() {
             return (_type as *HIRVariantType)->declaration->copy_assign;
-        } else {
-            return null;
-        }
-    }
-
-    fn GetDestructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
-        if _type->IsArray() {
-            this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
-            return (_type as *HIRArrayType)->destructor;
-        } else if _type->IsTuple() {
-            this.EnsureTupleSpecialMembers(_type as *mut HIRTupleType);
-            return (_type as *HIRTupleType)->destructor;
-        } else if _type->IsClass() {
-            return (_type as *HIRClassType)->declaration->destructor;
-        } else if _type->IsStructure() {
-            return (_type as *HIRStructureType)->declaration->destructor;
-        } else if _type->IsVariant() {
-            return (_type as *HIRVariantType)->declaration->destructor;
         } else {
             return null;
         }
@@ -890,9 +890,20 @@ class HIRLowerer {
         }
     }
 
+    fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
+        if !_type->HasSpecialMembers() { return; }
+        let function = this.GetDestructor(_type);
+        if function == null { return; }
+        let mut values = Vector<*HIRExpression>();
+        values.PushBack(this.builder.AddressOf(this_field));
+        let call = this.LowerResolvedCallExpression(function, values, node);
+        if call == null { return; }
+        this.builder.BuildExpressionStatement(call);
+    }
+
     fn LowerFieldCopyAssignment(&mut this, this_field: *HIRExpression, other_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
         if _type->HasSpecialMembers() {
-            let function = this.GetCopyAssign(_type);
+            let function = this.GetCopyAssignment(_type);
             if function == null { return; }
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.AddressOf(this_field));
@@ -903,17 +914,6 @@ class HIRLowerer {
         } else {
             this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, other_field));
         }
-    }
-
-    fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if !_type->HasSpecialMembers() { return; }
-        let function = this.GetDestructor(_type);
-        if function == null { return; }
-        let mut values = Vector<*HIRExpression>();
-        values.PushBack(this.builder.AddressOf(this_field));
-        let call = this.LowerResolvedCallExpression(function, values, node);
-        if call == null { return; }
-        this.builder.BuildExpressionStatement(call);
     }
 
     fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parents: &Vector<*HIRType>, fields: &Vector<*HIRFieldDeclaration>) {
@@ -2479,7 +2479,9 @@ class HIRLowerer {
         let mut right = this.LowerExpression(assignment->right);
         if right == null { return null; }
 
-        if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
+        if assignment->kind == ASTAssignmentKind::LeftShiftAssign || assignment->kind == ASTAssignmentKind::RightShiftAssign {
+            right = this.Coerce(right);
+        } else if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
             right = this.Coerce(right, this.context.IntegerPointerType(false));
         } else {
             right = this.Coerce(right, left->_type);
@@ -2503,7 +2505,7 @@ class HIRLowerer {
                     return null;
                 }
 
-                function = this.GetCopyAssign(left->_type);
+                function = this.GetCopyAssignment(left->_type);
                 if function == null { return null; }
             }
 
@@ -3391,7 +3393,7 @@ class HIRLowerer {
         let mut right = this.ImplicitDereference(this.LowerExpression(binary->right));
         if right == null { return null; }
 
-        if operand_target != null {
+        if operand_target != null && binary->kind != ASTBinaryKind::LeftShift && binary->kind != ASTBinaryKind::RightShift {
             right = this.Coerce(right, operand_target);
         }
 
@@ -3439,7 +3441,9 @@ class HIRLowerer {
             }
         }
 
-        if left->_type->IsPointer() && right->_type->IsInteger() && right->_type->IsLiteral() {
+        if kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift {
+            (left, right) = (this.Coerce(left), this.Coerce(right));
+        } else if left->_type->IsPointer() && right->_type->IsInteger() && right->_type->IsLiteral() {
             right = this.Coerce(right, this.context.IntegerPointerType(false));
         } else if right->_type->IsPointer() && left->_type->IsInteger() && left->_type->IsLiteral() {
             left = this.Coerce(left, this.context.IntegerPointerType(false));
@@ -3464,7 +3468,7 @@ class HIRLowerer {
                 return null;
             }
         } else if left->_type->IsInteger() && right->_type->IsInteger() {
-            if *left->_type != *right->_type {
+            if *left->_type != *right->_type && !(kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) {
                 Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
                 return null;
             }

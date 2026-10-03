@@ -2797,7 +2797,7 @@ class HIRBuilder {
         return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::Dereference, operand, operand->_type->Pointee(), HIRExpressionCategory::Place, operand->_type->IsMutable());
     }
 
-    fn MaskToWidth(&this, value: u64, width: u64) -> u64 {
+    fn MaskToWidth(&this, value: u64, width: u32) -> u64 {
         if width >= 64 { return value; }
         return value & ((1u64 << width) - 1);
     }
@@ -2805,13 +2805,13 @@ class HIRBuilder {
     fn FoldUnary(&mut this, kind: HIRUnaryKind, operand: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
         if kind == HIRUnaryKind::Negate {
             if operand->kind == HIRLiteralKind::Integer {
-                return this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width() as u64), _type);
+                return this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width()), _type);
             } else if operand->kind == HIRLiteralKind::Float {
                 return this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type);
             } else { return null; }
         } else if kind == HIRUnaryKind::Not {
             if operand->kind == HIRLiteralKind::Integer {
-                return this.IntegerLiteral(this.MaskToWidth(!(operand as *HIRIntegerLiteral)->value, _type->Width() as u64), _type);
+                return this.IntegerLiteral(this.MaskToWidth(!(operand as *HIRIntegerLiteral)->value, _type->Width()), _type);
             } else if operand->kind == HIRLiteralKind::Boolean {
                 return this.BooleanLiteral(!(operand as *HIRBooleanLiteral)->value, _type);
             } else { return null; }
@@ -2827,7 +2827,7 @@ class HIRBuilder {
         return this.context->arena.New<HIRUnaryExpression>(kind, operand, operand->_type, HIRExpressionCategory::Value, false);
     }
 
-    fn SignExtend(&this, value: u64, width: u64) -> i64 {
+    fn SignExtend(&this, value: u64, width: u32) -> i64 {
         let masked = this.MaskToWidth(value, width);
         if width >= 64 { return masked as i64; }
         let sign_bit = 1u64 << (width - 1);
@@ -2841,7 +2841,7 @@ class HIRBuilder {
         if left->kind == HIRLiteralKind::Integer && right->kind == HIRLiteralKind::Integer {
             let (left, right) = ((left as *HIRIntegerLiteral)->value, (right as *HIRIntegerLiteral)->value);
             if (kind == HIRBinaryKind::Divide || kind == HIRBinaryKind::Modulo) && right == 0 { return null; }
-            let (signed, width) = (_type->IsSigned(), _type->Width() as u64);
+            let (signed, width) = (_type->IsSigned(), _type->Width());
 
             if kind == HIRBinaryKind::Add {
                 return this.IntegerLiteral(this.MaskToWidth(left + right, width), _type);
@@ -2949,21 +2949,21 @@ class HIRBuilder {
                 : (value as *HIRIntegerLiteral)->value;
 
             if target->IsFloat() {
-                return this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width() as u64) as f64 : raw as f64, target);
+                return this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width()) as f64 : raw as f64, target);
             } else {
                 let mut converted = raw;
 
                 if value->_type->IsInteger() && value->_type->IsSigned() && target->Width() > value->_type->Width() {
-                    converted = this.SignExtend(raw, value->_type->Width() as u64) as u64;
+                    converted = this.SignExtend(raw, value->_type->Width()) as u64;
                 }
 
-                return this.IntegerLiteral(this.MaskToWidth(converted, target->Width() as u64), target);
+                return this.IntegerLiteral(this.MaskToWidth(converted, target->Width()), target);
             }
         } else if value->kind == HIRLiteralKind::Float {
             let value = (value as *HIRFloatLiteral)->value;
 
             if target->IsInteger() {
-                return this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width() as u64), target);
+                return this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width()), target);
             } else {
                 return this.FloatLiteral(value, target);
             }
