@@ -15,7 +15,7 @@
  */
 
 #[include "std/io", "std/file", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir",
-    "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/LIRLowerer.zir", "src/LLVMLowerer.zir", "src/Assembler.zir", "src/Logger.zir" : *]
+    "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/LLVMLowerer.zir", "src/Assembler.zir", "src/Logger.zir" : *]
 
 #[if WINDOWS]
 const INFINITE: u32 = 0xFFFFFFFF;
@@ -649,6 +649,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let mut llvm_lowerer = LLVMLowerer(target, freestanding, no_red_zone);
         let mut assembler = Assembler(target);
 
+        if target.backend == TargetBackend::Zodiac && extension != ".zir" {
+            failed = true;
+            Logger::Log(input_file, "Only Zircon sources can be compiled for the Zodiac target.", LogSeverity::Error);
+            Logger::Clear();
+            continue;
+        }
+
         if extension == ".zir" {
             if verbose {
                 Logger::Log("Compiling: '" + input_file + "'.", LogSeverity::Info);
@@ -687,15 +694,31 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
                 if emit_mir { _WriteFile(name + ".mir", mir_module->ToString()); }
 
-                let mut lir_lowerer = LIRLowerer();
-                let lir_start = timer.Get();
-                let lir_module = lir_lowerer.Lower(mir_module);
-                WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
-                if emit_lir { _WriteFile(name + ".lir", lir_module->ToString()); }
+                if target.backend == TargetBackend::Zodiac {
+                    let mut lir_lowerer = LIRLowerer();
+                    let lir_start = timer.Get();
+                    let lir_module = lir_lowerer.Lower(mir_module);
+                    WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
+                    if emit_lir { _WriteFile(name + ".virtual.lir", lir_module->ToString()); }
 
-                let llvm_start = timer.Get();
-                module = llvm_lowerer.Lower(mir_module);
-                WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
+                    let mut allocator = LIRAllocator(lir_lowerer.Context());
+                    let allocator_start = timer.Get();
+                    allocator.Allocate(lir_module);
+                    WriteLine("LIR module allocated in " + String::FromFloat(timer.Get() - allocator_start) + " seconds.");
+                    if emit_lir { _WriteFile(name + ".physical.lir", lir_module->ToString()); }
+
+                    if emit_asm {
+                        let mut asm_name = name + ".s";
+                        if !output_file.Empty() { asm_name = output_file; }
+                        let mut emitter = ZodiacEmitter();
+                        let assembly = emitter.Emit(lir_module);
+                        _WriteFile(asm_name, assembly);
+                    }
+                } else {
+                    let llvm_start = timer.Get();
+                    module = llvm_lowerer.Lower(mir_module);
+                    WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
+                }
             }
         } else if extension == ".ll" || extension == ".bc" {
             if verbose {
@@ -769,7 +792,11 @@ fn Main(args: &mut Vector<String>) -> i32 {
             Logger::Log(input_file, "Unsupported file extension '" + extension + "'.", LogSeverity::Error);
         }
 
-        failed |= module == null;
+        if target.backend == TargetBackend::Zodiac {
+            failed |= Logger::HasError();
+        } else {
+            failed |= module == null;
+        }
 
         if check || failed {
             if !check {
