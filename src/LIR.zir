@@ -78,6 +78,56 @@ class LIRVirtualRegister : LIRRegisterOperand {
     }
 }
 
+const LIR_ZERO: u8 = 0;
+const LIR_RA: u8 = 1;
+const LIR_SP: u8 = 2;
+const LIR_FP: u8 = 5;
+const LIR_S1: u8 = 6;
+const LIR_S11: u8 = 16;
+const LIR_T0: u8 = 17;
+const LIR_T5: u8 = 22;
+const LIR_T6: u8 = 23;
+const LIR_A0: u8 = 24;
+const LIR_A7: u8 = 31;
+const LIR_ARGUMENT_COUNT: usize = 8;
+
+fn LIRRegisterName(index: u8) -> String {
+    if index == 0 { return "zero".ToString(); }
+    else if index == 1 { return "ra".ToString(); }
+    else if index == 2 { return "sp".ToString(); }
+    else if index == 3 { return "gp".ToString(); }
+    else if index == 4 { return "tp".ToString(); }
+    else if index == 5 { return "fp".ToString(); }
+    else if index <= 16 { return 's' + String::FromInteger((index - 5) as u64); }
+    else if index <= 23 { return 't' + String::FromInteger((index - 17) as u64); }
+    else if index <= 31 { return 'a' + String::FromInteger((index - 24) as u64); }
+    else { return "<invalid register>".ToString(); }
+}
+
+fn LIRRegisterIndex(name: &String) -> i32 {
+    if name == "zero" { return 0; }
+    else if name == "ra" { return 1; }
+    else if name == "sp" { return 2; }
+    else if name == "gp" { return 3; }
+    else if name == "tp" { return 4; }
+    else if name == "fp" { return 5; }
+    else if name.Length() < 2 { return -1; }
+    let rest = name.SubString(1);
+
+    for character in rest {
+        if character < '0' || character > '9' {
+            return -1;
+        }
+    }
+
+    let index = rest.ToInteger(10) as i32;
+    if name.StartsWith('x') && index <= 31 { return index; }
+    else if name.StartsWith('s') && index <= 11 { return index + 5; }
+    else if name.StartsWith('t') && index <= 6 { return index + 17; }
+    else if name.StartsWith('a') && index <= 7 { return index + 24; }
+    else { return -1; }
+}
+
 class LIRPhysicalRegister : LIRRegisterOperand {
     pub index: u8,
     pub name: String;
@@ -151,7 +201,8 @@ enum LIROpcode: u16 {
     Mul, Mulh, Mulhsu, Mulhu, Div, Divu, Rem, Remu,
     And, Andi, Or, Ori, Xor, Xori,
     Sll, Slli, Srl, Srli, Sra, Srai,
-    Hlt
+    Hlt,
+    Li, La, Ret, Asm
 }
 
 extend LIROpcode {
@@ -206,6 +257,10 @@ extend LIROpcode {
         else if this == LIROpcode::Sra { return "sra".ToString(); }
         else if this == LIROpcode::Srai { return "srai".ToString(); }
         else if this == LIROpcode::Hlt { return "hlt".ToString(); }
+        else if this == LIROpcode::Li { return "li".ToString(); }
+        else if this == LIROpcode::La { return "la".ToString(); }
+        else if this == LIROpcode::Ret { return "ret".ToString(); }
+        else if this == LIROpcode::Asm { return "asm".ToString(); }
         else { return "<invalid instruction>".ToString(); }
     }
 }
@@ -213,7 +268,10 @@ extend LIROpcode {
 class LIRInstruction {
     pub opcode: LIROpcode,
     pub defines: Vector<*LIROperand>,
-    pub uses: Vector<*LIROperand>;
+    pub uses: Vector<*LIROperand>,
+    pub implicit_defines: Vector<*LIROperand>,
+    pub implicit_uses: Vector<*LIROperand>,
+    pub text: String;
 
     LIRInstruction(&mut this, opcode: LIROpcode, defines: Vector<*LIROperand>, uses: Vector<*LIROperand>) {
         (this.opcode, this.defines, this.uses) = (opcode, defines, uses);
@@ -231,6 +289,10 @@ class LIRInstruction {
 
         result += this.opcode.ToString();
 
+        if this.opcode == LIROpcode::Asm {
+            result += " \"" + this.text.Escape() + '"';
+        }
+
         if !this.uses.Empty() {
             result += ' ';
 
@@ -238,12 +300,22 @@ class LIRInstruction {
                 if i > 0 { result += ", "; }
                 result += this.uses[i]->ToString();
             }
+        }
+
+        if !this.implicit_uses.Empty() {
+            result += " [";
+
+            for i in 0..this.implicit_uses.Size() {
+                if i > 0 { result += ", "; }
+                result += this.implicit_uses[i]->ToString();
+            } result += ']';
         } return result;
     }
 }
 
 class LIRBlock {
     pub name: String,
+    pub index: u32 = 0,
     pub instructions: Vector<*LIRInstruction>,
     pub predecessors: Vector<*LIRBlock>,
     pub successors: Vector<*LIRBlock>;
@@ -267,9 +339,13 @@ class LIRBlock {
 
 class LIRFunction {
     pub name: String,
-    pub blocks: Vector<*LIRBlock>,
+    pub blocks: Vector<*mut LIRBlock>,
+    pub global: bool = true,
+    pub has_calls: bool = false,
     pub register_index: u32 = 0,
-    pub frame_size: u32 = 0;
+    pub frame_size: u32 = 0,
+    pub outgoing_size: u32 = 0,
+    pub saved_registers: Vector<u8>;
 
     LIRFunction(&mut this, name: String) {
         this.name = name;
@@ -289,14 +365,64 @@ class LIRFunction {
     }
 }
 
+class LIRRelocation {
+    pub offset: u32,
+    pub symbol: String;
+
+    LIRRelocation(&mut this) {}
+
+    LIRRelocation(&mut this, offset: u32, symbol: String) {
+        (this.offset, this.symbol) = (offset, symbol);
+    }
+}
+
+class LIRGlobal {
+    pub name: String,
+    pub global: bool,
+    pub alignment: u32,
+    pub data: Vector<u8>,
+    pub relocations: Vector<LIRRelocation>;
+
+    LIRGlobal(&mut this, name: String, global: bool, alignment: u32, size: u32) {
+        (this.name, this.global, this.alignment) = (name, global, alignment);
+
+        for i in 0..size as usize {
+            this.data.PushBack(0);
+        }
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = "global @\"" + this.name + "\" = [";
+
+        for i in 0..this.data.Size() {
+            if i > 0 { result += ", "; }
+            result += String::FromInteger(this.data[i] as u64);
+        } result += ']';
+
+        for relocation in this.relocations {
+            result += ", @\"" + relocation.symbol + "\" at " + String::FromInteger(relocation.offset as u64);
+        } return result;
+    }
+}
+
 class LIRModule {
-    pub functions: Vector<*LIRFunction>;
+    pub functions: Vector<*mut LIRFunction>,
+    pub globals: Vector<*mut LIRGlobal>,
+    pub assembly: Vector<String>;
 
     LIRModule(&mut this) {}
 
     pub fn ToString(&this) -> String {
         let mut result = String();
         let mut previous: *LIRFunction = null;
+
+        for global in this.globals {
+            result += global->ToString() + '\n';
+        }
+
+        if !this.globals.Empty() && !this.functions.Empty() {
+            result += '\n';
+        }
 
         for function in this.functions {
             if previous != null {
@@ -341,6 +467,10 @@ class LIRBuilder {
         return this.context->arena.New<LIRPhysicalRegister>(index, name);
     }
 
+    pub fn PhysicalRegister(&mut this, index: u8) -> *mut LIRPhysicalRegister {
+        return this.context->arena.New<LIRPhysicalRegister>(index, LIRRegisterName(index));
+    }
+
     pub fn ImmediateOperand(&mut this, value: i64) -> *mut LIRImmediateOperand {
         return this.context->arena.New<LIRImmediateOperand>(value);
     }
@@ -361,6 +491,12 @@ class LIRBuilder {
         let instruction = this.context->arena.New<LIRInstruction>(opcode, defines, uses);
         this.block->instructions.PushBack(instruction);
         return instruction;
+    }
+
+    pub fn BuildGlobal(&mut this, name: String, global: bool, alignment: u32, size: u32) -> *mut LIRGlobal {
+        let lowered = this.context->arena.New<LIRGlobal>(name, global, alignment, size);
+        this.module->globals.PushBack(lowered);
+        return lowered;
     }
 
     pub fn BuildBlock(&mut this, name: String) -> *mut LIRBlock {

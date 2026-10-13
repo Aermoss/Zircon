@@ -1,0 +1,591 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/LIR.zir", "src/Logger.zir" : *]
+
+const LIR_NO_POSITION: u32 = 0xFFFFFFFF;
+
+class LIRInterval {
+    pub start: u32 = LIR_NO_POSITION,
+    pub end: u32 = 0,
+    pub register: i32 = -1,
+    pub slot: i32 = 0,
+    pub spilled: bool = false;
+
+    LIRInterval(&mut this) {}
+}
+
+class LIRFixedRange {
+    pub register: u8,
+    pub start: u32,
+    pub end: u32;
+
+    LIRFixedRange(&mut this) {}
+
+    LIRFixedRange(&mut this, register: u8, start: u32, end: u32) {
+        (this.register, this.start, this.end) = (register, start, end);
+    }
+}
+
+class LIRAllocator {
+    context: *mut LIRContext,
+    function: *mut LIRFunction = null,
+    physical: Vector<*LIROperand>,
+    order: Vector<u8>,
+    intervals: Vector<LIRInterval>,
+    hints: Vector<i64>,
+    copies: Vector<i64>,
+    ranges: Vector<LIRFixedRange>,
+    range_offsets: Vector<u32>,
+    scratch: Vector<i32>,
+    before: Vector<*LIRInstruction>,
+    after: Vector<*LIRInstruction>;
+
+    LIRAllocator(&mut this, context: *mut LIRContext) {
+        this.context = context;
+
+        for i in 0u8..32 {
+            this.physical.PushBack(this.context->arena.New<LIRPhysicalRegister>(i, LIRRegisterName(i)));
+        }
+
+        for i in LIR_T0..LIR_T5 { this.order.PushBack(i); }
+        for i in 0u8..8 { this.order.PushBack(LIR_A7 - i); }
+        for i in LIR_S1..(LIR_S11 + 1) { this.order.PushBack(i); }
+    }
+
+    pub fn Allocate(&mut this, module: *LIRModule) {
+        for function in module->functions {
+            if !function->blocks.Empty() {
+                this.AllocateFunction(function);
+            }
+        }
+    }
+
+    fn IsAllocatable(&this, register: u8) -> bool {
+        return (register >= LIR_S1 && register <= LIR_S11) || (register >= LIR_T0 && register < LIR_T5) || (register >= LIR_A0 && register <= LIR_A7);
+    }
+
+    fn VirtualIndex(&this, operand: *LIROperand) -> i64 {
+        if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
+            return (operand as *LIRVirtualRegister)->index as i64;
+        } return -1;
+    }
+
+    fn PhysicalIndex(&this, operand: *LIROperand) -> i64 {
+        if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical {
+            return (operand as *LIRPhysicalRegister)->index as i64;
+        } return -1;
+    }
+
+    fn UsedRegister(&this, operand: *LIROperand) -> *LIROperand {
+        if operand != null && operand->kind == LIROperandKind::Memory {
+            return (operand as *LIRMemoryOperand)->base;
+        } return operand;
+    }
+
+    fn IsTerminator(&this, instruction: *LIRInstruction) -> bool {
+        return instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt;
+    }
+
+    fn SetBit(&this, bits: &mut Vector<u64>, base: usize, index: u32) {
+        bits[base + (index / 64) as usize] |= 1u64 << ((index % 64) as u64);
+    }
+
+    fn TestBit(&this, bits: &Vector<u64>, base: usize, index: u32) -> bool {
+        return (bits[base + (index / 64) as usize] & (1u64 << ((index % 64) as u64))) != 0;
+    }
+
+    fn Extend(&mut this, register: u32, position: u32) {
+        if position < this.intervals[register as usize].start { this.intervals[register as usize].start = position; }
+        if position > this.intervals[register as usize].end { this.intervals[register as usize].end = position; }
+    }
+
+    fn AllocateFunction(&mut this, function: *mut LIRFunction) {
+        this.function = function;
+        let block_count = function->blocks.Size();
+        let register_count = function->register_index;
+        let words = ((register_count + 63) / 64) as usize + 1;
+        let mut block_starts = Vector<u32>();
+        let mut block_ends = Vector<u32>();
+        let mut position: u32 = 0;
+
+        for i in 0..block_count {
+            let block = function->blocks[i];
+            block->index = i as u32;
+            block_starts.PushBack(position);
+            position += 2 + 2 * block->instructions.Size() as u32;
+            block_ends.PushBack(position - 1);
+        }
+
+        let mut successors = Vector<i64>();
+
+        for i in 0..block_count {
+            let block = function->blocks[i];
+            let mut first: i64 = -1;
+            let mut second: i64 = -1;
+
+            for instruction in block->instructions {
+                for operand in instruction->uses {
+                    if operand->kind != LIROperandKind::Block { continue; }
+                    let target = (operand as *LIRBlockOperand)->block->index as i64;
+
+                    if first < 0 {
+                        first = target;
+                    } else if second < 0 && target != first {
+                        second = target;
+                    }
+                }
+            }
+
+            if (block->instructions.Empty() || !this.IsTerminator(block->instructions.Back())) && i + 1 < block_count {
+                if first < 0 {
+                    if first < 0 {
+                        first = (i + 1) as i64;
+                    } else if second < 0 {
+                        second = (i + 1) as i64;
+                    }
+                }
+            }
+
+            successors.PushBack(first);
+            successors.PushBack(second);
+        }
+
+        let mut gen = Vector<u64>();
+        let mut kill = Vector<u64>();
+        let mut live_in = Vector<u64>();
+        let mut live_out = Vector<u64>();
+
+        for i in 0..(block_count * words) {
+            gen.PushBack(0);
+            kill.PushBack(0);
+            live_in.PushBack(0);
+            live_out.PushBack(0);
+        }
+
+        for i in 0..block_count {
+            let base = i * words;
+
+            for instruction in function->blocks[i]->instructions {
+                for operand in instruction->uses {
+                    let index = this.VirtualIndex(this.UsedRegister(operand));
+
+                    if index >= 0 && !this.TestBit(kill, base, index as u32) {
+                        this.SetBit(gen, base, index as u32);
+                    }
+                }
+
+                for operand in instruction->defines {
+                    let index = this.VirtualIndex(operand);
+                    if index >= 0 { this.SetBit(kill, base, index as u32); }
+                }
+            }
+        }
+
+        let mut changed = true;
+
+        while changed {
+            changed = false;
+
+            for offset in 0..block_count {
+                let i = block_count - 1 - offset;
+                let base = i * words;
+
+                for w in 0..words {
+                    let mut out: u64 = 0;
+
+                    for s in 0usize..2 {
+                        let successor = successors[i * 2 + s];
+                        if successor >= 0 { out |= live_in[(successor as usize) * words + w]; }
+                    }
+
+                    let _in = gen[base + w] | (out & !kill[base + w]);
+                    live_out[base + w] = out;
+
+                    if _in != live_in[base + w] {
+                        live_in[base + w] = _in;
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        this.intervals.Clear();
+        this.hints.Clear();
+        this.copies.Clear();
+
+        for i in 0..register_count as usize {
+            this.intervals.PushBack(LIRInterval());
+            this.hints.PushBack(-1);
+            this.copies.PushBack(-1);
+        }
+
+        for i in 0..block_count {
+            let base = i * words;
+
+            for w in 0..words {
+                let (_in, out) = (live_in[base + w], live_out[base + w]);
+                if (_in | out) == 0 { continue; }
+
+                for bit in 0usize..64 {
+                    let index = (w * 64 + bit) as u32;
+                    if index >= register_count { break; }
+                    if (_in & (1u64 << (bit as u64))) != 0 { this.Extend(index, block_starts[i]); }
+                    if (out & (1u64 << (bit as u64))) != 0 { this.Extend(index, block_ends[i]); }
+                }
+            }
+
+            let mut use_position = block_starts[i] + 2;
+
+            for instruction in function->blocks[i]->instructions {
+                for operand in instruction->uses {
+                    let index = this.VirtualIndex(this.UsedRegister(operand));
+                    if index >= 0 { this.Extend(index as u32, use_position); }
+                }
+
+                for operand in instruction->defines {
+                    let index = this.VirtualIndex(operand);
+                    if index >= 0 { this.Extend(index as u32, use_position + 1); }
+                }
+
+                this.RecordMove(instruction);
+                use_position += 2;
+            }
+        }
+
+        this.BuildFixedRanges(block_starts);
+        this.LinearScan(position);
+        this.Rewrite();
+
+        let mut saved = Vector<u8>();
+
+        for interval in this.intervals {
+            if interval.register >= LIR_S1 as i32 && interval.register <= LIR_S11 as i32 && !saved.Contains(interval.register as u8) {
+                saved.PushBack(interval.register as u8);
+            }
+        }
+
+        for register in LIR_S1..(LIR_S11 + 1) {
+            if saved.Contains(register) {
+                function->saved_registers.PushBack(register);
+            }
+        }
+    }
+
+    fn RecordMove(&mut this, instruction: *LIRInstruction) {
+        if instruction->opcode != LIROpcode::Addi || instruction->uses[1]->kind != LIROperandKind::Immediate { return; }
+        if (instruction->uses[1] as *LIRImmediateOperand)->value != 0 { return; }
+        let (destination, source) = (instruction->defines[0], instruction->uses[0]);
+        let (virtual_destination, virtual_source) = (this.VirtualIndex(destination), this.VirtualIndex(source));
+        let (physical_destination, physical_source) = (this.PhysicalIndex(destination), this.PhysicalIndex(source));
+
+        if virtual_destination >= 0 && physical_source >= 0 && this.IsAllocatable(physical_source as u8) {
+            this.hints[virtual_destination as usize] = physical_source;
+        } else if virtual_source >= 0 && physical_destination >= 0 && this.IsAllocatable(physical_destination as u8) {
+            this.hints[virtual_source as usize] = physical_destination;
+        } else if virtual_destination >= 0 && virtual_source >= 0 {
+            this.copies[virtual_destination as usize] = virtual_source;
+        }
+    }
+
+    fn BuildFixedRanges(&mut this, block_starts: &Vector<u32>) {
+        let mut ranges = Vector<LIRFixedRange>();
+        let mut open = Vector<u32>();
+
+        for i in 0usize..32 {
+            open.PushBack(LIR_NO_POSITION);
+        }
+
+        for i in 0..this.function->blocks.Size() {
+            for r in 0usize..32 {
+                open[r] = LIR_NO_POSITION;
+            }
+
+            let mut use_position = block_starts[i] + 2;
+
+            for instruction in this.function->blocks[i]->instructions {
+                for k in 0..(instruction->uses.Size() + instruction->implicit_uses.Size()) {
+                    let operand = k < instruction->uses.Size() ? instruction->uses[k] : instruction->implicit_uses[k - instruction->uses.Size()];
+                    let index = this.PhysicalIndex(this.UsedRegister(operand));
+                    if index < 0 || !this.IsAllocatable(index as u8) { continue; }
+                    let start = open[index as usize] != LIR_NO_POSITION ? open[index as usize] : block_starts[i];
+                    ranges.PushBack(LIRFixedRange(index as u8, start, use_position));
+                }
+
+                for k in 0..(instruction->defines.Size() + instruction->implicit_defines.Size()) {
+                    let operand = k < instruction->defines.Size() ? instruction->defines[k] : instruction->implicit_defines[k - instruction->defines.Size()];
+                    let index = this.PhysicalIndex(operand);
+                    if index < 0 || !this.IsAllocatable(index as u8) { continue; }
+                    open[index as usize] = use_position + 1;
+                    ranges.PushBack(LIRFixedRange(index as u8, use_position + 1, use_position + 1));
+                }
+
+                use_position += 2;
+            }
+        }
+
+        this.range_offsets.Clear();
+
+        for r in 0..33 {
+            this.range_offsets.PushBack(0);
+        }
+
+        for range in ranges {
+            this.range_offsets[range.register as usize + 1] += 1;
+        }
+
+        for r in 0usize..32 {
+            this.range_offsets[r + 1] += this.range_offsets[r];
+        }
+
+        let mut cursor = Vector<u32>();
+
+        for r in 0usize..32 {
+            cursor.PushBack(this.range_offsets[r]);
+        }
+
+        this.ranges.Clear();
+
+        for range in ranges {
+            this.ranges.PushBack(LIRFixedRange());
+        }
+
+        for range in ranges {
+            this.ranges[cursor[range.register as usize] as usize] = range;
+            cursor[range.register as usize] += 1;
+        }
+    }
+
+    fn Conflicts(&this, register: u8, start: u32, end: u32) -> bool {
+        for k in this.range_offsets[register as usize]..this.range_offsets[register as usize + 1] {
+            let range = this.ranges[k as usize];
+
+            if range.start <= end && start <= range.end {
+                return true;
+            }
+        } return false;
+    }
+
+    fn Spill(&mut this, register: u32) {
+        let function = this.function;
+        function->frame_size = ((function->frame_size + 4 + 3) / 4) * 4;
+
+        if function->frame_size > 32768 {
+            Logger::Log("Stack frame of '" + function->name + "' is too large for the Zodiac backend.", LogSeverity::Error);
+        }
+
+        this.intervals[register as usize].spilled = true;
+        this.intervals[register as usize].register = -1;
+        this.intervals[register as usize].slot = -(function->frame_size as i32);
+    }
+
+    fn LinearScan(&mut this, position_count: u32) {
+        let mut counts = Vector<u32>();
+
+        for i in 0..(position_count as usize + 2) {
+            counts.PushBack(0);
+        }
+
+        for interval in this.intervals {
+            if interval.start != LIR_NO_POSITION { counts[interval.start as usize + 1] += 1; }
+        }
+
+        for i in 0..(position_count as usize + 1) {
+            counts[i + 1] += counts[i];
+        }
+
+        let mut sorted = Vector<u32>();
+
+        for i in 0..this.intervals.Size() {
+            sorted.PushBack(0);
+        }
+
+        let mut sorted_count: usize = 0;
+
+        for i in 0..this.intervals.Size() {
+            let start = this.intervals[i].start;
+            if start == LIR_NO_POSITION { continue; }
+            sorted[counts[start as usize] as usize] = i as u32;
+            counts[start as usize] += 1;
+            sorted_count += 1;
+        }
+
+        let mut active = Vector<u32>();
+        let mut owners = Vector<i64>();
+
+        for i in 0usize..32 {
+            owners.PushBack(-1);
+        }
+
+        for n in 0..sorted_count {
+            let current = sorted[n];
+            let (start, end) = (this.intervals[current as usize].start, this.intervals[current as usize].end);
+            let mut i: usize = 0;
+
+            while i < active.Size() {
+                let other = this.intervals[active[i] as usize];
+
+                if other.end < start {
+                    owners[other.register as usize] = -1;
+                    active.RemoveAt(i);
+                } else {
+                    i += 1;
+                }
+            }
+
+            let mut chosen = -1i32;
+            let mut hint = this.hints[current as usize];
+            let copy = this.copies[current as usize];
+            if hint < 0 && copy >= 0 { hint = this.intervals[copy as usize].register as i64; }
+
+            if hint >= 0 && owners[hint as usize] < 0 && !this.Conflicts(hint as u8, start, end) {
+                chosen = hint as i32;
+            }
+
+            for register in this.order {
+                if chosen >= 0 { break; }
+
+                if owners[register as usize] < 0 && !this.Conflicts(register, start, end) {
+                    chosen = register as i32;
+                    break;
+                }
+            }
+
+            if chosen < 0 {
+                let mut victim: i64 = -1;
+                let mut furthest = end;
+
+                for k in 0..active.Size() {
+                    let other = this.intervals[active[k] as usize];
+
+                    if other.end > furthest && !this.Conflicts(other.register as u8, start, end) {
+                        (victim, furthest) = (k as i64, other.end);
+                    }
+                }
+
+                if victim < 0 {
+                    this.Spill(current);
+                    continue;
+                }
+
+                let stolen = active[victim as usize];
+                chosen = this.intervals[stolen as usize].register;
+                this.Spill(stolen);
+                active.RemoveAt(victim as usize);
+            }
+
+            this.intervals[current as usize].register = chosen;
+            owners[chosen as usize] = current as i64;
+            active.PushBack(current);
+        }
+    }
+
+    fn ScratchFor(&mut this, register: u32, load: bool) -> *LIROperand {
+        for i in 0usize..2 {
+            if this.scratch[i] == register as i32 {
+                return this.physical[(LIR_T5 + (i as u8)) as usize];
+            }
+        }
+
+        let interval = this.intervals[register as usize];
+        let mut index: usize = 0;
+
+        if !load {
+            index = 0;
+        } else if this.scratch[0] < 0 {
+            index = 0;
+        } else if this.scratch[1] < 0 {
+            index = 1;
+        } else {
+            Logger::Log("Too many spilled operands in a single instruction in '" + this.function->name + "'.", LogSeverity::Error);
+        }
+
+        let scratch = this.physical[(LIR_T5 + (index as u8)) as usize];
+        let slot = this.context->arena.New<LIRMemoryOperand>(this.physical[LIR_FP as usize], interval.slot);
+
+        if load {
+            this.scratch[index] = register as i32;
+            let mut defines = Vector<*LIROperand>();
+            defines.PushBack(scratch);
+            let mut uses = Vector<*LIROperand>();
+            uses.PushBack(slot);
+            this.before.PushBack(this.context->arena.New<LIRInstruction>(LIROpcode::Lw, defines, uses));
+        } else {
+            let defines = Vector<*LIROperand>();
+            let mut uses = Vector<*LIROperand>();
+            uses.PushBack(scratch);
+            uses.PushBack(slot);
+            this.after.PushBack(this.context->arena.New<LIRInstruction>(LIROpcode::Sw, defines, uses));
+        } return scratch;
+    }
+
+    fn RewriteOperand(&mut this, operand: *LIROperand, load: bool) -> *LIROperand {
+        if operand == null {
+            return operand;
+        } else if operand->kind == LIROperandKind::Memory {
+            let memory = operand as *LIRMemoryOperand;
+            let base = this.RewriteOperand(memory->base, true);
+            if base == memory->base { return operand; }
+            return this.context->arena.New<LIRMemoryOperand>(base, memory->offset);
+        }
+
+        let index = this.VirtualIndex(operand);
+        if index < 0 { return operand; }
+        let interval = this.intervals[index as usize];
+
+        if interval.spilled {
+            return this.ScratchFor(index as u32, load);
+        } else if interval.register < 0 {
+            Logger::Log("Virtual register v" + String::FromInteger(index) + " has no register in '" + this.function->name + "'.", LogSeverity::Error);
+            return this.physical[LIR_ZERO as usize];
+        } return this.physical[interval.register as usize];
+    }
+
+    fn Rewrite(&mut this) {
+        for block in this.function->blocks {
+            let mut rewritten = Vector<*LIRInstruction>();
+
+            for instruction in block->instructions {
+                this.scratch.Clear();
+                this.scratch.PushBack(-1);
+                this.scratch.PushBack(-1);
+                this.before.Clear();
+                this.after.Clear();
+                let mut uses = Vector<*LIROperand>();
+                let mut defines = Vector<*LIROperand>();
+
+                for operand in instruction->uses {
+                    uses.PushBack(this.RewriteOperand(operand, true));
+                }
+
+                for operand in instruction->defines {
+                    defines.PushBack(this.RewriteOperand(operand, false));
+                }
+
+                let lowered = this.context->arena.New<LIRInstruction>(instruction->opcode, defines, uses);
+                lowered->implicit_uses = instruction->implicit_uses;
+                lowered->implicit_defines = instruction->implicit_defines;
+                lowered->text = instruction->text;
+
+                for other in this.before { rewritten.PushBack(other); }
+                rewritten.PushBack(lowered);
+                for other in this.after { rewritten.PushBack(other); }
+            }
+
+            block->instructions = rewritten;
+        }
+    }
+}

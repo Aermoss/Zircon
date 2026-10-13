@@ -17,14 +17,46 @@
 #[include "std/str", "std/vec", "std/map",
     "src/MIR.zir", "src/LIR.zir", "src/Logger.zir" : *]
 
+class LIRPhiEdge {
+    pub from: *MIRBlock,
+    pub to: *MIRBlock,
+    pub block: *mut LIRBlock,
+    pub index: usize;
+
+    LIRPhiEdge(&mut this) {}
+
+    LIRPhiEdge(&mut this, from: *MIRBlock, to: *MIRBlock, block: *mut LIRBlock, index: usize) {
+        (this.from, this.to, this.block, this.index) = (from, to, block, index);
+    }
+}
+
+class LIRConstant {
+    pub symbol: String,
+    pub value: i64 = 0,
+    pub valid: bool = false;
+
+    LIRConstant(&mut this) {}
+
+    LIRConstant(&mut this, symbol: String, value: i64) {
+        (this.symbol, this.value, this.valid) = (symbol, value, true);
+    }
+}
+
 class LIRLowerer {
     context: LIRContext,
     builder: LIRBuilder,
     values: Map<*MIRValue, *LIROperand>,
     blocks: Map<*MIRBlock, *mut LIRBlock>,
+    edges: Vector<LIRPhiEdge>,
+    block: *MIRBlock = null,
+    constant_index: u32 = 0,
     module: *mut LIRModule;
 
     LIRLowerer(&mut this) {}
+
+    pub fn Context(&mut this) -> *mut LIRContext {
+        return &mut this.context;
+    }
 
     pub fn Lower(&mut this, module: *MIRModule) -> *LIRModule {
         this.module = this.context.arena.New<LIRModule>();
@@ -42,30 +74,231 @@ class LIRLowerer {
     fn LowerDeclaration(&mut this, declaration: *MIRDeclaration) {
         if declaration->kind == MIRDeclarationKind::Function {
             this.LowerFunctionDeclaration(declaration as *MIRFunctionDeclaration);
+        } else if declaration->kind == MIRDeclarationKind::Static {
+            let _static = declaration as *MIRStaticDeclaration;
+            this.LowerGlobal(_static->name, _static->linkage == MIRDeclarationLinkage::External, _static->_type, _static->initializer);
+        } else if declaration->kind == MIRDeclarationKind::Constant {
+            let constant = declaration as *MIRConstantDeclaration;
+            this.LowerGlobal(constant->name, true, constant->_type, constant->initializer);
+        } else if declaration->kind == MIRDeclarationKind::Assembly {
+            this.module->assembly.PushBack((declaration as *MIRAssemblyDeclaration)->text);
+        }
+    }
+
+    fn Unsupported(&mut this, feature: *i8) -> *LIROperand {
+        let function = this.builder.GetCurrentFunction();
+        let location = function != null ? " (in '" + function->name + "')" : String();
+        Logger::Log(feature.ToString() + " is not supported by the Zodiac backend" + location + '.', LogSeverity::Error);
+        return null;
+    }
+
+    fn LowerGlobal(&mut this, name: String, global: bool, _type: *MIRType, initializer: *MIRValue) -> *mut LIRGlobal {
+        if initializer == null { return null; }
+        let lowered = this.builder.BuildGlobal(name, global, this.AlignOf(_type), this.SizeOf(_type));
+        this.WriteConstant(lowered, 0, initializer);
+        return lowered;
+    }
+
+    fn WriteInteger(&mut this, global: *mut LIRGlobal, offset: u32, value: u64, size: u32) {
+        for i in 0..size as usize {
+            global->data[offset as usize + i] = ((value >> ((i * 8) as u64)) & 0xFF) as u8;
+        }
+    }
+
+    fn WriteConstant(&mut this, global: *mut LIRGlobal, offset: u32, value: *MIRValue) {
+        if value->kind == MIRValueKind::Constant {
+            let constant = value as *MIRConstant;
+
+            if constant->kind == MIRConstantKind::Integer {
+                this.WriteInteger(global, offset, (constant as *MIRConstantInteger)->value, this.SizeOf(constant->_type));
+                return;
+            } else if constant->kind == MIRConstantKind::Null {
+                return;
+            } else if constant->kind == MIRConstantKind::String {
+                let string = (constant as *MIRConstantString)->value;
+
+                if constant->_type->kind == MIRTypeKind::Pointer {
+                    global->relocations.PushBack(LIRRelocation(offset, this.LowerStringData(string)));
+                    return;
+                }
+
+                let size = this.SizeOf(constant->_type) as usize;
+
+                for i in 0..string.Length() {
+                    if i >= size { break; }
+                    global->data[offset as usize + i] = string[i] as u8;
+                } return;
+            } else if constant->kind == MIRConstantKind::Array {
+                let element_size = this.SizeOf((constant->_type as *MIRArrayType)->element);
+                let elements = (constant as *MIRConstantArray)->elements;
+
+                for i in 0..elements.Size() {
+                    this.WriteConstant(global, offset + i as u32 * element_size, elements[i]);
+                } return;
+            } else if constant->kind == MIRConstantKind::Structure {
+                let _type = constant->_type as *MIRStructureType;
+                let fields = (constant as *MIRConstantStructure)->fields;
+
+                for i in 0..fields.Size() {
+                    this.WriteConstant(global, offset + this.FieldOffset(_type, i as u32), fields[i]);
+                } return;
+            } else if constant->kind == MIRConstantKind::Float {
+                this.Unsupported("Floating point constant");
+                return;
+            }
+        }
+
+        let result = this.EvaluateConstant(value);
+
+        if !result.valid {
+            Logger::Log("Global '" + global->name + "' has an initializer that cannot be evaluated at compile time.", LogSeverity::Error);
+        } else if result.symbol.Empty() {
+            this.WriteInteger(global, offset, result.value as u64, this.SizeOf(value->_type));
+        } else if result.value != 0 {
+            Logger::Log("Global '" + global->name + "' has an initializer with a symbol offset, which is not supported by the Zodiac backend.", LogSeverity::Error);
+        } else {
+            global->relocations.PushBack(LIRRelocation(offset, result.symbol));
+        }
+    }
+
+    fn LowerStringData(&mut this, value: &String) -> String {
+        let name = ".Lstring." + String::FromInteger(this.constant_index as u64);
+        this.constant_index += 1;
+        let global = this.builder.BuildGlobal(name, false, 1, (value.Length() + 1) as u32);
+
+        for i in 0..value.Length() {
+            global->data[i] = value[i] as u8;
+        } return name;
+    }
+
+    fn EvaluateConstant(&mut this, value: *MIRValue) -> LIRConstant {
+        if value->kind == MIRValueKind::DeclarationReference {
+            return LIRConstant((value as *MIRDeclarationReference)->declaration->name, 0);
+        } else if value->kind != MIRValueKind::Constant {
+            return LIRConstant();
+        }
+
+        let constant = value as *MIRConstant;
+
+        if constant->kind == MIRConstantKind::Integer {
+            return LIRConstant(String(), (constant as *MIRConstantInteger)->value as i64);
+        } else if constant->kind == MIRConstantKind::Null {
+            return LIRConstant(String(), 0);
+        } else if constant->kind != MIRConstantKind::Expression {
+            return LIRConstant();
+        }
+
+        let expression = constant as *MIRConstantExpression;
+
+        if expression->kind == MIRConstantExpressionKind::Cast {
+            let cast = expression as *MIRCastExpression;
+            let mut result = this.EvaluateConstant(cast->value);
+            if !result.valid || !result.symbol.Empty() { return result; }
+            let source_width = this.IntegerWidth(cast->value->_type);
+
+            if cast->kind == MIRCastKind::Trunc {
+                result.value = this.TruncateValue(result.value, this.IntegerWidth(cast->_type));
+            } else if cast->kind == MIRCastKind::ZExt {
+                result.value = this.TruncateValue(result.value, source_width);
+            } else if cast->kind == MIRCastKind::SExt {
+                result.value = this.SignExtendValue(result.value, source_width);
+            } else if cast->kind != MIRCastKind::Bitcast && cast->kind != MIRCastKind::PtrToInt && cast->kind != MIRCastKind::IntToPtr {
+                return LIRConstant();
+            } return result;
+        } else if expression->kind == MIRConstantExpressionKind::ArrayGEP {
+            let gep = expression as *MIRArrayGEPExpression;
+            let mut result = this.EvaluateConstant(gep->pointer);
+            let index = this.EvaluateConstant(gep->index);
+            if !result.valid || !index.valid || !index.symbol.Empty() { return LIRConstant(); }
+            result.value += index.value * this.SizeOf((gep->pointer->_type as *MIRPointerType)->pointee) as i64;
+            return result;
+        } else if expression->kind == MIRConstantExpressionKind::StructGEP {
+            let gep = expression as *MIRStructGEPExpression;
+            let mut result = this.EvaluateConstant(gep->pointer);
+            if !result.valid { return result; }
+            result.value += this.FieldOffset((gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType, gep->index) as i64;
+            return result;
+        } else if expression->kind == MIRConstantExpressionKind::Unary {
+            let unary = expression as *MIRUnaryExpression;
+            let mut result = this.EvaluateConstant(unary->operand);
+            if !result.valid || !result.symbol.Empty() { return LIRConstant(); }
+
+            if unary->kind == MIRUnaryKind::Neg {
+                result.value = -result.value;
+            } else if unary->kind == MIRUnaryKind::Not {
+                result.value = !result.value;
+            } else {
+                return LIRConstant();
+            } return result;
+        } else if expression->kind == MIRConstantExpressionKind::Binary {
+            let binary = expression as *MIRBinaryExpression;
+            let mut left = this.EvaluateConstant(binary->left);
+            let right = this.EvaluateConstant(binary->right);
+            if !left.valid || !right.valid || !right.symbol.Empty() { return LIRConstant(); }
+            let width = this.IntegerWidth(binary->left->_type);
+
+            if binary->kind == MIRBinaryKind::Add {
+                left.value += right.value;
+                return left;
+            } else if binary->kind == MIRBinaryKind::Sub {
+                left.value -= right.value;
+                return left;
+            } else if !left.symbol.Empty() {
+                return LIRConstant();
+            }
+
+            let (a, b) = (this.SignExtendValue(left.value, width), this.SignExtendValue(right.value, width));
+            let ua = (this.TruncateValue(left.value, width) as u64) & 0xFFFFFFFF;
+            let ub = (this.TruncateValue(right.value, width) as u64) & 0xFFFFFFFF;
+
+            if binary->kind == MIRBinaryKind::Mul { left.value = a * b; }
+            else if binary->kind == MIRBinaryKind::SDiv && b != 0 { left.value = a / b; }
+            else if binary->kind == MIRBinaryKind::SRem && b != 0 { left.value = a % b; }
+            else if binary->kind == MIRBinaryKind::UDiv && ub != 0 { left.value = (ua / ub) as i64; }
+            else if binary->kind == MIRBinaryKind::URem && ub != 0 { left.value = (ua % ub) as i64; }
+            else if binary->kind == MIRBinaryKind::And { left.value = a & b; }
+            else if binary->kind == MIRBinaryKind::Or { left.value = a | b; }
+            else if binary->kind == MIRBinaryKind::Xor { left.value = a ^ b; }
+            else if binary->kind == MIRBinaryKind::Shl { left.value = a << (b & 31); }
+            else if binary->kind == MIRBinaryKind::LShr { left.value = (ua >> (ub & 31)) as i64; }
+            else if binary->kind == MIRBinaryKind::AShr { left.value = a >> (b & 31); }
+            else { return LIRConstant(); }
+            return left;
+        } else {
+            return LIRConstant();
         }
     }
 
     fn LowerFunctionDeclaration(&mut this, function: *MIRFunctionDeclaration) {
         let lowered = this.builder.BuildFunction(function->name);
+        lowered->global = function->linkage == MIRDeclarationLinkage::External;
         if function->blocks.Empty() { return; }
+        lowered->frame_size = 8;
         this.builder.SetCurrentFunction(lowered);
         this.blocks.Clear();
+        this.edges.Clear();
+        this.values.Clear();
 
         for block in function->blocks {
             this.blocks[block] = this.builder.BuildBlock(block->name);
         }
 
         this.builder.SetCurrentBlock(this.blocks[function->blocks[0]]);
-        this.values.Clear();
 
         for i in 0..function->parameters.Size() {
-            if i >= 8 { break; }
             let destination = this.builder.VirtualRegister();
-            this.EmitMove(destination, this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64)));
+
+            if i < LIR_ARGUMENT_COUNT {
+                this.EmitMove(destination, this.Physical(LIR_A0 + (i as u8)));
+            } else {
+                this.Emit(LIROpcode::Lw, destination, this.builder.MemoryOperand(this.Physical(LIR_FP), ((i - LIR_ARGUMENT_COUNT) * 4) as i32), null);
+            }
+
             this.values[function->parameters[i]] = destination;
         }
 
         for block in function->blocks {
+            this.block = block;
             this.builder.SetCurrentBlock(this.blocks[block]);
 
             for instruction in block->instructions {
@@ -76,13 +309,249 @@ class LIRLowerer {
                 this.LowerTerminator(block->terminator);
             }
         }
+
+        this.LowerPhiCopies();
+        this.OptimizeFunction(lowered);
+        this.builder.SetCurrentFunction(null);
+    }
+
+    fn VirtualIndex(&this, operand: *LIROperand) -> i64 {
+        if operand != null && operand->kind == LIROperandKind::Memory {
+            return this.VirtualIndex((operand as *LIRMemoryOperand)->base);
+        } else if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
+            return (operand as *LIRVirtualRegister)->index as i64;
+        } return -1;
+    }
+
+    fn IsPure(&this, instruction: *LIRInstruction) -> bool {
+        let opcode = instruction->opcode;
+        return (opcode >= LIROpcode::Slt && opcode <= LIROpcode::Srai) || opcode == LIROpcode::Li || opcode == LIROpcode::La;
+    }
+
+    fn IsZero(&this, operand: *LIROperand) -> bool {
+        return operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical
+            && (operand as *LIRPhysicalRegister)->index == LIR_ZERO;
+    }
+
+    fn IsImmediateValue(&this, operand: *LIROperand, value: i64) -> bool {
+        return this.IsImmediate(operand) && this.ImmediateValue(operand) == value;
+    }
+
+    fn OptimizeFunction(&mut this, function: *mut LIRFunction) {
+        let count = function->register_index as usize;
+        let mut uses = Vector<u32>();
+        let mut defines = Vector<u32>();
+        let mut definers = Vector<*LIRInstruction>();
+
+        for i in 0..count {
+            uses.PushBack(0);
+            defines.PushBack(0);
+            definers.PushBack(null);
+        }
+
+        for block in function->blocks {
+            for instruction in block->instructions {
+                for operand in instruction->uses {
+                    let index = this.VirtualIndex(operand);
+                    if index >= 0 { uses[index as usize] += 1; }
+                }
+
+                for operand in instruction->defines {
+                    let index = this.VirtualIndex(operand);
+
+                    if index >= 0 {
+                        defines[index as usize] += 1;
+                        definers[index as usize] = instruction;
+                    }
+                }
+            }
+        }
+
+        for block in function->blocks {
+            let size = block->instructions.Size();
+            if size < 2 { continue; }
+            let branch = block->instructions[size - 2];
+            if branch->opcode != LIROpcode::Bne || block->instructions[size - 1]->opcode != LIROpcode::B { continue; }
+            let condition = this.VirtualIndex(branch->uses[0]);
+            if condition < 0 || uses[condition as usize] != 1 || defines[condition as usize] != 1 { continue; }
+            let mut definer = definers[condition as usize];
+            let mut inverted = false;
+
+            if definer->opcode == LIROpcode::Xori && this.IsImmediateValue(definer->uses[1], 1) {
+                let inner = this.VirtualIndex(definer->uses[0]);
+                if inner < 0 || uses[inner as usize] != 1 || defines[inner as usize] != 1 { continue; }
+                (definer, inverted) = (definers[inner as usize], true);
+            }
+
+            if !block->instructions.Contains(definer) || definer->uses.Size() != 2 { continue; }
+            let mut left = definer->uses[0];
+            let mut right = definer->uses[1];
+            let mut stable = true;
+
+            for operand in definer->uses {
+                let index = this.VirtualIndex(operand);
+                if operand->kind != LIROperandKind::Register || this.IsZero(operand) { continue; }
+                if index < 0 || index as usize >= count || defines[index as usize] != 1 { stable = false; }
+            }
+
+            if !stable { continue; }
+            let mut opcode = LIROpcode::Nop;
+
+            if definer->opcode == LIROpcode::Sltiu && this.IsImmediateValue(right, 1) {
+                (opcode, right) = (inverted ? LIROpcode::Bne : LIROpcode::Beq, this.Zero());
+            } else if definer->opcode == LIROpcode::Sltu && this.IsZero(left) {
+                (opcode, left, right) = (inverted ? LIROpcode::Beq : LIROpcode::Bne, right, this.Zero());
+            } else if definer->opcode == LIROpcode::Slt || definer->opcode == LIROpcode::Slti {
+                opcode = inverted ? LIROpcode::Bge : LIROpcode::Blt;
+            } else if definer->opcode == LIROpcode::Sltu || definer->opcode == LIROpcode::Sltiu {
+                opcode = inverted ? LIROpcode::Bgeu : LIROpcode::Bltu;
+            } else {
+                continue;
+            }
+
+            let mut fused = Vector<*LIRInstruction>();
+
+            for i in 0..(size - 2) {
+                fused.PushBack(block->instructions[i]);
+            }
+
+            for operand in definer->uses {
+                let index = this.VirtualIndex(operand);
+                if index >= 0 { uses[index as usize] += 1; }
+            }
+
+            if this.IsImmediateValue(right, 0) {
+                right = this.Zero();
+            } else if this.IsImmediate(right) {
+                let register = this.builder.VirtualRegister();
+                let mut li_defines = Vector<*LIROperand>();
+                li_defines.PushBack(register);
+                let mut li_uses = Vector<*LIROperand>();
+                li_uses.PushBack(right);
+                fused.PushBack(this.context.arena.New<LIRInstruction>(LIROpcode::Li, li_defines, li_uses));
+                right = register;
+            }
+
+            let branch_defines = Vector<*LIROperand>();
+            let mut branch_uses = Vector<*LIROperand>();
+            branch_uses.PushBack(left);
+            branch_uses.PushBack(right);
+            branch_uses.PushBack(branch->uses[2]);
+            fused.PushBack(this.context.arena.New<LIRInstruction>(opcode, branch_defines, branch_uses));
+            fused.PushBack(block->instructions[size - 1]);
+            block->instructions = fused;
+            uses[condition as usize] = 0;
+        }
+
+        let mut changed = true;
+
+        while changed {
+            changed = false;
+
+            for block in function->blocks {
+                let mut kept = Vector<*LIRInstruction>();
+
+                for instruction in block->instructions {
+                    let mut dead = this.IsPure(instruction) && !instruction->defines.Empty();
+
+                    for operand in instruction->defines {
+                        let index = this.VirtualIndex(operand);
+                        if index < 0 || index as usize >= count || uses[index as usize] != 0 { dead = false; }
+                    }
+
+                    if !dead {
+                        kept.PushBack(instruction);
+                        continue;
+                    }
+
+                    for operand in instruction->uses {
+                        let index = this.VirtualIndex(operand);
+                        if index >= 0 && (index as usize) < count { uses[index as usize] -= 1; }
+                    } changed = true;
+                }
+
+                block->instructions = kept;
+            }
+        }
+    }
+
+    fn HasPhis(&this, block: *MIRBlock) -> bool {
+        for instruction in block->instructions {
+            if instruction->kind == MIRInstructionKind::Phi {
+                return true;
+            }
+        } return false;
+    }
+
+    fn EdgeTarget(&mut this, to: *MIRBlock, conditional: bool) -> *LIRBlock {
+        let target = this.blocks[to];
+        if !this.HasPhis(to) { return target; }
+        let current = this.builder.GetCurrentBlock();
+
+        if !conditional {
+            this.edges.PushBack(LIRPhiEdge(this.block, to, current, current->instructions.Size()));
+            return target;
+        }
+
+        let split = this.builder.BuildBlock(this.block->name + ".to." + to->name);
+        this.edges.PushBack(LIRPhiEdge(this.block, to, split, 0));
+        this.builder.SetCurrentBlock(split);
+        this.EmitBranch(target);
+        this.builder.SetCurrentBlock(current);
+        return split;
+    }
+
+    fn LowerPhiCopies(&mut this) {
+        for edge in this.edges {
+            let mut scratch = LIRBlock("".ToString());
+            this.builder.SetCurrentBlock(&mut scratch);
+            let mut destinations = Vector<*LIROperand>();
+            let mut sources = Vector<*LIROperand>();
+
+            for instruction in edge.to->instructions {
+                if instruction->kind != MIRInstructionKind::Phi { continue; }
+                let phi = instruction as *MIRPhiInstruction;
+                let destination = this.values.Get(phi as *MIRValue, null);
+                if destination == null { continue; }
+
+                for incoming in phi->incomings {
+                    if incoming.block == edge.from {
+                        destinations.PushBack(destination);
+                        sources.PushBack(this.EnsureRegister(this.LowerValue(incoming.value)));
+                        break;
+                    }
+                }
+            }
+
+            if sources.Size() > 1 {
+                for i in 0..sources.Size() {
+                    let temporary = this.builder.VirtualRegister();
+                    this.EmitMove(temporary, sources[i]);
+                    sources[i] = temporary;
+                }
+            }
+
+            for i in 0..sources.Size() {
+                this.EmitMove(destinations[i], sources[i]);
+            }
+
+            for i in 0..scratch.instructions.Size() {
+                edge.block->instructions.Insert(edge.index + i, scratch.instructions[i]);
+            }
+        }
+
+        this.builder.SetCurrentBlock(null);
     }
 
     fn LowerValue(&mut this, value: *MIRValue) -> *LIROperand {
-        if value->kind == MIRValueKind::Constant {
+        if value == null {
+            return null;
+        } else if value->kind == MIRValueKind::Constant {
             return this.LowerConstant(value as *MIRConstant);
         } else if value->kind == MIRValueKind::Instruction || value->kind == MIRValueKind::Parameter {
-            return this.values.Get(value, null);
+            if !this.values.Has(value) {
+                this.Unsupported("Using a value before its definition");
+            } return this.values.Get(value, null);
         } else if value->kind == MIRValueKind::DeclarationReference {
             return this.builder.SymbolOperand((value as *MIRDeclarationReference)->declaration->name);
         } else {
@@ -92,50 +561,26 @@ class LIRLowerer {
 
     fn LowerConstant(&mut this, constant: *MIRConstant) -> *LIROperand {
         if constant->kind == MIRConstantKind::Integer {
-            return this.builder.ImmediateOperand((constant as *MIRConstantInteger)->value as i64);
+            return this.Immediate(this.TruncateValue((constant as *MIRConstantInteger)->value as i64, this.IntegerWidth(constant->_type)));
         } else if constant->kind == MIRConstantKind::Null {
-            return this.builder.ImmediateOperand(0);
+            return this.Immediate(0);
+        } else if constant->kind == MIRConstantKind::Float {
+            return this.Unsupported("Floating point");
         } else if constant->kind == MIRConstantKind::Expression {
-            return this.LowerConstantExpression(constant as *MIRConstantExpression);
+            let result = this.EvaluateConstant(constant);
+            if !result.valid { return this.Unsupported("This constant expression"); }
+
+            if result.symbol.Empty() {
+                return this.Immediate(this.TruncateValue(result.value, this.IntegerWidth(constant->_type)));
+            } return this.builder.MemoryOperand(this.EnsureRegister(this.builder.SymbolOperand(result.symbol)), result.value as i32);
+        } else if constant->kind == MIRConstantKind::String && constant->_type->kind == MIRTypeKind::Pointer {
+            return this.builder.SymbolOperand(this.LowerStringData((constant as *MIRConstantString)->value));
         } else {
-            return null;
+            let name = ".Lconstant." + String::FromInteger(this.constant_index as u64);
+            this.constant_index += 1;
+            this.LowerGlobal(name, false, constant->_type, constant);
+            return this.builder.SymbolOperand(name);
         }
-    }
-
-    fn LowerConstantExpression(&mut this, expression: *MIRConstantExpression) -> *LIROperand {
-        if expression->kind == MIRConstantExpressionKind::Unary {
-            return this.LowerUnaryExpression(expression as *MIRUnaryExpression);
-        } else if expression->kind == MIRConstantExpressionKind::Binary {
-            return this.LowerBinaryExpression(expression as *MIRBinaryExpression);
-        } else if expression->kind == MIRConstantExpressionKind::Cast {
-            return this.LowerCastExpression(expression as *MIRCastExpression);
-        } else if expression->kind == MIRConstantExpressionKind::ArrayGEP {
-            return this.LowerArrayGEPExpression(expression as *MIRArrayGEPExpression);
-        } else if expression->kind == MIRConstantExpressionKind::StructGEP {
-            return this.LowerStructGEPExpression(expression as *MIRStructGEPExpression);
-        } else {
-            return null;
-        }
-    }
-
-    fn LowerUnaryExpression(&mut this, unary: *MIRUnaryExpression) -> *LIROperand {
-        return null;
-    }
-
-    fn LowerBinaryExpression(&mut this, binary: *MIRBinaryExpression) -> *LIROperand {
-        return null;
-    }
-
-    fn LowerCastExpression(&mut this, cast: *MIRCastExpression) -> *LIROperand {
-        return null;
-    }
-
-    fn LowerArrayGEPExpression(&mut this, gep: *MIRArrayGEPExpression) -> *LIROperand {
-        return null;
-    }
-
-    fn LowerStructGEPExpression(&mut this, gep: *MIRStructGEPExpression) -> *LIROperand {
-        return null;
     }
 
     fn LowerInstruction(&mut this, instruction: *MIRInstruction) -> *LIROperand {
@@ -146,26 +591,50 @@ class LIRLowerer {
         } else if instruction->kind == MIRInstructionKind::Store {
             return this.LowerStoreInstruction(instruction as *MIRStoreInstruction);
         } else if instruction->kind == MIRInstructionKind::ArrayGEP {
-            return this.LowerArrayGEPInstruction(instruction as *MIRArrayGEPInstruction);
+            let gep = instruction as *MIRArrayGEPInstruction;
+            return this.LowerArrayGEP(gep->pointer, gep->index);
         } else if instruction->kind == MIRInstructionKind::StructGEP {
-            return this.LowerStructGEPInstruction(instruction as *MIRStructGEPInstruction);
+            let gep = instruction as *MIRStructGEPInstruction;
+            return this.LowerStructGEP(gep->pointer, gep->index);
         } else if instruction->kind == MIRInstructionKind::Unary {
-            return this.LowerUnaryInstruction(instruction as *MIRUnaryInstruction);
+            let unary = instruction as *MIRUnaryInstruction;
+            return this.LowerUnary(unary->kind, unary->operand, unary->_type);
         } else if instruction->kind == MIRInstructionKind::Binary {
-            return this.LowerBinaryInstruction(instruction as *MIRBinaryInstruction);
+            let binary = instruction as *MIRBinaryInstruction;
+            return this.LowerBinary(binary->kind, binary->left, binary->right);
         } else if instruction->kind == MIRInstructionKind::Call {
             return this.LowerCallInstruction(instruction as *MIRCallInstruction);
         } else if instruction->kind == MIRInstructionKind::Cast {
-            return this.LowerCastInstruction(instruction as *MIRCastInstruction);
+            let cast = instruction as *MIRCastInstruction;
+            return this.LowerCast(cast->kind, cast->value, cast->_type);
         } else if instruction->kind == MIRInstructionKind::Select {
             return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
         } else if instruction->kind == MIRInstructionKind::Phi {
             return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
+        } else if instruction->kind == MIRInstructionKind::Assembly {
+            return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
         } else if instruction->kind == MIRInstructionKind::Terminator {
-            return this.LowerTerminator(instruction as *MIRTerminator);
+            this.LowerTerminator(instruction as *MIRTerminator);
+            return null;
         } else {
             return null;
         }
+    }
+
+    fn IntegerWidth(&this, _type: *MIRType) -> u32 {
+        if _type == null {
+            return 0;
+        } else if _type->kind == MIRTypeKind::Integer {
+            return (_type as *MIRIntegerType)->width;
+        } else if _type->kind == MIRTypeKind::Pointer || _type->kind == MIRTypeKind::Function {
+            return 32;
+        } else {
+            return 0;
+        }
+    }
+
+    fn IsAggregate(&this, _type: *MIRType) -> bool {
+        return _type != null && (_type->kind == MIRTypeKind::Array || _type->kind == MIRTypeKind::Structure);
     }
 
     fn AlignOf(&this, _type: *MIRType) -> u32 {
@@ -223,133 +692,12 @@ class LIRLowerer {
     }
 
     fn AlignUp(&this, mut value: u32, alignment: u32) -> u32 {
+        if alignment <= 1 { return value; }
         let remainder = value % alignment;
 
         if remainder != 0 {
             value += alignment - remainder;
         } return value;
-    }
-
-    fn EmitRType(&mut this, opcode: LIROpcode, rs1: *LIROperand, rs2: *LIROperand) -> *LIROperand {
-        let destination = this.builder.VirtualRegister();
-        let mut defines = Vector<*LIROperand>();
-        defines.PushBack(destination);
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(rs1);
-        uses.PushBack(rs2);
-        this.builder.BuildInstruction(opcode, defines, uses);
-        return destination;
-    }
-
-    fn EmitIType(&mut this, opcode: LIROpcode, rs1: *LIROperand, immediate: *LIROperand) -> *LIROperand {
-        let destination = this.builder.VirtualRegister();
-        let mut defines = Vector<*LIROperand>();
-        defines.PushBack(destination);
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(rs1);
-        uses.PushBack(immediate);
-        this.builder.BuildInstruction(opcode, defines, uses);
-        return destination;
-    }
-
-    fn EmitMove(&mut this, destination: *LIROperand, source: *LIROperand) {
-        let mut defines = Vector<*LIROperand>();
-        defines.PushBack(destination);
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(source);
-        uses.PushBack(this.builder.ImmediateOperand(0));
-        this.builder.BuildInstruction(LIROpcode::Addi, defines, uses);
-    }
-
-    fn EnsureRegister(&mut this, operand: *LIROperand) -> *LIROperand {
-        if operand == null {
-            return null;
-        } else if operand->kind == LIROperandKind::Register {
-            return operand;
-        } else if operand->kind == LIROperandKind::Immediate {
-            return this.EmitIType(LIROpcode::Addi, this.builder.PhysicalRegister(0, "zero".ToString()), operand);
-        } else if operand->kind == LIROperandKind::Memory {
-            let memory = operand as *LIRMemoryOperand;
-            let base = this.EnsureRegister(memory->base);
-
-            if memory->offset != 0 {
-                return this.EmitIType(LIROpcode::Addi, base, this.builder.ImmediateOperand(memory->offset as i64));
-            } return base;
-        } else {
-            return null;
-        }
-    }
-
-    fn EnsureMemory(&mut this, operand: *LIROperand) -> *LIROperand {
-        if operand == null {
-            return null;
-        } else if operand->kind == LIROperandKind::Memory {
-            return operand;
-        } else {
-            let base = this.EnsureRegister(operand);
-            if base == null { return null; }
-            return this.builder.MemoryOperand(base, 0);
-        }
-    }
-
-    fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
-        let size = this.SizeOf(alloca->_type);
-        if size == 0 { return null; }
-        let function = this.builder.GetCurrentFunction();
-        function->frame_size = this.AlignUp(function->frame_size, this.AlignOf(alloca->_type));
-        function->frame_size += size;
-        let frame = this.builder.PhysicalRegister(5, "fp".ToString());
-        return this.builder.MemoryOperand(frame, -(function->frame_size as i32));
-    }
-
-    fn LowerLoadInstruction(&mut this, load: *MIRLoadInstruction) -> *LIROperand {
-        let pointer = this.LowerValue(load->pointer);
-        if pointer == null { return null; }
-        let size = this.SizeOf(load->_type);
-        let opcode = size > 2 ? LIROpcode::Lw : (size > 1 ? LIROpcode::Lhu : LIROpcode::Lbu);
-        let destination = this.builder.VirtualRegister();
-        let mut defines = Vector<*LIROperand>();
-        defines.PushBack(destination);
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(this.EnsureMemory(pointer));
-        this.builder.BuildInstruction(opcode, defines, uses);
-        return destination;
-    }
-
-    fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> *LIROperand {
-        let value = this.LowerValue(store->value);
-        let pointer = this.LowerValue(store->pointer);
-        if value == null || pointer == null { return null; }
-        let size = this.SizeOf(store->value->_type);
-        let opcode = size > 2 ? LIROpcode::Sw : (size > 1 ? LIROpcode::Sh : LIROpcode::Sb);
-        let defines = Vector<*LIROperand>();
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(this.EnsureRegister(value));
-        uses.PushBack(this.EnsureMemory(pointer));
-        this.builder.BuildInstruction(opcode, defines, uses);
-        return null;
-    }
-
-    fn LowerArrayGEPInstruction(&mut this, gep: *MIRArrayGEPInstruction) -> *LIROperand {
-        let pointer = this.EnsureRegister(this.LowerValue(gep->pointer));
-        let index = this.EnsureRegister(this.LowerValue(gep->index));
-        if pointer == null || index == null { return null; }
-        let pointee = (gep->pointer->_type as *MIRPointerType)->pointee;
-        let mut element_size: u32 = 0;
-
-        if pointee->kind == MIRTypeKind::Array {
-            element_size = this.SizeOf((pointee as *MIRArrayType)->element);
-        } else {
-            element_size = this.SizeOf(pointee);
-        }
-
-        let mut offset = index;
-
-        if element_size > 1 {
-            offset = this.EmitRType(LIROpcode::Mul, index, this.EnsureRegister(this.builder.ImmediateOperand(element_size as i64)));
-        }
-
-        return this.builder.MemoryOperand(this.EmitRType(LIROpcode::Add, pointer, offset), 0);
     }
 
     fn FieldOffset(&this, _type: *MIRStructureType, index: u32) -> u32 {
@@ -367,228 +715,585 @@ class LIRLowerer {
         } return offset;
     }
 
-    fn LowerStructGEPInstruction(&mut this, gep: *MIRStructGEPInstruction) -> *LIROperand {
-        let pointer = this.EnsureMemory(this.LowerValue(gep->pointer));
-        if pointer == null { return null; }
-        let memory = pointer as *LIRMemoryOperand;
-        let _type = (gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType;
-        let offset = this.FieldOffset(_type, gep->index);
-        return this.builder.MemoryOperand(memory->base, memory->offset + offset as i32);
+    fn TruncateValue(&this, value: i64, width: u32) -> i64 {
+        if width == 0 || width >= 32 { return (((value as u64) & 0xFFFFFFFF) as u32) as i32 as i64; }
+        return ((value as u64) & ((1u64 << (width as u64)) - 1)) as i64;
     }
 
-    fn LowerUnaryInstruction(&mut this, unary: *MIRUnaryInstruction) -> *LIROperand {
-        let operand = this.EnsureRegister(this.LowerValue(unary->operand));
-        if operand == null { return null; }
+    fn SignExtendValue(&this, value: i64, width: u32) -> i64 {
+        let bits = (width == 0 || width > 32) ? 32 : width;
+        let shift = (64 - bits) as i64;
+        return (value << shift) >> shift;
+    }
 
-        if unary->kind == MIRUnaryKind::Neg {
-            return this.EmitRType(LIROpcode::Sub, this.builder.PhysicalRegister(0, "zero".ToString()), operand);
-        } else if unary->kind == MIRUnaryKind::Not {
-            return this.EmitIType(LIROpcode::Xori, operand, this.builder.ImmediateOperand(-1));
+    fn FitsSigned16(&this, value: i64) -> bool {
+        return value >= -32768 && value <= 32767;
+    }
+
+    fn FitsUnsigned16(&this, value: i64) -> bool {
+        return value >= 0 && value <= 65535;
+    }
+
+    fn Log2(&this, value: i64) -> i64 {
+        if value <= 0 || (value & (value - 1)) != 0 { return -1; }
+        let mut result: i64 = 0;
+
+        while (1i64 << result) < value {
+            result += 1;
+        } return result;
+    }
+
+    fn IsImmediate(&this, operand: *LIROperand) -> bool {
+        return operand != null && operand->kind == LIROperandKind::Immediate;
+    }
+
+    fn ImmediateValue(&this, operand: *LIROperand) -> i64 {
+        return (operand as *LIRImmediateOperand)->value;
+    }
+
+    fn Immediate(&mut this, value: i64) -> *LIROperand {
+        return this.builder.ImmediateOperand(value);
+    }
+
+    fn Physical(&mut this, index: u8) -> *LIROperand {
+        return this.builder.PhysicalRegister(index);
+    }
+
+    fn Zero(&mut this) -> *LIROperand {
+        return this.Physical(LIR_ZERO);
+    }
+
+    fn Emit(&mut this, opcode: LIROpcode, destination: *LIROperand, first: *LIROperand, second: *LIROperand) -> *mut LIRInstruction {
+        let mut defines = Vector<*LIROperand>();
+        if destination != null { defines.PushBack(destination); }
+        let mut uses = Vector<*LIROperand>();
+        if first != null { uses.PushBack(first); }
+        if second != null { uses.PushBack(second); }
+        return this.builder.BuildInstruction(opcode, defines, uses);
+    }
+
+    fn EmitValue(&mut this, opcode: LIROpcode, first: *LIROperand, second: *LIROperand) -> *LIROperand {
+        let destination = this.builder.VirtualRegister();
+        this.Emit(opcode, destination, first, second);
+        return destination;
+    }
+
+    fn EmitMove(&mut this, destination: *LIROperand, source: *LIROperand) {
+        this.Emit(LIROpcode::Addi, destination, source, this.Immediate(0));
+    }
+
+    fn EmitBranch(&mut this, target: *LIRBlock) {
+        this.Emit(LIROpcode::B, null, this.builder.BlockOperand(target), null);
+    }
+
+    fn EmitAddImmediate(&mut this, base: *LIROperand, value: i64) -> *LIROperand {
+        if value == 0 {
+            return base;
+        } else if this.FitsSigned16(value) {
+            return this.EmitValue(LIROpcode::Addi, base, this.Immediate(value));
+        } else {
+            return this.EmitValue(LIROpcode::Add, base, this.EmitValue(LIROpcode::Li, this.Immediate(value), null));
+        }
+    }
+
+    fn EnsureRegister(&mut this, operand: *LIROperand) -> *LIROperand {
+        if operand == null {
+            return this.Zero();
+        } else if operand->kind == LIROperandKind::Register {
+            return operand;
+        } else if operand->kind == LIROperandKind::Immediate {
+            if this.ImmediateValue(operand) == 0 { return this.Zero(); }
+            return this.EmitValue(LIROpcode::Li, operand, null);
+        } else if operand->kind == LIROperandKind::Memory {
+            let memory = operand as *LIRMemoryOperand;
+            return this.EmitAddImmediate(this.EnsureRegister(memory->base), memory->offset as i64);
+        } else if operand->kind == LIROperandKind::Symbol {
+            return this.EmitValue(LIROpcode::La, operand, null);
+        } else {
+            return this.Zero();
+        }
+    }
+
+    fn EnsureMemory(&mut this, operand: *LIROperand) -> *LIRMemoryOperand {
+        if operand != null && operand->kind == LIROperandKind::Memory {
+            return operand as *LIRMemoryOperand;
+        } else if this.IsImmediate(operand) {
+            let value = this.ImmediateValue(operand);
+            if this.FitsSigned16(value) { return this.builder.MemoryOperand(this.Zero(), value as i32); }
+            let low = value & 0x7FF;
+            return this.builder.MemoryOperand(this.EnsureRegister(this.Immediate(value - low)), low as i32);
+        } else {
+            return this.builder.MemoryOperand(this.EnsureRegister(operand), 0);
+        }
+    }
+
+    fn LegalMemory(&mut this, memory: *LIRMemoryOperand, size: u32) -> *LIRMemoryOperand {
+        if this.FitsSigned16(memory->offset as i64) && this.FitsSigned16(memory->offset as i64 + size as i64) {
+            return memory;
+        } return this.builder.MemoryOperand(this.EnsureRegister(memory), 0);
+    }
+
+    fn ZeroExtend(&mut this, operand: *LIROperand, width: u32) -> *LIROperand {
+        if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(this.ImmediateValue(operand), width)); }
+        let register = this.EnsureRegister(operand);
+        if width >= 32 { return register; }
+        if width <= 16 { return this.EmitValue(LIROpcode::Andi, register, this.Immediate((1i64 << (width as i64)) - 1)); }
+        let shift = this.Immediate((32 - width) as i64);
+        return this.EmitValue(LIROpcode::Srli, this.EmitValue(LIROpcode::Slli, register, shift), shift);
+    }
+
+    fn SignExtend(&mut this, operand: *LIROperand, width: u32) -> *LIROperand {
+        if this.IsImmediate(operand) { return this.Immediate(this.SignExtendValue(this.ImmediateValue(operand), width)); }
+        let register = this.EnsureRegister(operand);
+        if width >= 32 { return register; }
+        let shift = this.Immediate((32 - width) as i64);
+        return this.EmitValue(LIROpcode::Srai, this.EmitValue(LIROpcode::Slli, register, shift), shift);
+    }
+
+    fn AllocateStack(&mut this, size: u32, alignment: u32) -> *LIRMemoryOperand {
+        let function = this.builder.GetCurrentFunction();
+        function->frame_size = this.AlignUp(function->frame_size + size, alignment > 4 ? 4 : alignment);
+        return this.builder.MemoryOperand(this.Physical(LIR_FP), -(function->frame_size as i32));
+    }
+
+    fn CopyMemory(&mut this, destination: *LIRMemoryOperand, source: *LIRMemoryOperand, size: u32, alignment: u32) {
+        let unit: u32 = (alignment >= 4 && size % 4 == 0) ? 4 : ((alignment >= 2 && size % 2 == 0) ? 2 : 1);
+        let load = unit == 4 ? LIROpcode::Lw : (unit == 2 ? LIROpcode::Lhu : LIROpcode::Lbu);
+        let store = unit == 4 ? LIROpcode::Sw : (unit == 2 ? LIROpcode::Sh : LIROpcode::Sb);
+        let legal_source = this.LegalMemory(source, size);
+        let legal_destination = this.LegalMemory(destination, size);
+        let mut offset: u32 = 0;
+
+        while offset < size {
+            let value = this.EmitValue(load, this.builder.MemoryOperand(legal_source->base, legal_source->offset + offset as i32), null);
+            this.Emit(store, null, value, this.builder.MemoryOperand(legal_destination->base, legal_destination->offset + offset as i32));
+            offset += unit;
+        }
+    }
+
+    fn LoadOpcode(&this, size: u32) -> LIROpcode {
+        return size == 1 ? LIROpcode::Lbu : (size == 2 ? LIROpcode::Lhu : LIROpcode::Lw);
+    }
+
+    fn StoreOpcode(&this, size: u32) -> LIROpcode {
+        return size == 1 ? LIROpcode::Sb : (size == 2 ? LIROpcode::Sh : LIROpcode::Sw);
+    }
+
+    fn IsScalar(&this, _type: *MIRType) -> bool {
+        let width = this.IntegerWidth(_type);
+        return width > 0 && width <= 32;
+    }
+
+    fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
+        return this.AllocateStack(this.SizeOf(alloca->_type), this.AlignOf(alloca->_type));
+    }
+
+    fn LowerLoadInstruction(&mut this, load: *MIRLoadInstruction) -> *LIROperand {
+        let pointer = this.LowerValue(load->pointer);
+        if pointer == null { return null; }
+        let (size, alignment) = (this.SizeOf(load->_type), this.AlignOf(load->_type));
+
+        if this.IsAggregate(load->_type) {
+            let temporary = this.AllocateStack(size, alignment);
+            this.CopyMemory(temporary, this.EnsureMemory(pointer), size, alignment);
+            return temporary;
+        } else if !this.IsScalar(load->_type) {
+            return this.Unsupported(load->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+        }
+
+        return this.EmitValue(this.LoadOpcode(size), this.LegalMemory(this.EnsureMemory(pointer), size), null);
+    }
+
+    fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> *LIROperand {
+        let value = this.LowerValue(store->value);
+        let pointer = this.LowerValue(store->pointer);
+        if value == null || pointer == null { return null; }
+        let _type = store->value->_type;
+        let (size, alignment) = (this.SizeOf(_type), this.AlignOf(_type));
+
+        if this.IsAggregate(_type) {
+            this.CopyMemory(this.EnsureMemory(pointer), this.EnsureMemory(value), size, alignment);
+            return null;
+        } else if !this.IsScalar(_type) {
+            return this.Unsupported(_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+        }
+
+        let source = this.EnsureRegister(value);
+        this.Emit(this.StoreOpcode(size), null, source, this.LegalMemory(this.EnsureMemory(pointer), size));
+        return null;
+    }
+
+    fn LowerArrayGEP(&mut this, pointer_value: *MIRValue, index_value: *MIRValue) -> *LIROperand {
+        let pointer = this.LowerValue(pointer_value);
+        let index = this.LowerValue(index_value);
+        if pointer == null || index == null { return null; }
+        let element_size = this.SizeOf((pointer_value->_type as *MIRPointerType)->pointee) as i64;
+        let base = this.EnsureMemory(pointer);
+
+        if this.IsImmediate(index) {
+            return this.builder.MemoryOperand(base->base, (base->offset as i64 + this.ImmediateValue(index) * element_size) as i32);
+        } else if element_size == 0 {
+            return base;
+        }
+
+        let mut scaled = this.EnsureRegister(index);
+        let shift = this.Log2(element_size);
+
+        if shift > 0 {
+            scaled = this.EmitValue(LIROpcode::Slli, scaled, this.Immediate(shift));
+        } else if shift < 0 {
+            scaled = this.EmitValue(LIROpcode::Mul, scaled, this.EnsureRegister(this.Immediate(element_size)));
+        }
+
+        return this.builder.MemoryOperand(this.EmitValue(LIROpcode::Add, base->base, scaled), base->offset);
+    }
+
+    fn LowerStructGEP(&mut this, pointer_value: *MIRValue, index: u32) -> *LIROperand {
+        let pointer = this.LowerValue(pointer_value);
+        if pointer == null { return null; }
+        let base = this.EnsureMemory(pointer);
+        let _type = (pointer_value->_type as *MIRPointerType)->pointee as *MIRStructureType;
+        return this.builder.MemoryOperand(base->base, base->offset + this.FieldOffset(_type, index) as i32);
+    }
+
+    fn LowerUnary(&mut this, kind: MIRUnaryKind, operand_value: *MIRValue, _type: *MIRType) -> *LIROperand {
+        if kind == MIRUnaryKind::FNeg || !this.IsScalar(_type) {
+            return this.Unsupported(kind == MIRUnaryKind::FNeg ? "Floating point" : "64-bit integer arithmetic");
+        }
+
+        let operand = this.LowerValue(operand_value);
+        if operand == null { return null; }
+        let width = this.IntegerWidth(_type);
+
+        if kind == MIRUnaryKind::Neg {
+            if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(-this.ImmediateValue(operand), width)); }
+            return this.EmitValue(LIROpcode::Sub, this.Zero(), this.EnsureRegister(operand));
+        } else if kind == MIRUnaryKind::Not {
+            if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(!this.ImmediateValue(operand), width)); }
+            if width <= 16 { return this.EmitValue(LIROpcode::Xori, this.EnsureRegister(operand), this.Immediate((1i64 << (width as i64)) - 1)); }
+            return this.EmitValue(LIROpcode::Subi, this.EmitValue(LIROpcode::Sub, this.Zero(), this.EnsureRegister(operand)), this.Immediate(1));
         } else {
             return null;
         }
     }
 
-    fn LowerBinaryInstruction(&mut this, binary: *MIRBinaryInstruction) -> *LIROperand {
-        let left = this.EnsureRegister(this.LowerValue(binary->left));
-        let right = this.EnsureRegister(this.LowerValue(binary->right));
-        if left == null || right == null { return null; }
+    fn IsComparison(&this, kind: MIRBinaryKind) -> bool {
+        return kind >= MIRBinaryKind::ICmpEq && kind <= MIRBinaryKind::ICmpUge;
+    }
 
-        if binary->kind == MIRBinaryKind::Add {
-            return this.EmitRType(LIROpcode::Add, left, right);
-        } else if binary->kind == MIRBinaryKind::Sub {
-            return this.EmitRType(LIROpcode::Sub, left, right);
-        } else if binary->kind == MIRBinaryKind::Mul {
-            return this.EmitRType(LIROpcode::Mul, left, right);
-        } else if binary->kind == MIRBinaryKind::SDiv {
-            return this.EmitRType(LIROpcode::Div, left, right);
-        } else if binary->kind == MIRBinaryKind::UDiv {
-            return this.EmitRType(LIROpcode::Divu, left, right);
-        } else if binary->kind == MIRBinaryKind::SRem {
-            return this.EmitRType(LIROpcode::Rem, left, right);
-        } else if binary->kind == MIRBinaryKind::URem {
-            return this.EmitRType(LIROpcode::Remu, left, right);
-        } else if binary->kind == MIRBinaryKind::And {
-            return this.EmitRType(LIROpcode::And, left, right);
-        } else if binary->kind == MIRBinaryKind::Or {
-            return this.EmitRType(LIROpcode::Or, left, right);
-        } else if binary->kind == MIRBinaryKind::Xor {
-            return this.EmitRType(LIROpcode::Xor, left, right);
-        } else if binary->kind == MIRBinaryKind::Shl {
-            return this.EmitRType(LIROpcode::Sll, left, right);
-        } else if binary->kind == MIRBinaryKind::LShr {
-            return this.EmitRType(LIROpcode::Srl, left, right);
-        } else if binary->kind == MIRBinaryKind::AShr {
-            return this.EmitRType(LIROpcode::Sra, left, right);
-        } else if binary->kind == MIRBinaryKind::ICmpSlt {
-            return this.EmitRType(LIROpcode::Slt, left, right);
-        } else if binary->kind == MIRBinaryKind::ICmpSgt {
-            return this.EmitRType(LIROpcode::Slt, right, left);
-        } else if binary->kind == MIRBinaryKind::ICmpSge {
-            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Slt, left, right), this.builder.ImmediateOperand(1));
-        } else if binary->kind == MIRBinaryKind::ICmpSle {
-            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Slt, right, left), this.builder.ImmediateOperand(1));
-        } else if binary->kind == MIRBinaryKind::ICmpUlt {
-            return this.EmitRType(LIROpcode::Sltu, left, right);
-        } else if binary->kind == MIRBinaryKind::ICmpUgt {
-            return this.EmitRType(LIROpcode::Sltu, right, left);
-        } else if binary->kind == MIRBinaryKind::ICmpUge {
-            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Sltu, left, right), this.builder.ImmediateOperand(1));
-        } else if binary->kind == MIRBinaryKind::ICmpUle {
-            return this.EmitIType(LIROpcode::Xori, this.EmitRType(LIROpcode::Sltu, right, left), this.builder.ImmediateOperand(1));
-        } else if binary->kind == MIRBinaryKind::ICmpEq {
-            return this.EmitIType(LIROpcode::Sltiu, this.EmitRType(LIROpcode::Xor, left, right), this.builder.ImmediateOperand(1));
-        } else if binary->kind == MIRBinaryKind::ICmpNe {
-            return this.EmitRType(LIROpcode::Sltu, this.builder.PhysicalRegister(0, "zero".ToString()), this.EmitRType(LIROpcode::Xor, left, right));
-        } else { return null; }
+    fn LowerBinary(&mut this, kind: MIRBinaryKind, left_value: *MIRValue, right_value: *MIRValue) -> *LIROperand {
+        if (kind >= MIRBinaryKind::FAdd && kind <= MIRBinaryKind::FRem) || kind >= MIRBinaryKind::FCmpEq {
+            return this.Unsupported("Floating point");
+        } else if !this.IsScalar(left_value->_type) {
+            return this.Unsupported("64-bit integer arithmetic");
+        }
+
+        let mut left = this.LowerValue(left_value);
+        let mut right = this.LowerValue(right_value);
+        if left == null || right == null { return null; }
+        let width = this.IntegerWidth(left_value->_type);
+
+        let commutative = kind == MIRBinaryKind::Add || kind == MIRBinaryKind::Mul || kind == MIRBinaryKind::And || kind == MIRBinaryKind::Or
+            || kind == MIRBinaryKind::Xor || kind == MIRBinaryKind::ICmpEq || kind == MIRBinaryKind::ICmpNe;
+
+        if commutative && this.IsImmediate(left) && !this.IsImmediate(right) {
+            let temporary = left;
+            (left, right) = (right, temporary);
+        }
+
+        let immediate = this.IsImmediate(right);
+        let value = immediate ? this.ImmediateValue(right) : 0;
+
+        if kind == MIRBinaryKind::Add {
+            if immediate && this.FitsSigned16(value) { return this.EmitValue(LIROpcode::Addi, this.EnsureRegister(left), right); }
+            return this.EmitValue(LIROpcode::Add, this.EnsureRegister(left), this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::Sub {
+            if immediate && this.FitsSigned16(value) { return this.EmitValue(LIROpcode::Subi, this.EnsureRegister(left), right); }
+            return this.EmitValue(LIROpcode::Sub, this.EnsureRegister(left), this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::Mul {
+            let shift = immediate ? this.Log2(value) : -1;
+            if shift >= 0 { return this.EmitValue(LIROpcode::Slli, this.EnsureRegister(left), this.Immediate(shift)); }
+            return this.EmitValue(LIROpcode::Mul, this.EnsureRegister(left), this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::SDiv || kind == MIRBinaryKind::SRem {
+            let opcode = kind == MIRBinaryKind::SDiv ? LIROpcode::Div : LIROpcode::Rem;
+            return this.EmitValue(opcode, this.EnsureRegister(this.SignExtend(left, width)), this.EnsureRegister(this.SignExtend(right, width)));
+        } else if kind == MIRBinaryKind::UDiv || kind == MIRBinaryKind::URem {
+            let opcode = kind == MIRBinaryKind::UDiv ? LIROpcode::Divu : LIROpcode::Remu;
+            return this.EmitValue(opcode, this.EnsureRegister(this.ZeroExtend(left, width)), this.EnsureRegister(this.ZeroExtend(right, width)));
+        } else if kind == MIRBinaryKind::And || kind == MIRBinaryKind::Or || kind == MIRBinaryKind::Xor {
+            let register_opcode = kind == MIRBinaryKind::And ? LIROpcode::And : (kind == MIRBinaryKind::Or ? LIROpcode::Or : LIROpcode::Xor);
+            let immediate_opcode = kind == MIRBinaryKind::And ? LIROpcode::Andi : (kind == MIRBinaryKind::Or ? LIROpcode::Ori : LIROpcode::Xori);
+            if immediate && this.FitsUnsigned16(value) { return this.EmitValue(immediate_opcode, this.EnsureRegister(left), right); }
+            return this.EmitValue(register_opcode, this.EnsureRegister(left), this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::Shl {
+            if immediate { return this.EmitValue(LIROpcode::Slli, this.EnsureRegister(left), this.Immediate(value & 31)); }
+            return this.EmitValue(LIROpcode::Sll, this.EnsureRegister(left), this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::LShr {
+            let extended = this.EnsureRegister(this.ZeroExtend(left, width));
+            if immediate { return this.EmitValue(LIROpcode::Srli, extended, this.Immediate(value & 31)); }
+            return this.EmitValue(LIROpcode::Srl, extended, this.EnsureRegister(right));
+        } else if kind == MIRBinaryKind::AShr {
+            let extended = this.EnsureRegister(this.SignExtend(left, width));
+            if immediate { return this.EmitValue(LIROpcode::Srai, extended, this.Immediate(value & 31)); }
+            return this.EmitValue(LIROpcode::Sra, extended, this.EnsureRegister(right));
+        } else if this.IsComparison(kind) {
+            return this.LowerComparison(kind, left, right, width);
+        } else {
+            return null;
+        }
+    }
+
+    fn LowerComparison(&mut this, kind: MIRBinaryKind, left_operand: *LIROperand, right_operand: *LIROperand, width: u32) -> *LIROperand {
+        let signed = kind == MIRBinaryKind::ICmpSlt || kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpSle || kind == MIRBinaryKind::ICmpSge;
+        let left = signed ? this.SignExtend(left_operand, width) : this.ZeroExtend(left_operand, width);
+        let right = signed ? this.SignExtend(right_operand, width) : this.ZeroExtend(right_operand, width);
+        let immediate = this.IsImmediate(right);
+        let value = immediate ? this.ImmediateValue(right) : 0;
+
+        if kind == MIRBinaryKind::ICmpEq || kind == MIRBinaryKind::ICmpNe {
+            let mut difference = this.EnsureRegister(left);
+
+            if !immediate {
+                difference = this.EmitValue(LIROpcode::Xor, difference, right);
+            } else if value != 0 && this.FitsUnsigned16(value) {
+                difference = this.EmitValue(LIROpcode::Xori, difference, right);
+            } else if value != 0 {
+                difference = this.EmitValue(LIROpcode::Xor, difference, this.EnsureRegister(right));
+            }
+
+            if kind == MIRBinaryKind::ICmpEq { return this.EmitValue(LIROpcode::Sltiu, difference, this.Immediate(1)); }
+            return this.EmitValue(LIROpcode::Sltu, this.Zero(), difference);
+        } else if kind == MIRBinaryKind::ICmpSlt || kind == MIRBinaryKind::ICmpSge {
+            let result = (immediate && this.FitsSigned16(value)) ? this.EmitValue(LIROpcode::Slti, this.EnsureRegister(left), right)
+                : this.EmitValue(LIROpcode::Slt, this.EnsureRegister(left), this.EnsureRegister(right));
+            return kind == MIRBinaryKind::ICmpSlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
+        } else if kind == MIRBinaryKind::ICmpUlt || kind == MIRBinaryKind::ICmpUge {
+            let result = (immediate && this.FitsUnsigned16(value)) ? this.EmitValue(LIROpcode::Sltiu, this.EnsureRegister(left), right)
+                : this.EmitValue(LIROpcode::Sltu, this.EnsureRegister(left), this.EnsureRegister(right));
+            return kind == MIRBinaryKind::ICmpUlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
+        } else {
+            let opcode = signed ? LIROpcode::Slt : LIROpcode::Sltu;
+            let result = this.EmitValue(opcode, this.EnsureRegister(right), this.EnsureRegister(left));
+            let strict = kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpUgt;
+            return strict ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
+        }
+    }
+
+    fn LowerCondition(&mut this, value: *MIRValue) -> *LIROperand {
+        let condition = this.LowerValue(value);
+        if condition == null || this.IsImmediate(condition) { return condition; }
+
+        if value->kind == MIRValueKind::Instruction && (value as *MIRInstruction)->kind == MIRInstructionKind::Binary {
+            if this.IsComparison((value as *MIRBinaryInstruction)->kind) {
+                return condition;
+            }
+        }
+
+        return this.EmitValue(LIROpcode::Andi, this.EnsureRegister(condition), this.Immediate(1));
     }
 
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> *LIROperand {
+        let function = this.builder.GetCurrentFunction();
+        let mut sources = Vector<*LIROperand>();
+
         for i in 0..call->arguments.Size() {
-            if i >= 8 { break; }
-            let source = this.EnsureRegister(this.LowerValue(call->arguments[i]));
-            if source == null { continue; }
-            let destination = this.builder.PhysicalRegister((24 + i) as u8, 'a' + String::FromInteger(i as u64));
-            this.EmitMove(destination, source);
+            let argument = call->arguments[i];
+
+            if !this.IsScalar(argument->_type) && !this.IsAggregate(argument->_type) {
+                return this.Unsupported(argument->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+            }
+
+            let source = this.EnsureRegister(this.LowerValue(argument));
+
+            if i < LIR_ARGUMENT_COUNT {
+                sources.PushBack(source);
+            } else {
+                let offset = ((i - LIR_ARGUMENT_COUNT) * 4) as u32;
+                this.Emit(LIROpcode::Sw, null, source, this.builder.MemoryOperand(this.Physical(LIR_SP), offset as i32));
+                if offset + 4 > function->outgoing_size { function->outgoing_size = offset + 4; }
+            }
         }
 
-        let defines = Vector<*LIROperand>();
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(this.builder.PhysicalRegister(1, "ra".ToString()));
+        let mut callee: *LIROperand = null;
+        let mut opcode = LIROpcode::Blr;
 
-        if call->callee->kind == MIRValueKind::DeclarationReference {
-            uses.PushBack(this.builder.SymbolOperand((call->callee as *MIRDeclarationReference)->declaration->name));
-            this.builder.BuildInstruction(LIROpcode::Bl, defines, uses);
+        if call->callee->kind == MIRValueKind::DeclarationReference && (call->callee as *MIRDeclarationReference)->declaration->kind == MIRDeclarationKind::Function {
+            (callee, opcode) = (this.LowerValue(call->callee), LIROpcode::Bl);
         } else {
-            let callee = this.EnsureRegister(this.LowerValue(call->callee));
-            if callee == null { return null; }
-            uses.PushBack(callee);
-            this.builder.BuildInstruction(LIROpcode::Blr, defines, uses);
+            callee = this.EnsureRegister(this.LowerValue(call->callee));
         }
 
-        if call->_type->kind == MIRTypeKind::Void {
+        let mut arguments = Vector<*LIROperand>();
+
+        for i in 0..sources.Size() {
+            let register = this.Physical(LIR_A0 + (i as u8));
+            this.EmitMove(register, sources[i]);
+            arguments.PushBack(register);
+        }
+
+        let mut clobbers = Vector<*LIROperand>();
+
+        for i in LIR_T0..(LIR_A7 + 1) {
+            clobbers.PushBack(this.Physical(i));
+        }
+
+        let instruction = this.Emit(opcode, null, callee, null);
+        instruction->implicit_uses = arguments;
+        instruction->implicit_defines = clobbers;
+        function->has_calls = true;
+
+        if call->_type == null || call->_type->kind == MIRTypeKind::Void {
             return null;
+        } else if !this.IsScalar(call->_type) {
+            return this.Unsupported(call->_type->kind == MIRTypeKind::Float ? "Floating point" : "Returning this type by value");
         }
 
         let result = this.builder.VirtualRegister();
-        this.EmitMove(result, this.builder.PhysicalRegister(24, "a0".ToString()));
+        this.EmitMove(result, this.Physical(LIR_A0));
         return result;
     }
 
-    fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> *LIROperand {
-        let value = this.EnsureRegister(this.LowerValue(cast->value));
-        if value == null { return null; }
-        let source_type = cast->value->_type;
-        let destination_type = cast->_type;
+    fn LowerCast(&mut this, kind: MIRCastKind, value_value: *MIRValue, _type: *MIRType) -> *LIROperand {
+        if kind != MIRCastKind::Trunc && kind != MIRCastKind::ZExt && kind != MIRCastKind::SExt && kind != MIRCastKind::PtrToInt && kind != MIRCastKind::IntToPtr && kind != MIRCastKind::Bitcast {
+            return this.Unsupported("Floating point");
+        } else if kind != MIRCastKind::Bitcast && kind != MIRCastKind::Trunc && (!this.IsScalar(value_value->_type) || !this.IsScalar(_type)) {
+            return this.Unsupported("64-bit integer arithmetic");
+        }
 
-        if cast->kind == MIRCastKind::Trunc {
-            if destination_type->kind != MIRTypeKind::Integer { return null; }
-            let destination_width = (destination_type as *MIRIntegerType)->width;
-            if destination_width >= 32 { return null; }
-            let shift = (32 - destination_width) as i64;
-            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
-            return this.EmitIType(LIROpcode::Srli, shifted, this.builder.ImmediateOperand(shift));
-        } else if cast->kind == MIRCastKind::ZExt {
-            if source_type->kind != MIRTypeKind::Integer { return null; }
-            let source_width = (source_type as *MIRIntegerType)->width;
-            if source_width >= 32 { return null; }
-            let shift = (32 - source_width) as i64;
-            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
-            return this.EmitIType(LIROpcode::Srli, shifted, this.builder.ImmediateOperand(shift));
-        } else if cast->kind == MIRCastKind::SExt {
-            if source_type->kind != MIRTypeKind::Integer { return null; }
-            let source_width = (source_type as *MIRIntegerType)->width;
-            if source_width >= 32 { return null; }
-            let shift = (32 - source_width) as i64;
-            let shifted = this.EmitIType(LIROpcode::Slli, value, this.builder.ImmediateOperand(shift));
-            return this.EmitIType(LIROpcode::Srai, shifted, this.builder.ImmediateOperand(shift));
-        } else if cast->kind == MIRCastKind::Bitcast || cast->kind == MIRCastKind::PtrToInt || cast->kind == MIRCastKind::IntToPtr {
+        let value = this.LowerValue(value_value);
+        if value == null { return null; }
+
+        if kind == MIRCastKind::Trunc {
+            if this.IsImmediate(value) { return this.Immediate(this.TruncateValue(this.ImmediateValue(value), this.IntegerWidth(_type))); }
             return value;
+        } else if kind == MIRCastKind::ZExt {
+            return this.ZeroExtend(value, this.IntegerWidth(value_value->_type));
+        } else if kind == MIRCastKind::SExt {
+            return this.SignExtend(value, this.IntegerWidth(value_value->_type));
         } else {
-            return null;
+            return value;
         }
     }
 
     fn LowerSelectInstruction(&mut this, select: *MIRSelectInstruction) -> *LIROperand {
-        let condition = this.LowerValue(select->condition);
-        if condition == null { return null; }
+        let condition = this.LowerCondition(select->condition);
         let then_value = this.LowerValue(select->then_value);
-        if then_value == null { return null; }
         let else_value = this.LowerValue(select->else_value);
-        if else_value == null { return null; }
-        return null;
+        if condition == null || then_value == null || else_value == null { return null; }
+
+        if this.IsImmediate(condition) {
+            return this.ImmediateValue(condition) != 0 ? then_value : else_value;
+        }
+
+        let else_register = this.EnsureRegister(else_value);
+        let mask = this.EmitValue(LIROpcode::Sub, this.Zero(), condition);
+        let difference = this.EmitValue(LIROpcode::Xor, this.EnsureRegister(then_value), else_register);
+        return this.EmitValue(LIROpcode::Xor, else_register, this.EmitValue(LIROpcode::And, difference, mask));
     }
 
     fn LowerPhiInstruction(&mut this, phi: *MIRPhiInstruction) -> *LIROperand {
-        return null;
+        if !this.IsScalar(phi->_type) && !this.IsAggregate(phi->_type) {
+            return this.Unsupported(phi->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+        } return this.builder.VirtualRegister();
     }
 
-    fn LowerTerminator(&mut this, terminator: *MIRTerminator) -> *LIROperand {
-        if terminator->kind == MIRTerminatorKind::Return {
-            return this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Branch {
-            return this.LowerBranchInstruction(terminator as *MIRBranchInstruction);
-        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-            return this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Unreachable {
-            return this.LowerUnreachableInstruction(terminator as *MIRUnreachableInstruction);
-        } else {
+    fn PhysicalRegisterByName(&mut this, name: &String) -> *LIROperand {
+        let index = LIRRegisterIndex(name);
+
+        if index < 0 {
+            Logger::Log("Unknown register '" + name + "' in inline assembly.", LogSeverity::Error);
             return null;
+        } return this.Physical(index as u8);
+    }
+
+    fn LowerAssemblyInstruction(&mut this, assembly: *MIRAssemblyInstruction) -> *LIROperand {
+        let mut inputs = Vector<*LIROperand>();
+        let mut outputs = Vector<*LIROperand>();
+
+        for input in assembly->inputs {
+            let register = this.PhysicalRegisterByName(input->name);
+            let value = this.EnsureRegister(this.LowerValue(input->value));
+            if register == null { continue; }
+            this.EmitMove(register, value);
+            inputs.PushBack(register);
+        }
+
+        for output in assembly->outputs {
+            let register = this.PhysicalRegisterByName(output->name);
+            if register != null { outputs.PushBack(register); }
+        }
+
+        let mut defines = outputs;
+
+        for clobber in assembly->clobbers {
+            let index = LIRRegisterIndex(clobber);
+            if index >= 0 { defines.PushBack(this.Physical(index as u8)); }
+        }
+
+        let instruction = this.Emit(LIROpcode::Asm, null, null, null);
+        instruction->text = assembly->text;
+        instruction->implicit_uses = inputs;
+        instruction->implicit_defines = defines;
+
+        for i in 0..assembly->outputs.Size() {
+            if i >= outputs.Size() { break; }
+            let output = assembly->outputs[i];
+            let pointer = this.LowerValue(output->value);
+            if pointer == null { continue; }
+            let result = this.builder.VirtualRegister();
+            this.EmitMove(result, outputs[i]);
+            let size = this.SizeOf((output->value->_type as *MIRPointerType)->pointee);
+            this.Emit(this.StoreOpcode(size), null, result, this.LegalMemory(this.EnsureMemory(pointer), size));
+        } return null;
+    }
+
+    fn LowerTerminator(&mut this, terminator: *MIRTerminator) {
+        if terminator->kind == MIRTerminatorKind::Return {
+            this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
+        } else if terminator->kind == MIRTerminatorKind::Branch {
+            this.EmitBranch(this.EdgeTarget((terminator as *MIRBranchInstruction)->target, false));
+        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+            this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
+        } else if terminator->kind == MIRTerminatorKind::Unreachable {
+            this.Emit(LIROpcode::Hlt, null, null, null);
         }
     }
 
-    fn LowerReturnInstruction(&mut this, _return: *MIRReturnInstruction) -> *LIROperand {
-        if _return->value != null {
-            let value = this.LowerValue(_return->value);
+    fn LowerReturnInstruction(&mut this, _return: *MIRReturnInstruction) {
+        let mut uses = Vector<*LIROperand>();
 
-            if value != null {
-                this.EmitMove(this.builder.PhysicalRegister(24, "a0".ToString()), this.EnsureRegister(value));
+        if _return->value != null {
+            if !this.IsScalar(_return->value->_type) {
+                this.Unsupported(_return->value->_type->kind == MIRTypeKind::Float ? "Floating point" : "Returning this type by value");
+            } else {
+                let value = this.EnsureRegister(this.LowerValue(_return->value));
+                let register = this.Physical(LIR_A0);
+                this.EmitMove(register, value);
+                uses.PushBack(register);
             }
         }
 
+        let instruction = this.Emit(LIROpcode::Ret, null, null, null);
+        instruction->implicit_uses = uses;
+    }
+
+    fn LowerConditionalBranchInstruction(&mut this, branch: *MIRConditionalBranchInstruction) {
+        let condition = this.LowerCondition(branch->condition);
+        if condition == null { return; }
+
+        if this.IsImmediate(condition) {
+            this.EmitBranch(this.EdgeTarget(this.ImmediateValue(condition) != 0 ? branch->then_target : branch->else_target, false));
+            return;
+        }
+
+        let then_target = this.EdgeTarget(branch->then_target, true);
+        let else_target = this.EdgeTarget(branch->else_target, true);
         let defines = Vector<*LIROperand>();
         let mut uses = Vector<*LIROperand>();
-        uses.PushBack(this.builder.PhysicalRegister(1, "ra".ToString()));
-        this.builder.BuildInstruction(LIROpcode::Br, defines, uses);
-        return null;
-    }
-
-    fn LowerBranchInstruction(&mut this, branch: *MIRBranchInstruction) -> *LIROperand {
-        let target = this.blocks.Get(branch->target, null);
-        if target == null { return null; }
-        let defines = Vector<*LIROperand>();
-        let mut uses = Vector<*LIROperand>();
-        uses.PushBack(this.builder.BlockOperand(target));
-        this.builder.BuildInstruction(LIROpcode::B, defines, uses);
-        return null;
-    }
-
-    fn LowerConditionalBranchInstruction(&mut this, branch: *MIRConditionalBranchInstruction) -> *LIROperand {
-        let condition = this.LowerValue(branch->condition);
-        if condition == null { return null; }
-        let then_target = this.blocks.Get(branch->then_target, null);
-        if then_target == null { return null; }
-        let else_target = this.blocks.Get(branch->else_target, null);
-        if else_target == null { return null; }
-
-        let then_defines = Vector<*LIROperand>();
-        let mut then_uses = Vector<*LIROperand>();
-        then_uses.PushBack(this.EnsureRegister(condition));
-        then_uses.PushBack(this.builder.PhysicalRegister(0, "zero".ToString()));
-        then_uses.PushBack(this.builder.BlockOperand(then_target));
-        this.builder.BuildInstruction(LIROpcode::Bne, then_defines, then_uses);
-
-        let else_defines = Vector<*LIROperand>();
-        let mut else_uses = Vector<*LIROperand>();
-        else_uses.PushBack(this.builder.BlockOperand(else_target));
-        this.builder.BuildInstruction(LIROpcode::B, else_defines, else_uses);
-        return null;
-    }
-
-    fn LowerUnreachableInstruction(&mut this, unreachable: *MIRUnreachableInstruction) -> *LIROperand {
-        let defines = Vector<*LIROperand>();
-        let uses = Vector<*LIROperand>();
-        this.builder.BuildInstruction(LIROpcode::Hlt, defines, uses);
-        return null;
+        uses.PushBack(condition);
+        uses.PushBack(this.Zero());
+        uses.PushBack(this.builder.BlockOperand(then_target));
+        this.builder.BuildInstruction(LIROpcode::Bne, defines, uses);
+        this.EmitBranch(else_target);
     }
 }

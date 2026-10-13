@@ -3,13 +3,13 @@ VCPKG_PATH := C:\vcpkg\installed\x64-windows
 
 default: build
 
-bin/zirconc2.exe: transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
+bin/zirconc2.exe: $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
 	bin/zirconc.exe src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
 
-bin/zirconc3.exe: bin/zirconc2.exe transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
+bin/zirconc3.exe: bin/zirconc2.exe $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
 	$< src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
 
-bin/zirconc4.exe: bin/zirconc3.exe transpile-llvm $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
+bin/zirconc4.exe: bin/zirconc3.exe $(wildcard src/*.zir) $(wildcard include/vendor/llvm-c/*.zir)
 	$< src/Main.zir -o $@ -L"$(LLVM_PATH)\lib" -lLLVM-C -lDbgHelp -g -v
 
 bin/zircraft.exe: bin/zirconc2.exe Zircraft.zir

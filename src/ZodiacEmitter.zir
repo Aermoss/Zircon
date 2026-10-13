@@ -1,0 +1,335 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/LIR.zir", "src/Logger.zir" : *]
+
+class ZodiacEmitter {
+    output: String,
+    function: *LIRFunction = null,
+    function_index: u32 = 0,
+    has_frame: bool = false;
+
+    ZodiacEmitter(&mut this) {}
+
+    pub fn Emit(&mut this, module: *LIRModule) -> String {
+        this.output = String();
+        let mut defined = Vector<String>();
+        let mut externs = Vector<String>();
+
+        for function in module->functions {
+            if !function->blocks.Empty() { defined.PushBack(function->name); }
+        }
+
+        for global in module->globals {
+            defined.PushBack(global->name);
+        }
+
+        for function in module->functions {
+            for block in function->blocks {
+                for instruction in block->instructions {
+                    for operand in instruction->uses {
+                        if operand->kind != LIROperandKind::Symbol { continue; }
+                        let name = (operand as *LIRSymbolOperand)->name;
+                        if !defined.Contains(name) && !externs.Contains(name) { externs.PushBack(name); }
+                    }
+                }
+            }
+        }
+
+        for global in module->globals {
+            for relocation in global->relocations {
+                if !defined.Contains(relocation.symbol) && !externs.Contains(relocation.symbol) {
+                    externs.PushBack(relocation.symbol);
+                }
+            }
+        }
+
+        this.output += "\t.text\n";
+
+        for name in externs {
+            this.output += "\t.extern\t" + this.Symbol(name) + '\n';
+        }
+
+        for text in module->assembly {
+            this.output += text + '\n';
+        }
+
+        for function in module->functions {
+            if !function->blocks.Empty() {
+                this.EmitFunction(function);
+            }
+        }
+
+        if !module->globals.Empty() {
+            this.output += "\n\t.data\n";
+
+            for global in module->globals {
+                this.EmitGlobal(global);
+            }
+        } return this.output;
+    }
+
+    fn Symbol(&this, name: &String) -> String {
+        let mut result = String();
+
+        for i in 0..name.Length() {
+            let character = name[i];
+
+            if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_' || character == '.' || (character >= '0' && character <= '9' && i > 0) {
+                result += character;
+            } else if character == '$' {
+                result += "__";
+            } else {
+                result += "_" + String::FromInteger(character as u8 as u64, 16);
+            }
+        } return result;
+    }
+
+    fn Label(&this, block: *LIRBlock) -> String {
+        return "__LBB" + String::FromInteger(this.function_index as u64) + '_' + String::FromInteger(block->index as u64);
+    }
+
+    fn Operand(&mut this, operand: *LIROperand) -> String {
+        if operand->kind == LIROperandKind::Register {
+            if (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
+                Logger::Log("Unallocated virtual register in '" + this.function->name + "'.", LogSeverity::Error);
+            } return LIRRegisterName((operand as *LIRPhysicalRegister)->index);
+        } else if operand->kind == LIROperandKind::Immediate {
+            return String::FromInteger((operand as *LIRImmediateOperand)->value);
+        } else if operand->kind == LIROperandKind::Memory {
+            let memory = operand as *LIRMemoryOperand;
+            return String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')';
+        } else if operand->kind == LIROperandKind::Block {
+            return this.Label((operand as *LIRBlockOperand)->block);
+        } else if operand->kind == LIROperandKind::Symbol {
+            return this.Symbol((operand as *LIRSymbolOperand)->name);
+        } else {
+            return "<invalid operand>".ToString();
+        }
+    }
+
+    fn Line(&mut this, text: &String) {
+        this.output += "    " + text + '\n';
+    }
+
+    fn Line(&mut this, text: *i8) {
+        this.Line(text.ToString());
+    }
+
+    fn AlignUp(&this, value: u32, alignment: u32) -> u32 {
+        return ((value + alignment - 1) / alignment) * alignment;
+    }
+
+    fn IsFramePointer(&this, operand: *LIROperand) -> bool {
+        if operand->kind == LIROperandKind::Memory {
+            return this.IsFramePointer((operand as *LIRMemoryOperand)->base);
+        }
+
+        return operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical && (operand as *LIRPhysicalRegister)->index == LIR_FP;
+    }
+
+    fn UsesFramePointer(&this, function: *LIRFunction) -> bool {
+        for block in function->blocks {
+            for instruction in block->instructions {
+                for operand in instruction->uses {
+                    if this.IsFramePointer(operand) { return true; }
+                }
+
+                for operand in instruction->defines {
+                    if this.IsFramePointer(operand) { return true; }
+                }
+            }
+        } return false;
+    }
+
+    fn FrameSize(&this) -> u32 {
+        let function = this.function;
+        return this.AlignUp(function->frame_size + function->saved_registers.Size() as u32 * 4 + function->outgoing_size, 4);
+    }
+
+    fn EmitPrologue(&mut this) {
+        let function = this.function;
+        let size = this.FrameSize();
+        if function->has_calls { this.Line("sw ra, -4(sp)"); }
+        this.Line("sw fp, -8(sp)");
+        this.Line("addi fp, sp, 0");
+
+        if size <= 32768 {
+            this.Line("addi sp, sp, -" + String::FromInteger(size as u64));
+        } else {
+            this.Line("li t6, " + String::FromInteger(size as u64));
+            this.Line("sub sp, sp, t6");
+        }
+
+        for i in 0..function->saved_registers.Size() {
+            this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
+        }
+    }
+
+    fn EmitEpilogue(&mut this) {
+        let function = this.function;
+
+        if this.has_frame {
+            for i in 0..function->saved_registers.Size() {
+                this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
+            }
+
+            if function->has_calls { this.Line("lw ra, -4(fp)"); }
+            this.Line("addi sp, fp, 0");
+            this.Line("lw fp, -8(sp)");
+        }
+
+        this.Line("br ra");
+    }
+
+    fn EmitFunction(&mut this, function: *LIRFunction) {
+        this.function = function;
+
+        for i in 0..function->blocks.Size() {
+            function->blocks[i]->index = i as u32;
+        }
+
+        this.has_frame = function->has_calls || function->frame_size > 8 || !function->saved_registers.Empty()
+            || function->outgoing_size > 0 || this.UsesFramePointer(function);
+
+        let name = this.Symbol(function->name);
+        this.output += '\n';
+        if function->global { this.output += "\t.global\t" + name + '\n'; }
+        this.output += name + ":\n";
+        if this.has_frame { this.EmitPrologue(); }
+
+        for i in 0..function->blocks.Size() {
+            let block = function->blocks[i];
+            let next = i + 1 < function->blocks.Size() ? function->blocks[i + 1] : null;
+            this.output += this.Label(block) + ":\n";
+            let size = block->instructions.Size();
+
+            for k in 0..size {
+                let instruction = block->instructions[k];
+
+                if k + 2 == size && instruction->opcode >= LIROpcode::Beq && instruction->opcode <= LIROpcode::Bgeu && (instruction->uses[2] as *LIRBlockOperand)->block == next && block->instructions[k + 1]->opcode == LIROpcode::B {
+                    let other = block->instructions[k + 1]->uses[0];
+                    this.Line(this.InvertBranch(instruction->opcode).ToString() + ' ' + this.Operand(instruction->uses[0]) + ", " + this.Operand(instruction->uses[1]) + ", " + this.Operand(other));
+                    break;
+                }
+
+                this.EmitInstruction(instruction, next);
+            }
+        }
+
+        this.function_index += 1;
+    }
+
+    fn InvertBranch(&this, opcode: LIROpcode) -> LIROpcode {
+        if opcode == LIROpcode::Beq { return LIROpcode::Bne; }
+        else if opcode == LIROpcode::Bne { return LIROpcode::Beq; }
+        else if opcode == LIROpcode::Blt { return LIROpcode::Bge; }
+        else if opcode == LIROpcode::Bge { return LIROpcode::Blt; }
+        else if opcode == LIROpcode::Bltu { return LIROpcode::Bgeu; }
+        else { return LIROpcode::Bltu; }
+    }
+
+    fn EmitInstruction(&mut this, instruction: *LIRInstruction, next: *LIRBlock) {
+        let opcode = instruction->opcode;
+
+        if opcode == LIROpcode::Ret {
+            this.EmitEpilogue();
+            return;
+        } else if opcode == LIROpcode::Asm {
+            for line in instruction->text.Split('\n') {
+                this.Line(line.Strip());
+            } return;
+        } else if opcode == LIROpcode::B {
+            let target = (instruction->uses[0] as *LIRBlockOperand)->block;
+            if target == next { return; }
+        } else if opcode == LIROpcode::Bl || opcode == LIROpcode::Blr {
+            this.Line(opcode.ToString() + " ra, " + this.Operand(instruction->uses[0]));
+            return;
+        } else if opcode == LIROpcode::Addi && instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0 && this.Operand(instruction->defines[0]) == this.Operand(instruction->uses[0]) {
+            return;
+        }
+
+        let register_form = opcode == LIROpcode::Add || opcode == LIROpcode::Sub || (opcode >= LIROpcode::Mul && opcode <= LIROpcode::Remu)
+            || opcode == LIROpcode::And || opcode == LIROpcode::Or || opcode == LIROpcode::Xor || opcode == LIROpcode::Sll
+            || opcode == LIROpcode::Srl || opcode == LIROpcode::Sra || opcode == LIROpcode::Slt || opcode == LIROpcode::Sltu;
+
+        for i in 0..instruction->uses.Size() {
+            let last = i + 1 == instruction->uses.Size();
+
+            if instruction->uses[i]->kind == LIROperandKind::Immediate && opcode != LIROpcode::Li && (register_form || !last) {
+                Logger::Log("Invalid immediate operand in '" + instruction->ToString() + "' (in '" + this.function->name + "').", LogSeverity::Error);
+            }
+        }
+
+        let mut text = opcode.ToString();
+        let mut first = true;
+
+        for operand in instruction->defines {
+            text += (first ? " " : ", ") + this.Operand(operand);
+            first = false;
+        }
+
+        for operand in instruction->uses {
+            text += (first ? " " : ", ") + this.Operand(operand);
+            first = false;
+        }
+
+        this.Line(text);
+    }
+
+    fn EmitGlobal(&mut this, global: *LIRGlobal) {
+        let name = this.Symbol(global->name);
+        if global->alignment > 1 { this.output += "\t.align\t" + String::FromInteger(global->alignment as u64) + '\n'; }
+        if global->global { this.output += "\t.global\t" + name + '\n'; }
+        this.output += name + ":\n";
+        let mut offset: usize = 0;
+
+        while offset < global->data.Size() {
+            let mut relocation: i64 = -1;
+
+            for i in 0..global->relocations.Size() {
+                if global->relocations[i].offset as usize == offset {
+                    relocation = i as i64;
+                    break;
+                }
+            }
+
+            if relocation >= 0 {
+                this.output += "\t.word\t" + this.Symbol(global->relocations[relocation as usize].symbol) + '\n';
+                offset += 4;
+                continue;
+            }
+
+            let mut text = "\t.byte\t".ToString();
+            let mut count: usize = 0;
+
+            while offset < global->data.Size() && count < 16 {
+                let mut relocated = false;
+
+                for other in global->relocations {
+                    if other.offset as usize == offset { relocated = true; }
+                }
+
+                if relocated { break; }
+                if count > 0 { text += ", "; }
+                text += String::FromInteger(global->data[offset] as u64);
+                (offset, count) = (offset + 1, count + 1);
+            }
+
+            this.output += text + '\n';
+        }
+    }
+}
