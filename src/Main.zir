@@ -622,6 +622,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
         defines.PushBack(String("AMD64"));
     } else if triple.Contains("aarch64") || triple.Contains("arm64") {
         defines.PushBack(String("ARM64"));
+    } else if triple.StartsWith("zodiac") {
+        defines.PushBack(String("ZODIAC"));
+        freestanding = true;
+
+        if !emit_asm && !check {
+            Logger::Log("The Zodiac target can only generate assembly, use '-S' and assemble with 'zas'.", LogSeverity::Error);
+            return 1;
+        }
     }
 
     let mut timer = Timer();

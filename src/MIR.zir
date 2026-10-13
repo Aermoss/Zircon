@@ -729,7 +729,7 @@ class MIRAssemblyInstruction : MIRInstruction {
     pub outputs: Vector<*MIRAssemblyOperand>,
     pub clobbers: Vector<String>;
 
-    MIRAssemblyInstruction(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>) : MIRInstruction(MIRInstructionKind::Assembly, "".ToString(), null) {
+    MIRAssemblyInstruction(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Assembly, "".ToString(), _type) {
         (this._volatile, this.text, this.inputs, this.outputs, this.clobbers) = (_volatile, text, inputs, outputs, clobbers);
     }
 
@@ -1321,7 +1321,7 @@ class MIRBuilder {
     }
 
     pub fn BuildAssembly(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>) -> *mut MIRAssemblyInstruction {
-        let assembly = this.context->arena.New<MIRAssemblyInstruction>(_volatile, text, inputs, outputs, clobbers);
+        let assembly = this.context->arena.New<MIRAssemblyInstruction>(_volatile, text, inputs, outputs, clobbers, this.context->VoidType());
         this.block->AddInstruction(assembly);
         return assembly;
     }

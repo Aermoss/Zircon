@@ -28,10 +28,15 @@ class TargetInfo {
     }
 }
 
+enum TargetBackend: u8 {
+    LLVM, Zodiac
+}
+
 class Target {
-    pub target: LLVMTargetRef,
-    pub target_machine: LLVMTargetMachineRef,
-    pub layout: LLVMTargetDataRef,
+    pub backend: TargetBackend = TargetBackend::LLVM,
+    pub target: LLVMTargetRef = null,
+    pub target_machine: LLVMTargetMachineRef = null,
+    pub layout: LLVMTargetDataRef = null,
 
     pub triple: String,
     pub arch: String,
@@ -41,6 +46,12 @@ class Target {
     Target(&mut this, triple: &String, arch: &String, code_model: &String, features: &String, opt_level: LLVMCodeGenOptLevel) {
         (this.triple, this.arch, this.code_model, this.features) = (triple, arch, code_model, features);
         if this.triple.Empty() { this.triple = LLVMGetDefaultTargetTriple(); }
+
+        if this.triple.StartsWith("zodiac") {
+            this.backend = TargetBackend::Zodiac;
+            return;
+        }
+
         if this.arch == "native" { this.arch = LLVMGetHostCPUName(); }
         if this.arch.Empty() { this.arch = "generic"; }
         let mut message: *mut i8 = null;
@@ -73,10 +84,16 @@ class Target {
     }
 
     ~Target(&mut this) {
-        LLVMDisposeTargetMachine(this.target_machine);
+        if this.target_machine != null {
+            LLVMDisposeTargetMachine(this.target_machine);
+        }
     }
 
     pub fn Info(&this) -> TargetInfo {
+        if this.backend == TargetBackend::Zodiac {
+            return TargetInfo(4, 4, 4);
+        }
+
         return TargetInfo(LLVMPointerSize(this.layout) as usize, LLVMPointerSize(this.layout) as usize, 16);
     }
 

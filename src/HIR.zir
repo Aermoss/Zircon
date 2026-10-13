@@ -272,7 +272,7 @@ class HIRType {
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             return (this.Width() / 8) as usize;
         } else if this.IsPointer() || this.IsFunction() {
-            return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
+            return llvm_lowerer->target->Info().pointer_size;
         } else if this.IsArray() {
             return this.Element().Alignment();
         } else if this.IsTuple() {
@@ -318,7 +318,7 @@ class HIRType {
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             return (this.Width() / 8) as usize;
         } else if this.IsPointer() || this.IsFunction() {
-            return LLVMPointerSize(llvm_lowerer->target->layout) as usize;
+            return llvm_lowerer->target->Info().pointer_size;
         } else if this.IsArray() {
             return this.Element().Size() * this.Length();
         } else if this.IsTuple() {
@@ -2586,7 +2586,7 @@ class HIRContext {
     }
 
     pub fn IntegerPointerType(&mut this, signed: bool) -> *mut HIRIntegerType {
-        return this.arena.New<HIRIntegerType>(64u32, signed, false, true);
+        return this.arena.New<HIRIntegerType>((llvm_lowerer->target->Info().pointer_size * 8) as u32, signed, false, true);
     }
 
     pub fn IntegerLiteralType(&mut this) -> *mut HIRIntegerType {
@@ -3116,7 +3116,9 @@ class HIRBuilder {
     }
 
     pub fn BuildAssemblyStatement(&mut this, _volatile: bool, text: String, inputs: Vector<*HIRAssemblyOperand>, outputs: Vector<*HIRAssemblyOperand>, clobbers: Vector<String>) -> *mut HIRAssemblyStatement {
-        return this.context->arena.New<HIRAssemblyStatement>(_volatile, text, inputs, outputs, clobbers);
+        let assembly = this.context->arena.New<HIRAssemblyStatement>(_volatile, text, inputs, outputs, clobbers);
+        this.block->statements.PushBack(assembly);
+        return assembly;
     }
 
     pub fn BuildParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) -> *mut HIRParameterDeclaration {
