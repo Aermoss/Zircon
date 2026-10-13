@@ -386,7 +386,7 @@ class LIRGlobal {
     LIRGlobal(&mut this, name: String, global: bool, alignment: u32, size: u32) {
         (this.name, this.global, this.alignment) = (name, global, alignment);
 
-        for i in 0..size as usize {
+        for i in 0..size {
             this.data.PushBack(0);
         }
     }
@@ -493,12 +493,6 @@ class LIRBuilder {
         return instruction;
     }
 
-    pub fn BuildGlobal(&mut this, name: String, global: bool, alignment: u32, size: u32) -> *mut LIRGlobal {
-        let lowered = this.context->arena.New<LIRGlobal>(name, global, alignment, size);
-        this.module->globals.PushBack(lowered);
-        return lowered;
-    }
-
     pub fn BuildBlock(&mut this, name: String) -> *mut LIRBlock {
         let block = this.context->arena.New<LIRBlock>(name);
         this.function->blocks.PushBack(block);
@@ -511,6 +505,12 @@ class LIRBuilder {
 
     pub fn GetCurrentBlock(&mut this) -> *mut LIRBlock {
         return this.block;
+    }
+
+    pub fn BuildGlobal(&mut this, name: String, global: bool, alignment: u32, size: u32) -> *mut LIRGlobal {
+        let lowered = this.context->arena.New<LIRGlobal>(name, global, alignment, size);
+        this.module->globals.PushBack(lowered);
+        return lowered;
     }
 
     pub fn BuildFunction(&mut this, name: String) -> *mut LIRFunction {
