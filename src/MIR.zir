@@ -193,7 +193,7 @@ class MIRValue {
 }
 
 enum MIRConstantKind: u8 {
-    Integer, Float, String, Array, Structure, Null, Expression
+    Integer, Float, String, Array, Structure, Null, Expression, Undef
 }
 
 class MIRConstant : MIRValue {
@@ -218,6 +218,8 @@ class MIRConstant : MIRValue {
             return (this as *MIRConstantNull)->ToString();
         } else if this.kind == MIRConstantKind::Expression {
             return (this as *MIRConstantExpression)->ToString();
+        } else if this.kind == MIRConstantKind::Undef {
+            return (this as *MIRConstantUndef)->ToString();
         } else {
             return "<invalid constant>".ToString();
         }
@@ -301,6 +303,14 @@ class MIRConstantNull : MIRConstant {
 
     pub fn ToString(&this) -> String {
         return "null".ToString();
+    }
+}
+
+class MIRConstantUndef : MIRConstant {
+    MIRConstantUndef(&mut this, _type: *MIRType) : MIRConstant(MIRConstantKind::Undef, _type) {}
+
+    pub fn ToString(&this) -> String {
+        return "undef".ToString();
     }
 }
 
@@ -1203,6 +1213,10 @@ class MIRBuilder {
 
     pub fn ConstantNull(&mut this, _type: *MIRType) -> *mut MIRConstantNull {
         return this.context->arena.New<MIRConstantNull>(_type);
+    }
+
+    pub fn ConstantUndef(&mut this, _type: *MIRType) -> *mut MIRConstantUndef {
+        return this.context->arena.New<MIRConstantUndef>(_type);
     }
 
     pub fn ConstantUnary(&mut this, kind: MIRUnaryKind, operand: *MIRValue) -> *mut MIRUnaryExpression {

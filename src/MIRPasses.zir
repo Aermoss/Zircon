@@ -167,7 +167,7 @@ class MIRPromoteAllocas {
         this.PlacePhis();
 
         for alloca in this.allocas {
-            this.current.PushBack(this.Undefined(alloca->_type));
+            this.current.PushBack(this.context->arena.New<MIRConstantUndef>(alloca->_type));
         }
 
         this.Rename(0);
@@ -190,16 +190,6 @@ class MIRPromoteAllocas {
             return (first as *MIRFloatType)->width == (second as *MIRFloatType)->width;
         } else {
             return true;
-        }
-    }
-
-    fn Undefined(&mut this, _type: *MIRType) -> *MIRValue {
-        if _type->kind == MIRTypeKind::Pointer {
-            return this.context->arena.New<MIRConstantNull>(_type);
-        } else if _type->kind == MIRTypeKind::Float {
-            return this.context->arena.New<MIRConstantFloat>(0.0, _type);
-        } else {
-            return this.context->arena.New<MIRConstantInteger>(0u64, _type);
         }
     }
 

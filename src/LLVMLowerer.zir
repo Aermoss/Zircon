@@ -337,6 +337,8 @@ class LLVMLowerer {
             return LLVMConstNamedStruct(_type, fields.Data(), fields.Size() as u32);
         } else if constant->kind == MIRConstantKind::Null {
             return LLVMConstNull(_type);
+        } else if constant->kind == MIRConstantKind::Undef {
+            return LLVMGetUndef(_type);
         } else if constant->kind == MIRConstantKind::Expression {
             return this.LowerConstantExpression(constant as *MIRConstantExpression);
         } else {

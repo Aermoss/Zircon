@@ -178,7 +178,7 @@ class LIRLowerer {
 
         if constant->kind == MIRConstantKind::Integer {
             return LIRConstant(String(), (constant as *MIRConstantInteger)->value as i64);
-        } else if constant->kind == MIRConstantKind::Null {
+        } else if constant->kind == MIRConstantKind::Null || constant->kind == MIRConstantKind::Undef {
             return LIRConstant(String(), 0);
         } else if constant->kind != MIRConstantKind::Expression {
             return LIRConstant();
@@ -551,6 +551,10 @@ class LIRLowerer {
         }
     }
 
+    fn IsUndef(&this, value: *MIRValue) -> bool {
+        return value->kind == MIRValueKind::Constant && (value as *MIRConstant)->kind == MIRConstantKind::Undef;
+    }
+
     fn LowerPhiCopies(&mut this) {
         for edge in this.edges {
             let mut scratch = LIRBlock("".ToString());
@@ -566,6 +570,7 @@ class LIRLowerer {
 
                 for incoming in phi->incomings {
                     if incoming.block == edge.from {
+                        if this.IsUndef(incoming.value) { break; }
                         destinations.PushBack(destination);
                         sources.PushBack(this.EnsureRegister(this.LowerValue(incoming.value)));
                         break;
@@ -602,7 +607,7 @@ class LIRLowerer {
     fn LowerConstant(&mut this, constant: *MIRConstant) -> *LIROperand {
         if constant->kind == MIRConstantKind::Integer {
             return this.Immediate(this.TruncateValue((constant as *MIRConstantInteger)->value as i64, this.IntegerWidth(constant->_type)));
-        } else if constant->kind == MIRConstantKind::Null {
+        } else if constant->kind == MIRConstantKind::Null || constant->kind == MIRConstantKind::Undef {
             return this.Immediate(0);
         } else if constant->kind == MIRConstantKind::Float {
             return this.Unsupported("Floating point");
