@@ -43,7 +43,7 @@ class LIRConstant {
 }
 
 class LIRLowerer {
-    context: LIRContext,
+    pub context: LIRContext,
     builder: LIRBuilder,
     values: Map<*MIRValue, *LIROperand>,
     blocks: Map<*MIRBlock, *mut LIRBlock>,
@@ -53,10 +53,6 @@ class LIRLowerer {
     module: *mut LIRModule;
 
     LIRLowerer(&mut this) {}
-
-    pub fn Context(&mut this) -> *mut LIRContext {
-        return &mut this.context;
-    }
 
     pub fn Lower(&mut this, module: *MIRModule) -> *LIRModule {
         this.module = this.context.arena.New<LIRModule>();
@@ -383,7 +379,8 @@ class LIRLowerer {
                 (definer, inverted) = (definers[inner as usize], true);
             }
 
-            if !block->instructions.Contains(definer) || definer->uses.Size() != 2 { continue; }
+            let position = block->instructions.Index(definer);
+            if position < 0 || definer->uses.Size() != 2 { continue; }
             let mut left = definer->uses[0];
             let mut right = definer->uses[1];
             let mut stable = true;
@@ -391,7 +388,14 @@ class LIRLowerer {
             for operand in definer->uses {
                 let index = this.VirtualIndex(operand);
                 if operand->kind != LIROperandKind::Register || this.IsZero(operand) { continue; }
-                if index < 0 || index as usize >= count || defines[index as usize] != 1 { stable = false; }
+                if index < 0 || index as usize >= count { stable = false; continue; }
+                if defines[index as usize] == 1 { continue; }
+
+                for k in (position as usize + 1)..(size - 2) {
+                    for other in block->instructions[k]->defines {
+                        if this.VirtualIndex(other) == index { stable = false; }
+                    }
+                }
             }
 
             if !stable { continue; }
@@ -501,6 +505,52 @@ class LIRLowerer {
         return split;
     }
 
+    fn EmitParallelCopy(&mut this, destinations: &Vector<*LIROperand>, initial_sources: &Vector<*LIROperand>) {
+        let mut sources = initial_sources;
+        let mut pending = Vector<usize>();
+
+        for i in 0..destinations.Size() {
+            if destinations[i] != sources[i] {
+                pending.PushBack(i);
+            }
+        }
+
+        while !pending.Empty() {
+            let mut ready: i64 = -1;
+
+            for k in 0..pending.Size() {
+                let mut blocked = false;
+
+                for other in pending {
+                    if other != pending[k] && sources[other] == destinations[pending[k]] {
+                        blocked = true;
+                    }
+                }
+
+                if !blocked {
+                    ready = k as i64;
+                    break;
+                }
+            }
+
+            if ready >= 0 {
+                let i = pending.RemoveAt(ready as usize);
+                this.EmitMove(destinations[i], sources[i]);
+                continue;
+            }
+
+            let saved = destinations[pending[0]];
+            let temporary = this.builder.VirtualRegister();
+            this.EmitMove(temporary, saved);
+
+            for other in pending {
+                if sources[other] == saved {
+                    sources[other] = temporary;
+                }
+            }
+        }
+    }
+
     fn LowerPhiCopies(&mut this) {
         for edge in this.edges {
             let mut scratch = LIRBlock("".ToString());
@@ -523,17 +573,7 @@ class LIRLowerer {
                 }
             }
 
-            if sources.Size() > 1 {
-                for i in 0..sources.Size() {
-                    let temporary = this.builder.VirtualRegister();
-                    this.EmitMove(temporary, sources[i]);
-                    sources[i] = temporary;
-                }
-            }
-
-            for i in 0..sources.Size() {
-                this.EmitMove(destinations[i], sources[i]);
-            }
+            this.EmitParallelCopy(destinations, sources);
 
             for i in 0..scratch.instructions.Size() {
                 edge.block->instructions.Insert(edge.index + i, scratch.instructions[i]);

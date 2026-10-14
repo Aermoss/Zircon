@@ -1,0 +1,234 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/vec", "std/map", "src/MIR.zir" : *]
+
+const MIR_NO_BLOCK: usize = 0xFFFFFFFF;
+
+fn MIROperands(instruction: *MIRInstruction) -> Vector<*MIRValue> {
+    let mut result = Vector<*MIRValue>();
+    let kind = instruction->kind;
+
+    if kind == MIRInstructionKind::Load {
+        result.PushBack((instruction as *MIRLoadInstruction)->pointer);
+    } else if kind == MIRInstructionKind::Store {
+        let store = instruction as *MIRStoreInstruction;
+        result.PushBack(store->value);
+        result.PushBack(store->pointer);
+    } else if kind == MIRInstructionKind::ArrayGEP {
+        let gep = instruction as *MIRArrayGEPInstruction;
+        result.PushBack(gep->pointer);
+        result.PushBack(gep->index);
+    } else if kind == MIRInstructionKind::StructGEP {
+        result.PushBack((instruction as *MIRStructGEPInstruction)->pointer);
+    } else if kind == MIRInstructionKind::Unary {
+        result.PushBack((instruction as *MIRUnaryInstruction)->operand);
+    } else if kind == MIRInstructionKind::Binary {
+        let binary = instruction as *MIRBinaryInstruction;
+        result.PushBack(binary->left);
+        result.PushBack(binary->right);
+    } else if kind == MIRInstructionKind::Call {
+        let call = instruction as *MIRCallInstruction;
+        result.PushBack(call->callee);
+
+        for argument in call->arguments {
+            result.PushBack(argument);
+        }
+    } else if kind == MIRInstructionKind::Cast {
+        result.PushBack((instruction as *MIRCastInstruction)->value);
+    } else if kind == MIRInstructionKind::Select {
+        let select = instruction as *MIRSelectInstruction;
+        result.PushBack(select->condition);
+        result.PushBack(select->then_value);
+        result.PushBack(select->else_value);
+    } else if kind == MIRInstructionKind::Phi {
+        for incoming in (instruction as *MIRPhiInstruction)->incomings {
+            result.PushBack(incoming.value);
+        }
+    } else if kind == MIRInstructionKind::Assembly {
+        let assembly = instruction as *MIRAssemblyInstruction;
+
+        for input in assembly->inputs {
+            result.PushBack(input->value);
+        }
+
+        for output in assembly->outputs {
+            result.PushBack(output->value);
+        }
+    } else if kind == MIRInstructionKind::Terminator {
+        let terminator = instruction as *MIRTerminator;
+
+        if terminator->kind == MIRTerminatorKind::Return {
+            let value = (terminator as *MIRReturnInstruction)->value;
+            if value != null { result.PushBack(value); }
+        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+            result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
+        }
+    } return result;
+}
+
+fn MIRSuccessors(block: *MIRBlock) -> Vector<*MIRBlock> {
+    let mut result = Vector<*MIRBlock>();
+    let terminator = block->terminator;
+    if terminator == null { return result; }
+
+    if terminator->kind == MIRTerminatorKind::Branch {
+        result.PushBack((terminator as *MIRBranchInstruction)->target);
+    } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+        let branch = terminator as *MIRConditionalBranchInstruction;
+        result.PushBack(branch->then_target);
+
+        if branch->else_target != branch->then_target {
+            result.PushBack(branch->else_target);
+        }
+    } return result;
+}
+
+fn MIRBuildAdjacency(count: usize, sources: &Vector<usize>, targets: &Vector<usize>, offsets: &mut Vector<usize>, list: &mut Vector<usize>) {
+    offsets.Clear();
+    list.Clear();
+
+    for i in 0..(count + 1) {
+        offsets.PushBack(0);
+    }
+
+    for i in 0..sources.Size() {
+        offsets[sources[i] + 1] += 1;
+        list.PushBack(0);
+    }
+
+    for i in 0..count {
+        offsets[i + 1] += offsets[i];
+    }
+
+    let mut cursor = Vector<usize>();
+
+    for i in 0..count {
+        cursor.PushBack(offsets[i]);
+    }
+
+    for i in 0..sources.Size() {
+        list[cursor[sources[i]]] = targets[i];
+        cursor[sources[i]] += 1;
+    }
+}
+
+class MIRControlFlow {
+    pub indices: Map<*MIRBlock, usize>,
+    pub successors: Vector<usize>,
+    pub successor_offsets: Vector<usize>,
+    pub predecessors: Vector<usize>,
+    pub predecessor_offsets: Vector<usize>,
+    pub idom: Vector<usize>,
+    pub children: Vector<usize>,
+    pub child_offsets: Vector<usize>,
+    pub frontier: Vector<usize>,
+    pub frontier_offsets: Vector<usize>;
+
+    MIRControlFlow(&mut this) {}
+
+    pub fn Index(&this, block: *MIRBlock) -> usize {
+        return this.indices.Get(block, MIR_NO_BLOCK);
+    }
+
+    pub fn Compute(&mut this, function: *MIRFunctionDeclaration) {
+        let count = function->blocks.Size();
+        this.indices.Clear();
+
+        for i in 0..count {
+            this.indices[function->blocks[i]] = i;
+        }
+
+        let mut sources = Vector<usize>();
+        let mut targets = Vector<usize>();
+
+        for i in 0..count {
+            for successor in MIRSuccessors(function->blocks[i]) {
+                let index = this.Index(successor);
+                if index == MIR_NO_BLOCK { continue; }
+                sources.PushBack(i);
+                targets.PushBack(index);
+            }
+        }
+
+        MIRBuildAdjacency(count, sources, targets, this.successor_offsets, this.successors);
+        MIRBuildAdjacency(count, targets, sources, this.predecessor_offsets, this.predecessors);
+        this.idom.Clear();
+
+        for i in 0..count {
+            this.idom.PushBack(MIR_NO_BLOCK);
+        }
+
+        if count > 0 { this.idom[0] = 0; }
+        let mut changed = true;
+
+        while changed {
+            changed = false;
+
+            for b in 1..count {
+                let mut candidate = MIR_NO_BLOCK;
+
+                for k in this.predecessor_offsets[b]..this.predecessor_offsets[b + 1] {
+                    let predecessor = this.predecessors[k];
+                    if this.idom[predecessor] == MIR_NO_BLOCK { continue; }
+                    candidate = candidate == MIR_NO_BLOCK ? predecessor : this.Intersect(predecessor, candidate);
+                }
+
+                if candidate != this.idom[b] {
+                    this.idom[b] = candidate;
+                    changed = true;
+                }
+            }
+        }
+
+        sources.Clear();
+        targets.Clear();
+
+        for b in 1..count {
+            if this.idom[b] == MIR_NO_BLOCK { continue; }
+            sources.PushBack(this.idom[b]);
+            targets.PushBack(b);
+        }
+
+        MIRBuildAdjacency(count, sources, targets, this.child_offsets, this.children);
+        sources.Clear();
+        targets.Clear();
+
+        for b in 0..count {
+            if this.predecessor_offsets[b + 1] - this.predecessor_offsets[b] < 2 { continue; }
+
+            for k in this.predecessor_offsets[b]..this.predecessor_offsets[b + 1] {
+                let mut runner = this.predecessors[k];
+
+                while runner != MIR_NO_BLOCK && runner != this.idom[b] {
+                    sources.PushBack(runner);
+                    targets.PushBack(b);
+                    if runner == 0 { break; }
+                    runner = this.idom[runner];
+                }
+            }
+        }
+
+        MIRBuildAdjacency(count, sources, targets, this.frontier_offsets, this.frontier);
+    }
+
+    fn Intersect(&this, mut first: usize, mut second: usize) -> usize {
+        while first != second {
+            while first > second { first = this.idom[first]; }
+            while second > first { second = this.idom[second]; }
+        } return first;
+    }
+}

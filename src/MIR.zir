@@ -887,8 +887,8 @@ class MIRParameter : MIRValue {
 class MIRBlock {
     pub name: String,
     pub parent: *mut MIRFunctionDeclaration = null,
-    pub instructions: Vector<*MIRInstruction>,
-    pub terminator: *MIRTerminator = null;
+    pub instructions: Vector<*mut MIRInstruction>,
+    pub terminator: *mut MIRTerminator = null;
 
     MIRBlock(&mut this, name: String) {
         this.name = name;
@@ -898,11 +898,11 @@ class MIRBlock {
         return this.terminator != null;
     }
 
-    pub fn GetTerminator(&this) -> *MIRTerminator {
+    pub fn GetTerminator(&this) -> *mut MIRTerminator {
         return this.terminator;
     }
 
-    pub fn SetTerminator(&mut this, terminator: *MIRTerminator) {
+    pub fn SetTerminator(&mut this, terminator: *mut MIRTerminator) {
         if this.HasTerminator() {
             Logger::Log("Block already terminated!", LogSeverity::Fatal);
         } this.terminator = terminator;
@@ -1101,7 +1101,7 @@ class MIRAssemblyDeclaration : MIRDeclaration {
 }
 
 class MIRModule {
-    pub declarations: Vector<*MIRDeclaration>;
+    pub declarations: Vector<*mut MIRDeclaration>;
 
     MIRModule(&mut this) {}
 

@@ -15,7 +15,7 @@
  */
 
 #[include "std/io", "std/file", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir",
-    "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/LLVMLowerer.zir", "src/Assembler.zir", "src/Logger.zir" : *]
+    "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/LLVMLowerer.zir", "src/Assembler.zir", "src/Logger.zir" : *]
 
 #[if WINDOWS]
 const INFINITE: u32 = 0xFFFFFFFF;
@@ -692,6 +692,16 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 let mir_start = timer.Get();
                 let mir_module = mir_lowerer.Lower(hir_module);
                 WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
+
+                if target.backend == TargetBackend::Zodiac {
+                    let mut pass_manager = MIRPassManager(&mir_lowerer.context);
+                    pass_manager.Add(MIRPassKind::ReorderBlocks);
+                    pass_manager.Add(MIRPassKind::PromoteAllocas);
+                    let passes_start = timer.Get();
+                    pass_manager.Run(mir_module);
+                    WriteLine("MIR passes ran in " + String::FromFloat(timer.Get() - passes_start) + " seconds.");
+                }
+
                 if emit_mir { _WriteFile(name + ".mir", mir_module->ToString()); }
 
                 if target.backend == TargetBackend::Zodiac {
@@ -701,7 +711,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
                     if emit_lir { _WriteFile(name + ".virtual.lir", lir_module->ToString()); }
 
-                    let mut allocator = LIRAllocator(lir_lowerer.Context());
+                    let mut allocator = LIRAllocator(&lir_lowerer.context);
                     let allocator_start = timer.Get();
                     allocator.Allocate(lir_module);
                     WriteLine("LIR module allocated in " + String::FromFloat(timer.Get() - allocator_start) + " seconds.");
@@ -802,6 +812,11 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if !check {
                 Logger::Clear();
             } continue;
+        }
+
+        // The Zodiac backend has already written its output, the rest of the loop is LLVM specific.
+        if target.backend == TargetBackend::Zodiac {
+            continue;
         }
 
         if opt_level != LLVMCodeGenOptLevel::LLVMCodeGenLevelNone && extension == ".zir" {

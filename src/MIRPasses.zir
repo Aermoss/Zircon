@@ -1,0 +1,553 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/map", "src/MIR.zir", "src/MIRAnalysis.zir" : *]
+
+enum MIRPassKind: u8 {
+    ReorderBlocks, PromoteAllocas
+}
+
+extend MIRPassKind {
+    pub fn ToString(this) -> String {
+        if this == MIRPassKind::ReorderBlocks { return "reorder-blocks".ToString(); }
+        else if this == MIRPassKind::PromoteAllocas { return "promote-allocas".ToString(); }
+        else { return "<invalid pass>".ToString(); }
+    }
+}
+
+class MIRPassManager {
+    context: *mut MIRContext,
+    passes: Vector<MIRPassKind>;
+
+    MIRPassManager(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    pub fn Add(&mut this, kind: MIRPassKind) {
+        this.passes.PushBack(kind);
+    }
+
+    pub fn Run(&mut this, module: *MIRModule) {
+        for declaration in module->declarations {
+            if declaration->kind != MIRDeclarationKind::Function { continue; }
+            let function = declaration as *mut MIRFunctionDeclaration;
+            if function->blocks.Empty() { continue; }
+
+            for pass in this.passes {
+                this.RunPass(pass, function);
+            }
+        }
+    }
+
+    fn RunPass(&mut this, kind: MIRPassKind, function: *mut MIRFunctionDeclaration) -> bool {
+        if kind == MIRPassKind::ReorderBlocks {
+            let mut pass = MIRReorderBlocks();
+            return pass.Run(function);
+        } else if kind == MIRPassKind::PromoteAllocas {
+            let mut pass = MIRPromoteAllocas(this.context);
+            return pass.Run(function);
+        } else {
+            return false;
+        }
+    }
+}
+
+class MIRReorderBlocks {
+    MIRReorderBlocks(&mut this) {}
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let count = function->blocks.Size();
+        let mut indices = Map<*MIRBlock, usize>();
+        let mut visited = Vector<bool>();
+
+        for i in 0..count {
+            indices[function->blocks[i]] = i;
+            visited.PushBack(false);
+        }
+
+        let mut postorder = Vector<usize>();
+        let mut stack = Vector<usize>();
+        let mut next = Vector<usize>();
+        stack.PushBack(0);
+        next.PushBack(0);
+        visited[0] = true;
+
+        while !stack.Empty() {
+            let top = stack[stack.Size() - 1];
+            let successors = MIRSuccessors(function->blocks[top]);
+            let k = next[next.Size() - 1];
+
+            if k < successors.Size() {
+                next[next.Size() - 1] = k + 1;
+                let index = indices.Get(successors[k], MIR_NO_BLOCK);
+
+                if index != MIR_NO_BLOCK && !visited[index] {
+                    visited[index] = true;
+                    stack.PushBack(index);
+                    next.PushBack(0);
+                }
+            } else {
+                postorder.PushBack(top);
+                stack.PopBack();
+                next.PopBack();
+            }
+        }
+
+        let mut blocks = Vector<*mut MIRBlock>();
+        let mut changed = postorder.Size() != count;
+
+        for i in 0..postorder.Size() {
+            let index = postorder[postorder.Size() - 1 - i];
+            if index != i { changed = true; }
+            blocks.PushBack(function->blocks[index]);
+        }
+
+        if postorder.Size() != count {
+            for block in blocks {
+                for instruction in block->instructions {
+                    if instruction->kind != MIRInstructionKind::Phi { continue; }
+                    let phi = instruction as *mut MIRPhiInstruction;
+                    let mut incomings = Vector<MIRPhiIncoming>();
+
+                    for incoming in phi->incomings {
+                        let index = indices.Get(incoming.block, MIR_NO_BLOCK);
+
+                        if index != MIR_NO_BLOCK && visited[index] {
+                            incomings.PushBack(incoming);
+                        }
+                    }
+
+                    phi->incomings = incomings;
+                }
+            }
+        }
+
+        function->blocks = blocks;
+        return changed;
+    }
+}
+
+class MIRPromoteAllocas {
+    context: *mut MIRContext,
+    function: *mut MIRFunctionDeclaration = null,
+    control_flow: MIRControlFlow,
+    allocas: Vector<*mut MIRAllocaInstruction>,
+    slots: Map<*MIRValue, usize>,
+    phis: Vector<*mut MIRPhiInstruction>,
+    phi_slots: Vector<usize>,
+    phi_blocks: Vector<usize>,
+    current: Vector<*MIRValue>,
+    undo_slots: Vector<usize>,
+    undo_values: Vector<*MIRValue>,
+    replacements: Map<*MIRValue, *MIRValue>;
+
+    MIRPromoteAllocas(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        this.function = function;
+        this.FindPromotableAllocas();
+        if this.allocas.Empty() { return false; }
+        this.control_flow.Compute(function);
+        if this.control_flow.predecessor_offsets[1] != 0 { return false; }
+        this.PlacePhis();
+
+        for alloca in this.allocas {
+            this.current.PushBack(this.Undefined(alloca->_type));
+        }
+
+        this.Rename(0);
+        this.SimplifyPhis();
+        this.ResolveAll();
+        this.RemoveDeadPhis();
+        return true;
+    }
+
+    fn IsScalar(&this, _type: *MIRType) -> bool {
+        return _type->kind == MIRTypeKind::Integer || _type->kind == MIRTypeKind::Pointer || _type->kind == MIRTypeKind::Float;
+    }
+
+    fn SameType(&this, first: *MIRType, second: *MIRType) -> bool {
+        if first->kind != second->kind {
+            return false;
+        } else if first->kind == MIRTypeKind::Integer {
+            return (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width;
+        } else if first->kind == MIRTypeKind::Float {
+            return (first as *MIRFloatType)->width == (second as *MIRFloatType)->width;
+        } else {
+            return true;
+        }
+    }
+
+    fn Undefined(&mut this, _type: *MIRType) -> *MIRValue {
+        if _type->kind == MIRTypeKind::Pointer {
+            return this.context->arena.New<MIRConstantNull>(_type);
+        } else if _type->kind == MIRTypeKind::Float {
+            return this.context->arena.New<MIRConstantFloat>(0.0, _type);
+        } else {
+            return this.context->arena.New<MIRConstantInteger>(0u64, _type);
+        }
+    }
+
+    fn Slot(&this, value: *MIRValue) -> usize {
+        return this.slots.Get(value, MIR_NO_BLOCK);
+    }
+
+    fn FindPromotableAllocas(&mut this) {
+        let mut candidates = Vector<*mut MIRAllocaInstruction>();
+        let mut candidate_slots = Map<*MIRValue, usize>();
+
+        for instruction in this.function->blocks[0]->instructions {
+            if instruction->kind != MIRInstructionKind::Alloca { continue; }
+            let alloca = instruction as *mut MIRAllocaInstruction;
+            if !this.IsScalar(alloca->_type) { continue; }
+            candidate_slots[alloca] = candidates.Size();
+            candidates.PushBack(alloca);
+        }
+
+        if candidates.Empty() { return; }
+        let mut promotable = Vector<bool>();
+
+        for candidate in candidates {
+            promotable.PushBack(true);
+        }
+
+        for block in this.function->blocks {
+            for k in 0..(block->instructions.Size() + 1) {
+                let mut instruction: *MIRInstruction = block->terminator;
+                if k < block->instructions.Size() { instruction = block->instructions[k]; }
+                if instruction == null { continue; }
+
+                for operand in MIROperands(instruction) {
+                    let slot = candidate_slots.Get(operand, MIR_NO_BLOCK);
+                    if slot == MIR_NO_BLOCK { continue; }
+                    let _type = candidates[slot]->_type;
+                    let mut allowed = false;
+
+                    if instruction->kind == MIRInstructionKind::Load {
+                        allowed = this.SameType((instruction as *MIRLoadInstruction)->_type, _type);
+                    } else if instruction->kind == MIRInstructionKind::Store {
+                        let store = instruction as *MIRStoreInstruction;
+                        allowed = store->pointer == operand && store->value != operand && this.SameType(store->value->_type, _type);
+                    }
+
+                    if !allowed { promotable[slot] = false; }
+                }
+            }
+        }
+
+        for i in 0..candidates.Size() {
+            if !promotable[i] { continue; }
+            this.slots[candidates[i]] = this.allocas.Size();
+            this.allocas.PushBack(candidates[i]);
+        }
+    }
+
+    fn PlacePhis(&mut this) {
+        let mut store_slots = Vector<usize>();
+        let mut store_blocks = Vector<usize>();
+
+        for b in 0..this.function->blocks.Size() {
+            for instruction in this.function->blocks[b]->instructions {
+                if instruction->kind != MIRInstructionKind::Store { continue; }
+                let slot = this.Slot((instruction as *MIRStoreInstruction)->pointer);
+                if slot == MIR_NO_BLOCK { continue; }
+                store_slots.PushBack(slot);
+                store_blocks.PushBack(b);
+            }
+        }
+
+        for slot in 0..this.allocas.Size() {
+            let alloca = this.allocas[slot];
+            let mut has_phi = Vector<bool>();
+            let mut queued = Vector<bool>();
+
+            for b in 0..this.function->blocks.Size() {
+                has_phi.PushBack(false);
+                queued.PushBack(false);
+            }
+
+            let mut worklist = Vector<usize>();
+
+            for i in 0..store_slots.Size() {
+                if store_slots[i] != slot || queued[store_blocks[i]] { continue; }
+                queued[store_blocks[i]] = true;
+                worklist.PushBack(store_blocks[i]);
+            }
+
+            while !worklist.Empty() {
+                let block = worklist.PopBack();
+
+                for k in this.control_flow.frontier_offsets[block]..this.control_flow.frontier_offsets[block + 1] {
+                    let target = this.control_flow.frontier[k];
+                    if has_phi[target] { continue; }
+                    has_phi[target] = true;
+                    let phi = this.context->arena.New<MIRPhiInstruction>(this.function->GetUniqueName(alloca->name), alloca->_type);
+                    this.function->blocks[target]->instructions.Insert(0, phi);
+                    this.phis.PushBack(phi);
+                    this.phi_slots.PushBack(slot);
+                    this.phi_blocks.PushBack(target);
+
+                    if !queued[target] {
+                        queued[target] = true;
+                        worklist.PushBack(target);
+                    }
+                }
+            }
+        }
+    }
+
+    fn Define(&mut this, slot: usize, value: *MIRValue) {
+        this.undo_slots.PushBack(slot);
+        this.undo_values.PushBack(this.current[slot]);
+        this.current[slot] = value;
+    }
+
+    fn Rename(&mut this, index: usize) {
+        let block = this.function->blocks[index];
+        let saved = this.undo_slots.Size();
+
+        for i in 0..this.phis.Size() {
+            if this.phi_blocks[i] == index {
+                this.Define(this.phi_slots[i], this.phis[i]);
+            }
+        }
+
+        let mut kept = Vector<*mut MIRInstruction>();
+
+        for instruction in block->instructions {
+            if instruction->kind == MIRInstructionKind::Alloca && this.Slot(instruction) != MIR_NO_BLOCK {
+                continue;
+            } else if instruction->kind == MIRInstructionKind::Load {
+                let load = instruction as *MIRLoadInstruction;
+                let slot = this.Slot(load->pointer);
+
+                if slot != MIR_NO_BLOCK {
+                    this.replacements[load] = this.current[slot];
+                    continue;
+                }
+            } else if instruction->kind == MIRInstructionKind::Store {
+                let store = instruction as *MIRStoreInstruction;
+                let slot = this.Slot(store->pointer);
+
+                if slot != MIR_NO_BLOCK {
+                    this.Define(slot, store->value);
+                    continue;
+                }
+            }
+
+            kept.PushBack(instruction);
+        }
+
+        block->instructions = kept;
+
+        for k in this.control_flow.successor_offsets[index]..this.control_flow.successor_offsets[index + 1] {
+            let successor = this.control_flow.successors[k];
+
+            for i in 0..this.phis.Size() {
+                if this.phi_blocks[i] == successor {
+                    this.phis[i]->AddIncoming(this.current[this.phi_slots[i]], block);
+                }
+            }
+        }
+
+        for k in this.control_flow.child_offsets[index]..this.control_flow.child_offsets[index + 1] {
+            this.Rename(this.control_flow.children[k]);
+        }
+
+        while this.undo_slots.Size() > saved {
+            let slot = this.undo_slots.PopBack();
+            this.current[slot] = this.undo_values.PopBack();
+        }
+    }
+
+    fn Resolve(&this, mut value: *MIRValue) -> *MIRValue {
+        while value != null && this.replacements.Has(value) {
+            value = this.replacements.Get(value, null);
+        } return value;
+    }
+
+    fn SimplifyPhis(&mut this) {
+        let mut changed = true;
+
+        while changed {
+            changed = false;
+
+            for phi in this.phis {
+                if this.replacements.Has(phi) { continue; }
+                let mut unique: *MIRValue = null;
+                let mut trivial = true;
+
+                for incoming in phi->incomings {
+                    let value = this.Resolve(incoming.value);
+                    if value == phi as *MIRValue || value == unique { continue; }
+
+                    if unique != null {
+                        trivial = false;
+                        break;
+                    } unique = value;
+                }
+
+                if trivial && unique != null {
+                    this.replacements[phi] = unique;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    fn ResolveOperands(&mut this, instruction: *mut MIRInstruction) {
+        let kind = instruction->kind;
+
+        if kind == MIRInstructionKind::Load {
+            let load = instruction as *mut MIRLoadInstruction;
+            load->pointer = this.Resolve(load->pointer);
+        } else if kind == MIRInstructionKind::Store {
+            let store = instruction as *mut MIRStoreInstruction;
+            (store->value, store->pointer) = (this.Resolve(store->value), this.Resolve(store->pointer));
+        } else if kind == MIRInstructionKind::ArrayGEP {
+            let gep = instruction as *mut MIRArrayGEPInstruction;
+            (gep->pointer, gep->index) = (this.Resolve(gep->pointer), this.Resolve(gep->index));
+        } else if kind == MIRInstructionKind::StructGEP {
+            let gep = instruction as *mut MIRStructGEPInstruction;
+            gep->pointer = this.Resolve(gep->pointer);
+        } else if kind == MIRInstructionKind::Unary {
+            let unary = instruction as *mut MIRUnaryInstruction;
+            unary->operand = this.Resolve(unary->operand);
+        } else if kind == MIRInstructionKind::Binary {
+            let binary = instruction as *mut MIRBinaryInstruction;
+            (binary->left, binary->right) = (this.Resolve(binary->left), this.Resolve(binary->right));
+        } else if kind == MIRInstructionKind::Call {
+            let call = instruction as *mut MIRCallInstruction;
+            call->callee = this.Resolve(call->callee);
+
+            for i in 0..call->arguments.Size() {
+                call->arguments[i] = this.Resolve(call->arguments[i]);
+            }
+        } else if kind == MIRInstructionKind::Cast {
+            let cast = instruction as *mut MIRCastInstruction;
+            cast->value = this.Resolve(cast->value);
+        } else if kind == MIRInstructionKind::Select {
+            let select = instruction as *mut MIRSelectInstruction;
+            select->condition = this.Resolve(select->condition);
+            select->then_value = this.Resolve(select->then_value);
+            select->else_value = this.Resolve(select->else_value);
+        } else if kind == MIRInstructionKind::Phi {
+            let phi = instruction as *mut MIRPhiInstruction;
+
+            for i in 0..phi->incomings.Size() {
+                phi->incomings[i].value = this.Resolve(phi->incomings[i].value);
+            }
+        } else if kind == MIRInstructionKind::Assembly {
+            let assembly = instruction as *mut MIRAssemblyInstruction;
+
+            for i in 0..assembly->inputs.Size() {
+                let operand = assembly->inputs[i];
+                let value = this.Resolve(operand->value);
+                if value != operand->value { assembly->inputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+            }
+
+            for i in 0..assembly->outputs.Size() {
+                let operand = assembly->outputs[i];
+                let value = this.Resolve(operand->value);
+                if value != operand->value { assembly->outputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+            }
+        } else if kind == MIRInstructionKind::Terminator {
+            let terminator = instruction as *mut MIRTerminator;
+
+            if terminator->kind == MIRTerminatorKind::Return {
+                let _return = terminator as *mut MIRReturnInstruction;
+                _return->value = this.Resolve(_return->value);
+            } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+                let branch = terminator as *mut MIRConditionalBranchInstruction;
+                branch->condition = this.Resolve(branch->condition);
+            }
+        }
+    }
+
+    fn ResolveAll(&mut this) {
+        for block in this.function->blocks {
+            for instruction in block->instructions {
+                this.ResolveOperands(instruction);
+            }
+
+            if block->terminator != null {
+                this.ResolveOperands(block->terminator);
+            }
+        }
+    }
+
+    fn RemoveDeadPhis(&mut this) {
+        let mut indices = Map<*MIRValue, usize>();
+        let mut uses = Vector<u32>();
+        let mut dead = Vector<bool>();
+
+        for i in 0..this.phis.Size() {
+            indices[this.phis[i]] = i;
+            uses.PushBack(0);
+            dead.PushBack(false);
+        }
+
+        for block in this.function->blocks {
+            for k in 0..(block->instructions.Size() + 1) {
+                let mut instruction: *MIRInstruction = block->terminator;
+                if k < block->instructions.Size() { instruction = block->instructions[k]; }
+                if instruction == null { continue; }
+
+                for operand in MIROperands(instruction) {
+                    let index = indices.Get(operand, MIR_NO_BLOCK);
+                    if index != MIR_NO_BLOCK && operand != instruction as *MIRValue { uses[index] += 1; }
+                }
+            }
+        }
+
+        let mut worklist = Vector<usize>();
+
+        for i in 0..this.phis.Size() {
+            if uses[i] == 0 {
+                dead[i] = true;
+                worklist.PushBack(i);
+            }
+        }
+
+        while !worklist.Empty() {
+            let phi = this.phis[worklist.PopBack()];
+
+            for incoming in phi->incomings {
+                let index = indices.Get(incoming.value, MIR_NO_BLOCK);
+                if index == MIR_NO_BLOCK || dead[index] || incoming.value == phi as *MIRValue { continue; }
+                uses[index] -= 1;
+
+                if uses[index] == 0 {
+                    dead[index] = true;
+                    worklist.PushBack(index);
+                }
+            }
+        }
+
+        for block in this.function->blocks {
+            let mut kept = Vector<*mut MIRInstruction>();
+
+            for instruction in block->instructions {
+                let index = instruction->kind == MIRInstructionKind::Phi ? indices.Get(instruction, MIR_NO_BLOCK) : MIR_NO_BLOCK;
+                if index == MIR_NO_BLOCK || !dead[index] { kept.PushBack(instruction); }
+            }
+
+            block->instructions = kept;
+        }
+    }
+}

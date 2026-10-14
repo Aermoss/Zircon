@@ -17,7 +17,7 @@
 #[include "std/map", "std/arena", "src/HIR.zir", "src/MIR.zir", "src/Mangler.zir" : *]
 
 class MIRLowerer {
-    context: MIRContext,
+    pub context: MIRContext,
     builder: MIRBuilder,
     target_info: TargetInfo,
     bindings: Map<*HIRIdentifierPattern, *MIRValue>,
