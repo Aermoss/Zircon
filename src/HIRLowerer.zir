@@ -36,7 +36,7 @@ class HIRLowerer {
     extend_data: Map<*ASTNode, Pair<*mut HIRExtendDeclaration, *mut Scope>>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
-    temporaries: Vector<*HIRExpression>,
+    pub temporaries: Vector<*HIRExpression>,
     loop_scopes: Vector<*mut Scope>,
 
     pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,

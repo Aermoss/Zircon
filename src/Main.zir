@@ -806,9 +806,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
             Logger::Log(input_file, "Unsupported file extension '" + extension + "'.", LogSeverity::Error);
         }
 
-        if target.backend == TargetBackend::Zodiac {
-            failed |= Logger::HasError();
-        } else {
+        failed |= Logger::HasError();
+
+        if target.backend == TargetBackend::LLVM {
             failed |= module == null;
         }
 
@@ -818,7 +818,6 @@ fn Main(args: &mut Vector<String>) -> i32 {
             } continue;
         }
 
-        // The Zodiac backend has already written its output, the rest of the loop is LLVM specific.
         if target.backend == TargetBackend::Zodiac {
             continue;
         }

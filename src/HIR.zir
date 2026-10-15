@@ -843,6 +843,25 @@ class HIRPattern {
         this.kind = kind;
     }
 
+    pub fn CoversMember(&this, member: *HIRVariantMember) -> bool {
+        if this.IsIrrefutable() {
+            return true;
+        } else if this.kind == HIRPatternKind::Variant {
+            let variant = this as *HIRVariantPattern;
+            if variant->member != member { return false; }
+
+            for pattern in variant->patterns {
+                if !pattern->IsIrrefutable() { return false; }
+            } return true;
+        } else if this.kind == HIRPatternKind::Or {
+            for pattern in (this as *HIROrPattern)->patterns {
+                if pattern->CoversMember(member) {
+                    return true;
+                }
+            }
+        } return false;
+    }
+
     pub fn IsIrrefutable(&this) -> bool {
         if this.kind == HIRPatternKind::Wildcard || this.kind == HIRPatternKind::Rest || this.kind == HIRPatternKind::Identifier {
             return true;
@@ -2009,6 +2028,33 @@ class HIRMatchStatement : HIRStatement {
 
     HIRMatchStatement(&mut this, target: *HIRExpression, destructors: Vector<*HIRExpression>, arms: Vector<*HIRMatchArm>) : HIRStatement(HIRStatementKind::Match) {
         (this.target, this.destructors, this.arms) = (target, destructors, arms);
+    }
+
+    pub fn IsExhaustive(&this) -> bool {
+        for arm in this.arms {
+            if arm->guard == null && arm->pattern->IsIrrefutable() {
+                return true;
+            }
+        }
+
+        let mut _type = this.target->_type;
+        if _type->IsReference() { _type = _type->Pointee(); }
+        if !_type->IsVariant() { return false; }
+
+        for member in (_type as *HIRVariantType)->declaration->members {
+            let mut covered = false;
+
+            for arm in this.arms {
+                if arm->guard == null && arm->pattern->CoversMember(member) {
+                    covered = true;
+                    break;
+                }
+            }
+
+            if !covered {
+                return false;
+            }
+        } return true;
     }
 
     pub fn ToString(&this, indent: usize) -> String {

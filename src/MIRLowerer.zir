@@ -252,7 +252,9 @@ class MIRLowerer {
         this.LowerBlockStatement(function->body);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
-            if this.builder.GetCurrentFunction()->_return->kind == MIRTypeKind::Void {
+            if this.builder.GetCurrentFunction()->_return->kind != MIRTypeKind::Void {
+                Logger::Log("Function '" + function->name + "' does not return a value on all paths.", LogSeverity::Error);
+            } else {
                 this.builder.BuildReturn(null);
             }
         }
@@ -680,7 +682,11 @@ class MIRLowerer {
         }
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
-            this.builder.BuildBranch(merge_block);
+            if _match->IsExhaustive() {
+                this.builder.BuildUnreachable();
+            } else {
+                this.builder.BuildBranch(merge_block);
+            }
         }
 
         this.builder.SetCurrentBlock(merge_block);
