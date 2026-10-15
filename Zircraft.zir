@@ -723,9 +723,8 @@ class Shader {
     }
 
     fn FromPath(&mut this, vertex_path: &String, fragment_path: &String) {
-        let vertex_source = _ReadFile(vertex_path).Data();
-        let fragment_source = _ReadFile(fragment_path).Data();
-        this.FromSource(vertex_source, fragment_source);
+        let (vertex_source, fragment_source) = (_ReadFile(vertex_path), _ReadFile(fragment_path));
+        this.FromSource(vertex_source.Data(), fragment_source.Data());
     }
 
     pub fn Reload(&mut this) {
@@ -1113,21 +1112,21 @@ class Subchunk {
         this.vertices.Clear();
         this.indices.Clear();
 
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3( 1.0,  0.0,  0.0),
             Vector3(-1.0,  0.0,  0.0),
             Vector3( 0.0,  1.0,  0.0),
             Vector3( 0.0, -1.0,  0.0),
             Vector3( 0.0,  0.0,  1.0),
             Vector3( 0.0,  0.0, -1.0)
-        };
+        ];
 
         for x in 0..SUBCHUNK_WIDTH {
             for y in 0..SUBCHUNK_HEIGHT {
                 for z in 0..SUBCHUNK_DEPTH {
                     let position = Vector3(x as f32, y as f32, z as f32);
                     let block = this.blocks[x + y * SUBCHUNK_WIDTH + z * SUBCHUNK_WIDTH * SUBCHUNK_HEIGHT];
-                    let block_type: *mut BlockType = chunk->parent->block_types[block as usize - 1];
+                    let block_type = chunk->parent->block_types[block as usize - 1];
 
                     if block != 0 {
                         for i in 0usize..6 {
@@ -1182,7 +1181,7 @@ class Chunk {
     vertex_array: u32 = 0, vertex_buffer: u32 = 0, index_buffer: u32 = 0,
     vertices: Vector<f32>, indices: Vector<u32>, pub index_count: i32, pub offset: u32,
     pub subchunks: [*mut Subchunk; CHUNK_HEIGHT / SUBCHUNK_HEIGHT],
-    pub state: Atomic<ChunkState> = ChunkState::Empty,
+    pub state: Atomic<ChunkState> = Atomic<ChunkState>(ChunkState::Empty),
 
     pub north_neighbor: Weak<Chunk>, pub south_neighbor: Weak<Chunk>,
     pub east_neighbor: Weak<Chunk>, pub west_neighbor: Weak<Chunk>;
@@ -1227,7 +1226,7 @@ class Chunk {
         this.indices.Clear();
 
         for i in 0..(CHUNK_HEIGHT / SUBCHUNK_HEIGHT) {
-            let subchunk: *mut Subchunk = this.subchunks[i];
+            let subchunk = this.subchunks[i];
             this.vertices += subchunk->vertices;
 
             for j in 0..subchunk->indices.Size() {
@@ -1299,32 +1298,32 @@ class Chunk {
     }
 }
 
-static vertices: [f32; 72] = {
+static vertices: [f32; 72] = [
      0.5,  0.5,  0.5,  0.5, -0.5,  0.5,  0.5, -0.5, -0.5,  0.5,  0.5, -0.5,
     -0.5,  0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5,  0.5, -0.5,  0.5,  0.5,
      0.5,  0.5,  0.5,  0.5,  0.5, -0.5, -0.5,  0.5, -0.5, -0.5,  0.5,  0.5,
     -0.5, -0.5,  0.5, -0.5, -0.5, -0.5,  0.5, -0.5, -0.5,  0.5, -0.5,  0.5,
     -0.5,  0.5,  0.5, -0.5, -0.5,  0.5,  0.5, -0.5,  0.5,  0.5,  0.5,  0.5,
      0.5,  0.5, -0.5,  0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5,  0.5, -0.5
-};
+];
 
-static tex_coords: [f32; 72] = {
+static tex_coords: [f32; 72] = [
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0
-};
+];
 
-static shadings: [f32; 24] = {
+static shadings: [f32; 24] = [
     0.6, 0.6, 0.6, 0.6,
     0.6, 0.6, 0.6, 0.6,
     1.0, 1.0, 1.0, 1.0,
     0.4, 0.4, 0.4, 0.4,
     0.8, 0.8, 0.8, 0.8,
     0.8, 0.8, 0.8, 0.8
-};
+];
 
 class BlockType {
     pub textures: Vector<f32>;
@@ -1412,22 +1411,22 @@ class World {
             this.threads.PushBack(mesher_thread);
         }
 
-        let grass_textures: [f32; 6] = { 1.0, 1.0, 2.0, 3.0, 1.0, 1.0 };
+        let grass_textures: [f32; 6] = [1.0, 1.0, 2.0, 3.0, 1.0, 1.0];
         this.block_types.PushBack(new BlockType(grass_textures));
 
-        let dirt_textures: [f32; 6] = { 3.0, 3.0, 3.0, 3.0, 3.0, 3.0 };
+        let dirt_textures: [f32; 6] = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0];
         this.block_types.PushBack(new BlockType(dirt_textures));
 
-        let cobblestone_textures: [f32; 6] = { 4.0, 4.0, 4.0, 4.0, 4.0, 4.0 };
+        let cobblestone_textures: [f32; 6] = [4.0, 4.0, 4.0, 4.0, 4.0, 4.0];
         this.block_types.PushBack(new BlockType(cobblestone_textures));
 
-        let stone_textures: [f32; 6] = { 5.0, 5.0, 5.0, 5.0, 5.0, 5.0 };
+        let stone_textures: [f32; 6] = [5.0, 5.0, 5.0, 5.0, 5.0, 5.0];
         this.block_types.PushBack(new BlockType(stone_textures));
 
-        let spruce_planks_textures: [f32; 6] = { 6.0, 6.0, 6.0, 6.0, 6.0, 6.0 };
+        let spruce_planks_textures: [f32; 6] = [6.0, 6.0, 6.0, 6.0, 6.0, 6.0];
         this.block_types.PushBack(new BlockType(spruce_planks_textures));
 
-        let oak_log_textures: [f32; 6] = { 7.0, 7.0, 7.0, 7.0, 7.0, 7.0 };
+        let oak_log_textures: [f32; 6] = [7.0, 7.0, 7.0, 7.0, 7.0, 7.0];
         this.block_types.PushBack(new BlockType(oak_log_textures));
     }
 
@@ -1578,12 +1577,12 @@ class World {
     }
 
     pub fn GeneratorThread(&mut this) {
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3( 1.0, 0.0,  0.0),
             Vector3(-1.0, 0.0,  0.0),
             Vector3( 0.0, 0.0, -1.0),
             Vector3( 0.0, 0.0,  1.0)
-        };
+        ];
 
         while this.running {
             let mut chunk_update_queue = Vector<Shared<Chunk>>();
@@ -1597,7 +1596,7 @@ class World {
                     let mut j: usize = 0;
 
                     while j < this.buckets[i]->Size() {
-                        let chunk: Shared<Chunk> = this.buckets[i]->Data()[j];
+                        let chunk = this.buckets[i]->Data()[j];
                         let dist_x = chunk->position.x - current_chunk.x;
                         let dist_z = chunk->position.z - current_chunk.z;
                         let dist_sq = dist_x * dist_x + dist_z * dist_z;
@@ -1742,7 +1741,7 @@ class World {
                 let mut min_dist_sq: f32 = 1.0 / 0.0;
 
                 for i in 0..this.chunk_update_queue.Size() {
-                    let chunk: Shared<Chunk> = this.chunk_update_queue[i];
+                    let chunk = this.chunk_update_queue[i];
                     let dist_x = chunk->position.x - current_chunk.x;
                     let dist_z = chunk->position.z - current_chunk.z;
                     let dist_sq = dist_x * dist_x + dist_z * dist_z;
@@ -1826,11 +1825,11 @@ class World {
     }
 
     fn PropagateSkylightIncrease(&mut this, light_update: bool) {
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
-        };
+        ];
 
         while !this.skylight_increase_queue.Empty() {
             let values = this.skylight_increase_queue.RemoveAt(0);
@@ -1848,7 +1847,7 @@ class World {
                 if chunk.Valid() {
                     let subchunk_position = (neighbour_position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
                     let local_position = neighbour_position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32));
-                    let subchunk: *mut Subchunk = chunk->subchunks[subchunk_position.y as usize];
+                    let subchunk = chunk->subchunks[subchunk_position.y as usize];
 
                     if subchunk->GetBlock(local_position) == 0 {
                         let current_skylight = subchunk->GetSkylight(local_position);
@@ -1888,11 +1887,11 @@ class World {
     }
 
     fn PropagateSkylightDecrease(&mut this, light_update: bool) {
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
-        };
+        ];
 
         while !this.skylight_decrease_queue.Empty() {
             let values = this.skylight_decrease_queue.RemoveAt(0);
@@ -1910,7 +1909,7 @@ class World {
                 if chunk.Valid() {
                     let subchunk_position = (neighbour_position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
                     let local_position = neighbour_position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32));
-                    let subchunk: *mut Subchunk = chunk->subchunks[subchunk_position.y as usize];
+                    let subchunk = chunk->subchunks[subchunk_position.y as usize];
 
                     if subchunk->GetBlock(local_position) == 0 {
                         let neighbour_level = subchunk->GetSkylight(local_position);
@@ -1948,11 +1947,11 @@ class World {
     }
 
     fn PropagateIncrease(&mut this, light_update: bool) {
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
-        };
+        ];
 
         while !this.light_increase_queue.Empty() {
             let values = this.light_increase_queue.RemoveAt(0);
@@ -1970,7 +1969,7 @@ class World {
                 if chunk.Valid() {
                     let subchunk_position = (neighbour_position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
                     let local_position = neighbour_position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32));
-                    let subchunk: *mut Subchunk = chunk->subchunks[subchunk_position.y as usize];
+                    let subchunk = chunk->subchunks[subchunk_position.y as usize];
 
                     if subchunk->GetBlock(local_position) == 0 && subchunk->GetBlockLight(local_position) + 2 <= values.right {
                         subchunk->SetBlockLight(local_position, values.right - 1);
@@ -2001,11 +2000,11 @@ class World {
     }
 
     fn PropagateDecrease(&mut this, light_update: bool) {
-        let neighbor_offsets = {
+        let neighbor_offsets = [
             Vector3(1.0, 0.0, 0.0), Vector3(-1.0,  0.0,  0.0),
             Vector3(0.0, 1.0, 0.0), Vector3( 0.0, -1.0,  0.0),
             Vector3(0.0, 0.0, 1.0), Vector3( 0.0,  0.0, -1.0)
-        };
+        ];
 
         while !this.light_decrease_queue.Empty() {
             let values = this.light_decrease_queue.RemoveAt(0);
@@ -2023,7 +2022,7 @@ class World {
                 if chunk.Valid() {
                     let subchunk_position = (neighbour_position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
                     let local_position = neighbour_position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32));
-                    let subchunk: *mut Subchunk = chunk->subchunks[subchunk_position.y as usize];
+                    let subchunk = chunk->subchunks[subchunk_position.y as usize];
                     let block = subchunk->GetBlock(local_position);
                     let mut light_source = false;
 
@@ -2236,6 +2235,8 @@ class World {
 class Collider {
     pub min: Vector3,
     pub max: Vector3;
+
+    Collider(&mut this) {}
 
     Collider(&mut this, min: Vector3, max: Vector3) {
         (this.min, this.max) = (min, max);

@@ -60,7 +60,7 @@ class ScopeManager {
             }
         } else {
             for child in scope->children {
-                if child->name == segment.name {
+                if child->global && child->name == segment.name {
                     return child;
                 }
             }

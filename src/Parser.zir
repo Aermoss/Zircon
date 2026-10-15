@@ -1204,7 +1204,7 @@ class Parser {
             }
         }
 
-        let public = this.Match(TokenType::PUBLIC);
+        let mut public = this.Match(TokenType::PUBLIC);
         let mut name = String();
 
         if !_class || public {
@@ -1215,8 +1215,10 @@ class Parser {
                 let identifier = this.Expect(TokenType::IDENTIFIER);
                 if identifier._type == TokenType::UNKNOWN { return null; }
                 name += identifier.value;
+                public = true;
             } else if this.Match(TokenType::IDENTIFIER) {
                 name += token.value;
+                public = true;
             } else if !this.ExpectSuccess(TokenType::FUNCTION) {
                 return null;
             }

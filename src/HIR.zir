@@ -131,6 +131,10 @@ class HIRType {
     }
 
     pub fn IsCompatible(&this, other: &HIRType) -> bool {
+        if this.IsFunction() && other.IsNullPointer() {
+            return true;
+        }
+
         if this.IsPointer() && other.IsPointer() {
             if this.Pointee().IsVoid() || other.IsNullPointer() {
                 return true;
@@ -172,6 +176,20 @@ class HIRType {
 
             (left, right) = (left->Pointee(), right->Pointee());
         } return this == other;
+    }
+
+    pub fn ContainsLiteral(&this) -> bool {
+        if this.IsArray() {
+            return this.Element().ContainsLiteral();
+        } else if this.IsTuple() {
+            for element in (this as *HIRTupleType)->elements {
+                if element->ContainsLiteral() {
+                    return true;
+                }
+            } return false;
+        } else {
+            return this.IsLiteral();
+        }
     }
 
     pub fn ScorePointer(&this, other: &HIRType, base: u64) -> u64 {
@@ -2610,6 +2628,10 @@ class HIRContext {
     }
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
+        if element->ContainsLiteral() {
+            return this.arena.New<HIRArrayType>(element, length);
+        }
+
         for existing in this.array_types {
             if existing->length == length && existing->element->IsSame(element) {
                 return existing;
@@ -2622,6 +2644,12 @@ class HIRContext {
     }
 
     pub fn TupleType(&mut this, elements: Vector<*HIRType>) -> *mut HIRTupleType {
+        for element in elements {
+            if element->ContainsLiteral() {
+                return this.arena.New<HIRTupleType>(elements);
+            }
+        }
+
         for existing in this.tuple_types {
             if existing->elements.Size() != elements.Size() {
                 continue;

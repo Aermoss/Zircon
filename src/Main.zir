@@ -682,9 +682,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             let mut hir_lowerer = HIRLowerer();
             let hir_start = timer.Get();
-            let hir_module = hir_lowerer.Lower(ast_module);
+            let mut hir_module: *HIRModule = null;
 
-            if !check && !Logger::HasError() {
+            if !Logger::HasError() {
+                hir_module = hir_lowerer.Lower(ast_module);
+            }
+
+            if !check && !Logger::HasError() && hir_module != null {
                 WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
                 if emit_hir { _WriteFile(name + ".hir", hir_module->ToString()); }
 

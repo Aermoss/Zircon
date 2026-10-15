@@ -16,12 +16,12 @@
 
 #[include "std/str", "std/vec" : *]
 
-class gladGLversionStruct {
+struct gladGLversionStruct {
     pub major: i32,
     pub minor: i32
 }
 
-static mut GLVersion: gladGLversionStruct = { 0, 0 };
+static mut GLVersion: gladGLversionStruct = gladGLversionStruct { major: 0, minor: 0 };
 
 static mut max_loaded_major: i32 = 0;
 static mut max_loaded_minor: i32 = 0;
@@ -886,9 +886,9 @@ extern "C" {
     }
 
     fn find_coreGL() {
-        let prefixes = {
+        let prefixes = [
             "OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES ", null
-        };
+        ];
 
         let mut version = glGetString(GL_VERSION) as *i8;
 

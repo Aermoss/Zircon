@@ -260,6 +260,30 @@ class HIRLowerer {
             return expression;
         } else if expression->kind == HIRExpressionKind::Deferred {
             return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, target), target);
+        } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Array {
+            let array = expression as *mut HIRArrayLiteral;
+            if array->elements.Empty() { return expression; }
+
+            for i in 0..array->elements.Size() {
+                array->elements[i] = target->IsArray() ? this.Coerce(array->elements[i], target->Element()) : this.Coerce(array->elements[i]);
+            }
+
+            expression->_type = this.context.ArrayType(array->elements[0]->_type, array->elements.Size());
+            return expression;
+        } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple {
+            let tuple = expression as *mut HIRTupleLiteral;
+            let mut types = Vector<*HIRType>();
+
+            for i in 0..tuple->elements.Size() {
+                if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
+                    tuple->elements[i] = this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i]);
+                } else {
+                    tuple->elements[i] = this.Coerce(tuple->elements[i]);
+                } types.PushBack(tuple->elements[i]->_type);
+            }
+
+            expression->_type = this.context.TupleType(types);
+            return expression;
         }
 
         if expression->_type->IsInteger() && expression->_type->IsLiteral() && target->IsPointer() {
@@ -291,6 +315,8 @@ class HIRLowerer {
         if expression != null {
             if expression->kind == HIRExpressionKind::Deferred {
                 return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, null));
+            } else if expression->kind == HIRExpressionKind::Literal && ((expression as *HIRLiteral)->kind == HIRLiteralKind::Array || (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple) {
+                return this.Coerce(expression, this.context.VoidType());
             } else if expression->_type->IsLiteral() {
                 if expression->_type->IsInteger() {
                     expression->_type = this.context.IntegerType(32, true);
@@ -866,8 +892,13 @@ class HIRLowerer {
 
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this_field);
-                let function = this.ResolveOverload(candidates, values, null, false);
-                if function == null { continue; }
+                let function = this.ResolveOverload(candidates, values, null, true);
+
+                if function == null {
+                    Logger::Log("Field '" + field->name + "' of type '" + field->_type->ToString() + "' has no default constructor, it must be initialized explicitly.", LogSeverity::Error);
+                    continue;
+                }
+
                 let call = this.LowerResolvedCallExpression(function, values, null);
                 if call == null { continue; }
                 this.builder.BuildExpressionStatement(call);
@@ -2609,7 +2640,7 @@ class HIRLowerer {
 
                 if start <= values.Size() {
                     for i in start..values.Size() {
-                        types.PushBack(values[i]->_type);
+                        types.PushBack(this.Coerce(values[i])->_type);
                     }
                 }
             }
@@ -2766,7 +2797,13 @@ class HIRLowerer {
                 }
 
                 values.Insert(0, this.builder.NullLiteral());
-                let function = this.ResolveOverload(candidates, values, call, false);
+                let mut function = this.ResolveOverload(candidates, values, call, true);
+
+                if function == null {
+                    candidates += this.ResolveGenericMethods(symbol->_type, (symbol->_type as *HIRClassType)->declaration->name, Vector<*ASTType>(), values, call);
+                    function = this.ResolveOverload(candidates, values, call, false);
+                }
+
                 if function == null { return null; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
                 if !this.ValidateCallArguments(callee, values, call) { return null; }
@@ -2833,7 +2870,6 @@ class HIRLowerer {
                 }
             }
 
-            values.Insert(0, instance);
             let mut candidates = Vector<*HIRFunctionDeclaration>();
 
             if !instance->_type->HasMethods() {
@@ -2842,6 +2878,7 @@ class HIRLowerer {
                 candidates += instance->_type->GetCandidates(member_access->member, call, true);
             }
 
+            values.Insert(0, instance);
             candidates += this.ResolveGenericMethods(instance->_type, member_access->member, member_access->types, values, call);
 
             if !candidates.Empty() {
@@ -2975,18 +3012,25 @@ class HIRLowerer {
             if invalid { return null; }
 
             if _type->IsClass() {
-                let arguments = Vector<*HIRExpression>(values);
-                values.Insert(0, this.builder.NullLiteral());
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 for candidate in (_type as *HIRClassType)->declaration->constructors {
                     candidates.PushBack(candidate);
                 }
 
-                let function = this.ResolveOverload(candidates, values, _new, false);
+                values.Insert(0, this.builder.NullLiteral());
+                let mut function = this.ResolveOverload(candidates, values, _new, true);
+
+                if function == null {
+                    candidates += this.ResolveGenericMethods(_type, (_type as *HIRClassType)->declaration->name, Vector<*ASTType>(), values, _new);
+                    function = this.ResolveOverload(candidates, values, _new, false);
+                }
+
                 if function == null { return null; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
-                return this.builder.New(_type, null, true, callee, arguments);
+                if !this.ValidateCallArguments(callee, values, _new) { return null; }
+                values.RemoveAt(0);
+                return this.builder.New(_type, null, true, callee, values);
             } else {
                 if values.Size() != 1 {
                     Logger::Log("Primitive type initialization requires exactly 1 argument.", _new, LogSeverity::Error);
@@ -3023,12 +3067,25 @@ class HIRLowerer {
     }
 
     fn LiteralNeedsExplicitType(&mut this, _type: *HIRType, target: *HIRType) -> bool {
-        if !_type->IsLiteral() {
-            return false;
-        } else if _type->IsInteger() {
-            return target->IsInteger() && !target->IsSame(this.context.IntegerType(32, true));
-        } else if _type->IsFloat() {
-            return target->IsFloat() && !target->IsSame(this.context.FloatType(64));
+        if _type->IsArray() && target->IsArray() {
+            return this.LiteralNeedsExplicitType(_type->Element(), target->Element());
+        } else if _type->IsTuple() && target->IsTuple() {
+            let (elements, targets) = ((_type as *HIRTupleType)->elements, (target as *HIRTupleType)->elements);
+            if elements.Size() != targets.Size() { return false; }
+
+            for i in 0..elements.Size() {
+                if this.LiteralNeedsExplicitType(elements[i], targets[i]) {
+                    return true;
+                }
+            } return false;
+        } else if _type->IsLiteral() {
+            if _type->IsInteger() {
+                return target->IsInteger() && !target->IsSame(this.context.IntegerType(32, true));
+            } else if _type->IsFloat() {
+                return target->IsFloat() && !target->IsSame(this.context.FloatType(64));
+            } else {
+                return false;
+            }
         } else {
             return false;
         }

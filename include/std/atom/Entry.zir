@@ -685,9 +685,9 @@ fn AtomicPause() {
 class Atomic<T> {
     value: T;
 
-    pub fn Atomic(&mut this) {}
+    Atomic(&mut this) {}
 
-    pub fn Atomic(&mut this, value: T) {
+    Atomic(&mut this, value: T) {
         this.value = value;
     }
 
