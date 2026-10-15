@@ -94,12 +94,13 @@ class ASTPath : ASTNode {
 }
 
 enum ASTTypeKind: u8 {
-    Path, Pointer, Reference, Array, Tuple, Function
+    Never, Path, Pointer, Reference, Array, Tuple, Function
 }
 
 extend ASTTypeKind {
     pub fn ToString(this) -> String {
-        if this == ASTTypeKind::Path { return "Path".ToString(); }
+        if this == ASTTypeKind::Never { return "Never".ToString(); }
+        else if this == ASTTypeKind::Path { return "Path".ToString(); }
         else if this == ASTTypeKind::Pointer { return "Pointer".ToString(); }
         else if this == ASTTypeKind::Reference { return "Reference".ToString(); }
         else if this == ASTTypeKind::Array { return "Array".ToString(); }
@@ -117,7 +118,9 @@ class ASTType : ASTNode {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == ASTTypeKind::Path {
+        if this.kind == ASTTypeKind::Never {
+            return (this as *ASTNeverType)->ToString();
+        } else if this.kind == ASTTypeKind::Path {
             return (this as *ASTPathType)->ToString();
         } else if this.kind == ASTTypeKind::Pointer {
             return (this as *ASTPointerType)->ToString();
@@ -132,6 +135,14 @@ class ASTType : ASTNode {
         } else {
             return "<invalid type>".ToString();
         }
+    }
+}
+
+class ASTNeverType : ASTType {
+    ASTNeverType(&mut this, start: Token) : ASTType(ASTTypeKind::Never, start) {}
+
+    pub fn ToString(&this) -> String {
+        return '!'.ToString();
     }
 }
 

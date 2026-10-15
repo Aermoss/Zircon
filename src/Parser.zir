@@ -672,7 +672,9 @@ class Parser {
         let token = this.Current();
         let mut node: *ASTType = null;
 
-        if this.Match(TokenType::FUNCTION) {
+        if this.Match(TokenType::NOT) {
+            node = this.arena.New<ASTNeverType>(token);
+        } else if this.Match(TokenType::FUNCTION) {
             if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
             let function = this.arena.New<ASTFunctionType>(token);
 

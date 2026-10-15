@@ -252,10 +252,10 @@ class MIRLowerer {
         this.LowerBlockStatement(function->body);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
-            if this.builder.GetCurrentFunction()->_return->kind != MIRTypeKind::Void {
-                Logger::Log("Function '" + function->name + "' does not return a value on all paths.", LogSeverity::Error);
-            } else {
+            if function->_return->IsVoid() {
                 this.builder.BuildReturn(null);
+            } else {
+                this.builder.BuildUnreachable();
             }
         }
 
@@ -1030,7 +1030,10 @@ class MIRLowerer {
         arguments += this.LowerCallArguments(call->arguments, parameters);
         let result = this.builder.BuildCall("call".ToString(), callee, arguments);
 
-        if this.IsIndirectAggregate(_return) {
+        if _return.IsNever() {
+            this.builder.BuildUnreachable();
+            this.builder.SetCurrentBlock(this.builder.BuildBlock("unreachable".ToString()));
+        } else if this.IsIndirectAggregate(_return) {
             return destination;
         } else if this.IsAggregate(_return) {
             let target = this.context.PointerType(this.LowerAggregateType(_return));
@@ -1225,7 +1228,9 @@ class MIRLowerer {
         let mut value = this.LowerExpression(cast->value);
         if value == null { return null; }
 
-        if value_type->IsBoolean() {
+        if value_type->IsNever() {
+            return this.builder.ConstantUndef(this.LowerType(target_type));
+        } else if value_type->IsBoolean() {
             if target_type->IsInteger() {
                 return this.builder.BuildCast("cast".ToString(), MIRCastKind::ZExt, value, this.LowerType(target_type));
             }
@@ -1798,7 +1803,7 @@ class MIRLowerer {
     }
 
     pub fn LowerType(&mut this, _type: *HIRType) -> *MIRType {
-        if _type->IsVoid() {
+        if _type->IsNever() || _type->IsVoid() {
             return this.context.VoidType();
         } else if _type->IsBoolean() || _type->IsCharacter() || _type->IsInteger() || _type->IsEnumeration() {
             return this.context.IntegerType(_type->Width());

@@ -258,6 +258,8 @@ class HIRLowerer {
 
         if expression == null {
             return expression;
+        } else if expression->_type->IsNever() && target != null && !target->IsNever() && !target->IsVoid() {
+            return this.builder.Cast(expression, target);
         } else if expression->kind == HIRExpressionKind::Deferred {
             return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, target), target);
         } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Array {
@@ -482,6 +484,62 @@ class HIRLowerer {
 
         declaration->body = this.LowerBlockStatement(function->body);
         this.scope_manager.PopScope();
+
+        if declaration->body != null && !this.Diverges(declaration->body) {
+            if declaration->_return->IsNever() {
+                Logger::Log("Function '" + function->name + "' has return type '!' but may return.", function, LogSeverity::Error);
+            } else if !declaration->_return->IsVoid() {
+                Logger::Log("Function '" + function->name + "' does not return a value on all paths.", function, LogSeverity::Error);
+            }
+        }
+    }
+
+    fn ContainsBreak(&mut this, statement: *HIRStatement) -> bool {
+        if statement == null {
+            return false;
+        } else if statement->kind == HIRStatementKind::Break {
+            return true;
+        } else if statement->kind == HIRStatementKind::Block {
+            for child in (statement as *HIRBlockStatement)->statements {
+                if this.ContainsBreak(child) { return true; }
+            } return false;
+        } else if statement->kind == HIRStatementKind::If {
+            let _if = statement as *HIRIfStatement;
+            return this.ContainsBreak(_if->then_body) || this.ContainsBreak(_if->else_body);
+        } else if statement->kind == HIRStatementKind::Match {
+            for arm in (statement as *HIRMatchStatement)->arms {
+                if this.ContainsBreak(arm->body) { return true; }
+            } return false;
+        } else if statement->kind == HIRStatementKind::While {
+            return this.ContainsBreak((statement as *HIRWhileStatement)->else_body);
+        } return false;
+    }
+
+    fn Diverges(&mut this, statement: *HIRStatement) -> bool {
+        if statement == null {
+            return false;
+        } else if statement->kind == HIRStatementKind::Return || statement->kind == HIRStatementKind::Break || statement->kind == HIRStatementKind::Continue {
+            return true;
+        } else if statement->kind == HIRStatementKind::Block {
+            for child in (statement as *HIRBlockStatement)->statements {
+                if this.Diverges(child) { return true; }
+            } return false;
+        } else if statement->kind == HIRStatementKind::Expression {
+            let expression = (statement as *HIRExpressionStatement)->expression;
+            return expression != null && expression->_type->IsNever();
+        } else if statement->kind == HIRStatementKind::If {
+            let _if = statement as *HIRIfStatement;
+            return _if->else_body != null && this.Diverges(_if->then_body) && this.Diverges(_if->else_body);
+        } else if statement->kind == HIRStatementKind::Loop {
+            return !this.ContainsBreak((statement as *HIRLoopStatement)->body);
+        } else if statement->kind == HIRStatementKind::Match {
+            let _match = statement as *HIRMatchStatement;
+            if !_match->IsExhaustive() { return false; }
+
+            for arm in _match->arms {
+                if !this.Diverges(arm->body) { return false; }
+            } return true;
+        } return false;
     }
 
     pub fn LowerClassDeclarationFirstPass(&mut this, _class: *ASTClassDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRClassDeclaration, *mut Scope> {
@@ -1987,10 +2045,19 @@ class HIRLowerer {
 
     fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
         let mut value: *HIRExpression = null;
+        let return_type = this.builder.GetCurrentFunction()->_return;
+
+        if return_type->IsNever() {
+            Logger::Log("Cannot return from a function with return type '!'.", _return, LogSeverity::Error);
+            return;
+        }
+
+        if _return->expression == null && !return_type->IsVoid() {
+            Logger::Log("Expected a return value of type '" + return_type->ToString() + "'.", _return, LogSeverity::Error);
+            return;
+        }
 
         if _return->expression != null {
-            let function = this.builder.GetCurrentFunction();
-            let return_type = function->_return;
             value = this.Validate(this.LowerExpression(_return->expression), return_type, "Incompatible return types", _return->expression);
             if value == null { return; }
             value = this.LowerCopyOrMoveValue(value);
@@ -3684,6 +3751,11 @@ class HIRLowerer {
                     value = this.Coerce(value);
                     if value == null { return null; }
                     target_type = value->_type;
+
+                    if target_type->IsNever() {
+                        Logger::Log("Cannot bind a value of type '!'.", pattern, LogSeverity::Error);
+                        return null;
+                    }
                 }
 
                 value = this.LowerCopyOrMoveValue(value);
@@ -3898,7 +3970,9 @@ class HIRLowerer {
             return this.context.VoidType();
         }
 
-        if _type->kind == ASTTypeKind::Path {
+        if _type->kind == ASTTypeKind::Never {
+            return this.context.NeverType();
+        } else if _type->kind == ASTTypeKind::Path {
             return this.LowerType((_type as *ASTPathType)->path);
         } else if _type->kind == ASTTypeKind::Pointer {
             let pointer = _type as *ASTPointerType;

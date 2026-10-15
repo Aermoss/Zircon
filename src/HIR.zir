@@ -18,7 +18,7 @@
     "src/AST.zir", "src/Generic.zir", "src/Logger.zir" : *]
 
 enum HIRTypeKind: u8 {
-    Void, Boolean, Character, Integer, Float, Pointer, Reference,
+    Never, Void, Boolean, Character, Integer, Float, Pointer, Reference,
     Array, Tuple, Function, Class, Structure, Enumeration, Variant
 }
 
@@ -33,6 +33,7 @@ class HIRType {
     pub fn IsLiteral(&this) -> bool { return (this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal) || (this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal); }
     pub fn IsSigned(&this) -> bool { return this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->signed; }
 
+    pub fn IsNever(&this) -> bool { return this.kind == HIRTypeKind::Never; }
     pub fn IsVoid(&this) -> bool { return this.kind == HIRTypeKind::Void; }
     pub fn IsBoolean(&this) -> bool { return this.kind == HIRTypeKind::Boolean; }
     pub fn IsCharacter(&this) -> bool { return this.kind == HIRTypeKind::Character; }
@@ -53,7 +54,7 @@ class HIRType {
     pub fn IsVariant(&this) -> bool { return this.kind == HIRTypeKind::Variant; }
 
     pub fn IsTrivial(&this) -> bool {
-        if this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() {
+        if this.IsNever() || this.IsVoid() || this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() {
             return true;
         } else if this.IsArray() {
             return (this as *HIRArrayType)->element->IsTrivial();
@@ -131,6 +132,10 @@ class HIRType {
     }
 
     pub fn IsCompatible(&this, other: &HIRType) -> bool {
+        if other.IsNever() {
+            return true;
+        }
+
         if this.IsFunction() && other.IsNullPointer() {
             return true;
         }
@@ -329,7 +334,7 @@ class HIRType {
     }
 
     pub fn Size(&this) -> usize {
-        if this.IsVoid() {
+        if this.IsNever() || this.IsVoid() {
             return 0;
         } else if this.IsBoolean() {
             return 1;
@@ -523,7 +528,7 @@ class HIRType {
     }
 
     pub fn operator==(&this, other: &HIRType) -> bool {
-        if (this.IsVoid() && other.IsVoid()) || (this.IsBoolean() && other.IsBoolean()) || (this.IsCharacter() && other.IsCharacter()) {
+        if (this.IsNever() && other.IsNever()) || (this.IsVoid() && other.IsVoid()) || (this.IsBoolean() && other.IsBoolean()) || (this.IsCharacter() && other.IsCharacter()) {
             return true;
         } else if this.IsInteger() && other.IsInteger() {
             let (left, right) = (this as *HIRIntegerType, other as *HIRIntegerType);
@@ -600,7 +605,9 @@ class HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRTypeKind::Void {
+        if this.kind == HIRTypeKind::Never {
+            return (this as *HIRNeverType)->ToString();
+        } else if this.kind == HIRTypeKind::Void {
             return (this as *HIRVoidType)->ToString();
         } else if this.kind == HIRTypeKind::Boolean {
             return (this as *HIRBooleanType)->ToString();
@@ -631,6 +638,14 @@ class HIRType {
         } else {
             return "<invalid type>".ToString();
         }
+    }
+}
+
+class HIRNeverType : HIRType {
+    HIRNeverType(&mut this) : HIRType(HIRTypeKind::Never) {}
+
+    pub fn ToString(&this) -> String {
+        return '!'.ToString();
     }
 }
 
@@ -2632,6 +2647,10 @@ class HIRContext {
     tuple_types: Vector<*mut HIRTupleType>;
 
     HIRContext(&mut this) {}
+
+    pub fn NeverType(&mut this) -> *mut HIRNeverType {
+        return this.arena.New<HIRNeverType>();
+    }
 
     pub fn VoidType(&mut this) -> *mut HIRVoidType {
         return this.arena.New<HIRVoidType>();

@@ -16,19 +16,21 @@
 
 extern "C" {
 #[if WINDOWS]
-    fn ExitProcess(uExitCode: u32);
+    fn ExitProcess(uExitCode: u32) -> !;
 #[else]
-    fn exit(status: i32) #[if DARWIN] ; #[else] {
+    fn exit(status: i32) -> ! #[if DARWIN] ; #[else] {
         let _status: i64 = status as i64;
 
         volatile asm : rax(60), rdi(_status) -> {
             syscall
         } : memory, rcx, r11, rax;
+
+        loop {}
     } #[endif]
 #[endif]
 }
 
-fn Exit(status: i32) {
+fn Exit(status: i32) -> ! {
 #[if WINDOWS]
     ExitProcess(status as u32);
 #[else]

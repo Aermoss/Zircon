@@ -39,7 +39,6 @@ enum Option<T> {
             Option<T>::None => {
                 WriteLine("Panicked: called Unwrap() on a None value.");
                 Exit(1);
-                loop {}
             }
         }
     }

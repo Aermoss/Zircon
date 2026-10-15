@@ -28,7 +28,9 @@ class Mangler {
             result += 'M';
         }
 
-        if _type->IsVoid() {
+        if _type->IsNever() {
+            result += 'n';
+        } else if _type->IsVoid() {
             result += 'v';
         } else if _type->IsBoolean() {
             result += 'b';
