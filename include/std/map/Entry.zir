@@ -108,11 +108,19 @@ class Map<K, V> {
         return this.vector[index];
     }
 
-    pub fn Begin(&this) -> *mut Pair<K, V> {
+    pub fn Begin(&this) -> *Pair<K, V> {
         return this.vector.Begin();
     }
 
-    pub fn End(&this) -> *mut Pair<K, V> {
+    pub fn End(&this) -> *Pair<K, V> {
+        return this.vector.End();
+    }
+
+    pub fn Begin(&mut this) -> *mut Pair<K, V> {
+        return this.vector.Begin();
+    }
+
+    pub fn End(&mut this) -> *mut Pair<K, V> {
         return this.vector.End();
     }
 }

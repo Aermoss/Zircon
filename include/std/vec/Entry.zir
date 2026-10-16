@@ -209,11 +209,19 @@ class Vector<T> {
         return this.data[index];
     }
 
-    pub fn Begin(&this) -> *mut T {
+    pub fn Begin(&this) -> *T {
         return this.data;
     }
 
-    pub fn End(&this) -> *mut T {
+    pub fn End(&this) -> *T {
+        return this.data + this.size;
+    }
+
+    pub fn Begin(&mut this) -> *mut T {
+        return this.data;
+    }
+
+    pub fn End(&mut this) -> *mut T {
         return this.data + this.size;
     }
 }

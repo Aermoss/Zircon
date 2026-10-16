@@ -1945,15 +1945,14 @@ class HIRLowerer {
             return;
         }
 
-        if !is_range && !iterator_type->IsPointer() && !iterator_type->HasMethods() {
-            Logger::Log("For loop requires a pointer iterator or an iterator class.", _for, LogSeverity::Error);
+        if !is_range && !iterator_type->IsPointer() {
+            Logger::Log("For loop 'Begin()' and 'End()' methods must return pointers.", _for, LogSeverity::Error);
             return;
         }
 
         let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
         let iterator = this.builder.IdentifierPattern("iterator".ToString(), iterator_type, start, true);
         let (mut item, mut condition, mut step): (*HIRExpression, *HIRExpression, *HIRExpression) = (null, null, null);
-        let mut dereference_candidates = Vector<*HIRFunctionDeclaration>();
         let iterator_reference = this.builder.ReferenceBinding(iterator);
         let target_reference = this.builder.ReferenceBinding(target);
 
@@ -1969,30 +1968,11 @@ class HIRLowerer {
             item = iterator_reference;
             condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, target_reference, this.context.BooleanType());
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
-        } else if iterator_type->IsPointer() {
+        } else {
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
             condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, target_reference, this.context.BooleanType());
             item = this.builder.Cast(iterator_reference, this.context.ReferenceType(iterator_type->Pointee(), iterator_type->IsMutable()));
-        } else {
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(iterator_reference);
-            values.PushBack(target_reference);
-            let condition_candidates = iterator_type->GetCandidates("operator!=".ToString(), _for, false);
-            if condition_candidates.Empty() { return; }
-            let condition_call = this.LowerResolvedCallExpression(condition_candidates, values, _for);
-            if condition_call == null { return; }
-            condition = condition_call;
-
-            values.Back() = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
-            let step_candidates = iterator_type->GetCandidates("operator+=".ToString(), _for, false);
-            if step_candidates.Empty() { return; }
-            let step_call = this.LowerResolvedCallExpression(step_candidates, values, _for);
-            if step_call == null { return; }
-            step = step_call;
-
-            dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for, false);
-            if dereference_candidates.Empty() { return; }
         }
 
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
@@ -2003,22 +1983,14 @@ class HIRLowerer {
         let body = this.builder.BuildBlockStatement();
         this.builder.SetCurrentBlock(body);
 
-        if !dereference_candidates.Empty() {
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(iterator_reference);
-            item = this.LowerResolvedCallExpression(dereference_candidates, values, _for);
-        }
+        let pattern = this.LowerPattern(_for->pattern, null, item, HIRBindingMode::Value);
 
-        if item != null {
-            let pattern = this.LowerPattern(_for->pattern, null, item, HIRBindingMode::Value);
-
-            if pattern != null {
-                if !pattern->IsIrrefutable() {
-                    Logger::Log("A refutable pattern cannot be used in a 'for' loop.", _for->pattern, LogSeverity::Error);
-                } else {
-                    body->statements.PushBack(this.builder.BuildLetStatement(pattern, null, item));
-                    this.BuildTemporaryDestructors(null);
-                }
+        if pattern != null {
+            if !pattern->IsIrrefutable() {
+                Logger::Log("A refutable pattern cannot be used in a 'for' loop.", _for->pattern, LogSeverity::Error);
+            } else {
+                body->statements.PushBack(this.builder.BuildLetStatement(pattern, null, item));
+                this.BuildTemporaryDestructors(null);
             }
         }
 
