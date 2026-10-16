@@ -506,7 +506,7 @@ class LIRLowerer {
     }
 
     fn EmitParallelCopy(&mut this, destinations: &Vector<*LIROperand>, initial_sources: &Vector<*LIROperand>) {
-        let mut sources = initial_sources;
+        let mut sources: Vector<*LIROperand> = initial_sources;
         let mut pending = Vector<usize>();
 
         for i in 0..destinations.Size() {

@@ -172,7 +172,8 @@ class HIRType {
         if left->IsArray() && right->IsArray() {
             return left->Element().IsMutabilityCompatible(right->Element());
         } else if left->IsTuple() && right->IsTuple() {
-            let (lefts, rights) = ((left as *HIRTupleType)->elements, (right as *HIRTupleType)->elements);
+            let &lefts = (left as *HIRTupleType)->elements;
+            let &rights = (right as *HIRTupleType)->elements;
             if lefts.Size() != rights.Size() { return true; }
 
             for i in 0..lefts.Size() {
@@ -198,7 +199,8 @@ class HIRType {
         if left->IsArray() && right->IsArray() {
             return left->Length() == right->Length() && left->Element().IsSame(right->Element());
         } else if left->IsTuple() && right->IsTuple() {
-            let (lefts, rights) = ((left as *HIRTupleType)->elements, (right as *HIRTupleType)->elements);
+            let &lefts = (left as *HIRTupleType)->elements;
+            let &rights = (right as *HIRTupleType)->elements;
             if lefts.Size() != rights.Size() { return false; }
 
             for i in 0..lefts.Size() {

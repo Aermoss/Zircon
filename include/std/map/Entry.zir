@@ -28,6 +28,8 @@ class Map<K, V> {
     ~Map(&mut this) {}
 
     pub fn Data(&this) -> *Pair<K, V> { return this.vector.Data(); }
+    pub fn Data(&mut this) -> *mut Pair<K, V> { return this.vector.Data(); }
+
     pub fn Empty(&this) -> bool { return this.vector.Empty(); }
     pub fn Size(&this) -> usize { return this.vector.Size(); }
 
@@ -104,7 +106,11 @@ class Map<K, V> {
         return this.vector[this.vector.Size() - 1].right;
     }
 
-    pub fn operator[](&this, index: usize) -> &mut Pair<K, V> {
+    pub fn operator[](&this, index: usize) -> &Pair<K, V> {
+        return this.vector[index];
+    }
+
+    pub fn operator[](&mut this, index: usize) -> &mut Pair<K, V> {
         return this.vector[index];
     }
 

@@ -1976,13 +1976,11 @@ class HIRLowerer {
         }
 
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
-
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
         let previous_block = this.builder.GetCurrentBlock();
         let body = this.builder.BuildBlockStatement();
         this.builder.SetCurrentBlock(body);
-
         let pattern = this.LowerPattern(_for->pattern, null, item, HIRBindingMode::Value);
 
         if pattern != null {
@@ -3156,7 +3154,8 @@ class HIRLowerer {
         if _type->IsArray() && target->IsArray() {
             return this.LiteralNeedsExplicitType(_type->Element(), target->Element());
         } else if _type->IsTuple() && target->IsTuple() {
-            let (elements, targets) = ((_type as *HIRTupleType)->elements, (target as *HIRTupleType)->elements);
+            let &elements = (_type as *HIRTupleType)->elements;
+            let &targets = (target as *HIRTupleType)->elements;
             if elements.Size() != targets.Size() { return false; }
 
             for i in 0..elements.Size() {

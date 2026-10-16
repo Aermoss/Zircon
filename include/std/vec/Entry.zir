@@ -36,9 +36,14 @@ class Vector<T> {
         this.Release();
     }
 
-    pub fn Data(&this) -> *mut T { return this.data; }
-    pub fn Front(&this) -> &mut T { return this.data[0]; }
-    pub fn Back(&this) -> &mut T { return this.data[this.size - 1]; }
+    pub fn Data(&this) -> *T { return this.data; }
+    pub fn Front(&this) -> &T { return this.data; }
+    pub fn Back(&this) -> &T { return this.data[this.size - 1]; }
+
+    pub fn Data(&mut this) -> *mut T { return this.data; }
+    pub fn Front(&mut this) -> &mut T { return this.data; }
+    pub fn Back(&mut this) -> &mut T { return this.data[this.size - 1]; }
+
     pub fn Empty(&this) -> bool { return this.size == 0; }
     pub fn Size(&this) -> usize { return this.size; }
 
@@ -205,7 +210,11 @@ class Vector<T> {
         return this;
     }
 
-    pub fn operator[](&this, index: usize) -> &mut T {
+    pub fn operator[](&this, index: usize) -> &T {
+        return this.data[index];
+    }
+
+    pub fn operator[](&mut this, index: usize) -> &mut T {
         return this.data[index];
     }
 
