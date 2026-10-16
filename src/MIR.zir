@@ -571,27 +571,33 @@ class MIRAllocaInstruction : MIRInstruction {
 }
 
 class MIRLoadInstruction : MIRInstruction {
-    pub pointer: *MIRValue;
+    pub pointer: *MIRValue,
+    pub alignment: u32 = 0;
 
     MIRLoadInstruction(&mut this, name: String, pointer: *MIRValue, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Load, name, _type) {
         this.pointer = pointer;
     }
 
     pub fn ToString(&this) -> String {
-        return "load " + this._type->ToString() + ", " + this.pointer->ToString();
+        let mut result = "load " + this._type->ToString() + ", " + this.pointer->ToString();
+        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
+        return result;
     }
 }
 
 class MIRStoreInstruction : MIRInstruction {
     pub value: *MIRValue,
-    pub pointer: *MIRValue;
+    pub pointer: *MIRValue,
+    pub alignment: u32 = 0;
 
     MIRStoreInstruction(&mut this, value: *MIRValue, pointer: *MIRValue, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Store, "".ToString(), _type) {
         (this.value, this.pointer) = (value, pointer);
     }
 
     pub fn ToString(&this) -> String {
-        return "store " + this.value->ToString() + ", " + this.pointer->ToString();
+        let mut result = "store " + this.value->ToString() + ", " + this.pointer->ToString();
+        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
+        return result;
     }
 }
 

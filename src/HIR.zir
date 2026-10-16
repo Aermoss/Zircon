@@ -402,12 +402,11 @@ class HIRType {
             }
 
             for field in this.Fields() {
-                let field_type = field->_type;
-                let field_alignment = field_type->Alignment();
+                let field_alignment = field->_type->Alignment();
                 if field_alignment > alignment { alignment = field_alignment; }
                 let remainder = size % field_alignment;
                 if remainder != 0 { size += field_alignment - remainder; }
-                size += field_type->Size();
+                size += field->_type->Size();
             }
 
             let remainder = size % alignment;
@@ -415,23 +414,27 @@ class HIRType {
             return size;
         } else if this.IsVariant() {
             let mut size: usize = 0;
+            let mut alignment: usize = 1;
 
             for member in (this as *HIRVariantType)->declaration->members {
                 let mut member_size: usize = 1;
-                let mut member_alignment: usize = 1;
 
                 for field in member->fields {
                     let field_alignment = field->_type->Alignment();
-                    if field_alignment > member_alignment { member_alignment = field_alignment; }
+                    if field_alignment > alignment { alignment = field_alignment; }
                     let remainder = member_size % field_alignment;
                     if remainder != 0 { member_size += field_alignment - remainder; }
                     member_size += field->_type->Size();
                 }
 
-                let remainder = member_size % member_alignment;
-                if remainder != 0 { member_size += member_alignment - remainder; }
-                if member_size > size { size = member_size; }
-            } return size;
+                if member_size > size {
+                    size = member_size;
+                }
+            }
+
+            let remainder = size % alignment;
+            if remainder != 0 { size += alignment - remainder; }
+            return size;
         } else {
             return 0;
         }
@@ -1567,7 +1570,7 @@ class HIRTernaryExpression : HIRExpression {
     pub else_value: *HIRExpression,
     pub else_destructors: Vector<*HIRExpression>;
 
-    HIRTernaryExpression(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, category: HIRExpressionCategory, mutable: bool) : HIRExpression(HIRExpressionKind::Ternary, then_value->_type, category, mutable) {
+    HIRTernaryExpression(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, _type: *HIRType, category: HIRExpressionCategory, mutable: bool) : HIRExpression(HIRExpressionKind::Ternary, _type, category, mutable) {
         (this.condition, this.then_value, this.then_destructors, this.else_value, this.else_destructors) = (condition, then_value, then_destructors, else_value, else_destructors);
     }
 
@@ -3085,8 +3088,8 @@ class HIRBuilder {
         return this.context->arena.New<HIRBinaryExpression>(kind, left, right, destructors, _type);
     }
 
-    pub fn Ternary(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, category: HIRExpressionCategory, mutable: bool) -> *mut HIRTernaryExpression {
-        return this.context->arena.New<HIRTernaryExpression>(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
+    pub fn Ternary(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, _type: *HIRType, category: HIRExpressionCategory, mutable: bool) -> *mut HIRTernaryExpression {
+        return this.context->arena.New<HIRTernaryExpression>(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
     }
 
     pub fn Call(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRCallExpression {

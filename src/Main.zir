@@ -743,7 +743,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut message: *mut i8 = null;
 
             if LLVMCreateMemoryBufferWithContentsOfFile(input_file.Data(), &mut buffer, &mut message) != 0 {
-                let final_message: *i8 = message != null ? message : "Unknown reason.";
+                let final_message = message != null ? message : "Unknown reason.";
                 Logger::Log(input_file, "Failed to read file: " + final_message.ToString(), LogSeverity::Error);
             }
 
@@ -755,12 +755,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if buffer != null {
                 if extension == ".ll" {
                     if LLVMParseIRInContext(LLVMGetGlobalContext(), buffer, &mut module, &mut message) != 0 {
-                        let final_message: *i8 = message != null ? message : "Unknown reason.";
+                        let final_message = message != null ? message : "Unknown reason.";
                         Logger::Log(input_file, "Failed to parse LLVM IR: " + final_message.ToString(), LogSeverity::Error);
                     }
                 } else {
                     if LLVMParseBitcodeInContext(LLVMGetGlobalContext(), buffer, &mut module, &mut message) != 0 {
-                        let final_message: *i8 = message != null ? message : "Unknown reason.";
+                        let final_message = message != null ? message : "Unknown reason.";
                         Logger::Log(input_file, "Failed to parse bitcode: " + final_message.ToString(), LogSeverity::Error);
                     }
                 }
@@ -777,7 +777,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 LLVMSetTarget(module, target.triple.Data());
 
                 if LLVMVerifyModule(module, LLVMVerifierFailureAction::LLVMReturnStatusAction, &mut message) != 0 {
-                    let final_message: *i8 = message != null ? message : "Unknown reason.";
+                    let final_message = message != null ? message : "Unknown reason.";
                     Logger::Log(input_file, "Module verification failed: " + final_message.ToString(), LogSeverity::Error);
                     LLVMDisposeModule(module);
                     module = null;
@@ -851,7 +851,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut message: *mut i8 = null;
 
             if LLVMPrintModuleToFile(module, (name + ".ll").Data(), &mut message) != 0 {
-                let final_message: *i8 = message != null ? message : "Unknown reason.";
+                let final_message = message != null ? message : "Unknown reason.";
                 Logger::Log(input_file, "Failed to emit LLVM IR: " + final_message.ToString(), LogSeverity::Error);
             }
 

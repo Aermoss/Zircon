@@ -445,7 +445,9 @@ class LLVMLowerer {
         if _type == null { return null; }
         let pointer = this.LowerValue(load->pointer);
         if pointer == null { return null; }
-        return LLVMBuildLoad2(this.builder, _type, pointer, load->name.Data());
+        let result = LLVMBuildLoad2(this.builder, _type, pointer, load->name.Data());
+        if load->alignment != 0 { LLVMSetAlignment(result, load->alignment); }
+        return result;
     }
 
     fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> LLVMValueRef {
@@ -453,7 +455,9 @@ class LLVMLowerer {
         if value == null { return null; }
         let pointer = this.LowerValue(store->pointer);
         if pointer == null { return null; }
-        return LLVMBuildStore(this.builder, value, pointer);
+        let result = LLVMBuildStore(this.builder, value, pointer);
+        if store->alignment != 0 { LLVMSetAlignment(result, store->alignment); }
+        return result;
     }
 
     fn LowerArrayGEPInstruction(&mut this, gep: *MIRArrayGEPInstruction) -> LLVMValueRef {

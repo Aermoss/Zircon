@@ -3732,11 +3732,57 @@ class HIRLowerer {
 
         then_value = this.Coerce(then_value, target != null ? target : else_value->_type);
         else_value = this.Coerce(else_value, target != null ? target : then_value->_type);
+        let _type = this.CommonType(then_value->_type, else_value->_type);
+
+        if _type == null {
+            Logger::Log("Incompatible ternary branch types ('" + then_value->_type->ToString() + "' != '" + else_value->_type->ToString() + "').", ternary, LogSeverity::Error);
+            return null;
+        }
 
         let mutable = then_value->mutable && else_value->mutable ? true : false;
-        let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place)
-            ? HIRExpressionCategory::Place : HIRExpressionCategory::Value;
-        return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
+        let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place) ? HIRExpressionCategory::Place : HIRExpressionCategory::Value;
+        return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
+    }
+
+    fn CommonType(&mut this, left: *HIRType, right: *HIRType) -> *HIRType {
+        if left->IsSame(right) || right->IsNever() {
+            return left;
+        } else if left->IsNever() {
+            return right;
+        } else if left->IsNullPointer() && (right->IsPointer() || right->IsFunction()) {
+            return right;
+        } else if right->IsNullPointer() && (left->IsPointer() || left->IsFunction()) {
+            return left;
+        } else if left->IsPointer() && right->IsPointer() && left->IsReference() == right->IsReference() {
+            let pointee = this.CommonType(left->Pointee(), right->Pointee());
+            if pointee == null { return null; }
+            let mutable = left->IsMutable() && right->IsMutable();
+
+            if left->IsReference() {
+                return this.context.ReferenceType(pointee, mutable);
+            } else {
+                return this.context.PointerType(pointee, mutable);
+            }
+        } else if left->IsArray() && right->IsArray() && left->Length() == right->Length() {
+            let element = this.CommonType(left->Element(), right->Element());
+            if element == null { return null; }
+            return this.context.ArrayType(element, left->Length());
+        } else if left->IsTuple() && right->IsTuple() {
+            let &lefts = (left as *HIRTupleType)->elements;
+            let &rights = (right as *HIRTupleType)->elements;
+            if lefts.Size() != rights.Size() { return null; }
+            let mut elements = Vector<*HIRType>();
+
+            for i in 0..lefts.Size() {
+                let element = this.CommonType(lefts[i], rights[i]);
+                if element == null { return null; }
+                elements.PushBack(element);
+            }
+
+            return this.context.TupleType(elements);
+        } else {
+            return null;
+        }
     }
 
     fn IsTemporary(&mut this, mut expression: *HIRExpression) -> bool {
