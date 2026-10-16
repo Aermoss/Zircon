@@ -22,6 +22,10 @@ enum HIRLoweringPass: u8 {
     "src/ScopeManager.zir", "src/Scope.zir", "src/Symbol.zir", "src/Generic.zir",
         "src/Token.zir", "src/AST.zir", "src/HIR.zir", "src/Logger.zir" : *]
 
+enum HIRBindingMode: u8 {
+    Value, Reference
+}
+
 class HIRLowerer {
     context: HIRContext,
     pub module: *mut HIRModule = null,
@@ -1499,7 +1503,7 @@ class HIRLowerer {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
-                let prev_block = this.builder.GetCurrentBlock();
+                let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.BuildBlockStatement();
                 this.builder.SetCurrentBlock(then_block);
 
@@ -1508,7 +1512,7 @@ class HIRLowerer {
                 }
 
                 this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
-                this.builder.SetCurrentBlock(prev_block);
+                this.builder.SetCurrentBlock(previous_block);
                 this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
             }
 
@@ -1531,7 +1535,7 @@ class HIRLowerer {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
-                let prev_block = this.builder.GetCurrentBlock();
+                let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.BuildBlockStatement();
                 this.builder.SetCurrentBlock(then_block);
 
@@ -1540,7 +1544,7 @@ class HIRLowerer {
                 }
 
                 this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
-                this.builder.SetCurrentBlock(prev_block);
+                this.builder.SetCurrentBlock(previous_block);
                 this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
             }
 
@@ -1568,7 +1572,7 @@ class HIRLowerer {
                 let other_tag = this.builder.TagAccess(other_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(other_member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, other_tag, member_tag, this.context.BooleanType()));
-                let prev_block = this.builder.GetCurrentBlock();
+                let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.BuildBlockStatement();
                 this.builder.SetCurrentBlock(then_block);
 
@@ -1587,7 +1591,7 @@ class HIRLowerer {
                     if this_member->index == other_member->index { continue; }
                     let member_tag = this.builder.IntegerLiteral(this_member->index as u64, this.context.IntegerType(8, false));
                     let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
-                    let prev_block = this.builder.GetCurrentBlock();
+                    let previous_block = this.builder.GetCurrentBlock();
                     let then_block = this.builder.BuildBlockStatement();
                     this.builder.SetCurrentBlock(then_block);
 
@@ -1595,7 +1599,7 @@ class HIRLowerer {
                         this.LowerFieldDestructor(this.builder.MemberAccess(this_dereferenced, this_member, field), field->_type, variant);
                     }
 
-                    this.builder.SetCurrentBlock(prev_block);
+                    this.builder.SetCurrentBlock(previous_block);
                     this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
                 }
 
@@ -1606,7 +1610,7 @@ class HIRLowerer {
                 this.builder.BuildExpressionStatement(this.builder.Assignment(this_tag, member_tag));
                 this.builder.SetCurrentBlock(then_block);
                 this.builder.BuildIfStatement(same_condition, Vector<*HIRExpression>(), same_block, different_block);
-                this.builder.SetCurrentBlock(prev_block);
+                this.builder.SetCurrentBlock(previous_block);
                 this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
             }
 
@@ -1740,7 +1744,7 @@ class HIRLowerer {
     }
 
     fn LowerBlockStatement(&mut this, block: *ASTBlockStatement) -> *HIRBlockStatement {
-        let prev_block = this.builder.GetCurrentBlock();
+        let previous_block = this.builder.GetCurrentBlock();
         let statement = this.builder.BuildBlockStatement();
         this.builder.SetCurrentBlock(statement);
 
@@ -1749,7 +1753,7 @@ class HIRLowerer {
         }
 
         this.BuildDestructors(this.scope_manager.current, null);
-        this.builder.SetCurrentBlock(prev_block);
+        this.builder.SetCurrentBlock(previous_block);
         return statement;
     }
 
@@ -1771,7 +1775,7 @@ class HIRLowerer {
             return;
         }
 
-        let pattern = this.LowerPattern(_let->pattern, _type, initializer);
+        let pattern = this.LowerPattern(_let->pattern, _type, initializer, HIRBindingMode::Value);
         if pattern == null { return; }
 
         if !pattern->IsIrrefutable() {
@@ -1783,7 +1787,7 @@ class HIRLowerer {
         this.builder.GetCurrentBlock()->statements.PushBack(statement);
 
         if initializer != null {
-            this.BuildTemporaryDestructors(initializer);
+            this.BuildTemporaryDestructors(null);
         }
     }
 
@@ -1795,7 +1799,7 @@ class HIRLowerer {
         this.scope_manager.PushScope("<then>".ToString(), false);
 
         if _if->condition->pattern != null {
-            let pattern = this.LowerPattern(_if->condition->pattern, null, expression);
+            let pattern = this.LowerPattern(_if->condition->pattern, null, expression, HIRBindingMode::Value);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -1820,11 +1824,11 @@ class HIRLowerer {
             if _if->_else->kind == ASTStatementKind::Block {
                 else_body = this.LowerBlockStatement(_if->_else as *ASTBlockStatement);
             } else {
-                let prev_block = this.builder.GetCurrentBlock();
+                let previous_block = this.builder.GetCurrentBlock();
                 let else_block = this.builder.BuildBlockStatement();
                 this.builder.SetCurrentBlock(else_block);
                 this.LowerStatement(_if->_else);
-                this.builder.SetCurrentBlock(prev_block);
+                this.builder.SetCurrentBlock(previous_block);
                 else_body = else_block;
             }
 
@@ -1842,7 +1846,7 @@ class HIRLowerer {
         this.scope_manager.PushScope("<while>".ToString(), false);
 
         if _while->condition->pattern != null {
-            let pattern = this.LowerPattern(_while->condition->pattern, null, expression);
+            let pattern = this.LowerPattern(_while->condition->pattern, null, expression, HIRBindingMode::Value);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -1889,8 +1893,8 @@ class HIRLowerer {
         if _for->iterable->kind == ASTExpressionKind::Range {
             let range = _for->iterable as *ASTRangeExpression;
             (is_range, inclusive) = (true, range->inclusive);
-            start = this.LowerExpression(range->start);
-            end = this.LowerExpression(range->end);
+            start = this.ImplicitDereference(this.LowerExpression(range->start));
+            end = this.ImplicitDereference(this.LowerExpression(range->end));
             if start == null || end == null { return; }
             start = this.Coerce(start, end->_type);
             end = this.Coerce(end, start->_type);
@@ -1898,28 +1902,35 @@ class HIRLowerer {
             let iterable = this.ImplicitDereference(this.LowerExpression(_for->iterable));
             if iterable == null { return; }
 
-            let mut values = Vector<*HIRExpression>();
-            values.PushBack(iterable);
+            if iterable->_type->IsArray() {
+                let index_type = this.context.IntegerPointerType(false);
+                let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->mutable);
+                start = this.builder.Cast(this.builder.AddressOf(this.builder.IndexAccess(iterable, this.builder.IntegerLiteral(0, index_type))), pointer_type);
+                end = this.builder.Binary(HIRBinaryKind::Add, start, this.builder.IntegerLiteral(iterable->_type->Length() as u64, index_type), pointer_type);
+            } else {
+                let mut values = Vector<*HIRExpression>();
+                values.PushBack(iterable);
 
-            let mut begin_function: *HIRFunctionDeclaration = null;
-            let mut end_function: *HIRFunctionDeclaration = null;
+                let mut begin_function: *HIRFunctionDeclaration = null;
+                let mut end_function: *HIRFunctionDeclaration = null;
 
-            if iterable->_type->HasMethods() {
-                let begin_candidates = iterable->_type->GetCandidates("Begin".ToString(), _for, true);
-                begin_function = this.ResolveOverload(begin_candidates, values, _for, true);
+                if iterable->_type->HasMethods() {
+                    let begin_candidates = iterable->_type->GetCandidates("Begin".ToString(), _for, true);
+                    begin_function = this.ResolveOverload(begin_candidates, values, _for, true);
 
-                let end_candidates = iterable->_type->GetCandidates("End".ToString(), _for, true);
-                end_function = this.ResolveOverload(end_candidates, values, _for, true);
+                    let end_candidates = iterable->_type->GetCandidates("End".ToString(), _for, true);
+                    end_function = this.ResolveOverload(end_candidates, values, _for, true);
+                }
+
+                if begin_function == null || end_function == null {
+                    Logger::Log("For loop iterable must provide 'Begin()' and 'End()' methods.", _for, LogSeverity::Error);
+                    return;
+                }
+
+                start = this.LowerResolvedCallExpression(begin_function, values, _for);
+                end = this.LowerResolvedCallExpression(end_function, values, _for);
+                if start == null || end == null { return; }
             }
-
-            if begin_function == null || end_function == null {
-                Logger::Log("For loop iterable must provide 'Begin()' and 'End()' methods.", _for, LogSeverity::Error);
-                return;
-            }
-
-            start = this.LowerResolvedCallExpression(begin_function, values, _for);
-            end = this.LowerResolvedCallExpression(end_function, values, _for);
-            if start == null || end == null { return; }
         }
 
         if *start->_type != *end->_type {
@@ -1940,8 +1951,9 @@ class HIRLowerer {
         }
 
         let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
-        let iterator = this.builder.IdentifierPattern("iterator".ToString(), iterator_type, start, false);
-        let (mut alias, mut condition, mut step): (*HIRExpression, *HIRExpression, *HIRExpression) = (null, null, null);
+        let iterator = this.builder.IdentifierPattern("iterator".ToString(), iterator_type, start, true);
+        let (mut item, mut condition, mut step): (*HIRExpression, *HIRExpression, *HIRExpression) = (null, null, null);
+        let mut dereference_candidates = Vector<*HIRFunctionDeclaration>();
         let iterator_reference = this.builder.ReferenceBinding(iterator);
         let target_reference = this.builder.ReferenceBinding(target);
 
@@ -1954,14 +1966,14 @@ class HIRLowerer {
                 one = this.builder.IntegerLiteral(1, iterator_type);
             }
 
-            alias = iterator_reference;
+            item = iterator_reference;
             condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, target_reference, this.context.BooleanType());
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
         } else if iterator_type->IsPointer() {
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
             condition = this.builder.Binary(HIRBinaryKind::NotEqual, iterator_reference, target_reference, this.context.BooleanType());
-            alias = this.builder.Dereference(iterator_reference);
+            item = this.builder.Cast(iterator_reference, this.context.ReferenceType(iterator_type->Pointee(), iterator_type->IsMutable()));
         } else {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(iterator_reference);
@@ -1979,20 +1991,43 @@ class HIRLowerer {
             if step_call == null { return; }
             step = step_call;
 
-            values.PopBack();
-            let dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for, false);
+            dereference_candidates = iterator_type->GetCandidates("operator*".ToString(), _for, false);
             if dereference_candidates.Empty() { return; }
-            let dereference_call = this.LowerResolvedCallExpression(dereference_candidates, values, _for);
-            if dereference_call == null { return; }
-            alias = dereference_call;
         }
 
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
 
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
-        this.scope_manager.current->Set(_for->iterator, alias, _for);
-        let body = this.LowerBlockStatement(_for->body);
+        let previous_block = this.builder.GetCurrentBlock();
+        let body = this.builder.BuildBlockStatement();
+        this.builder.SetCurrentBlock(body);
+
+        if !dereference_candidates.Empty() {
+            let mut values = Vector<*HIRExpression>();
+            values.PushBack(iterator_reference);
+            item = this.LowerResolvedCallExpression(dereference_candidates, values, _for);
+        }
+
+        if item != null {
+            let pattern = this.LowerPattern(_for->pattern, null, item, HIRBindingMode::Value);
+
+            if pattern != null {
+                if !pattern->IsIrrefutable() {
+                    Logger::Log("A refutable pattern cannot be used in a 'for' loop.", _for->pattern, LogSeverity::Error);
+                } else {
+                    body->statements.PushBack(this.builder.BuildLetStatement(pattern, null, item));
+                    this.BuildTemporaryDestructors(null);
+                }
+            }
+        }
+
+        for statement in _for->body->statements {
+            this.LowerStatement(statement);
+        }
+
+        this.BuildDestructors(this.scope_manager.current, null);
+        this.builder.SetCurrentBlock(previous_block);
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
         this.builder.BuildForStatement(iterator, target, condition, step, destructors, body);
@@ -2012,7 +2047,7 @@ class HIRLowerer {
 
         for arm in _match->arms {
             this.scope_manager.PushScope("<match>".ToString(), false);
-            let pattern = this.LowerPattern(arm->pattern, null, target);
+            let pattern = this.LowerPattern(arm->pattern, null, target, HIRBindingMode::Value);
 
             if pattern == null {
                 this.scope_manager.PopScope();
@@ -2577,6 +2612,10 @@ class HIRLowerer {
         let mut right = this.LowerExpression(assignment->right);
         if right == null { return null; }
 
+        if assignment->kind != ASTAssignmentKind::Assign && !left->_type->IsClass() {
+            right = this.ImplicitDereference(right);
+        }
+
         if assignment->kind == ASTAssignmentKind::LeftShiftAssign || assignment->kind == ASTAssignmentKind::RightShiftAssign {
             right = this.Coerce(right);
         } else if left->_type->IsPointer() && (assignment->kind == ASTAssignmentKind::AddAssign || assignment->kind == ASTAssignmentKind::SubtractAssign) {
@@ -2969,7 +3008,15 @@ class HIRLowerer {
             let (mut _match, mut score) = (true, 1u64);
 
             for j in 0..parameters.Size() {
-                let parameter_score = parameters[j]->ScoreParameter(values[j]->_type);
+                let mut parameter_score = parameters[j]->ScoreParameter(values[j]->_type);
+
+                if parameter_score != 0 && parameters[j]->IsReference() && !values[j]->_type->IsPointer() && values[j]->category == HIRExpressionCategory::Place {
+                    if parameters[j]->IsMutable() && !values[j]->mutable {
+                        parameter_score = 0;
+                    } else if !parameters[j]->IsMutable() && values[j]->mutable {
+                        parameter_score -= 1;
+                    }
+                }
 
                 if parameter_score != 0 {
                     score += parameter_score;
@@ -3114,7 +3161,7 @@ class HIRLowerer {
     }
 
     fn LowerDeleteExpression(&mut this, _delete: *ASTDeleteExpression) -> *HIRExpression {
-        let pointer = this.LowerExpression(_delete->expression);
+        let pointer = this.ImplicitDereference(this.LowerExpression(_delete->expression));
         if pointer == null { return null; }
 
         if !pointer->_type->IsPointer() {
@@ -3175,6 +3222,8 @@ class HIRLowerer {
     fn LowerResolvedCastExpression(&mut this, mut value: *HIRExpression, target: *HIRType, node: *ASTNode) -> *HIRExpression {
         if !target->IsPointer() {
             value = this.ImplicitDereference(value);
+        } else if value->category == HIRExpressionCategory::Place && value->_type->IsReference() && value->_type->Pointee().IsPointer() && !value->_type->Pointee().IsReference() {
+            value = this.ImplicitDereference(value);
         }
 
         let (mut state, mut failed) = (false, false);
@@ -3185,6 +3234,10 @@ class HIRLowerer {
                 if left->IsMutable() && !right->IsNullPointer() {
                     failed = true;
                 } state = true;
+            }
+
+            if left->IsReference() != right->IsReference() {
+                state = true;
             }
 
             (left, right) = (left->Pointee(), right->Pointee());
@@ -3405,7 +3458,7 @@ class HIRLowerer {
                 return null;
             }
 
-            return this.builder.AddressOf(value);
+            return this.builder.AddressOf(value, unary->mutable);
         } else if unary->kind == ASTUnaryKind::Dereference {
             if !value->_type->IsPointer() {
                 Logger::Log("Cannot dereference non-pointer type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
@@ -3715,7 +3768,38 @@ class HIRLowerer {
         return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, category, mutable);
     }
 
-    fn LowerPattern(&mut this, pattern: *ASTPattern, mut target_type: *HIRType, mut value: *HIRExpression) -> *HIRPattern {
+    fn IsTemporary(&mut this, mut expression: *HIRExpression) -> bool {
+        loop {
+            if expression->category != HIRExpressionCategory::Place {
+                return true;
+            } else if expression->kind == HIRExpressionKind::IndexAccess && (expression as *HIRIndexAccessExpression)->value->_type->IsArray() {
+                expression = (expression as *HIRIndexAccessExpression)->value;
+            } else if expression->kind == HIRExpressionKind::TupleAccess {
+                expression = (expression as *HIRTupleAccessExpression)->instance;
+            } else if expression->kind == HIRExpressionKind::FieldAccess {
+                expression = (expression as *HIRFieldAccessExpression)->instance;
+            } else if expression->kind == HIRExpressionKind::MemberAccess {
+                expression = (expression as *HIRMemberAccessExpression)->instance;
+            } else if expression->kind == HIRExpressionKind::TagAccess {
+                expression = (expression as *HIRTagAccessExpression)->instance;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    fn LowerReferencePattern(&mut this, pattern: *ASTPattern, reference: *HIRExpression) -> *HIRPattern {
+        let binding = this.builder.IdentifierPattern("reference".ToString(), reference->_type, reference, false);
+        let referent = this.LowerPattern(pattern, null, this.builder.Dereference(this.builder.ReferenceBinding(binding)), HIRBindingMode::Reference);
+        if referent == null { return null; }
+        return this.builder.DereferencePattern(binding, referent);
+    }
+
+    fn LowerPattern(&mut this, pattern: *ASTPattern, mut target_type: *HIRType, mut value: *HIRExpression, mode: HIRBindingMode) -> *HIRPattern {
+        if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant) {
+            return this.LowerReferencePattern(pattern, value);
+        }
+
         if pattern->kind == ASTPatternKind::Wildcard {
             return this.builder.WildcardPattern();
         } else if pattern->kind == ASTPatternKind::Rest {
@@ -3735,6 +3819,39 @@ class HIRLowerer {
         } else if pattern->kind == ASTPatternKind::Identifier {
             let identifier = pattern as *ASTIdentifierPattern;
 
+            if identifier->reference {
+                if mode == HIRBindingMode::Reference {
+                    Logger::Log("Binding modifiers can only be used when the default binding mode is by value.", pattern, LogSeverity::Error);
+                    return null;
+                } else if value == null {
+                    Logger::Log("A '&' binding requires a value to refer to.", pattern, LogSeverity::Error);
+                    return null;
+                } else if this.IsTemporary(value) {
+                    Logger::Log("Cannot bind a reference to a temporary value.", pattern, LogSeverity::Error);
+                    return null;
+                } else if identifier->mutable && !value->mutable {
+                    Logger::Log("Cannot take mutable reference to immutable value.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let reference_type = this.context.ReferenceType(value->_type, identifier->mutable);
+                let lowered = this.builder.IdentifierPattern(identifier->name, reference_type, this.builder.AddressOf(value, identifier->mutable), false);
+                this.scope_manager.current->Set(identifier->name, lowered, pattern);
+                return lowered;
+            }
+
+            if mode == HIRBindingMode::Reference && value != null && value->category == HIRExpressionCategory::Place && !value->_type->IsReference() {
+                if identifier->mutable {
+                    Logger::Log("Binding modifiers can only be used when the default binding mode is by value.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let reference_type = this.context.ReferenceType(value->_type, value->mutable);
+                let lowered = this.builder.IdentifierPattern(identifier->name, reference_type, this.builder.AddressOf(value), false);
+                this.scope_manager.current->Set(identifier->name, lowered, pattern);
+                return lowered;
+            }
+
             if value != null {
                 if target_type != null {
                     let original_type = value->_type;
@@ -3743,6 +3860,11 @@ class HIRLowerer {
 
                     if target_type->IsSame(value->_type) && !this.LiteralNeedsExplicitType(original_type, target_type) {
                         Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", pattern, LogSeverity::Warning);
+                    }
+
+                    if target_type->IsReference() && !value->_type->IsReference() && this.IsTemporary(value) {
+                        Logger::Log("Cannot bind a reference to a temporary value.", pattern, LogSeverity::Error);
+                        return null;
                     }
 
                     value = this.Validate(value, target_type, "Incompatible binding initialization types", pattern);
@@ -3784,6 +3906,19 @@ class HIRLowerer {
             } return lowered;
         } else if pattern->kind == ASTPatternKind::Tuple {
             let tuple = pattern as *ASTTuplePattern;
+
+            if value != null {
+                if target_type != null {
+                    value = this.Coerce(value, target_type);
+                } else {
+                    value = this.Coerce(value);
+                }
+
+                if value == null {
+                    return null;
+                }
+            }
+
             let mut any_type = target_type;
 
             if any_type == null && value != null {
@@ -3808,7 +3943,7 @@ class HIRLowerer {
                 let mut element_type: *HIRType = null;
                 if target_type != null { element_type = tuple_type->elements[i]; }
                 let element = value != null ? this.builder.TupleAccess(value, i) : null;
-                let lowered_pattern = this.LowerPattern(tuple->patterns[i], element_type, element);
+                let lowered_pattern = this.LowerPattern(tuple->patterns[i], element_type, element, mode);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }
@@ -3816,7 +3951,7 @@ class HIRLowerer {
             return this.builder.TuplePattern(patterns, tuple_type);
         } else if pattern->kind == ASTPatternKind::Field {
             let field = pattern as *ASTFieldPattern;
-            let lowered_pattern = this.LowerPattern(field->pattern, target_type, value);
+            let lowered_pattern = this.LowerPattern(field->pattern, target_type, value, mode);
             if lowered_pattern == null { return null; }
             return this.builder.FieldPattern(field->name, lowered_pattern);
         } else if pattern->kind == ASTPatternKind::Structure {
@@ -3832,7 +3967,7 @@ class HIRLowerer {
 
                 for i in 0..structure->patterns.Size() {
                     let field = value != null ? this.builder.FieldAccess(value, declaration->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field);
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3852,7 +3987,7 @@ class HIRLowerer {
 
                 for i in 0..structure->patterns.Size() {
                     let field = value != null ? this.builder.MemberAccess(value, member, member->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field);
+                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3878,7 +4013,7 @@ class HIRLowerer {
 
                 for i in 0..variant->patterns.Size() {
                     let field = value != null ? this.builder.MemberAccess(value, member, member->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(variant->patterns[i], null, field);
+                    let lowered_pattern = this.LowerPattern(variant->patterns[i], null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -3892,7 +4027,7 @@ class HIRLowerer {
             let mut patterns = Vector<*HIRPattern>();
 
             for pattern in (pattern as *ASTOrPattern)->patterns {
-                let lowered_pattern = this.LowerPattern(pattern, target_type, value);
+                let lowered_pattern = this.LowerPattern(pattern, target_type, value, mode);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }

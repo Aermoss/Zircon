@@ -284,10 +284,11 @@ class ASTLiteralPattern : ASTPattern {
 
 class ASTIdentifierPattern : ASTPattern {
     pub name: String,
-    pub mutable: bool;
+    pub mutable: bool,
+    pub reference: bool;
 
-    ASTIdentifierPattern(&mut this, name: String, mutable: bool, start: Token) : ASTPattern(ASTPatternKind::Identifier, start) {
-        (this.name, this.mutable) = (name, mutable);
+    ASTIdentifierPattern(&mut this, name: String, mutable: bool, reference: bool, start: Token) : ASTPattern(ASTPatternKind::Identifier, start) {
+        (this.name, this.mutable, this.reference) = (name, mutable, reference);
     }
 }
 
@@ -973,12 +974,12 @@ class ASTLoopStatement : ASTStatement {
 }
 
 class ASTForStatement : ASTStatement {
-    pub iterator: String,
+    pub pattern: *ASTPattern,
     pub iterable: *ASTExpression,
     pub body: *ASTBlockStatement;
 
-    ASTForStatement(&mut this, iterator: String, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
-        (this.iterator, this.iterable, this.body) = (iterator, iterable, body);
+    ASTForStatement(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
+        (this.pattern, this.iterable, this.body) = (pattern, iterable, body);
     }
 }
 

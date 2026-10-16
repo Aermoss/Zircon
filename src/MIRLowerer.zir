@@ -1666,6 +1666,8 @@ class MIRLowerer {
             return this.TestVariantPattern(pattern as *HIRVariantPattern, target);
         } else if pattern->kind == HIRPatternKind::Or {
             return this.TestOrPattern(pattern as *HIROrPattern, target);
+        } else if pattern->kind == HIRPatternKind::Dereference {
+            return this.TestPattern((pattern as *HIRDereferencePattern)->pattern, this.builder.BuildLoad("pattern.deref".ToString(), target));
         } else {
             return this.builder.ConstantInteger(1, this.context.IntegerType(1));
         }
@@ -1799,6 +1801,10 @@ class MIRLowerer {
             for pattern in (pattern as *HIRVariantPattern)->patterns {
                 this.BindPattern(pattern);
             }
+        } else if pattern->kind == HIRPatternKind::Dereference {
+            let dereference = pattern as *HIRDereferencePattern;
+            this.BindPattern(dereference->binding);
+            this.BindPattern(dereference->pattern);
         }
     }
 

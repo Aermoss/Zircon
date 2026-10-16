@@ -315,7 +315,8 @@ class Parser {
 
                 if this.Current()._type == TokenType::INTEGER {
                     let value = this.Advance().value;
-                    return this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
+                    expression = this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
+                    continue;
                 }
 
                 let member_access = this.arena.New<ASTMemberAccessExpression>(expression, token._type == TokenType::ARROW, token);
@@ -566,15 +567,22 @@ class Parser {
             return tuple;
         }
 
+        if this.Match(TokenType::BITWISE_AND) {
+            let mutable = this.Match(TokenType::MUT);
+            let identifier = this.Expect(TokenType::IDENTIFIER);
+            if identifier._type == TokenType::UNKNOWN { return null; }
+            return this.arena.New<ASTIdentifierPattern>(identifier.value, mutable, true, token);
+        }
+
         if this.Match(TokenType::MUT) {
             let identifier = this.Expect(TokenType::IDENTIFIER);
             if identifier._type == TokenType::UNKNOWN { return null; }
-            return this.arena.New<ASTIdentifierPattern>(identifier.value, true, token);
+            return this.arena.New<ASTIdentifierPattern>(identifier.value, true, false, token);
         }
 
         if token._type == TokenType::IDENTIFIER && this.Peek(1)._type != TokenType::DOUBLE_COLON && this.Peek(1)._type != TokenType::LPAREN && this.Peek(1)._type != TokenType::LBRACE && this.Peek(1)._type != TokenType::LESS {
             this.Advance();
-            return this.arena.New<ASTIdentifierPattern>(token.value, false, token);
+            return this.arena.New<ASTIdentifierPattern>(token.value, false, false, token);
         }
 
         if token._type == TokenType::IDENTIFIER || token._type == TokenType::DOUBLE_COLON {
@@ -599,7 +607,7 @@ class Parser {
                         field = this.ParsePattern();
                         if field == null { return null; }
                     } else {
-                        field = this.arena.New<ASTIdentifierPattern>(field_identifier.value, false, field_identifier);
+                        field = this.arena.New<ASTIdentifierPattern>(field_identifier.value, false, false, field_identifier);
                     }
 
                     structure->patterns.PushBack(this.arena.New<ASTFieldPattern>(field_identifier.value, field, field_identifier));
@@ -940,14 +948,14 @@ class Parser {
     fn ParseForStatement(&mut this) -> *ASTForStatement {
         let token = this.Expect(TokenType::FOR);
         if token._type == TokenType::UNKNOWN { return null; }
-        let identifier = this.Expect(TokenType::IDENTIFIER);
-        if identifier._type == TokenType::UNKNOWN { return null; }
+        let pattern = this.ParsePattern();
+        if pattern == null { return null; }
         if !this.ExpectSuccess(TokenType::IN) { return null; }
         let iterable = this.ParseForIterable();
         if iterable == null { return null; }
         let body = this.ParseBlockStatement();
         if body == null { return null; }
-        return this.arena.New<ASTForStatement>(identifier.value, iterable, body, token);
+        return this.arena.New<ASTForStatement>(pattern, iterable, body, token);
     }
 
     fn ParseMatchStatement(&mut this) -> *ASTMatchStatement {
