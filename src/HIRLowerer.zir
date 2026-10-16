@@ -338,6 +338,15 @@ class HIRLowerer {
         } return expression;
     }
 
+    fn IntegerLiteralValue(&mut this, expression: *HIRExpression, value: &mut u64) -> bool {
+        if expression == null || expression->kind != HIRExpressionKind::Literal || (expression as *HIRLiteral)->kind != HIRLiteralKind::Integer {
+            return false;
+        }
+
+        value = (expression as *HIRIntegerLiteral)->value;
+        return true;
+    }
+
     fn ContainsByValue(&mut this, _type: *HIRType, target: *HIRType, visited: &mut Vector<*HIRType>) -> bool {
         if _type == target { return true; }
         if visited.Contains(_type) { return false; }
@@ -3529,6 +3538,13 @@ class HIRLowerer {
             return null;
         }
 
+        let mut constant_index: u64 = 0;
+
+        if value->_type->IsArray() && this.IntegerLiteralValue(index, &mut constant_index) && constant_index >= value->_type->Length() as u64 {
+            Logger::Log("Index " + String::FromInteger(constant_index) + " is out of bounds for an array of length " + String::FromInteger(value->_type->Length() as u64) + ".", index_access, LogSeverity::Error);
+            return null;
+        }
+
         return this.builder.IndexAccess(value, index);
     }
 
@@ -3855,6 +3871,18 @@ class HIRLowerer {
         } else if left->_type->IsFloat() && right->_type->IsFloat() {
             if *left->_type != *right->_type {
                 Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                return null;
+            }
+
+            let mut constant: u64 = 0;
+
+            if (kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo) && this.IntegerLiteralValue(right, &mut constant) && constant == 0 {
+                Logger::Log(kind == ASTBinaryKind::Divide ? "Division by zero." : "Remainder with a divisor of zero.", node, LogSeverity::Error);
+                return null;
+            }
+
+            if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as u64 {
+                Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
                 return null;
             }
 
