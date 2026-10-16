@@ -3874,6 +3874,82 @@ class HIRLowerer {
         }
     }
 
+    fn ExpandRestPatterns(&mut this, patterns: &Vector<*ASTPattern>, count: usize, description: &String, node: *ASTNode, expanded: &mut Vector<*ASTPattern>) -> bool {
+        let mut rest: isize = -1;
+
+        for i in 0..patterns.Size() {
+            if patterns[i]->kind != ASTPatternKind::Rest {
+                continue;
+            }
+
+            if rest != -1 {
+                Logger::Log("'..' can only be used once per pattern.", patterns[i], LogSeverity::Error);
+                return false;
+            }
+
+            rest = i as isize;
+        }
+
+        let explicit = rest == -1 ? patterns.Size() : patterns.Size() - 1;
+
+        if (rest == -1 && explicit != count) || explicit > count {
+            Logger::Log(description + " has " + String::FromInteger(count as u64) + " field(s), but the pattern has " + String::FromInteger(explicit as u64) + '.', node, LogSeverity::Error);
+            return false;
+        }
+
+        for i in 0..patterns.Size() {
+            if i as isize == rest {
+                for j in 0..count - explicit {
+                    expanded.PushBack(null);
+                }
+            } else {
+                expanded.PushBack(patterns[i]);
+            }
+        } return true;
+    }
+
+    fn ResolveFieldPatterns(&mut this, patterns: &Vector<*ASTPattern>, names: &Vector<String>, description: &String, node: *ASTNode, indices: &mut Vector<usize>) -> bool {
+        let mut rest = false;
+
+        for pattern in patterns {
+            if pattern->kind == ASTPatternKind::Rest {
+                rest = true;
+                continue;
+            }
+
+            let name = (pattern as *ASTFieldPattern)->name;
+            let mut index: isize = -1;
+
+            for i in 0..names.Size() {
+                if names[i] == name {
+                    index = i as isize;
+                    break;
+                }
+            }
+
+            if index == -1 {
+                Logger::Log(description + " doesn't contain any field named '" + name + "'.", pattern, LogSeverity::Error);
+                return false;
+            }
+
+            if indices.Contains(index as usize) {
+                Logger::Log("Field '" + name + "' is bound more than once in the pattern.", pattern, LogSeverity::Error);
+                return false;
+            }
+
+            indices.PushBack(index as usize);
+        }
+
+        if !rest && indices.Size() != names.Size() {
+            for i in 0..names.Size() {
+                if !indices.Contains(i) {
+                    Logger::Log("Pattern does not mention field '" + names[i] + "' of " + description + "; use '..' to ignore the remaining fields.", node, LogSeverity::Error);
+                    return false;
+                }
+            }
+        } return true;
+    }
+
     fn LowerReferencePattern(&mut this, pattern: *ASTPattern, reference: *HIRExpression) -> *HIRPattern {
         let binding = this.builder.IdentifierPattern("reference".ToString(), reference->_type, reference, false);
         let referent = this.LowerPattern(pattern, null, this.builder.Dereference(this.builder.ReferenceBinding(binding)), HIRBindingMode::Reference);
@@ -4022,19 +4098,24 @@ class HIRLowerer {
             }
 
             let tuple_type = any_type as *HIRTupleType;
+            let mut expanded = Vector<*ASTPattern>();
 
-            if tuple_type->elements.Size() != tuple->patterns.Size() {
-                Logger::Log("Tuple pattern has " + String::FromInteger(tuple->patterns.Size() as u64) + " element(s), but the tuple type has " + String::FromInteger(tuple_type->elements.Size() as u64) + ".", pattern, LogSeverity::Error);
+            if !this.ExpandRestPatterns(tuple->patterns, tuple_type->elements.Size(), "Tuple type '" + any_type->ToString() + "'", pattern, expanded) {
                 return null;
             }
 
             let mut patterns = Vector<*HIRPattern>();
 
-            for i in 0..tuple->patterns.Size() {
+            for i in 0..expanded.Size() {
+                if expanded[i] == null {
+                    patterns.PushBack(this.builder.WildcardPattern());
+                    continue;
+                }
+
                 let mut element_type: *HIRType = null;
                 if target_type != null { element_type = tuple_type->elements[i]; }
                 let element = value != null ? this.builder.TupleAccess(value, i) : null;
-                let lowered_pattern = this.LowerPattern(tuple->patterns[i], element_type, element, mode);
+                let lowered_pattern = this.LowerPattern(expanded[i], element_type, element, mode);
                 if lowered_pattern == null { return null; }
                 patterns.PushBack(lowered_pattern);
             }
@@ -4055,10 +4136,31 @@ class HIRLowerer {
                 }
 
                 let declaration = (symbol->_type as *HIRStructureType)->declaration;
+                let description = "structure '" + structure->path->ToString() + "'";
 
-                for i in 0..structure->patterns.Size() {
-                    let field = value != null ? this.builder.FieldAccess(value, declaration->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field, mode);
+                if value != null && !value->_type->IsSame(symbol->_type) {
+                    Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found " + description + ".", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut names = Vector<String>();
+                for field in declaration->fields { names.PushBack(field->name); }
+                let mut indices = Vector<usize>();
+                if !this.ResolveFieldPatterns(structure->patterns, names, description, pattern, indices) { return null; }
+                let mut position: usize = 0;
+
+                for field_pattern in structure->patterns {
+                    if field_pattern->kind == ASTPatternKind::Rest { continue; }
+                    let declaration_field = declaration->fields[indices[position]];
+                    position += 1;
+
+                    if !declaration_field->public && (this.current_type == null || *this.current_type != *symbol->_type) {
+                        Logger::Log("Field '" + declaration_field->name + "' of " + description + " is private.", field_pattern, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let field = value != null ? this.builder.FieldAccess(value, declaration_field) : null;
+                    let lowered_pattern = this.LowerPattern(field_pattern, null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -4075,10 +4177,30 @@ class HIRLowerer {
                 }
 
                 let member = symbol->declaration as *HIRVariantMember;
+                let description = "variant member '" + structure->path->ToString() + "'";
 
-                for i in 0..structure->patterns.Size() {
-                    let field = value != null ? this.builder.MemberAccess(value, member, member->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(structure->patterns[i], null, field, mode);
+                if !member->structure {
+                    Logger::Log("Variant member '" + structure->path->ToString() + "' is not a structure.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                if value != null && !value->_type->IsSame(member->_type) {
+                    Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found " + description + ".", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut names = Vector<String>();
+                for field in member->fields { names.PushBack(field->name); }
+                let mut indices = Vector<usize>();
+                if !this.ResolveFieldPatterns(structure->patterns, names, description, pattern, indices) { return null; }
+                let mut position: usize = 0;
+
+                for field_pattern in structure->patterns {
+                    if field_pattern->kind == ASTPatternKind::Rest { continue; }
+                    let member_field = member->fields[indices[position]];
+                    position += 1;
+                    let field = value != null ? this.builder.MemberAccess(value, member, member_field) : null;
+                    let lowered_pattern = this.LowerPattern(field_pattern, null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
@@ -4102,9 +4224,30 @@ class HIRLowerer {
 
                 let member = symbol->declaration as *HIRVariantMember;
 
-                for i in 0..variant->patterns.Size() {
+                if member->structure {
+                    Logger::Log("Variant member '" + variant->path->ToString() + "' is a structure.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                if value != null && !value->_type->IsSame(member->_type) {
+                    Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut expanded = Vector<*ASTPattern>();
+
+                if !this.ExpandRestPatterns(variant->patterns, member->fields.Size(), "Variant member '" + variant->path->ToString() + "'", pattern, expanded) {
+                    return null;
+                }
+
+                for i in 0..expanded.Size() {
+                    if expanded[i] == null {
+                        patterns.PushBack(this.builder.WildcardPattern());
+                        continue;
+                    }
+
                     let field = value != null ? this.builder.MemberAccess(value, member, member->fields[i]) : null;
-                    let lowered_pattern = this.LowerPattern(variant->patterns[i], null, field, mode);
+                    let lowered_pattern = this.LowerPattern(expanded[i], null, field, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
                 }
