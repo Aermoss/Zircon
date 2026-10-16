@@ -449,6 +449,11 @@ class HIRLowerer {
         for parameter in function->parameters {
             let _type = this.LowerType(parameter->_type);
             if _type == null { return null; }
+
+            if _type->IsVoid() || _type->IsNever() {
+                Logger::Log("Parameter '" + parameter->name + "' cannot have type '" + _type->ToString() + "'.", parameter->_type, LogSeverity::Error);
+            }
+
             parameters.PushBack(this.builder.BuildParameterDeclaration(parameter->name, _type, parameter->mutable));
             parameter_types.PushBack(_type);
         }
@@ -1193,6 +1198,7 @@ class HIRLowerer {
 
         for method in _class->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
+            if index >= declaration->methods.Size() { break; }
             let function = declaration->methods[index];
             this.LowerFunctionDeclarationSecondPass(function, method);
             index += 1;
@@ -1294,6 +1300,7 @@ class HIRLowerer {
 
         for method in structure->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
+            if index >= declaration->methods.Size() { break; }
             this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
             index += 1;
         }
@@ -1477,6 +1484,7 @@ class HIRLowerer {
 
         for method in variant->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
+            if index >= declaration->methods.Size() { break; }
             this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
             index += 1;
         }
@@ -1648,6 +1656,7 @@ class HIRLowerer {
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
 
         for i in 0.._extend->methods.Size() {
+            if i >= declaration->methods.Size() { break; }
             this.LowerFunctionDeclarationSecondPass(declaration->methods[i], _extend->methods[i]);
         }
 
@@ -2398,6 +2407,12 @@ class HIRLowerer {
             for element in (literal as *ASTArrayLiteral)->elements {
                 let mut value = this.LowerExpression(element);
                 if value == null { return null; }
+
+                if value->_type->IsVoid() {
+                    Logger::Log("Array elements cannot have type 'void'.", element, LogSeverity::Error);
+                    return null;
+                }
+
                 value = this.LowerCopyOrMoveValue(value);
                 if value == null { return null; }
                 elements.PushBack(value);
@@ -2420,6 +2435,12 @@ class HIRLowerer {
             for element in (literal as *ASTTupleLiteral)->elements {
                 let mut value = this.LowerExpression(element);
                 if value == null { return null; }
+
+                if value->_type->IsVoid() {
+                    Logger::Log("Tuple elements cannot have type 'void'.", element, LogSeverity::Error);
+                    return null;
+                }
+
                 value = this.LowerCopyOrMoveValue(value);
                 if value == null { return null; }
                 types.PushBack(value->_type);
@@ -2464,6 +2485,12 @@ class HIRLowerer {
                     }
 
                     let declaration = fields[index as usize];
+
+                    if !declaration->public && (this.current_type == null || *this.current_type != *(_type as *HIRType)) {
+                        Logger::Log("Field '" + field.left + "' of structure '" + path->ToString() + "' is private.", field.right, LogSeverity::Error);
+                        return null;
+                    }
+
                     let mut value = this.Validate(this.LowerExpression(field.right), declaration->_type, "Incompatible structure field types", field.right);
                     if value == null { return null; }
                     value = this.LowerCopyOrMoveValue(value);
@@ -2847,6 +2874,7 @@ class HIRLowerer {
 
                     if target_type->IsClass() {
                         let function = (target_type as *HIRClassType)->declaration->destructor;
+                        if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function, false);
                         this.builder.BuildExpressionStatement(this.builder.Destructor(target, callee));
                     } return null;
@@ -2936,6 +2964,7 @@ class HIRLowerer {
                     let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                     if candidates.Empty() { return null; }
                     instance = this.LowerResolvedCallExpression(candidates, values, member_access);
+                    if instance == null { return null; }
                 }
 
                 if instance->_type->IsPointer() {
@@ -3022,6 +3051,11 @@ class HIRLowerer {
 
         let parameter_types = callee->_type->Parameters();
 
+        if values.Size() != parameter_types.Size() {
+            Logger::Log("Function expects " + String::FromInteger(parameter_types.Size() as u64) + " argument(s), but " + String::FromInteger(values.Size() as u64) + " were provided.", node, LogSeverity::Error);
+            return false;
+        }
+
         for i in 0..parameter_types.Size() {
             let mut message = String();
 
@@ -3064,6 +3098,11 @@ class HIRLowerer {
     fn LowerNewExpression(&mut this, _new: *ASTNewExpression) -> *HIRExpression {
         let _type = this.LowerType(_new->_type);
         if _type == null { return null; }
+
+        if _type->IsVoid() || _type->IsNever() {
+            Logger::Log("Cannot allocate a value of type '" + _type->ToString() + "'.", _new, LogSeverity::Error);
+            return null;
+        }
 
         if _new->size != null {
             let size = this.Coerce(this.LowerExpression(_new->size), this.context.IntegerPointerType(false));
@@ -3143,6 +3182,7 @@ class HIRLowerer {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(this.builder.NullLiteral());
             let function = (pointer->_type->Pointee() as *HIRClassType)->declaration->destructor;
+            if function == null { return null; }
             let callee = this.builder.ReferenceDeclaration(function, false);
             return this.builder.Delete(pointer, _delete->array, callee, Vector<*HIRExpression>());
         } else {
@@ -3151,7 +3191,9 @@ class HIRLowerer {
     }
 
     fn LiteralNeedsExplicitType(&mut this, _type: *HIRType, target: *HIRType) -> bool {
-        if _type->IsArray() && target->IsArray() {
+        if _type->IsNever() {
+            return true;
+        } else if _type->IsArray() && target->IsArray() {
             return this.LiteralNeedsExplicitType(_type->Element(), target->Element());
         } else if _type->IsTuple() && target->IsTuple() {
             let &elements = (_type as *HIRTupleType)->elements;
@@ -3314,6 +3356,11 @@ class HIRLowerer {
             return null;
         }
 
+        if value->_type->IsPointer() && value->_type->Pointee().IsVoid() {
+            Logger::Log("Cannot index a pointer to 'void'.", index_access, LogSeverity::Error);
+            return null;
+        }
+
         return this.builder.IndexAccess(value, index);
     }
 
@@ -3354,6 +3401,7 @@ class HIRLowerer {
                 let candidates = instance->_type->GetCandidates("operator->".ToString(), member_access, false);
                 if candidates.Empty() { return null; }
                 instance = this.LowerResolvedCallExpression(candidates, values, member_access);
+                if instance == null { return null; }
             }
 
             if instance->_type->IsPointer() {
@@ -3383,7 +3431,7 @@ class HIRLowerer {
                 instance = this.builder.Dereference(this.builder.Cast(this.builder.AddressOf(instance), this.context.ReferenceType(parent, instance->mutable)));
             }
 
-            if !field->public && (this.current_type != null && *this.current_type != *instance->_type) {
+            if !field->public && (this.current_type == null || *this.current_type != *instance->_type) {
                 Logger::Log("Field '" + member_access->member + "' is private.", member_access, LogSeverity::Error);
                 return null;
             }
@@ -3433,6 +3481,11 @@ class HIRLowerer {
         } else if unary->kind == ASTUnaryKind::Dereference {
             if !value->_type->IsPointer() {
                 Logger::Log("Cannot dereference non-pointer type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                return null;
+            }
+
+            if value->_type->Pointee().IsVoid() {
+                Logger::Log("Cannot dereference a value of type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
                 return null;
             }
 
@@ -3668,6 +3721,11 @@ class HIRLowerer {
                 return null;
             }
 
+            if pointer->_type->Pointee().IsVoid() {
+                Logger::Log("Pointer arithmetic is not allowed on type '" + pointer->_type->ToString() + "'.", node, LogSeverity::Error);
+                return null;
+            }
+
             if kind == ASTBinaryKind::Add {
                 return this.builder.Binary(this.LowerBinaryKind(kind), left, right, pointer->_type);
             } else if kind == ASTBinaryKind::Subtract {
@@ -3741,7 +3799,18 @@ class HIRLowerer {
 
         let mutable = then_value->mutable && else_value->mutable ? true : false;
         let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place) ? HIRExpressionCategory::Place : HIRExpressionCategory::Value;
-        return this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
+        let temporary = category == HIRExpressionCategory::Value && _type->HasSpecialMembers();
+
+        if temporary {
+            then_value = this.LowerCopyOrMoveValue(then_value);
+            if then_value == null { return null; }
+            else_value = this.LowerCopyOrMoveValue(else_value);
+            if else_value == null { return null; }
+        }
+
+        let result = this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
+        if temporary { this.temporaries.PushBack(result); }
+        return result;
     }
 
     fn CommonType(&mut this, left: *HIRType, right: *HIRType) -> *HIRType {
@@ -3915,6 +3984,11 @@ class HIRLowerer {
                 value = this.builder.Constructor(callee, values, target_type);
             }
 
+            if target_type->IsVoid() {
+                Logger::Log("Cannot bind a value of type 'void'.", pattern, LogSeverity::Error);
+                return null;
+            }
+
             let lowered = this.builder.IdentifierPattern(identifier->name, target_type, value, identifier->mutable);
             this.scope_manager.current->Set(identifier->name, lowered, pattern);
 
@@ -4056,12 +4130,30 @@ class HIRLowerer {
         }
     }
 
+    fn IsPrimitiveTypeName(&mut this, path: *ASTPath) -> bool {
+        if path->absolute || path->segments.Size() != 1 || !path->segments[0].types.Empty() {
+            return false;
+        }
+
+        let name = path->segments[0].name;
+
+        if name == "void" || name == "bool" || name == "char" || name == "isize" || name == "usize" {
+            return true;
+        } else if name.Length() < 2 || (name[0] != 'i' && name[0] != 'u' && name[0] != 'f') {
+            return false;
+        }
+
+        for i in 1..name.Length() {
+            if name[i] < '0' || name[i] > '9' { return false; }
+        } return true;
+    }
+
     fn LowerType(&mut this, path: *ASTPath) -> *HIRType {
         if path == null {
             return this.context.VoidType();
         }
 
-        if !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() {
+        if this.IsPrimitiveTypeName(path) {
             let name = path->segments[0].name;
 
             if name == "void" {
@@ -4142,10 +4234,15 @@ class HIRLowerer {
             if element == null { return null; }
 
             if array->length != null {
+                if element->IsVoid() || element->IsNever() {
+                    Logger::Log("Array elements cannot have type '" + element->ToString() + "'.", array->element, LogSeverity::Error);
+                    return null;
+                }
+
                 let length = this.LowerExpression(array->length);
                 if length == null { return null; }
 
-                if length->kind != HIRExpressionKind::Literal && (length as *HIRLiteral)->kind != HIRLiteralKind::Integer {
+                if length->kind != HIRExpressionKind::Literal || (length as *HIRLiteral)->kind != HIRLiteralKind::Integer {
                     Logger::Log("Array length must be an integer literal.", array->length, LogSeverity::Error);
                     return null;
                 }
@@ -4160,6 +4257,12 @@ class HIRLowerer {
             for element in (_type as *ASTTupleType)->elements {
                 let lowered_element = this.LowerType(element);
                 if lowered_element == null { return null; }
+
+                if lowered_element->IsVoid() || lowered_element->IsNever() {
+                    Logger::Log("Tuple elements cannot have type '" + lowered_element->ToString() + "'.", element, LogSeverity::Error);
+                    return null;
+                }
+
                 elements.PushBack(lowered_element);
             }
 
