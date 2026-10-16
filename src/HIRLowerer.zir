@@ -268,7 +268,12 @@ class HIRLowerer {
             return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, target), target);
         } else if expression->kind == HIRExpressionKind::Literal && (expression as *HIRLiteral)->kind == HIRLiteralKind::Array {
             let array = expression as *mut HIRArrayLiteral;
-            if array->elements.Empty() { return expression; }
+
+            if array->elements.Empty() {
+                if target != null && target->IsArray() {
+                    expression->_type = this.context.ArrayType(target->Element(), 0);
+                } return expression;
+            }
 
             for i in 0..array->elements.Size() {
                 array->elements[i] = target->IsArray() ? this.Coerce(array->elements[i], target->Element()) : this.Coerce(array->elements[i]);
@@ -333,6 +338,66 @@ class HIRLowerer {
         } return expression;
     }
 
+    fn ContainsByValue(&mut this, _type: *HIRType, target: *HIRType, visited: &mut Vector<*HIRType>) -> bool {
+        if _type == target { return true; }
+        if visited.Contains(_type) { return false; }
+        visited.PushBack(_type);
+
+        if _type->IsArray() {
+            return this.ContainsByValue(_type->Element(), target, visited);
+        } else if _type->IsTuple() {
+            for element in (_type as *HIRTupleType)->elements {
+                if this.ContainsByValue(element, target, visited) { return true; }
+            } return false;
+        } else if _type->IsClass() {
+            for parent in (_type as *HIRClassType)->declaration->parents {
+                if this.ContainsByValue(parent, target, visited) { return true; }
+            }
+
+            for field in (_type as *HIRClassType)->declaration->fields {
+                if this.ContainsByValue(field->_type, target, visited) { return true; }
+            } return false;
+        } else if _type->IsStructure() {
+            for field in (_type as *HIRStructureType)->declaration->fields {
+                if this.ContainsByValue(field->_type, target, visited) { return true; }
+            } return false;
+        } else if _type->IsVariant() {
+            for member in (_type as *HIRVariantType)->declaration->members {
+                for field in member->fields {
+                    if this.ContainsByValue(field->_type, target, visited) { return true; }
+                }
+            } return false;
+        } else {
+            return false;
+        }
+    }
+
+    fn HasField(&mut this, fields: &Vector<*HIRFieldDeclaration>, name: &String) -> bool {
+        for field in fields {
+            if field->name == name { return true; }
+        } return false;
+    }
+
+    fn HasField(&mut this, fields: &Vector<*HIRVariantField>, name: &String) -> bool {
+        for field in fields {
+            if field->name == name { return true; }
+        } return false;
+    }
+
+    fn ValidateFieldType(&mut this, name: &String, _type: *HIRType, owner: *HIRType, node: *ASTNode) -> bool {
+        if _type->IsVoid() || _type->IsNever() {
+            Logger::Log("Field '" + name + "' cannot have type '" + _type->ToString() + "'.", node, LogSeverity::Error);
+            return false;
+        }
+
+        let mut visited = Vector<*HIRType>();
+
+        if this.ContainsByValue(_type, owner, visited) {
+            Logger::Log("Recursive type '" + owner->ToString() + "' has infinite size; field '" + name + "' must be behind a pointer.", node, LogSeverity::Error);
+            return false;
+        } return true;
+    }
+
     fn ImplicitDereference(&mut this, expression: *HIRExpression) -> *HIRExpression {
         if expression != null && expression->_type->IsReference() {
             return this.builder.Dereference(expression);
@@ -374,6 +439,48 @@ class HIRLowerer {
         return this.MakeCompatible(expression, target);
     }
 
+    fn IsConstantExpression(&mut this, expression: *HIRExpression) -> bool {
+        if expression->kind == HIRExpressionKind::Literal {
+            let literal = expression as *HIRLiteral;
+
+            if literal->kind == HIRLiteralKind::Array {
+                for element in (literal as *HIRArrayLiteral)->elements {
+                    if !this.IsConstantExpression(element) { return false; }
+                } return true;
+            } else if literal->kind == HIRLiteralKind::Tuple {
+                for element in (literal as *HIRTupleLiteral)->elements {
+                    if !this.IsConstantExpression(element) { return false; }
+                } return true;
+            } else if literal->kind == HIRLiteralKind::Structure {
+                for field in (literal as *HIRStructureLiteral)->fields {
+                    if !this.IsConstantExpression(field) { return false; }
+                } return true;
+            } else {
+                return literal->kind != HIRLiteralKind::Variant;
+            }
+        } else if expression->kind == HIRExpressionKind::Cast {
+            return this.IsConstantExpression((expression as *HIRCastExpression)->value);
+        } else if expression->kind == HIRExpressionKind::Unary {
+            let unary = expression as *HIRUnaryExpression;
+
+            if unary->kind == HIRUnaryKind::AddressOf {
+                if unary->operand->kind != HIRExpressionKind::DeclarationReference { return false; }
+                let kind = (unary->operand as *HIRDeclarationReference)->declaration->kind;
+                return kind == HIRDeclarationKind::Static || kind == HIRDeclarationKind::Function;
+            }
+
+            return unary->kind != HIRUnaryKind::Dereference && this.IsConstantExpression(unary->operand);
+        } else if expression->kind == HIRExpressionKind::Binary {
+            let binary = expression as *HIRBinaryExpression;
+            if binary->kind == HIRBinaryKind::LogicalAnd || binary->kind == HIRBinaryKind::LogicalOr { return false; }
+            return this.IsConstantExpression(binary->left) && this.IsConstantExpression(binary->right);
+        } else if expression->kind == HIRExpressionKind::DeclarationReference {
+            return (expression as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Function;
+        } else {
+            return expression->kind == HIRExpressionKind::Intrinsic;
+        }
+    }
+
     fn LowerConstantDeclaration(&mut this, constant: *ASTConstantDeclaration) {
         let mut initializer: *HIRExpression = null;
         let _type = this.LowerType(constant->_type);
@@ -382,6 +489,11 @@ class HIRLowerer {
         if constant->initializer != null {
             initializer = this.Validate(this.LowerExpression(constant->initializer), _type, "Incompatible constant initializer types", constant->initializer);
             if initializer == null { return; }
+
+            if !this.IsConstantExpression(initializer) {
+                Logger::Log("Constant initializer must be a constant expression.", constant->initializer, LogSeverity::Error);
+                return;
+            }
         }
 
         let declaration = this.builder.BuildConstantDeclaration(constant->name, _type, initializer);
@@ -396,6 +508,11 @@ class HIRLowerer {
         if _static->initializer != null && !_static->zero_initializer {
             initializer = this.Validate(this.LowerExpression(_static->initializer), _type, "Incompatible static initializer types", _static->initializer);
             if initializer == null { return; }
+
+            if !this.IsConstantExpression(initializer) {
+                Logger::Log("Static initializer must be a constant expression.", _static->initializer, LogSeverity::Error);
+                return;
+            }
         }
 
         let mut alignment: *HIRExpression = null;
@@ -584,9 +701,26 @@ class HIRLowerer {
             declaration->parents.PushBack(parent_type);
         }
 
+        for parent in declaration->parents {
+            let mut visited = Vector<*HIRType>();
+
+            if this.ContainsByValue(parent, declaration->_type, visited) {
+                Logger::Log("Class '" + declaration->name + "' cannot inherit from itself.", _class, LogSeverity::Error);
+                declaration->parents.Clear();
+                break;
+            }
+        }
+
         for field in _class->fields {
             let field_type = this.LowerType(field->_type);
             if field_type == null { continue; }
+
+            if this.HasField(declaration->fields, field->name) {
+                Logger::Log("Field '" + field->name + "' is already declared in class '" + declaration->name + "'.", field, LogSeverity::Error);
+                continue;
+            }
+
+            if !this.ValidateFieldType(field->name, field_type, declaration->_type, field) { continue; }
             let index = declaration->parents.Size() + declaration->fields.Size();
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, index, field->initializer, field->public));
         }
@@ -1269,6 +1403,13 @@ class HIRLowerer {
         for field in structure->fields {
             let field_type = this.LowerType(field->_type);
             if field_type == null { continue; }
+
+            if this.HasField(declaration->fields, field->name) {
+                Logger::Log("Field '" + field->name + "' is already declared in structure '" + declaration->name + "'.", field, LogSeverity::Error);
+                continue;
+            }
+
+            if !this.ValidateFieldType(field->name, field_type, declaration->_type, field) { continue; }
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Size(), field->initializer, field->public));
         }
 
@@ -1448,7 +1589,18 @@ class HIRLowerer {
             index += 1;
 
             for field in member->fields {
-                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, this.LowerType(field->_type), lowered_member->fields.Size()));
+                let field_type = this.LowerType(field->_type);
+                if field_type == null { continue; }
+
+                if member->structure && this.HasField(lowered_member->fields, field->name) {
+                    Logger::Log("Field '" + field->name + "' is already declared in variant member '" + member->name + "'.", variant, LogSeverity::Error);
+                    continue;
+                }
+
+                let mut name = field->name;
+                if !member->structure { name = member->name + "." + String::FromInteger(lowered_member->fields.Size() as u64); }
+                if !this.ValidateFieldType(name, field_type, declaration->_type, variant) { continue; }
+                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, field_type, lowered_member->fields.Size()));
             }
 
             lowered_member->structure = member->structure;
@@ -2425,6 +2577,7 @@ class HIRLowerer {
                 }
             }
 
+            if _type == null { _type = this.context.NeverType(); }
             let literal = this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
             this.temporaries.PushBack(literal);
             return literal;
@@ -2777,29 +2930,34 @@ class HIRLowerer {
                     let argument = call->arguments[0];
 
                     if argument->kind == ASTExpressionKind::Path {
-                        let path = (argument as *ASTPathExpression)->path;
-                        let symbols = this.scope_manager.Resolve(path, false);
-                        if symbols.Empty() { return null; }
+                        if this.IsPrimitiveTypeName((argument as *ASTPathExpression)->path) {
+                            _type = this.LowerType((argument as *ASTPathExpression)->path);
+                            if _type == null { return null; }
+                        } else {
+                            let path = (argument as *ASTPathExpression)->path;
+                            let symbols = this.scope_manager.Resolve(path, false);
+                            if symbols.Empty() { return null; }
 
-                        for symbol in symbols {
-                            if symbol->kind == SymbolKind::Type {
-                                _type = symbol->_type;
-                            } else if symbol->kind == SymbolKind::Pattern {
-                                _type = (symbol->pattern as *HIRIdentifierPattern)->_type;
-                            } else if symbol->kind == SymbolKind::Expression {
-                                _type = symbol->expression->_type;
-                            } else if symbol->kind == SymbolKind::Declaration {
-                                _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
+                            for symbol in symbols {
+                                if symbol->kind == SymbolKind::Type {
+                                    _type = symbol->_type;
+                                } else if symbol->kind == SymbolKind::Pattern {
+                                    _type = (symbol->pattern as *HIRIdentifierPattern)->_type;
+                                } else if symbol->kind == SymbolKind::Expression {
+                                    _type = symbol->expression->_type;
+                                } else if symbol->kind == SymbolKind::Declaration {
+                                    _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
+                                }
+
+                                if _type != null {
+                                    break;
+                                }
                             }
 
-                            if _type != null {
-                                break;
+                            if _type == null {
+                                Logger::Log("Symbol '" + path->ToString() + "' cannot be used as a type.", path, LogSeverity::Error);
+                                return null;
                             }
-                        }
-
-                        if _type == null {
-                            Logger::Log("Symbol '" + path->ToString() + "' cannot be used as a type.", path, LogSeverity::Error);
-                            return null;
                         }
                     } else {
                         Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
@@ -2825,7 +2983,7 @@ class HIRLowerer {
                     }
 
                     if !target->_type->IsMutable() {
-                        Logger::Log("Destruct target must be a mutable pointer.", call, LogSeverity::Error);
+                        Logger::Log("Construct target must be a mutable pointer.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -2876,7 +3034,7 @@ class HIRLowerer {
                     }
 
                     if !target->_type->IsMutable() {
-                        Logger::Log("Construct target must be a mutable pointer.", call, LogSeverity::Error);
+                        Logger::Log("Destruct target must be a mutable pointer.", call, LogSeverity::Error);
                         return null;
                     }
 
