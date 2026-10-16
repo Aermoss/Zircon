@@ -93,6 +93,30 @@ class Scope {
             return null;
         } else if !this.symbols.Has(name) {
             this.symbols[name] = Vector<*Symbol>();
+        } else if declaration->kind == HIRDeclarationKind::Function {
+            let parameters = (declaration as *HIRFunctionDeclaration)->_type->Parameters();
+
+            for symbol in this.symbols[name] {
+                if symbol->kind != SymbolKind::Declaration || symbol->declaration->kind != HIRDeclarationKind::Function {
+                    continue;
+                }
+
+                let other = (symbol->declaration as *HIRFunctionDeclaration)->_type->Parameters();
+                if other.Size() != parameters.Size() { continue; }
+                let mut same = true;
+
+                for i in 0..parameters.Size() {
+                    if !parameters[i]->IsSame(other[i]) {
+                        same = false;
+                        break;
+                    }
+                }
+
+                if same {
+                    Logger::Log("Function '" + name + "' is already defined with the same parameter types.", node, LogSeverity::Error);
+                    return null;
+                }
+            }
         }
 
         let symbol: *Symbol = new Symbol(declaration);
