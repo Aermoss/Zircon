@@ -23,6 +23,7 @@ extern "C" {
     fn HeapFree(hHeap: *mut void, dwFlags: u32, lpMem: *mut void) -> i32;
 
     fn RtlCopyMemory(Destination: *mut void, Source: *void, Length: usize);
+    fn RtlMoveMemory(Destination: *mut void, Source: *void, Length: usize);
     fn RtlFillMemory(Destination: *mut void, Length: usize, Fill: u8);
 #[endif]
 
@@ -66,6 +67,26 @@ extern "C" {
         volatile asm : rdi(dst as *mut i8), rsi(src as *i8), rcx(size as i64) -> {
             rep movsb
         } : memory, rdi, rsi, rcx;
+#[endif]
+        return dst;
+    } #[endif]
+
+    fn memmove(dst: *mut void, src: *void, size: usize) -> *mut void #[if DARWIN] ; #[else] {
+        if size == 0 || dst == null || src == null { return dst; }
+#[if WINDOWS]
+        RtlMoveMemory(dst, src, size);
+#[else]
+        if (dst as usize) <= (src as usize) || (dst as usize) >= (src as usize) + size {
+            volatile asm : rdi(dst as *mut i8), rsi(src as *i8), rcx(size as i64) -> {
+                rep movsb
+            } : memory, rdi, rsi, rcx;
+        } else {
+            volatile asm : rdi((dst as *mut i8) + (size - 1)), rsi((src as *i8) + (size - 1)), rcx(size as i64) -> {
+                std
+                rep movsb
+                cld
+            } : memory, rdi, rsi, rcx;
+        }
 #[endif]
         return dst;
     } #[endif]

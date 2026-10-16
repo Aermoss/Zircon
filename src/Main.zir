@@ -979,7 +979,16 @@ fn Main(args: &mut Vector<String>) -> i32 {
         Logger::Log("Link: '" + command.Replace("\"", "") + "'.", LogSeverity::Info);
     }
 
-    Execute(command.Data());
+    let result = Execute(command.Data());
+
+    if result != 0 {
+        Logger::Log("Linking failed with exit code " + String::FromInteger(result as u64) + ".", LogSeverity::Error);
+
+        for temp_file in temp_files {
+            RemoveFile(temp_file);
+        } return 1;
+    }
+
     WriteLine("Program compiled in " + String::FromFloat(timer.Get() - start) + " seconds.");
 
     for temp_file in temp_files {
