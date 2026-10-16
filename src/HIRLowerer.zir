@@ -2824,6 +2824,11 @@ class HIRLowerer {
                         return null;
                     }
 
+                    if !target->_type->IsMutable() {
+                        Logger::Log("Destruct target must be a mutable pointer.", call, LogSeverity::Error);
+                        return null;
+                    }
+
                     let target_type: *HIRType = target->_type->Pointee();
 
                     if target_type->IsClass() {
@@ -2867,6 +2872,11 @@ class HIRLowerer {
 
                     if !target->_type->IsPointer() {
                         Logger::Log("Destruct target must be a pointer.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    if !target->_type->IsMutable() {
+                        Logger::Log("Construct target must be a mutable pointer.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -3854,6 +3864,18 @@ class HIRLowerer {
         }
     }
 
+    fn IsUninferred(&mut this, _type: *HIRType) -> bool {
+        if _type->IsArray() {
+            return _type->Element().IsNever() || this.IsUninferred(_type->Element());
+        } else if _type->IsTuple() {
+            for element in (_type as *HIRTupleType)->elements {
+                if this.IsUninferred(element) { return true; }
+            } return false;
+        } else {
+            return false;
+        }
+    }
+
     fn IsTemporary(&mut this, mut expression: *HIRExpression) -> bool {
         loop {
             if expression->category != HIRExpressionCategory::Place {
@@ -4038,6 +4060,11 @@ class HIRLowerer {
 
                     if target_type->IsNever() {
                         Logger::Log("Cannot bind a value of type '!'.", pattern, LogSeverity::Error);
+                        return null;
+                    }
+
+                    if this.IsUninferred(target_type) {
+                        Logger::Log("Cannot infer the element type of an empty array literal; add a type annotation.", pattern, LogSeverity::Error);
                         return null;
                     }
                 }
