@@ -68,13 +68,12 @@ class String {
     }
 
     String(&mut this, string: *i8) {
-        let other_length = strlen(string);
-
         if string == null {
             this.Allocate(0);
             return;
         }
 
+        let other_length = strlen(string);
         this.Allocate(other_length);
         memcpy(this.data, string, other_length);
     }
@@ -90,12 +89,12 @@ class String {
     }
 
     String(&mut this, string: *i8, mut length: usize) {
-        let other_length = strlen(string);
-
         if string == null || length == 0 {
             this.Allocate(0);
             return;
         }
+
+        let other_length = strlen(string);
 
         if length > other_length {
             length = other_length;
@@ -120,7 +119,7 @@ class String {
     }
 
     String(&mut this, string: *i8, start: usize, mut length: usize) {
-        let other_length = strlen(string);
+        let other_length = string != null ? strlen(string) : 0;
 
         if string == null || start >= other_length || length == 0 {
             this.Allocate(0);
@@ -870,20 +869,20 @@ class String {
     }
 
     pub fn operator==(&this, other: &String) -> bool {
-        if this.length != other.length { return false; }
         if this.data == null || other.data == null { return false; }
+        if this.length != other.length { return false; }
         return strcmp(this.data, other.data) == 0;
     }
 
     pub fn operator==(&this, string: *i8) -> bool {
-        if this.length != strlen(string) { return false; }
         if this.data == null || string == null { return false; }
+        if this.length != strlen(string) { return false; }
         return strcmp(this.data, string) == 0;
     }
 
     pub fn operator==(&this, character: i8) -> bool {
-        if this.length != 1 { return false; }
         if this.data == null { return false; }
+        if this.length != 1 { return false; }
         return this.data[0] == character;
     }
 

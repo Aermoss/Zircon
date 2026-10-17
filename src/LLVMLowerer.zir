@@ -571,7 +571,7 @@ class LLVMLowerer {
             MIRBinaryKind::ICmpUle => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntULE, left, right, name); },
             MIRBinaryKind::ICmpUge => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntUGE, left, right, name); },
             MIRBinaryKind::FCmpEq => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOEQ, left, right, name); },
-            MIRBinaryKind::FCmpNe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealONE, left, right, name); },
+            MIRBinaryKind::FCmpNe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealUNE, left, right, name); },
             MIRBinaryKind::FCmpLt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLT, left, right, name); },
             MIRBinaryKind::FCmpGt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGT, left, right, name); },
             MIRBinaryKind::FCmpLe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLE, left, right, name); },

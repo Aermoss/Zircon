@@ -198,6 +198,7 @@ class Vector<T> {
     }
 
     pub fn operator=(&mut this, other: &Vector<T>) -> &mut Vector<T> {
+        if this.data == other.data { return this; }
         this.Release();
         if other.data == null { return this; }
         this.Allocate(other.capacity);

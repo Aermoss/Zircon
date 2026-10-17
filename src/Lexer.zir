@@ -84,14 +84,19 @@ class Lexer {
                     this.Advance(1);
                 } return true;
             } else if this.PeekChar(1) == '*' {
+                let mut token: Token;
+                (token.row, token.column, token.file) = (this.row, this.column, this.file);
                 this.Advance(2);
 
                 while this.CurrentChar() != '\0' {
                     if this.CurrentChar() == '*' && this.PeekChar(1) == '/' {
                         this.Advance(2);
-                        break;
+                        return true;
                     } this.Advance(1);
-                } return true;
+                }
+
+                Logger::Log("Unterminated block comment.", token, LogSeverity::Error);
+                return true;
             }
         } return false;
     }
