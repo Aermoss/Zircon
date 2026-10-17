@@ -23,13 +23,13 @@ enum ASTNodeKind: i32 {
 extend ASTNodeKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTNodeKind::Path => "Path".ToString(),
-            ASTNodeKind::Declaration => "Declaration".ToString(),
-            ASTNodeKind::Statement => "Statement".ToString(),
-            ASTNodeKind::Expression => "Expression".ToString(),
-            ASTNodeKind::Pattern => "Pattern".ToString(),
-            ASTNodeKind::Type => "Type".ToString()
-        }
+            ASTNodeKind::Path => "Path",
+            ASTNodeKind::Declaration => "Declaration",
+            ASTNodeKind::Statement => "Statement",
+            ASTNodeKind::Expression => "Expression",
+            ASTNodeKind::Pattern => "Pattern",
+            ASTNodeKind::Type => "Type"
+        }.ToString()
     }
 }
 
@@ -103,14 +103,14 @@ enum ASTTypeKind: u8 {
 extend ASTTypeKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTTypeKind::Never => "Never".ToString(),
-            ASTTypeKind::Path => "Path".ToString(),
-            ASTTypeKind::Pointer => "Pointer".ToString(),
-            ASTTypeKind::Reference => "Reference".ToString(),
-            ASTTypeKind::Array => "Array".ToString(),
-            ASTTypeKind::Tuple => "Tuple".ToString(),
-            ASTTypeKind::Function => "Function".ToString()
-        }
+            ASTTypeKind::Never => "Never",
+            ASTTypeKind::Path => "Path",
+            ASTTypeKind::Pointer => "Pointer",
+            ASTTypeKind::Reference => "Reference",
+            ASTTypeKind::Array => "Array",
+            ASTTypeKind::Tuple => "Tuple",
+            ASTTypeKind::Function => "Function"
+        }.ToString()
     }
 }
 
@@ -246,18 +246,18 @@ enum ASTPatternKind: u8 {
 extend ASTPatternKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTPatternKind::Wildcard => "Wildcard".ToString(),
-            ASTPatternKind::Rest => "Rest".ToString(),
-            ASTPatternKind::Literal => "Literal".ToString(),
-            ASTPatternKind::Range => "Range".ToString(),
-            ASTPatternKind::Identifier => "Identifier".ToString(),
-            ASTPatternKind::Tuple => "Tuple".ToString(),
-            ASTPatternKind::Field => "Field".ToString(),
-            ASTPatternKind::Structure => "Structure".ToString(),
-            ASTPatternKind::Variant => "Variant".ToString(),
-            ASTPatternKind::Path => "Path".ToString(),
-            ASTPatternKind::Or => "Or".ToString()
-        }
+            ASTPatternKind::Wildcard => "Wildcard",
+            ASTPatternKind::Rest => "Rest",
+            ASTPatternKind::Literal => "Literal",
+            ASTPatternKind::Range => "Range",
+            ASTPatternKind::Identifier => "Identifier",
+            ASTPatternKind::Tuple => "Tuple",
+            ASTPatternKind::Field => "Field",
+            ASTPatternKind::Structure => "Structure",
+            ASTPatternKind::Variant => "Variant",
+            ASTPatternKind::Path => "Path",
+            ASTPatternKind::Or => "Or"
+        }.ToString()
     }
 }
 
@@ -362,32 +362,32 @@ enum ASTExpressionKind: u8 {
 extend ASTExpressionKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTExpressionKind::Literal => "Literal".ToString(),
-            ASTExpressionKind::Path => "Path".ToString(),
-            ASTExpressionKind::Unary => "Unary".ToString(),
-            ASTExpressionKind::Binary => "Binary".ToString(),
-            ASTExpressionKind::Ternary => "Ternary".ToString(),
-            ASTExpressionKind::Call => "Call".ToString(),
-            ASTExpressionKind::PackSplat => "PackSplat".ToString(),
-            ASTExpressionKind::MemberAccess => "MemberAccess".ToString(),
-            ASTExpressionKind::TupleAccess => "TupleAccess".ToString(),
-            ASTExpressionKind::IndexAccess => "IndexAccess".ToString(),
-            ASTExpressionKind::Cast => "Cast".ToString(),
-            ASTExpressionKind::New => "New".ToString(),
-            ASTExpressionKind::Delete => "Delete".ToString(),
-            ASTExpressionKind::Assignment => "Assignment".ToString(),
-            ASTExpressionKind::Await => "Await".ToString(),
-            ASTExpressionKind::Range => "Range".ToString(),
-            ASTExpressionKind::Block => "Block".ToString(),
-            ASTExpressionKind::If => "If".ToString(),
-            ASTExpressionKind::While => "While".ToString(),
-            ASTExpressionKind::Loop => "Loop".ToString(),
-            ASTExpressionKind::For => "For".ToString(),
-            ASTExpressionKind::Match => "Match".ToString(),
-            ASTExpressionKind::Return => "Return".ToString(),
-            ASTExpressionKind::Break => "Break".ToString(),
-            ASTExpressionKind::Continue => "Continue".ToString()
-        }
+            ASTExpressionKind::Literal => "Literal",
+            ASTExpressionKind::Path => "Path",
+            ASTExpressionKind::Unary => "Unary",
+            ASTExpressionKind::Binary => "Binary",
+            ASTExpressionKind::Ternary => "Ternary",
+            ASTExpressionKind::Call => "Call",
+            ASTExpressionKind::PackSplat => "PackSplat",
+            ASTExpressionKind::MemberAccess => "MemberAccess",
+            ASTExpressionKind::TupleAccess => "TupleAccess",
+            ASTExpressionKind::IndexAccess => "IndexAccess",
+            ASTExpressionKind::Cast => "Cast",
+            ASTExpressionKind::New => "New",
+            ASTExpressionKind::Delete => "Delete",
+            ASTExpressionKind::Assignment => "Assignment",
+            ASTExpressionKind::Await => "Await",
+            ASTExpressionKind::Range => "Range",
+            ASTExpressionKind::Block => "Block",
+            ASTExpressionKind::If => "If",
+            ASTExpressionKind::While => "While",
+            ASTExpressionKind::Loop => "Loop",
+            ASTExpressionKind::For => "For",
+            ASTExpressionKind::Match => "Match",
+            ASTExpressionKind::Return => "Return",
+            ASTExpressionKind::Break => "Break",
+            ASTExpressionKind::Continue => "Continue"
+        }.ToString()
     }
 }
 
@@ -436,16 +436,16 @@ enum ASTLiteralKind: u8 {
 extend ASTLiteralKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTLiteralKind::Boolean => "Boolean".ToString(),
-            ASTLiteralKind::Character => "Character".ToString(),
-            ASTLiteralKind::Integer => "Integer".ToString(),
-            ASTLiteralKind::Float => "Float".ToString(),
-            ASTLiteralKind::String => "String".ToString(),
-            ASTLiteralKind::Array => "Array".ToString(),
-            ASTLiteralKind::Tuple => "Tuple".ToString(),
-            ASTLiteralKind::Structure => "Structure".ToString(),
-            ASTLiteralKind::Null => "Null".ToString()
-        }
+            ASTLiteralKind::Boolean => "Boolean",
+            ASTLiteralKind::Character => "Character",
+            ASTLiteralKind::Integer => "Integer",
+            ASTLiteralKind::Float => "Float",
+            ASTLiteralKind::String => "String",
+            ASTLiteralKind::Array => "Array",
+            ASTLiteralKind::Tuple => "Tuple",
+            ASTLiteralKind::Structure => "Structure",
+            ASTLiteralKind::Null => "Null"
+        }.ToString()
     }
 }
 
@@ -615,11 +615,11 @@ enum ASTUnaryKind: u8 {
 extend ASTUnaryKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTUnaryKind::AddressOf => '&'.ToString(),
-            ASTUnaryKind::Dereference => '*'.ToString(),
-            ASTUnaryKind::Negate => '-'.ToString(),
-            ASTUnaryKind::Not => '!'.ToString()
-        }
+            ASTUnaryKind::AddressOf => '&',
+            ASTUnaryKind::Dereference => '*',
+            ASTUnaryKind::Negate => '-',
+            ASTUnaryKind::Not => '!'
+        }.ToString()
     }
 }
 
@@ -1066,10 +1066,10 @@ enum ASTStatementKind: u8 {
 extend ASTStatementKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTStatementKind::Variable => "Variable".ToString(),
-            ASTStatementKind::Expression => "Expression".ToString(),
-            ASTStatementKind::Assembly => "Assembly".ToString()
-        }
+            ASTStatementKind::Variable => "Variable",
+            ASTStatementKind::Expression => "Expression",
+            ASTStatementKind::Assembly => "Assembly"
+        }.ToString()
     }
 }
 
@@ -1128,22 +1128,22 @@ enum ASTDeclarationKind: u8 {
 extend ASTDeclarationKind {
     pub fn ToString(this) -> String {
         match this {
-            ASTDeclarationKind::Parameter => "Parameter".ToString(),
-            ASTDeclarationKind::Function => "Function".ToString(),
-            ASTDeclarationKind::Field => "Field".ToString(),
-            ASTDeclarationKind::Class => "Class".ToString(),
-            ASTDeclarationKind::Structure => "Structure".ToString(),
-            ASTDeclarationKind::EnumerationMember => "EnumerationMember".ToString(),
-            ASTDeclarationKind::Enumeration => "Enumeration".ToString(),
-            ASTDeclarationKind::VariantMember => "VariantMember".ToString(),
-            ASTDeclarationKind::Variant => "Variant".ToString(),
-            ASTDeclarationKind::Constant => "Constant".ToString(),
-            ASTDeclarationKind::Static => "Static".ToString(),
-            ASTDeclarationKind::Extend => "Extend".ToString(),
-            ASTDeclarationKind::Type => "Type".ToString(),
-            ASTDeclarationKind::Extern => "Extern".ToString(),
-            ASTDeclarationKind::Assembly => "Assembly".ToString()
-        }
+            ASTDeclarationKind::Parameter => "Parameter",
+            ASTDeclarationKind::Function => "Function",
+            ASTDeclarationKind::Field => "Field",
+            ASTDeclarationKind::Class => "Class",
+            ASTDeclarationKind::Structure => "Structure",
+            ASTDeclarationKind::EnumerationMember => "EnumerationMember",
+            ASTDeclarationKind::Enumeration => "Enumeration",
+            ASTDeclarationKind::VariantMember => "VariantMember",
+            ASTDeclarationKind::Variant => "Variant",
+            ASTDeclarationKind::Constant => "Constant",
+            ASTDeclarationKind::Static => "Static",
+            ASTDeclarationKind::Extend => "Extend",
+            ASTDeclarationKind::Type => "Type",
+            ASTDeclarationKind::Extern => "Extern",
+            ASTDeclarationKind::Assembly => "Assembly"
+        }.ToString()
     }
 }
 

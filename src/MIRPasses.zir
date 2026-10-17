@@ -23,9 +23,9 @@ enum MIRPassKind: u8 {
 extend MIRPassKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRPassKind::ReorderBlocks => "reorder-blocks".ToString(),
-            MIRPassKind::PromoteAllocas => "promote-allocas".ToString()
-        }
+            MIRPassKind::ReorderBlocks => "reorder-blocks",
+            MIRPassKind::PromoteAllocas => "promote-allocas"
+        }.ToString()
     }
 }
 

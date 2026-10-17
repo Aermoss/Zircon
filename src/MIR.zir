@@ -333,10 +333,10 @@ enum MIRUnaryKind: u8 {
 extend MIRUnaryKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRUnaryKind::Neg => "neg".ToString(),
-            MIRUnaryKind::FNeg => "fneg".ToString(),
-            MIRUnaryKind::Not => "not".ToString()
-        }
+            MIRUnaryKind::Neg => "neg",
+            MIRUnaryKind::FNeg => "fneg",
+            MIRUnaryKind::Not => "not"
+        }.ToString()
     }
 }
 
@@ -364,41 +364,41 @@ enum MIRBinaryKind: u8 {
 extend MIRBinaryKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRBinaryKind::Add => "add".ToString(),
-            MIRBinaryKind::Sub => "sub".ToString(),
-            MIRBinaryKind::Mul => "mul".ToString(),
-            MIRBinaryKind::SDiv => "sdiv".ToString(),
-            MIRBinaryKind::UDiv => "udiv".ToString(),
-            MIRBinaryKind::SRem => "srem".ToString(),
-            MIRBinaryKind::URem => "urem".ToString(),
-            MIRBinaryKind::And => "and".ToString(),
-            MIRBinaryKind::Or => "or".ToString(),
-            MIRBinaryKind::Xor => "xor".ToString(),
-            MIRBinaryKind::Shl => "shl".ToString(),
-            MIRBinaryKind::LShr => "lshr".ToString(),
-            MIRBinaryKind::AShr => "ashr".ToString(),
-            MIRBinaryKind::FAdd => "fadd".ToString(),
-            MIRBinaryKind::FSub => "fsub".ToString(),
-            MIRBinaryKind::FMul => "fmul".ToString(),
-            MIRBinaryKind::FDiv => "fdiv".ToString(),
-            MIRBinaryKind::FRem => "frem".ToString(),
-            MIRBinaryKind::ICmpEq => "icmp eq".ToString(),
-            MIRBinaryKind::ICmpNe => "icmp ne".ToString(),
-            MIRBinaryKind::ICmpSlt => "icmp slt".ToString(),
-            MIRBinaryKind::ICmpSgt => "icmp sgt".ToString(),
-            MIRBinaryKind::ICmpSle => "icmp sle".ToString(),
-            MIRBinaryKind::ICmpSge => "icmp sge".ToString(),
-            MIRBinaryKind::ICmpUlt => "icmp ult".ToString(),
-            MIRBinaryKind::ICmpUgt => "icmp ugt".ToString(),
-            MIRBinaryKind::ICmpUle => "icmp ule".ToString(),
-            MIRBinaryKind::ICmpUge => "icmp uge".ToString(),
-            MIRBinaryKind::FCmpEq => "fcmp eq".ToString(),
-            MIRBinaryKind::FCmpNe => "fcmp ne".ToString(),
-            MIRBinaryKind::FCmpLt => "fcmp lt".ToString(),
-            MIRBinaryKind::FCmpGt => "fcmp gt".ToString(),
-            MIRBinaryKind::FCmpLe => "fcmp le".ToString(),
-            MIRBinaryKind::FCmpGe => "fcmp ge".ToString()
-        }
+            MIRBinaryKind::Add => "add",
+            MIRBinaryKind::Sub => "sub",
+            MIRBinaryKind::Mul => "mul",
+            MIRBinaryKind::SDiv => "sdiv",
+            MIRBinaryKind::UDiv => "udiv",
+            MIRBinaryKind::SRem => "srem",
+            MIRBinaryKind::URem => "urem",
+            MIRBinaryKind::And => "and",
+            MIRBinaryKind::Or => "or",
+            MIRBinaryKind::Xor => "xor",
+            MIRBinaryKind::Shl => "shl",
+            MIRBinaryKind::LShr => "lshr",
+            MIRBinaryKind::AShr => "ashr",
+            MIRBinaryKind::FAdd => "fadd",
+            MIRBinaryKind::FSub => "fsub",
+            MIRBinaryKind::FMul => "fmul",
+            MIRBinaryKind::FDiv => "fdiv",
+            MIRBinaryKind::FRem => "frem",
+            MIRBinaryKind::ICmpEq => "icmp eq",
+            MIRBinaryKind::ICmpNe => "icmp ne",
+            MIRBinaryKind::ICmpSlt => "icmp slt",
+            MIRBinaryKind::ICmpSgt => "icmp sgt",
+            MIRBinaryKind::ICmpSle => "icmp sle",
+            MIRBinaryKind::ICmpSge => "icmp sge",
+            MIRBinaryKind::ICmpUlt => "icmp ult",
+            MIRBinaryKind::ICmpUgt => "icmp ugt",
+            MIRBinaryKind::ICmpUle => "icmp ule",
+            MIRBinaryKind::ICmpUge => "icmp uge",
+            MIRBinaryKind::FCmpEq => "fcmp eq",
+            MIRBinaryKind::FCmpNe => "fcmp ne",
+            MIRBinaryKind::FCmpLt => "fcmp lt",
+            MIRBinaryKind::FCmpGt => "fcmp gt",
+            MIRBinaryKind::FCmpLe => "fcmp le",
+            MIRBinaryKind::FCmpGe => "fcmp ge"
+        }.ToString()
     }
 }
 
@@ -425,19 +425,19 @@ enum MIRCastKind: u8 {
 extend MIRCastKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRCastKind::Trunc => "trunc".ToString(),
-            MIRCastKind::ZExt => "zext".ToString(),
-            MIRCastKind::SExt => "sext".ToString(),
-            MIRCastKind::FPTrunc => "fptrunc".ToString(),
-            MIRCastKind::FPExt => "fpext".ToString(),
-            MIRCastKind::FPToSI => "fptosi".ToString(),
-            MIRCastKind::FPToUI => "fptoui".ToString(),
-            MIRCastKind::SIToFP => "sitofp".ToString(),
-            MIRCastKind::UIToFP => "uitofp".ToString(),
-            MIRCastKind::PtrToInt => "ptrtoint".ToString(),
-            MIRCastKind::IntToPtr => "inttoptr".ToString(),
-            MIRCastKind::Bitcast => "bitcast".ToString()
-        }
+            MIRCastKind::Trunc => "trunc",
+            MIRCastKind::ZExt => "zext",
+            MIRCastKind::SExt => "sext",
+            MIRCastKind::FPTrunc => "fptrunc",
+            MIRCastKind::FPExt => "fpext",
+            MIRCastKind::FPToSI => "fptosi",
+            MIRCastKind::FPToUI => "fptoui",
+            MIRCastKind::SIToFP => "sitofp",
+            MIRCastKind::UIToFP => "uitofp",
+            MIRCastKind::PtrToInt => "ptrtoint",
+            MIRCastKind::IntToPtr => "inttoptr",
+            MIRCastKind::Bitcast => "bitcast"
+        }.ToString()
     }
 }
 

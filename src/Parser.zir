@@ -336,9 +336,12 @@ class Parser {
     }
 
     fn ParsePostfix(&mut this) -> *ASTExpression {
-        let mut expression = this.ParsePrimary();
+        let expression = this.ParsePrimary();
         if expression == null { return null; }
+        this.ParsePostfix(expression)
+    }
 
+    fn ParsePostfix(&mut this, mut expression: *ASTExpression) -> *ASTExpression {
         loop {
             let token = this.Current();
 
@@ -884,10 +887,20 @@ class Parser {
             TokenType::LET => this.ParseLetStatement(),
             TokenType::ASSEMBLY | TokenType::VOLATILE => this.ParseAssemblyStatement(),
             TokenType::UNSAFE | TokenType::LBRACE | TokenType::IF | TokenType::WHILE | TokenType::LOOP | TokenType::FOR | TokenType::MATCH => {
-                let expression = this.ParseBlockLikeExpression();
+                let mut expression = this.ParseBlockLikeExpression();
+                if expression == null { return null; }
+
+                if this.Current()._type != TokenType::DOT && this.Current()._type != TokenType::ARROW {
+                    let statement = this.arena.New<ASTExpressionStatement>(expression, token);
+                    statement->semicolon = this.Match(TokenType::SEMICOLON);
+                    return statement;
+                }
+
+                expression = this.ParsePostfix(expression);
                 if expression == null { return null; }
                 let statement = this.arena.New<ASTExpressionStatement>(expression, token);
-                statement->semicolon = this.Match(TokenType::SEMICOLON);
+                statement->semicolon = this.Current()._type != TokenType::RBRACE;
+                if statement->semicolon && !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
                 statement
             },
             _ => {

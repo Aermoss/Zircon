@@ -1507,11 +1507,11 @@ enum HIRUnaryKind: u8 {
 extend HIRUnaryKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRUnaryKind::AddressOf => '&'.ToString(),
-            HIRUnaryKind::Dereference => '*'.ToString(),
-            HIRUnaryKind::Negate => '-'.ToString(),
-            HIRUnaryKind::Not => '!'.ToString()
-        }
+            HIRUnaryKind::AddressOf => '&',
+            HIRUnaryKind::Dereference => '*',
+            HIRUnaryKind::Negate => '-',
+            HIRUnaryKind::Not => '!'
+        }.ToString()
     }
 }
 
@@ -1900,9 +1900,9 @@ enum HIRIntrinsicKind: u8 {
 extend HIRIntrinsicKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRIntrinsicKind::SizeOf => "sizeof".ToString(),
-            HIRIntrinsicKind::AlignOf => "alignof".ToString()
-        }
+            HIRIntrinsicKind::SizeOf => "sizeof",
+            HIRIntrinsicKind::AlignOf => "alignof"
+        }.ToString()
     }
 }
 
