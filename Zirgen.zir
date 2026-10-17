@@ -71,11 +71,11 @@ fn GetRelativePath(path: &String, root_directory: &String) -> String {
         }
 
         if start < normalized.Length() {
-            return SplitExtension(normalized.SubString(start, normalized.Length() - start)).left;
+            return SplitExtension(normalized.SubString(start, normalized.Length() - start)).0;
         }
     }
 
-    return SplitExtension(SplitPath(normalized).right).left;
+    return SplitExtension(SplitPath(normalized).1).0;
 }
 
 fn GetFileState(state: *mut GlobalState, cursor: CXCursor) -> *mut FileState {
@@ -94,11 +94,11 @@ fn GetFileState(state: *mut GlobalState, cursor: CXCursor) -> *mut FileState {
         return state->included_from[path];
     }
 
-    let extension = SplitExtension(SplitPath(path).right).right;
+    let extension = SplitExtension(SplitPath(path).1).1;
     if extension == ".def" || extension == ".inc" { return null; }
     if state->files.Has(path) { return state->files[path]; }
     let mut file_state = new FileState();
-    file_state->name = SplitExtension(SplitPath(path).right).left;
+    file_state->name = SplitExtension(SplitPath(path).1).0;
     file_state->relative_path = GetRelativePath(path, state->root_directory);
     (file_state->path, state->files[path]) = (path, file_state);
     return file_state;
@@ -374,7 +374,7 @@ fn StripCSuffix(value: &String, float: bool) -> String {
     let mut end = value.Length();
 
     while end > 0 {
-        let character: i8 = value[end - 1];
+        let character = value[end - 1];
 
         if float && (character == 'f' || character == 'F') {
             end -= 1;
@@ -401,7 +401,7 @@ fn TranslateMacro(state: *mut GlobalState, file_state: *mut FileState, cursor: C
     state->transpile_states[name] = TranspileState::Defined;
 
     let extent = clang_getCursorExtent(cursor);
-    let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0u32);
+    let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0);
     clang_tokenize(state->translation_unit, extent, &mut tokens, &mut num_tokens);
 
     if num_tokens != 2 || tokens == null {
@@ -431,7 +431,7 @@ extern "C" {
 
 fn EnsureDirectory(path: &String) {
     if path.Empty() || FolderExists(path) { return; }
-    let directory = SplitPath(path).left;
+    let directory = SplitPath(path).0;
     if !directory.Empty() { EnsureDirectory(directory); }
     CreateDirectoryA(path.Data(), null);
 }
@@ -481,7 +481,7 @@ fn TranslateExpression(cursor: CXCursor) -> String {
     } else if kind == CXCursorKind::CXCursor_IntegerLiteral || kind == CXCursorKind::CXCursor_FloatingLiteral {
         let extent = clang_getCursorExtent(cursor);
         let translation_unit = clang_Cursor_getTranslationUnit(cursor);
-        let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0u32);
+        let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0);
         clang_tokenize(translation_unit, extent, &mut tokens, &mut num_tokens);
         let mut value = String();
 
@@ -564,7 +564,12 @@ extern "C" {
         let child_expression = TranslateExpression(cursor);
 
         if !child_expression.Empty() {
-            expressions->PushBack(child_expression);
+            if cursor.kind == CXCursorKind::CXCursor_BinaryOperator {
+                expressions->PushBack("(" + child_expression + ")");
+            } else {
+                expressions->PushBack(child_expression);
+            }
+
             return CXChildVisitResult::CXChildVisit_Continue;
         }
 
@@ -605,14 +610,14 @@ extern "C" {
                 let path = NormalizePath(clang_getCString(spelling).ToString());
                 clang_disposeString(spelling);
 
-                let extension = SplitExtension(SplitPath(path).right).right;
+                let extension = SplitExtension(SplitPath(path).1).1;
 
                 if extension == ".def" || extension == ".inc" {
                     if !state->included_from.Has(path) {
                         state->included_from[path] = file_state;
                     }
                 } else if !file_state->includes.Has(path) {
-                    file_state->includes[path] = "vendor/" + SplitPath(state->output_directory).right + '/' + GetRelativePath(path, state->root_directory) + ".zir";
+                    file_state->includes[path] = "vendor/" + SplitPath(state->output_directory).1 + '/' + GetRelativePath(path, state->root_directory) + ".zir";
                 }
             }
         } else if cursor.kind == CXCursorKind::CXCursor_EnumDecl {
@@ -784,7 +789,7 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
 
             if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
                 CollectHeaders(path, headers);
-            } else if name.Length() >= 2 && SplitExtension(name).right == ".h" {
+            } else if name.Length() >= 2 && SplitExtension(name).1 == ".h" {
                 headers.PushBack(path);
             }
         }
@@ -798,7 +803,7 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0]).right;
+    let (_, executable) = SplitPath(args[0]);
 
     if args.Size() < 2 {
         WriteLine("Usage: " + executable + " <header.h | input_directory> [-o output_directory] [-I include_directory] [-ignore file_name]");
@@ -858,16 +863,16 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if IsDirectory(input) {
         root_directory = input;
     } else {
-        root_directory = SplitPath(input).left;
+        root_directory = SplitPath(input).0;
     }
 
     if output_directory.Empty() {
         let mut name = String();
 
         if IsDirectory(input) {
-            name = SplitPath(input).right;
+            name = SplitPath(input).1;
         } else {
-            name = SplitPath(SplitPath(input).left).right;
+            name = SplitPath(SplitPath(input).0).1;
         }
 
         output_directory = JoinPath("include".ToString(), JoinPath("vendor".ToString(), name));
@@ -957,7 +962,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         }
 
         let output_path = JoinPath(output_directory, file_state->relative_path + ".zir");
-        EnsureDirectory(SplitPath(output_path).left);
+        EnsureDirectory(SplitPath(output_path).0);
 
         if _WriteFile(output_path, content.SubString(0, end)) {
             WriteLine(executable + ": \x1b[32mInfo:\x1b[0m Generated '" + output_path + "'.");

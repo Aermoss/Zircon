@@ -49,7 +49,7 @@ extern "C" {
     fn DwmSetWindowAttribute(hwnd: *mut void, dwAttribute: DWMWINDOWATTRIBUTE, pvAttribute: *void, cbAttribute: u32) -> i32;
 }
 
-fn Lerp(a: f64, b: f64, t: f64) -> f64 {
+fn Lerp2(a: f64, b: f64, t: f64) -> f64 {
     let value = a + (b - a) * t;
     if a < b && value > b { return b; }
     else if a > b && value < b { return b; }
@@ -2624,7 +2624,7 @@ class Player {
             this.target_fov = 30.0;
         }
 
-        this.fov = Lerp(this.fov as f64, this.target_fov as f64, delta_time * 8.0) as f32;
+        this.fov = Lerp2(this.fov as f64, this.target_fov as f64, delta_time * 8.0) as f32;
     }
 }
 
@@ -2720,14 +2720,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if sun_height > 0.2 {
                 let t = ((sun_height - 0.2) / 0.8) as f64;
-                skylight.x = Lerp(sunset_tint.x as f64, day_tint.x as f64, t) as f32;
-                skylight.y = Lerp(sunset_tint.y as f64, day_tint.y as f64, t) as f32;
-                skylight.z = Lerp(sunset_tint.z as f64, day_tint.z as f64, t) as f32;
+                skylight.x = Lerp2(sunset_tint.x as f64, day_tint.x as f64, t) as f32;
+                skylight.y = Lerp2(sunset_tint.y as f64, day_tint.y as f64, t) as f32;
+                skylight.z = Lerp2(sunset_tint.z as f64, day_tint.z as f64, t) as f32;
             } else if sun_height > -0.2 {
                 let t = ((sun_height + 0.2) / 0.4) as f64;
-                skylight.x = Lerp(night_tint.x as f64, sunset_tint.x as f64, t) as f32;
-                skylight.y = Lerp(night_tint.y as f64, sunset_tint.y as f64, t) as f32;
-                skylight.z = Lerp(night_tint.z as f64, sunset_tint.z as f64, t) as f32;
+                skylight.x = Lerp2(night_tint.x as f64, sunset_tint.x as f64, t) as f32;
+                skylight.y = Lerp2(night_tint.y as f64, sunset_tint.y as f64, t) as f32;
+                skylight.z = Lerp2(night_tint.z as f64, sunset_tint.z as f64, t) as f32;
             } else {
                 skylight = night_tint;
             }
