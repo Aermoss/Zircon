@@ -941,6 +941,10 @@ class HIRLowerer {
         this.current_type = previous_type;
     }
 
+    fn IsCopyConstructor(&mut this, function: *HIRFunctionDeclaration, _type: *HIRType) -> bool {
+        return function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false);
+    }
+
     fn GetCopyConstructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
@@ -950,9 +954,7 @@ class HIRLowerer {
             return (_type as *HIRTupleType)->copy_constructor;
         } else if _type->IsClass() {
             for candidate in (_type as *HIRClassType)->declaration->constructors {
-                if candidate->parameters.Size() == 2 && *candidate->parameters[1]->_type == *this.context.ReferenceType(_type, false) {
-                    return candidate;
-                }
+                if this.IsCopyConstructor(candidate, _type) { return candidate; }
             } return null;
         } else if _type->IsStructure() {
             return (_type as *HIRStructureType)->declaration->copy_constructor;
@@ -981,6 +983,10 @@ class HIRLowerer {
         }
     }
 
+    fn IsCopyAssignment(&mut this, function: *HIRFunctionDeclaration, _type: *HIRType) -> bool {
+        return function->name == "operator=" && function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false);
+    }
+
     fn GetCopyAssignment(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
@@ -990,13 +996,7 @@ class HIRLowerer {
             return (_type as *HIRTupleType)->copy_assign;
         } else if _type->IsClass() {
             for method in (_type as *HIRClassType)->declaration->methods {
-                if method->name == "operator=" && method->parameters.Size() == 2 {
-                    if *method->parameters[1]->_type == *this.context.ReferenceType(_type, false) {
-                        if *method->_return == *this.context.ReferenceType(_type, false) {
-                            return method;
-                        }
-                    }
-                }
+                if this.IsCopyAssignment(method, _type) { return method; }
             } return null;
         } else if _type->IsStructure() {
             return (_type as *HIRStructureType)->declaration->copy_assign;
@@ -1036,7 +1036,7 @@ class HIRLowerer {
             if function != null {
                 declaration->constructors.PushBack(function);
 
-                if function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
+                if this.IsCopyConstructor(function, declaration->_type) {
                     has_copy_constructor = true;
                 }
             }
@@ -1066,12 +1066,8 @@ class HIRLowerer {
             if function != null {
                 declaration->methods.PushBack(function);
 
-                if method->name == "operator=" && function->parameters.Size() == 2 {
-                    if *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
-                        if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
-                            has_copy_assign = true;
-                        }
-                    }
+                if this.IsCopyAssignment(function, declaration->_type) {
+                    has_copy_assign = true;
                 }
             }
         }
@@ -1272,7 +1268,7 @@ class HIRLowerer {
             this.LowerConstructorDeclaration(function, constructor, parents, fields);
             index += 1;
 
-            if function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
+            if this.IsCopyConstructor(function, declaration->_type) {
                 has_copy_constructor = true;
             }
         }
@@ -1346,12 +1342,8 @@ class HIRLowerer {
             this.LowerFunctionDeclarationSecondPass(function, method);
             index += 1;
 
-            if method->name == "operator=" && function->parameters.Size() == 2 {
-                if *function->parameters[1]->_type == *this.context.ReferenceType(declaration->_type, false) {
-                    if *function->_return == *this.context.ReferenceType(declaration->_type, false) {
-                        has_copy_assign = true;
-                    }
-                }
+            if this.IsCopyAssignment(function, declaration->_type) {
+                has_copy_assign = true;
             }
         }
 
@@ -2648,7 +2640,7 @@ class HIRLowerer {
 
                     let declaration = fields[index as usize];
 
-                    if !declaration->public && (this.current_type == null || *this.current_type != *(_type as *HIRType)) {
+                    if !declaration->public && (this.current_type == null || *this.current_type != *_type) {
                         Logger::Log("Field '" + field.left + "' of structure '" + path->ToString() + "' is private.", field.right, LogSeverity::Error);
                         return null;
                     }
