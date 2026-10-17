@@ -103,21 +103,32 @@ class ZodiacEmitter {
     }
 
     fn Operand(&mut this, operand: *LIROperand) -> String {
-        if operand->kind == LIROperandKind::Register {
-            if (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
-                Logger::Log("Unallocated virtual register in '" + this.function->name + "'.", LogSeverity::Error);
-            } return LIRRegisterName((operand as *LIRPhysicalRegister)->index);
-        } else if operand->kind == LIROperandKind::Immediate {
-            return String::FromInteger((operand as *LIRImmediateOperand)->value);
-        } else if operand->kind == LIROperandKind::Memory {
-            let memory = operand as *LIRMemoryOperand;
-            return String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')';
-        } else if operand->kind == LIROperandKind::Block {
-            return this.Label((operand as *LIRBlockOperand)->block);
-        } else if operand->kind == LIROperandKind::Symbol {
-            return this.Symbol((operand as *LIRSymbolOperand)->name);
-        } else {
-            return "<invalid operand>".ToString();
+        match operand->kind {
+            LIROperandKind::Register => {
+                let register = operand as *LIRRegisterOperand;
+
+                if register->kind == LIRRegisterKind::Virtual {
+                    Logger::Log("Unallocated virtual register in '" + this.function->name + "'.", LogSeverity::Error);
+                }
+
+                return LIRRegisterName((register as *LIRPhysicalRegister)->index);
+            },
+            LIROperandKind::Immediate => {
+                return String::FromInteger((operand as *LIRImmediateOperand)->value);
+            },
+            LIROperandKind::Memory => {
+                let memory = operand as *LIRMemoryOperand;
+                return String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')';
+            },
+            LIROperandKind::Block => {
+                return this.Label((operand as *LIRBlockOperand)->block);
+            },
+            LIROperandKind::Symbol => {
+                return this.Symbol((operand as *LIRSymbolOperand)->name);
+            },
+            _ => {
+                return "<invalid operand>".ToString();
+            }
         }
     }
 
@@ -234,12 +245,14 @@ class ZodiacEmitter {
     }
 
     fn InvertBranch(&this, opcode: LIROpcode) -> LIROpcode {
-        if opcode == LIROpcode::Beq { return LIROpcode::Bne; }
-        else if opcode == LIROpcode::Bne { return LIROpcode::Beq; }
-        else if opcode == LIROpcode::Blt { return LIROpcode::Bge; }
-        else if opcode == LIROpcode::Bge { return LIROpcode::Blt; }
-        else if opcode == LIROpcode::Bltu { return LIROpcode::Bgeu; }
-        else { return LIROpcode::Bltu; }
+        match opcode {
+            LIROpcode::Beq => { return LIROpcode::Bne; },
+            LIROpcode::Bne => { return LIROpcode::Beq; },
+            LIROpcode::Blt => { return LIROpcode::Bge; },
+            LIROpcode::Bge => { return LIROpcode::Blt; },
+            LIROpcode::Bltu => { return LIROpcode::Bgeu; },
+            _ => { return LIROpcode::Bltu; }
+        }
     }
 
     fn EmitInstruction(&mut this, instruction: *LIRInstruction, next: *LIRBlock) {

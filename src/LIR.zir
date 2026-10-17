@@ -28,18 +28,25 @@ class LIROperand {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == LIROperandKind::Register {
-            return (this as *LIRRegisterOperand)->ToString();
-        } else if this.kind == LIROperandKind::Immediate {
-            return (this as *LIRImmediateOperand)->ToString();
-        } else if this.kind == LIROperandKind::Memory {
-            return (this as *LIRMemoryOperand)->ToString();
-        } else if this.kind == LIROperandKind::Block {
-            return (this as *LIRBlockOperand)->ToString();
-        } else if this.kind == LIROperandKind::Symbol {
-            return (this as *LIRSymbolOperand)->ToString();
-        } else {
-            return "<invalid operand>".ToString();
+        match this.kind {
+            LIROperandKind::Register => {
+                return (this as *LIRRegisterOperand)->ToString();
+            },
+            LIROperandKind::Immediate => {
+                return (this as *LIRImmediateOperand)->ToString();
+            },
+            LIROperandKind::Memory => {
+                return (this as *LIRMemoryOperand)->ToString();
+            },
+            LIROperandKind::Block => {
+                return (this as *LIRBlockOperand)->ToString();
+            },
+            LIROperandKind::Symbol => {
+                return (this as *LIRSymbolOperand)->ToString();
+            },
+            _ => {
+                return "<invalid operand>".ToString();
+            }
         }
     }
 }
@@ -207,61 +214,63 @@ enum LIROpcode: u16 {
 
 extend LIROpcode {
     pub fn ToString(this) -> String {
-        if this == LIROpcode::Nop { return "nop".ToString(); }
-        else if this == LIROpcode::Lb { return "lb".ToString(); }
-        else if this == LIROpcode::Lbu { return "lbu".ToString(); }
-        else if this == LIROpcode::Lh { return "lh".ToString(); }
-        else if this == LIROpcode::Lhu { return "lhu".ToString(); }
-        else if this == LIROpcode::Lw { return "lw".ToString(); }
-        else if this == LIROpcode::Lui { return "lui".ToString(); }
-        else if this == LIROpcode::Auipc { return "auipc".ToString(); }
-        else if this == LIROpcode::Sb { return "sb".ToString(); }
-        else if this == LIROpcode::Sh { return "sh".ToString(); }
-        else if this == LIROpcode::Sw { return "sw".ToString(); }
-        else if this == LIROpcode::B { return "b".ToString(); }
-        else if this == LIROpcode::Br { return "br".ToString(); }
-        else if this == LIROpcode::Bl { return "bl".ToString(); }
-        else if this == LIROpcode::Blr { return "blr".ToString(); }
-        else if this == LIROpcode::Beq { return "beq".ToString(); }
-        else if this == LIROpcode::Bne { return "bne".ToString(); }
-        else if this == LIROpcode::Blt { return "blt".ToString(); }
-        else if this == LIROpcode::Bltu { return "bltu".ToString(); }
-        else if this == LIROpcode::Bge { return "bge".ToString(); }
-        else if this == LIROpcode::Bgeu { return "bgeu".ToString(); }
-        else if this == LIROpcode::Slt { return "slt".ToString(); }
-        else if this == LIROpcode::Slti { return "slti".ToString(); }
-        else if this == LIROpcode::Sltu { return "sltu".ToString(); }
-        else if this == LIROpcode::Sltiu { return "sltiu".ToString(); }
-        else if this == LIROpcode::Add { return "add".ToString(); }
-        else if this == LIROpcode::Addi { return "addi".ToString(); }
-        else if this == LIROpcode::Sub { return "sub".ToString(); }
-        else if this == LIROpcode::Subi { return "subi".ToString(); }
-        else if this == LIROpcode::Mul { return "mul".ToString(); }
-        else if this == LIROpcode::Mulh { return "mulh".ToString(); }
-        else if this == LIROpcode::Mulhsu { return "mulhsu".ToString(); }
-        else if this == LIROpcode::Mulhu { return "mulhu".ToString(); }
-        else if this == LIROpcode::Div { return "div".ToString(); }
-        else if this == LIROpcode::Divu { return "divu".ToString(); }
-        else if this == LIROpcode::Rem { return "rem".ToString(); }
-        else if this == LIROpcode::Remu { return "remu".ToString(); }
-        else if this == LIROpcode::And { return "and".ToString(); }
-        else if this == LIROpcode::Andi { return "andi".ToString(); }
-        else if this == LIROpcode::Or { return "or".ToString(); }
-        else if this == LIROpcode::Ori { return "ori".ToString(); }
-        else if this == LIROpcode::Xor { return "xor".ToString(); }
-        else if this == LIROpcode::Xori { return "xori".ToString(); }
-        else if this == LIROpcode::Sll { return "sll".ToString(); }
-        else if this == LIROpcode::Slli { return "slli".ToString(); }
-        else if this == LIROpcode::Srl { return "srl".ToString(); }
-        else if this == LIROpcode::Srli { return "srli".ToString(); }
-        else if this == LIROpcode::Sra { return "sra".ToString(); }
-        else if this == LIROpcode::Srai { return "srai".ToString(); }
-        else if this == LIROpcode::Hlt { return "hlt".ToString(); }
-        else if this == LIROpcode::Li { return "li".ToString(); }
-        else if this == LIROpcode::La { return "la".ToString(); }
-        else if this == LIROpcode::Ret { return "ret".ToString(); }
-        else if this == LIROpcode::Asm { return "asm".ToString(); }
-        else { return "<invalid instruction>".ToString(); }
+        match this {
+            LIROpcode::Nop => { return "nop".ToString(); },
+            LIROpcode::Lb => { return "lb".ToString(); },
+            LIROpcode::Lbu => { return "lbu".ToString(); },
+            LIROpcode::Lh => { return "lh".ToString(); },
+            LIROpcode::Lhu => { return "lhu".ToString(); },
+            LIROpcode::Lw => { return "lw".ToString(); },
+            LIROpcode::Lui => { return "lui".ToString(); },
+            LIROpcode::Auipc => { return "auipc".ToString(); },
+            LIROpcode::Sb => { return "sb".ToString(); },
+            LIROpcode::Sh => { return "sh".ToString(); },
+            LIROpcode::Sw => { return "sw".ToString(); },
+            LIROpcode::B => { return "b".ToString(); },
+            LIROpcode::Br => { return "br".ToString(); },
+            LIROpcode::Bl => { return "bl".ToString(); },
+            LIROpcode::Blr => { return "blr".ToString(); },
+            LIROpcode::Beq => { return "beq".ToString(); },
+            LIROpcode::Bne => { return "bne".ToString(); },
+            LIROpcode::Blt => { return "blt".ToString(); },
+            LIROpcode::Bltu => { return "bltu".ToString(); },
+            LIROpcode::Bge => { return "bge".ToString(); },
+            LIROpcode::Bgeu => { return "bgeu".ToString(); },
+            LIROpcode::Slt => { return "slt".ToString(); },
+            LIROpcode::Slti => { return "slti".ToString(); },
+            LIROpcode::Sltu => { return "sltu".ToString(); },
+            LIROpcode::Sltiu => { return "sltiu".ToString(); },
+            LIROpcode::Add => { return "add".ToString(); },
+            LIROpcode::Addi => { return "addi".ToString(); },
+            LIROpcode::Sub => { return "sub".ToString(); },
+            LIROpcode::Subi => { return "subi".ToString(); },
+            LIROpcode::Mul => { return "mul".ToString(); },
+            LIROpcode::Mulh => { return "mulh".ToString(); },
+            LIROpcode::Mulhsu => { return "mulhsu".ToString(); },
+            LIROpcode::Mulhu => { return "mulhu".ToString(); },
+            LIROpcode::Div => { return "div".ToString(); },
+            LIROpcode::Divu => { return "divu".ToString(); },
+            LIROpcode::Rem => { return "rem".ToString(); },
+            LIROpcode::Remu => { return "remu".ToString(); },
+            LIROpcode::And => { return "and".ToString(); },
+            LIROpcode::Andi => { return "andi".ToString(); },
+            LIROpcode::Or => { return "or".ToString(); },
+            LIROpcode::Ori => { return "ori".ToString(); },
+            LIROpcode::Xor => { return "xor".ToString(); },
+            LIROpcode::Xori => { return "xori".ToString(); },
+            LIROpcode::Sll => { return "sll".ToString(); },
+            LIROpcode::Slli => { return "slli".ToString(); },
+            LIROpcode::Srl => { return "srl".ToString(); },
+            LIROpcode::Srli => { return "srli".ToString(); },
+            LIROpcode::Sra => { return "sra".ToString(); },
+            LIROpcode::Srai => { return "srai".ToString(); },
+            LIROpcode::Hlt => { return "hlt".ToString(); },
+            LIROpcode::Li => { return "li".ToString(); },
+            LIROpcode::La => { return "la".ToString(); },
+            LIROpcode::Ret => { return "ret".ToString(); },
+            LIROpcode::Asm => { return "asm".ToString(); },
+            _ => { return "<invalid instruction>".ToString(); }
+        }
     }
 }
 

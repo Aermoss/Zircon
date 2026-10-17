@@ -22,61 +22,75 @@ fn MIROperands(instruction: *MIRInstruction) -> Vector<*MIRValue> {
     let mut result = Vector<*MIRValue>();
     let kind = instruction->kind;
 
-    if kind == MIRInstructionKind::Load {
-        result.PushBack((instruction as *MIRLoadInstruction)->pointer);
-    } else if kind == MIRInstructionKind::Store {
-        let store = instruction as *MIRStoreInstruction;
-        result.PushBack(store->value);
-        result.PushBack(store->pointer);
-    } else if kind == MIRInstructionKind::ArrayGEP {
-        let gep = instruction as *MIRArrayGEPInstruction;
-        result.PushBack(gep->pointer);
-        result.PushBack(gep->index);
-    } else if kind == MIRInstructionKind::StructGEP {
-        result.PushBack((instruction as *MIRStructGEPInstruction)->pointer);
-    } else if kind == MIRInstructionKind::Unary {
-        result.PushBack((instruction as *MIRUnaryInstruction)->operand);
-    } else if kind == MIRInstructionKind::Binary {
-        let binary = instruction as *MIRBinaryInstruction;
-        result.PushBack(binary->left);
-        result.PushBack(binary->right);
-    } else if kind == MIRInstructionKind::Call {
-        let call = instruction as *MIRCallInstruction;
-        result.PushBack(call->callee);
+    match kind {
+        MIRInstructionKind::Load => {
+            result.PushBack((instruction as *MIRLoadInstruction)->pointer);
+        },
+        MIRInstructionKind::Store => {
+            let store = instruction as *MIRStoreInstruction;
+            result.PushBack(store->value);
+            result.PushBack(store->pointer);
+        },
+        MIRInstructionKind::ArrayGEP => {
+            let gep = instruction as *MIRArrayGEPInstruction;
+            result.PushBack(gep->pointer);
+            result.PushBack(gep->index);
+        },
+        MIRInstructionKind::StructGEP => {
+            result.PushBack((instruction as *MIRStructGEPInstruction)->pointer);
+        },
+        MIRInstructionKind::Unary => {
+            result.PushBack((instruction as *MIRUnaryInstruction)->operand);
+        },
+        MIRInstructionKind::Binary => {
+            let binary = instruction as *MIRBinaryInstruction;
+            result.PushBack(binary->left);
+            result.PushBack(binary->right);
+        },
+        MIRInstructionKind::Call => {
+            let call = instruction as *MIRCallInstruction;
+            result.PushBack(call->callee);
 
-        for argument in call->arguments {
-            result.PushBack(argument);
-        }
-    } else if kind == MIRInstructionKind::Cast {
-        result.PushBack((instruction as *MIRCastInstruction)->value);
-    } else if kind == MIRInstructionKind::Select {
-        let select = instruction as *MIRSelectInstruction;
-        result.PushBack(select->condition);
-        result.PushBack(select->then_value);
-        result.PushBack(select->else_value);
-    } else if kind == MIRInstructionKind::Phi {
-        for incoming in (instruction as *MIRPhiInstruction)->incomings {
-            result.PushBack(incoming.value);
-        }
-    } else if kind == MIRInstructionKind::Assembly {
-        let assembly = instruction as *MIRAssemblyInstruction;
+            for argument in call->arguments {
+                result.PushBack(argument);
+            }
+        },
+        MIRInstructionKind::Cast => {
+            result.PushBack((instruction as *MIRCastInstruction)->value);
+        },
+        MIRInstructionKind::Select => {
+            let select = instruction as *MIRSelectInstruction;
+            result.PushBack(select->condition);
+            result.PushBack(select->then_value);
+            result.PushBack(select->else_value);
+        },
+        MIRInstructionKind::Phi => {
+            for incoming in (instruction as *MIRPhiInstruction)->incomings {
+                result.PushBack(incoming.value);
+            }
+        },
+        MIRInstructionKind::Assembly => {
+            let assembly = instruction as *MIRAssemblyInstruction;
 
-        for input in assembly->inputs {
-            result.PushBack(input->value);
-        }
+            for input in assembly->inputs {
+                result.PushBack(input->value);
+            }
 
-        for output in assembly->outputs {
-            result.PushBack(output->value);
-        }
-    } else if kind == MIRInstructionKind::Terminator {
-        let terminator = instruction as *MIRTerminator;
+            for output in assembly->outputs {
+                result.PushBack(output->value);
+            }
+        },
+        MIRInstructionKind::Terminator => {
+            let terminator = instruction as *MIRTerminator;
 
-        if terminator->kind == MIRTerminatorKind::Return {
-            let value = (terminator as *MIRReturnInstruction)->value;
-            if value != null { result.PushBack(value); }
-        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-            result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
-        }
+            if terminator->kind == MIRTerminatorKind::Return {
+                let value = (terminator as *MIRReturnInstruction)->value;
+                if value != null { result.PushBack(value); }
+            } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+                result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
+            }
+        },
+        _ => {}
     } return result;
 }
 

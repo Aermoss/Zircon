@@ -22,13 +22,15 @@ enum ASTNodeKind: i32 {
 
 extend ASTNodeKind {
     pub fn ToString(this) -> String {
-        if this == ASTNodeKind::Path { return "Path".ToString(); }
-        else if this == ASTNodeKind::Declaration { return "Declaration".ToString(); }
-        else if this == ASTNodeKind::Statement { return "Statement".ToString(); }
-        else if this == ASTNodeKind::Expression { return "Expression".ToString(); }
-        else if this == ASTNodeKind::Pattern { return "Pattern".ToString(); }
-        else if this == ASTNodeKind::Type { return "Type".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTNodeKind::Path => { return "Path".ToString(); },
+            ASTNodeKind::Declaration => { return "Declaration".ToString(); },
+            ASTNodeKind::Statement => { return "Statement".ToString(); },
+            ASTNodeKind::Expression => { return "Expression".ToString(); },
+            ASTNodeKind::Pattern => { return "Pattern".ToString(); },
+            ASTNodeKind::Type => { return "Type".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -99,14 +101,16 @@ enum ASTTypeKind: u8 {
 
 extend ASTTypeKind {
     pub fn ToString(this) -> String {
-        if this == ASTTypeKind::Never { return "Never".ToString(); }
-        else if this == ASTTypeKind::Path { return "Path".ToString(); }
-        else if this == ASTTypeKind::Pointer { return "Pointer".ToString(); }
-        else if this == ASTTypeKind::Reference { return "Reference".ToString(); }
-        else if this == ASTTypeKind::Array { return "Array".ToString(); }
-        else if this == ASTTypeKind::Tuple { return "Tuple".ToString(); }
-        else if this == ASTTypeKind::Function { return "Function".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTTypeKind::Never => { return "Never".ToString(); },
+            ASTTypeKind::Path => { return "Path".ToString(); },
+            ASTTypeKind::Pointer => { return "Pointer".ToString(); },
+            ASTTypeKind::Reference => { return "Reference".ToString(); },
+            ASTTypeKind::Array => { return "Array".ToString(); },
+            ASTTypeKind::Tuple => { return "Tuple".ToString(); },
+            ASTTypeKind::Function => { return "Function".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -118,22 +122,31 @@ class ASTType : ASTNode {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == ASTTypeKind::Never {
-            return (this as *ASTNeverType)->ToString();
-        } else if this.kind == ASTTypeKind::Path {
-            return (this as *ASTPathType)->ToString();
-        } else if this.kind == ASTTypeKind::Pointer {
-            return (this as *ASTPointerType)->ToString();
-        } else if this.kind == ASTTypeKind::Reference {
-            return (this as *ASTReferenceType)->ToString();
-        } else if this.kind == ASTTypeKind::Array {
-            return (this as *ASTArrayType)->ToString();
-        } else if this.kind == ASTTypeKind::Tuple {
-            return (this as *ASTTupleType)->ToString();
-        } else if this.kind == ASTTypeKind::Function {
-            return (this as *ASTFunctionType)->ToString();
-        } else {
-            return "<invalid type>".ToString();
+        match this.kind {
+            ASTTypeKind::Never => {
+                return (this as *ASTNeverType)->ToString();
+            },
+            ASTTypeKind::Path => {
+                return (this as *ASTPathType)->ToString();
+            },
+            ASTTypeKind::Pointer => {
+                return (this as *ASTPointerType)->ToString();
+            },
+            ASTTypeKind::Reference => {
+                return (this as *ASTReferenceType)->ToString();
+            },
+            ASTTypeKind::Array => {
+                return (this as *ASTArrayType)->ToString();
+            },
+            ASTTypeKind::Tuple => {
+                return (this as *ASTTupleType)->ToString();
+            },
+            ASTTypeKind::Function => {
+                return (this as *ASTFunctionType)->ToString();
+            },
+            _ => {
+                return "<invalid type>".ToString();
+            }
         }
     }
 }
@@ -245,17 +258,19 @@ enum ASTPatternKind: u8 {
 
 extend ASTPatternKind {
     pub fn ToString(this) -> String {
-        if this == ASTPatternKind::Wildcard { return "Wildcard".ToString(); }
-        else if this == ASTPatternKind::Rest { return "Rest".ToString(); }
-        else if this == ASTPatternKind::Literal { return "Literal".ToString(); }
-        else if this == ASTPatternKind::Identifier { return "Identifier".ToString(); }
-        else if this == ASTPatternKind::Tuple { return "Tuple".ToString(); }
-        else if this == ASTPatternKind::Field { return "Field".ToString(); }
-        else if this == ASTPatternKind::Structure { return "Structure".ToString(); }
-        else if this == ASTPatternKind::Variant { return "Variant".ToString(); }
-        else if this == ASTPatternKind::Path { return "Path".ToString(); }
-        else if this == ASTPatternKind::Or { return "Or".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTPatternKind::Wildcard => { return "Wildcard".ToString(); },
+            ASTPatternKind::Rest => { return "Rest".ToString(); },
+            ASTPatternKind::Literal => { return "Literal".ToString(); },
+            ASTPatternKind::Identifier => { return "Identifier".ToString(); },
+            ASTPatternKind::Tuple => { return "Tuple".ToString(); },
+            ASTPatternKind::Field => { return "Field".ToString(); },
+            ASTPatternKind::Structure => { return "Structure".ToString(); },
+            ASTPatternKind::Variant => { return "Variant".ToString(); },
+            ASTPatternKind::Path => { return "Path".ToString(); },
+            ASTPatternKind::Or => { return "Or".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -348,23 +363,25 @@ enum ASTExpressionKind: u8 {
 
 extend ASTExpressionKind {
     pub fn ToString(this) -> String {
-        if this == ASTExpressionKind::Literal { return "Literal".ToString(); }
-        else if this == ASTExpressionKind::Path { return "Path".ToString(); }
-        else if this == ASTExpressionKind::Unary { return "Unary".ToString(); }
-        else if this == ASTExpressionKind::Binary { return "Binary".ToString(); }
-        else if this == ASTExpressionKind::Ternary { return "Ternary".ToString(); }
-        else if this == ASTExpressionKind::Call { return "Call".ToString(); }
-        else if this == ASTExpressionKind::PackSplat { return "PackSplat".ToString(); }
-        else if this == ASTExpressionKind::MemberAccess { return "MemberAccess".ToString(); }
-        else if this == ASTExpressionKind::TupleAccess { return "TupleAccess".ToString(); }
-        else if this == ASTExpressionKind::IndexAccess { return "IndexAccess".ToString(); }
-        else if this == ASTExpressionKind::Cast { return "Cast".ToString(); }
-        else if this == ASTExpressionKind::New { return "New".ToString(); }
-        else if this == ASTExpressionKind::Delete { return "Delete".ToString(); }
-        else if this == ASTExpressionKind::Assignment { return "Assignment".ToString(); }
-        else if this == ASTExpressionKind::Await { return "Await".ToString(); }
-        else if this == ASTExpressionKind::Range { return "Range".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTExpressionKind::Literal => { return "Literal".ToString(); },
+            ASTExpressionKind::Path => { return "Path".ToString(); },
+            ASTExpressionKind::Unary => { return "Unary".ToString(); },
+            ASTExpressionKind::Binary => { return "Binary".ToString(); },
+            ASTExpressionKind::Ternary => { return "Ternary".ToString(); },
+            ASTExpressionKind::Call => { return "Call".ToString(); },
+            ASTExpressionKind::PackSplat => { return "PackSplat".ToString(); },
+            ASTExpressionKind::MemberAccess => { return "MemberAccess".ToString(); },
+            ASTExpressionKind::TupleAccess => { return "TupleAccess".ToString(); },
+            ASTExpressionKind::IndexAccess => { return "IndexAccess".ToString(); },
+            ASTExpressionKind::Cast => { return "Cast".ToString(); },
+            ASTExpressionKind::New => { return "New".ToString(); },
+            ASTExpressionKind::Delete => { return "Delete".ToString(); },
+            ASTExpressionKind::Assignment => { return "Assignment".ToString(); },
+            ASTExpressionKind::Await => { return "Await".ToString(); },
+            ASTExpressionKind::Range => { return "Range".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -376,38 +393,55 @@ class ASTExpression : ASTNode {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == ASTExpressionKind::Literal {
-            return (this as *ASTLiteral)->ToString();
-        } else if this.kind == ASTExpressionKind::Path {
-            return (this as *ASTPathExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Unary {
-            return (this as *ASTUnaryExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Binary {
-            return (this as *ASTBinaryExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Ternary {
-            return (this as *ASTTernaryExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Call {
-            return (this as *ASTCallExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::PackSplat {
-            return (this as *ASTPackSplatExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::MemberAccess {
-            return (this as *ASTMemberAccessExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::IndexAccess {
-            return (this as *ASTIndexAccessExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Cast {
-            return (this as *ASTCastExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::New {
-            return (this as *ASTNewExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Delete {
-            return (this as *ASTDeleteExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Assignment {
-            return (this as *ASTAssignmentExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Await {
-            return (this as *ASTAwaitExpression)->ToString();
-        } else if this.kind == ASTExpressionKind::Range {
-            return (this as *ASTRangeExpression)->ToString();
-        } else {
-            return "<invalid expression>".ToString();
+        match this.kind {
+            ASTExpressionKind::Literal => {
+                return (this as *ASTLiteral)->ToString();
+            },
+            ASTExpressionKind::Path => {
+                return (this as *ASTPathExpression)->ToString();
+            },
+            ASTExpressionKind::Unary => {
+                return (this as *ASTUnaryExpression)->ToString();
+            },
+            ASTExpressionKind::Binary => {
+                return (this as *ASTBinaryExpression)->ToString();
+            },
+            ASTExpressionKind::Ternary => {
+                return (this as *ASTTernaryExpression)->ToString();
+            },
+            ASTExpressionKind::Call => {
+                return (this as *ASTCallExpression)->ToString();
+            },
+            ASTExpressionKind::PackSplat => {
+                return (this as *ASTPackSplatExpression)->ToString();
+            },
+            ASTExpressionKind::MemberAccess => {
+                return (this as *ASTMemberAccessExpression)->ToString();
+            },
+            ASTExpressionKind::IndexAccess => {
+                return (this as *ASTIndexAccessExpression)->ToString();
+            },
+            ASTExpressionKind::Cast => {
+                return (this as *ASTCastExpression)->ToString();
+            },
+            ASTExpressionKind::New => {
+                return (this as *ASTNewExpression)->ToString();
+            },
+            ASTExpressionKind::Delete => {
+                return (this as *ASTDeleteExpression)->ToString();
+            },
+            ASTExpressionKind::Assignment => {
+                return (this as *ASTAssignmentExpression)->ToString();
+            },
+            ASTExpressionKind::Await => {
+                return (this as *ASTAwaitExpression)->ToString();
+            },
+            ASTExpressionKind::Range => {
+                return (this as *ASTRangeExpression)->ToString();
+            },
+            _ => {
+                return "<invalid expression>".ToString();
+            }
         }
     }
 }
@@ -418,16 +452,18 @@ enum ASTLiteralKind: u8 {
 
 extend ASTLiteralKind {
     pub fn ToString(this) -> String {
-        if this == ASTLiteralKind::Boolean { return "Boolean".ToString(); }
-        else if this == ASTLiteralKind::Character { return "Character".ToString(); }
-        else if this == ASTLiteralKind::Integer { return "Integer".ToString(); }
-        else if this == ASTLiteralKind::Float { return "Float".ToString(); }
-        else if this == ASTLiteralKind::String { return "String".ToString(); }
-        else if this == ASTLiteralKind::Array { return "Array".ToString(); }
-        else if this == ASTLiteralKind::Tuple { return "Tuple".ToString(); }
-        else if this == ASTLiteralKind::Structure { return "Structure".ToString(); }
-        else if this == ASTLiteralKind::Null { return "Null".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTLiteralKind::Boolean => { return "Boolean".ToString(); },
+            ASTLiteralKind::Character => { return "Character".ToString(); },
+            ASTLiteralKind::Integer => { return "Integer".ToString(); },
+            ASTLiteralKind::Float => { return "Float".ToString(); },
+            ASTLiteralKind::String => { return "String".ToString(); },
+            ASTLiteralKind::Array => { return "Array".ToString(); },
+            ASTLiteralKind::Tuple => { return "Tuple".ToString(); },
+            ASTLiteralKind::Structure => { return "Structure".ToString(); },
+            ASTLiteralKind::Null => { return "Null".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -439,26 +475,37 @@ class ASTLiteral : ASTExpression {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == ASTLiteralKind::Boolean {
-            return (this as *ASTBooleanLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Character {
-            return (this as *ASTCharacterLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Integer {
-            return (this as *ASTIntegerLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Float {
-            return (this as *ASTFloatLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::String {
-            return (this as *ASTStringLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Array {
-            return (this as *ASTArrayLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Tuple {
-            return (this as *ASTTupleLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Structure {
-            return (this as *ASTStructureLiteral)->ToString();
-        } else if this.kind == ASTLiteralKind::Null {
-            return (this as *ASTNullLiteral)->ToString();
-        } else {
-            return "<invalid literal>".ToString();
+        match this.kind {
+            ASTLiteralKind::Boolean => {
+                return (this as *ASTBooleanLiteral)->ToString();
+            },
+            ASTLiteralKind::Character => {
+                return (this as *ASTCharacterLiteral)->ToString();
+            },
+            ASTLiteralKind::Integer => {
+                return (this as *ASTIntegerLiteral)->ToString();
+            },
+            ASTLiteralKind::Float => {
+                return (this as *ASTFloatLiteral)->ToString();
+            },
+            ASTLiteralKind::String => {
+                return (this as *ASTStringLiteral)->ToString();
+            },
+            ASTLiteralKind::Array => {
+                return (this as *ASTArrayLiteral)->ToString();
+            },
+            ASTLiteralKind::Tuple => {
+                return (this as *ASTTupleLiteral)->ToString();
+            },
+            ASTLiteralKind::Structure => {
+                return (this as *ASTStructureLiteral)->ToString();
+            },
+            ASTLiteralKind::Null => {
+                return (this as *ASTNullLiteral)->ToString();
+            },
+            _ => {
+                return "<invalid literal>".ToString();
+            }
         }
     }
 }
@@ -600,11 +647,13 @@ enum ASTUnaryKind: u8 {
 
 extend ASTUnaryKind {
     pub fn ToString(this) -> String {
-        if this == ASTUnaryKind::AddressOf { return '&'.ToString(); }
-        else if this == ASTUnaryKind::Dereference { return '*'.ToString(); }
-        else if this == ASTUnaryKind::Negate { return '-'.ToString(); }
-        else if this == ASTUnaryKind::Not { return '!'.ToString(); }
-        else { return "<invalid unary>".ToString(); }
+        match this {
+            ASTUnaryKind::AddressOf => { return '&'.ToString(); },
+            ASTUnaryKind::Dereference => { return '*'.ToString(); },
+            ASTUnaryKind::Negate => { return '-'.ToString(); },
+            ASTUnaryKind::Not => { return '!'.ToString(); },
+            _ => { return "<invalid unary>".ToString(); }
+        }
     }
 }
 
@@ -631,25 +680,27 @@ enum ASTBinaryKind: u8 {
 
 extend ASTBinaryKind {
     pub fn ToString(this) -> String {
-        if this == ASTBinaryKind::Add { return '+'.ToString(); }
-        else if this == ASTBinaryKind::Subtract { return '-'.ToString(); }
-        else if this == ASTBinaryKind::Multiply { return '*'.ToString(); }
-        else if this == ASTBinaryKind::Divide { return '/'.ToString(); }
-        else if this == ASTBinaryKind::Modulo { return '%'.ToString(); }
-        else if this == ASTBinaryKind::Equal { return "==".ToString(); }
-        else if this == ASTBinaryKind::NotEqual { return "!=".ToString(); }
-        else if this == ASTBinaryKind::Less { return '<'.ToString(); }
-        else if this == ASTBinaryKind::LessEqual { return "<=".ToString(); }
-        else if this == ASTBinaryKind::Greater { return '>'.ToString(); }
-        else if this == ASTBinaryKind::GreaterEqual { return ">=".ToString(); }
-        else if this == ASTBinaryKind::LogicalAnd { return "&&".ToString(); }
-        else if this == ASTBinaryKind::LogicalOr { return "||".ToString(); }
-        else if this == ASTBinaryKind::BitwiseAnd { return '&'.ToString(); }
-        else if this == ASTBinaryKind::BitwiseOr { return '|'.ToString(); }
-        else if this == ASTBinaryKind::BitwiseXor { return '^'.ToString(); }
-        else if this == ASTBinaryKind::LeftShift { return "<<".ToString(); }
-        else if this == ASTBinaryKind::RightShift { return ">>".ToString(); }
-        else { return "<invalid binary>".ToString(); }
+        match this {
+            ASTBinaryKind::Add => { return '+'.ToString(); },
+            ASTBinaryKind::Subtract => { return '-'.ToString(); },
+            ASTBinaryKind::Multiply => { return '*'.ToString(); },
+            ASTBinaryKind::Divide => { return '/'.ToString(); },
+            ASTBinaryKind::Modulo => { return '%'.ToString(); },
+            ASTBinaryKind::Equal => { return "==".ToString(); },
+            ASTBinaryKind::NotEqual => { return "!=".ToString(); },
+            ASTBinaryKind::Less => { return '<'.ToString(); },
+            ASTBinaryKind::LessEqual => { return "<=".ToString(); },
+            ASTBinaryKind::Greater => { return '>'.ToString(); },
+            ASTBinaryKind::GreaterEqual => { return ">=".ToString(); },
+            ASTBinaryKind::LogicalAnd => { return "&&".ToString(); },
+            ASTBinaryKind::LogicalOr => { return "||".ToString(); },
+            ASTBinaryKind::BitwiseAnd => { return '&'.ToString(); },
+            ASTBinaryKind::BitwiseOr => { return '|'.ToString(); },
+            ASTBinaryKind::BitwiseXor => { return '^'.ToString(); },
+            ASTBinaryKind::LeftShift => { return "<<".ToString(); },
+            ASTBinaryKind::RightShift => { return ">>".ToString(); },
+            _ => { return "<invalid binary>".ToString(); }
+        }
     }
 }
 
@@ -811,18 +862,20 @@ enum ASTAssignmentKind: u8 {
 
 extend ASTAssignmentKind {
     pub fn ToString(this) -> String {
-        if this == ASTAssignmentKind::Assign { return '='.ToString(); }
-        else if this == ASTAssignmentKind::AddAssign { return "+=".ToString(); }
-        else if this == ASTAssignmentKind::SubtractAssign { return "-=".ToString(); }
-        else if this == ASTAssignmentKind::MultiplyAssign { return "*=".ToString(); }
-        else if this == ASTAssignmentKind::DivideAssign { return "/=".ToString(); }
-        else if this == ASTAssignmentKind::ModuloAssign { return "%=".ToString(); }
-        else if this == ASTAssignmentKind::LeftShiftAssign { return "<<=".ToString(); }
-        else if this == ASTAssignmentKind::RightShiftAssign { return ">>=".ToString(); }
-        else if this == ASTAssignmentKind::AndAssign { return "&=".ToString(); }
-        else if this == ASTAssignmentKind::OrAssign { return "|=".ToString(); }
-        else if this == ASTAssignmentKind::XorAssign { return "^=".ToString(); }
-        else { return "<invalid assignment>".ToString(); }
+        match this {
+            ASTAssignmentKind::Assign => { return '='.ToString(); },
+            ASTAssignmentKind::AddAssign => { return "+=".ToString(); },
+            ASTAssignmentKind::SubtractAssign => { return "-=".ToString(); },
+            ASTAssignmentKind::MultiplyAssign => { return "*=".ToString(); },
+            ASTAssignmentKind::DivideAssign => { return "/=".ToString(); },
+            ASTAssignmentKind::ModuloAssign => { return "%=".ToString(); },
+            ASTAssignmentKind::LeftShiftAssign => { return "<<=".ToString(); },
+            ASTAssignmentKind::RightShiftAssign => { return ">>=".ToString(); },
+            ASTAssignmentKind::AndAssign => { return "&=".ToString(); },
+            ASTAssignmentKind::OrAssign => { return "|=".ToString(); },
+            ASTAssignmentKind::XorAssign => { return "^=".ToString(); },
+            _ => { return "<invalid assignment>".ToString(); }
+        }
     }
 }
 
@@ -892,20 +945,22 @@ enum ASTStatementKind: u8 {
 
 extend ASTStatementKind {
     pub fn ToString(this) -> String {
-        if this == ASTStatementKind::Block { return "Block".ToString(); }
-        else if this == ASTStatementKind::Variable { return "Variable".ToString(); }
-        else if this == ASTStatementKind::Expression { return "Expression".ToString(); }
-        else if this == ASTStatementKind::If { return "If".ToString(); }
-        else if this == ASTStatementKind::While { return "While".ToString(); }
-        else if this == ASTStatementKind::Loop { return "Loop".ToString(); }
-        else if this == ASTStatementKind::For { return "For".ToString(); }
-        else if this == ASTStatementKind::Match { return "Match".ToString(); }
-        else if this == ASTStatementKind::Return { return "Return".ToString(); }
-        else if this == ASTStatementKind::Break { return "Break".ToString(); }
-        else if this == ASTStatementKind::Continue { return "Continue".ToString(); }
-        else if this == ASTStatementKind::Unsafe { return "Unsafe".ToString(); }
-        else if this == ASTStatementKind::Assembly { return "Assembly".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTStatementKind::Block => { return "Block".ToString(); },
+            ASTStatementKind::Variable => { return "Variable".ToString(); },
+            ASTStatementKind::Expression => { return "Expression".ToString(); },
+            ASTStatementKind::If => { return "If".ToString(); },
+            ASTStatementKind::While => { return "While".ToString(); },
+            ASTStatementKind::Loop => { return "Loop".ToString(); },
+            ASTStatementKind::For => { return "For".ToString(); },
+            ASTStatementKind::Match => { return "Match".ToString(); },
+            ASTStatementKind::Return => { return "Return".ToString(); },
+            ASTStatementKind::Break => { return "Break".ToString(); },
+            ASTStatementKind::Continue => { return "Continue".ToString(); },
+            ASTStatementKind::Unsafe => { return "Unsafe".ToString(); },
+            ASTStatementKind::Assembly => { return "Assembly".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -1062,22 +1117,24 @@ enum ASTDeclarationKind: u8 {
 
 extend ASTDeclarationKind {
     pub fn ToString(this) -> String {
-        if this == ASTDeclarationKind::Parameter { return "Parameter".ToString(); }
-        else if this == ASTDeclarationKind::Function { return "Function".ToString(); }
-        else if this == ASTDeclarationKind::Field { return "Field".ToString(); }
-        else if this == ASTDeclarationKind::Class { return "Class".ToString(); }
-        else if this == ASTDeclarationKind::Structure { return "Structure".ToString(); }
-        else if this == ASTDeclarationKind::EnumerationMember { return "EnumerationMember".ToString(); }
-        else if this == ASTDeclarationKind::Enumeration { return "Enumeration".ToString(); }
-        else if this == ASTDeclarationKind::VariantMember { return "VariantMember".ToString(); }
-        else if this == ASTDeclarationKind::Variant { return "Variant".ToString(); }
-        else if this == ASTDeclarationKind::Constant { return "Constant".ToString(); }
-        else if this == ASTDeclarationKind::Static { return "Static".ToString(); }
-        else if this == ASTDeclarationKind::Extend { return "Extend".ToString(); }
-        else if this == ASTDeclarationKind::Type { return "Type".ToString(); }
-        else if this == ASTDeclarationKind::Extern { return "Extern".ToString(); }
-        else if this == ASTDeclarationKind::Assembly { return "Assembly".ToString(); }
-        else { return "Unknown".ToString(); }
+        match this {
+            ASTDeclarationKind::Parameter => { return "Parameter".ToString(); },
+            ASTDeclarationKind::Function => { return "Function".ToString(); },
+            ASTDeclarationKind::Field => { return "Field".ToString(); },
+            ASTDeclarationKind::Class => { return "Class".ToString(); },
+            ASTDeclarationKind::Structure => { return "Structure".ToString(); },
+            ASTDeclarationKind::EnumerationMember => { return "EnumerationMember".ToString(); },
+            ASTDeclarationKind::Enumeration => { return "Enumeration".ToString(); },
+            ASTDeclarationKind::VariantMember => { return "VariantMember".ToString(); },
+            ASTDeclarationKind::Variant => { return "Variant".ToString(); },
+            ASTDeclarationKind::Constant => { return "Constant".ToString(); },
+            ASTDeclarationKind::Static => { return "Static".ToString(); },
+            ASTDeclarationKind::Extend => { return "Extend".ToString(); },
+            ASTDeclarationKind::Type => { return "Type".ToString(); },
+            ASTDeclarationKind::Extern => { return "Extern".ToString(); },
+            ASTDeclarationKind::Assembly => { return "Assembly".ToString(); },
+            _ => { return "Unknown".ToString(); }
+        }
     }
 }
 
@@ -1088,7 +1145,6 @@ class ASTDeclaration : ASTNode {
         this.kind = kind;
     }
 }
-
 
 class ASTParameterDeclaration : ASTDeclaration {
     pub name: String,

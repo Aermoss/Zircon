@@ -68,16 +68,22 @@ class LIRLowerer {
     }
 
     fn LowerDeclaration(&mut this, declaration: *MIRDeclaration) {
-        if declaration->kind == MIRDeclarationKind::Function {
-            this.LowerFunctionDeclaration(declaration as *MIRFunctionDeclaration);
-        } else if declaration->kind == MIRDeclarationKind::Static {
-            let _static = declaration as *MIRStaticDeclaration;
-            this.LowerGlobal(_static->name, _static->linkage == MIRDeclarationLinkage::External, _static->_type, _static->initializer);
-        } else if declaration->kind == MIRDeclarationKind::Constant {
-            let constant = declaration as *MIRConstantDeclaration;
-            this.LowerGlobal(constant->name, true, constant->_type, constant->initializer);
-        } else if declaration->kind == MIRDeclarationKind::Assembly {
-            this.module->assembly.PushBack((declaration as *MIRAssemblyDeclaration)->text);
+        match declaration->kind {
+            MIRDeclarationKind::Function => {
+                this.LowerFunctionDeclaration(declaration as *MIRFunctionDeclaration);
+            },
+            MIRDeclarationKind::Static => {
+                let _static = declaration as *MIRStaticDeclaration;
+                this.LowerGlobal(_static->name, _static->linkage == MIRDeclarationLinkage::External, _static->_type, _static->initializer);
+            },
+            MIRDeclarationKind::Constant => {
+                let constant = declaration as *MIRConstantDeclaration;
+                this.LowerGlobal(constant->name, true, constant->_type, constant->initializer);
+            },
+            MIRDeclarationKind::Assembly => {
+                this.module->assembly.PushBack((declaration as *MIRAssemblyDeclaration)->text);
+            },
+            _ => {}
         }
     }
 
@@ -105,42 +111,50 @@ class LIRLowerer {
         if value->kind == MIRValueKind::Constant {
             let constant = value as *MIRConstant;
 
-            if constant->kind == MIRConstantKind::Integer {
-                this.WriteInteger(global, offset, (constant as *MIRConstantInteger)->value, this.SizeOf(constant->_type));
-                return;
-            } else if constant->kind == MIRConstantKind::Null {
-                return;
-            } else if constant->kind == MIRConstantKind::String {
-                let string = (constant as *MIRConstantString)->value;
-
-                if constant->_type->kind == MIRTypeKind::Pointer {
-                    global->relocations.PushBack(LIRRelocation(offset, this.LowerStringData(string)));
+            match constant->kind {
+                MIRConstantKind::Integer => {
+                    this.WriteInteger(global, offset, (constant as *MIRConstantInteger)->value, this.SizeOf(constant->_type));
                     return;
-                }
+                },
+                MIRConstantKind::Null => {
+                    return;
+                },
+                MIRConstantKind::String => {
+                    let string = (constant as *MIRConstantString)->value;
 
-                let size = this.SizeOf(constant->_type) as usize;
+                    if constant->_type->kind == MIRTypeKind::Pointer {
+                        global->relocations.PushBack(LIRRelocation(offset, this.LowerStringData(string)));
+                        return;
+                    }
 
-                for i in 0..string.Length() {
-                    if i >= size { break; }
-                    global->data[offset as usize + i] = string[i] as u8;
-                } return;
-            } else if constant->kind == MIRConstantKind::Array {
-                let element_size = this.SizeOf((constant->_type as *MIRArrayType)->element);
-                let elements = (constant as *MIRConstantArray)->elements;
+                    let size = this.SizeOf(constant->_type) as usize;
 
-                for i in 0..elements.Size() {
-                    this.WriteConstant(global, offset + i as u32 * element_size, elements[i]);
-                } return;
-            } else if constant->kind == MIRConstantKind::Structure {
-                let _type = constant->_type as *MIRStructureType;
-                let fields = (constant as *MIRConstantStructure)->fields;
+                    for i in 0..string.Length() {
+                        if i >= size { break; }
+                        global->data[offset as usize + i] = string[i] as u8;
+                    } return;
+                },
+                MIRConstantKind::Array => {
+                    let element_size = this.SizeOf((constant->_type as *MIRArrayType)->element);
+                    let elements = (constant as *MIRConstantArray)->elements;
 
-                for i in 0..fields.Size() {
-                    this.WriteConstant(global, offset + this.FieldOffset(_type, i as u32), fields[i]);
-                } return;
-            } else if constant->kind == MIRConstantKind::Float {
-                this.Unsupported("Floating point constant");
-                return;
+                    for i in 0..elements.Size() {
+                        this.WriteConstant(global, offset + i as u32 * element_size, elements[i]);
+                    } return;
+                },
+                MIRConstantKind::Structure => {
+                    let _type = constant->_type as *MIRStructureType;
+                    let fields = (constant as *MIRConstantStructure)->fields;
+
+                    for i in 0..fields.Size() {
+                        this.WriteConstant(global, offset + this.FieldOffset(_type, i as u32), fields[i]);
+                    } return;
+                },
+                MIRConstantKind::Float => {
+                    this.Unsupported("Floating point constant");
+                    return;
+                },
+                _ => {}
             }
         }
 
@@ -186,82 +200,89 @@ class LIRLowerer {
 
         let expression = constant as *MIRConstantExpression;
 
-        if expression->kind == MIRConstantExpressionKind::Cast {
-            let cast = expression as *MIRCastExpression;
-            let mut result = this.EvaluateConstant(cast->value);
-            if !result.valid || !result.symbol.Empty() { return result; }
-            let source_width = this.IntegerWidth(cast->value->_type);
+        match expression->kind {
+            MIRConstantExpressionKind::Cast => {
+                let cast = expression as *MIRCastExpression;
+                let mut result = this.EvaluateConstant(cast->value);
+                if !result.valid || !result.symbol.Empty() { return result; }
+                let source_width = this.IntegerWidth(cast->value->_type);
 
-            if cast->kind == MIRCastKind::Trunc {
-                result.value = this.TruncateValue(result.value, this.IntegerWidth(cast->_type));
-            } else if cast->kind == MIRCastKind::ZExt {
-                result.value = this.TruncateValue(result.value, source_width);
-            } else if cast->kind == MIRCastKind::SExt {
-                result.value = this.SignExtendValue(result.value, source_width);
-            } else if cast->kind != MIRCastKind::Bitcast && cast->kind != MIRCastKind::PtrToInt && cast->kind != MIRCastKind::IntToPtr {
-                return LIRConstant();
-            } return result;
-        } else if expression->kind == MIRConstantExpressionKind::ArrayGEP {
-            let gep = expression as *MIRArrayGEPExpression;
-            let mut result = this.EvaluateConstant(gep->pointer);
-            let index = this.EvaluateConstant(gep->index);
-            if !result.valid || !index.valid || !index.symbol.Empty() { return LIRConstant(); }
-            result.value += index.value * this.SizeOf((gep->pointer->_type as *MIRPointerType)->pointee) as i64;
-            return result;
-        } else if expression->kind == MIRConstantExpressionKind::StructGEP {
-            let gep = expression as *MIRStructGEPExpression;
-            let mut result = this.EvaluateConstant(gep->pointer);
-            if !result.valid { return result; }
-            result.value += this.FieldOffset((gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType, gep->index) as i64;
-            return result;
-        } else if expression->kind == MIRConstantExpressionKind::Unary {
-            let unary = expression as *MIRUnaryExpression;
-            let mut result = this.EvaluateConstant(unary->operand);
-            if !result.valid || !result.symbol.Empty() { return LIRConstant(); }
+                if cast->kind == MIRCastKind::Trunc {
+                    result.value = this.TruncateValue(result.value, this.IntegerWidth(cast->_type));
+                } else if cast->kind == MIRCastKind::ZExt {
+                    result.value = this.TruncateValue(result.value, source_width);
+                } else if cast->kind == MIRCastKind::SExt {
+                    result.value = this.SignExtendValue(result.value, source_width);
+                } else if cast->kind != MIRCastKind::Bitcast && cast->kind != MIRCastKind::PtrToInt && cast->kind != MIRCastKind::IntToPtr {
+                    return LIRConstant();
+                } return result;
+            },
+            MIRConstantExpressionKind::ArrayGEP => {
+                let gep = expression as *MIRArrayGEPExpression;
+                let mut result = this.EvaluateConstant(gep->pointer);
+                let index = this.EvaluateConstant(gep->index);
+                if !result.valid || !index.valid || !index.symbol.Empty() { return LIRConstant(); }
+                result.value += index.value * this.SizeOf((gep->pointer->_type as *MIRPointerType)->pointee) as i64;
+                return result;
+            },
+            MIRConstantExpressionKind::StructGEP => {
+                let gep = expression as *MIRStructGEPExpression;
+                let mut result = this.EvaluateConstant(gep->pointer);
+                if !result.valid { return result; }
+                result.value += this.FieldOffset((gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType, gep->index) as i64;
+                return result;
+            },
+            MIRConstantExpressionKind::Unary => {
+                let unary = expression as *MIRUnaryExpression;
+                let mut result = this.EvaluateConstant(unary->operand);
+                if !result.valid || !result.symbol.Empty() { return LIRConstant(); }
 
-            if unary->kind == MIRUnaryKind::Neg {
-                result.value = -result.value;
-            } else if unary->kind == MIRUnaryKind::Not {
-                result.value = !result.value;
-            } else {
-                return LIRConstant();
-            } return result;
-        } else if expression->kind == MIRConstantExpressionKind::Binary {
-            let binary = expression as *MIRBinaryExpression;
-            let mut left = this.EvaluateConstant(binary->left);
-            let right = this.EvaluateConstant(binary->right);
-            if !left.valid || !right.valid || !right.symbol.Empty() { return LIRConstant(); }
-            let width = this.IntegerWidth(binary->left->_type);
+                if unary->kind == MIRUnaryKind::Neg {
+                    result.value = -result.value;
+                } else if unary->kind == MIRUnaryKind::Not {
+                    result.value = !result.value;
+                } else {
+                    return LIRConstant();
+                } return result;
+            },
+            MIRConstantExpressionKind::Binary => {
+                let binary = expression as *MIRBinaryExpression;
+                let mut left = this.EvaluateConstant(binary->left);
+                let right = this.EvaluateConstant(binary->right);
+                if !left.valid || !right.valid || !right.symbol.Empty() { return LIRConstant(); }
+                let width = this.IntegerWidth(binary->left->_type);
 
-            if binary->kind == MIRBinaryKind::Add {
-                left.value += right.value;
+                if binary->kind == MIRBinaryKind::Add {
+                    left.value += right.value;
+                    return left;
+                } else if binary->kind == MIRBinaryKind::Sub {
+                    left.value -= right.value;
+                    return left;
+                } else if !left.symbol.Empty() {
+                    return LIRConstant();
+                }
+
+                let (a, b) = (this.SignExtendValue(left.value, width), this.SignExtendValue(right.value, width));
+                let ua = (this.TruncateValue(left.value, width) as u64) & 0xFFFFFFFF;
+                let ub = (this.TruncateValue(right.value, width) as u64) & 0xFFFFFFFF;
+
+                if binary->kind == MIRBinaryKind::Mul { left.value = a * b; }
+                else if binary->kind == MIRBinaryKind::SDiv && b != 0 { left.value = a / b; }
+                else if binary->kind == MIRBinaryKind::SRem && b != 0 { left.value = a % b; }
+                else if binary->kind == MIRBinaryKind::UDiv && ub != 0 { left.value = (ua / ub) as i64; }
+                else if binary->kind == MIRBinaryKind::URem && ub != 0 { left.value = (ua % ub) as i64; }
+                else if binary->kind == MIRBinaryKind::And { left.value = a & b; }
+                else if binary->kind == MIRBinaryKind::Or { left.value = a | b; }
+                else if binary->kind == MIRBinaryKind::Xor { left.value = a ^ b; }
+                else if binary->kind == MIRBinaryKind::Shl { left.value = a << (b & 31); }
+                else if binary->kind == MIRBinaryKind::LShr { left.value = (ua >> (ub & 31)) as i64; }
+                else if binary->kind == MIRBinaryKind::AShr { left.value = a >> (b & 31); }
+                else { return LIRConstant(); }
                 return left;
-            } else if binary->kind == MIRBinaryKind::Sub {
-                left.value -= right.value;
-                return left;
-            } else if !left.symbol.Empty() {
+            },
+            _ => {
                 return LIRConstant();
             }
-
-            let (a, b) = (this.SignExtendValue(left.value, width), this.SignExtendValue(right.value, width));
-            let ua = (this.TruncateValue(left.value, width) as u64) & 0xFFFFFFFF;
-            let ub = (this.TruncateValue(right.value, width) as u64) & 0xFFFFFFFF;
-
-            if binary->kind == MIRBinaryKind::Mul { left.value = a * b; }
-            else if binary->kind == MIRBinaryKind::SDiv && b != 0 { left.value = a / b; }
-            else if binary->kind == MIRBinaryKind::SRem && b != 0 { left.value = a % b; }
-            else if binary->kind == MIRBinaryKind::UDiv && ub != 0 { left.value = (ua / ub) as i64; }
-            else if binary->kind == MIRBinaryKind::URem && ub != 0 { left.value = (ua % ub) as i64; }
-            else if binary->kind == MIRBinaryKind::And { left.value = a & b; }
-            else if binary->kind == MIRBinaryKind::Or { left.value = a | b; }
-            else if binary->kind == MIRBinaryKind::Xor { left.value = a ^ b; }
-            else if binary->kind == MIRBinaryKind::Shl { left.value = a << (b & 31); }
-            else if binary->kind == MIRBinaryKind::LShr { left.value = (ua >> (ub & 31)) as i64; }
-            else if binary->kind == MIRBinaryKind::AShr { left.value = a >> (b & 31); }
-            else { return LIRConstant(); }
-            return left;
-        } else {
-            return LIRConstant();
         }
     }
 
@@ -629,40 +650,55 @@ class LIRLowerer {
     }
 
     fn LowerInstruction(&mut this, instruction: *MIRInstruction) -> *LIROperand {
-        if instruction->kind == MIRInstructionKind::Alloca {
-            return this.LowerAllocaInstruction(instruction as *MIRAllocaInstruction);
-        } else if instruction->kind == MIRInstructionKind::Load {
-            return this.LowerLoadInstruction(instruction as *MIRLoadInstruction);
-        } else if instruction->kind == MIRInstructionKind::Store {
-            return this.LowerStoreInstruction(instruction as *MIRStoreInstruction);
-        } else if instruction->kind == MIRInstructionKind::ArrayGEP {
-            let gep = instruction as *MIRArrayGEPInstruction;
-            return this.LowerArrayGEP(gep->pointer, gep->index);
-        } else if instruction->kind == MIRInstructionKind::StructGEP {
-            let gep = instruction as *MIRStructGEPInstruction;
-            return this.LowerStructGEP(gep->pointer, gep->index);
-        } else if instruction->kind == MIRInstructionKind::Unary {
-            let unary = instruction as *MIRUnaryInstruction;
-            return this.LowerUnary(unary->kind, unary->operand, unary->_type);
-        } else if instruction->kind == MIRInstructionKind::Binary {
-            let binary = instruction as *MIRBinaryInstruction;
-            return this.LowerBinary(binary->kind, binary->left, binary->right);
-        } else if instruction->kind == MIRInstructionKind::Call {
-            return this.LowerCallInstruction(instruction as *MIRCallInstruction);
-        } else if instruction->kind == MIRInstructionKind::Cast {
-            let cast = instruction as *MIRCastInstruction;
-            return this.LowerCast(cast->kind, cast->value, cast->_type);
-        } else if instruction->kind == MIRInstructionKind::Select {
-            return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
-        } else if instruction->kind == MIRInstructionKind::Phi {
-            return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
-        } else if instruction->kind == MIRInstructionKind::Assembly {
-            return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
-        } else if instruction->kind == MIRInstructionKind::Terminator {
-            this.LowerTerminator(instruction as *MIRTerminator);
-            return null;
-        } else {
-            return null;
+        match instruction->kind {
+            MIRInstructionKind::Alloca => {
+                return this.LowerAllocaInstruction(instruction as *MIRAllocaInstruction);
+            },
+            MIRInstructionKind::Load => {
+                return this.LowerLoadInstruction(instruction as *MIRLoadInstruction);
+            },
+            MIRInstructionKind::Store => {
+                return this.LowerStoreInstruction(instruction as *MIRStoreInstruction);
+            },
+            MIRInstructionKind::ArrayGEP => {
+                let gep = instruction as *MIRArrayGEPInstruction;
+                return this.LowerArrayGEP(gep->pointer, gep->index);
+            },
+            MIRInstructionKind::StructGEP => {
+                let gep = instruction as *MIRStructGEPInstruction;
+                return this.LowerStructGEP(gep->pointer, gep->index);
+            },
+            MIRInstructionKind::Unary => {
+                let unary = instruction as *MIRUnaryInstruction;
+                return this.LowerUnary(unary->kind, unary->operand, unary->_type);
+            },
+            MIRInstructionKind::Binary => {
+                let binary = instruction as *MIRBinaryInstruction;
+                return this.LowerBinary(binary->kind, binary->left, binary->right);
+            },
+            MIRInstructionKind::Call => {
+                return this.LowerCallInstruction(instruction as *MIRCallInstruction);
+            },
+            MIRInstructionKind::Cast => {
+                let cast = instruction as *MIRCastInstruction;
+                return this.LowerCast(cast->kind, cast->value, cast->_type);
+            },
+            MIRInstructionKind::Select => {
+                return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
+            },
+            MIRInstructionKind::Phi => {
+                return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
+            },
+            MIRInstructionKind::Assembly => {
+                return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
+            },
+            MIRInstructionKind::Terminator => {
+                this.LowerTerminator(instruction as *MIRTerminator);
+                return null;
+            },
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -683,56 +719,70 @@ class LIRLowerer {
     }
 
     fn AlignOf(&this, _type: *MIRType) -> u32 {
-        if _type->kind == MIRTypeKind::Integer {
-            let width = (_type as *MIRIntegerType)->width;
-            return width <= 8 ? 1 : width / 8;
-        } else if _type->kind == MIRTypeKind::Float {
-            let width = (_type as *MIRFloatType)->width;
-            return width <= 8 ? 1 : width / 8;
-        } else if _type->kind == MIRTypeKind::Pointer {
-            return 4;
-        } else if _type->kind == MIRTypeKind::Array {
-            return this.AlignOf((_type as *MIRArrayType)->element);
-        } else if _type->kind == MIRTypeKind::Structure {
-            let mut alignment: u32 = 1;
+        match _type->kind {
+            MIRTypeKind::Integer => {
+                let width = (_type as *MIRIntegerType)->width;
+                return width <= 8 ? 1 : width / 8;
+            },
+            MIRTypeKind::Float => {
+                let width = (_type as *MIRFloatType)->width;
+                return width <= 8 ? 1 : width / 8;
+            },
+            MIRTypeKind::Pointer => {
+                return 4;
+            },
+            MIRTypeKind::Array => {
+                return this.AlignOf((_type as *MIRArrayType)->element);
+            },
+            MIRTypeKind::Structure => {
+                let mut alignment: u32 = 1;
 
-            for field in (_type as *MIRStructureType)->fields {
-                let field_alignment = this.AlignOf(field);
+                for field in (_type as *MIRStructureType)->fields {
+                    let field_alignment = this.AlignOf(field);
 
-                if field_alignment > alignment {
-                    alignment = field_alignment;
-                }
-            } return alignment;
-        } else {
-            return 1;
+                    if field_alignment > alignment {
+                        alignment = field_alignment;
+                    }
+                } return alignment;
+            },
+            _ => {
+                return 1;
+            }
         }
     }
 
     fn SizeOf(&this, _type: *MIRType) -> u32 {
-        if _type->kind == MIRTypeKind::Integer {
-            let width = (_type as *MIRIntegerType)->width;
-            return width <= 8 ? 1 : width / 8;
-        } else if _type->kind == MIRTypeKind::Float {
-            let width = (_type as *MIRFloatType)->width;
-            return width <= 8 ? 1 : width / 8;
-        } else if _type->kind == MIRTypeKind::Pointer {
-            return 4;
-        } else if _type->kind == MIRTypeKind::Array {
-            let array = _type as *MIRArrayType;
-            return this.SizeOf(array->element) * array->length as u32;
-        } else if _type->kind == MIRTypeKind::Structure {
-            let mut size: u32 = 0;
-            let alignment = this.AlignOf(_type);
+        match _type->kind {
+            MIRTypeKind::Integer => {
+                let width = (_type as *MIRIntegerType)->width;
+                return width <= 8 ? 1 : width / 8;
+            },
+            MIRTypeKind::Float => {
+                let width = (_type as *MIRFloatType)->width;
+                return width <= 8 ? 1 : width / 8;
+            },
+            MIRTypeKind::Pointer => {
+                return 4;
+            },
+            MIRTypeKind::Array => {
+                let array = _type as *MIRArrayType;
+                return this.SizeOf(array->element) * array->length as u32;
+            },
+            MIRTypeKind::Structure => {
+                let mut size: u32 = 0;
+                let alignment = this.AlignOf(_type);
 
-            for field in (_type as *MIRStructureType)->fields {
-                let field_alignment = this.AlignOf(field);
-                size = this.AlignUp(size, field_alignment);
-                size += this.SizeOf(field);
+                for field in (_type as *MIRStructureType)->fields {
+                    let field_alignment = this.AlignOf(field);
+                    size = this.AlignUp(size, field_alignment);
+                    size += this.SizeOf(field);
+                }
+
+                return this.AlignUp(size, alignment);
+            },
+            _ => {
+                return 0;
             }
-
-            return this.AlignUp(size, alignment);
-        } else {
-            return 0;
         }
     }
 
@@ -1095,32 +1145,37 @@ class LIRLowerer {
         let immediate = this.IsImmediate(right);
         let value = immediate ? this.ImmediateValue(right) : 0;
 
-        if kind == MIRBinaryKind::ICmpEq || kind == MIRBinaryKind::ICmpNe {
-            let mut difference = this.EnsureRegister(left);
+        match kind {
+            MIRBinaryKind::ICmpEq | MIRBinaryKind::ICmpNe => {
+                let mut difference = this.EnsureRegister(left);
 
-            if !immediate {
-                difference = this.EmitValue(LIROpcode::Xor, difference, right);
-            } else if value != 0 && this.FitsUnsigned16(value) {
-                difference = this.EmitValue(LIROpcode::Xori, difference, right);
-            } else if value != 0 {
-                difference = this.EmitValue(LIROpcode::Xor, difference, this.EnsureRegister(right));
+                if !immediate {
+                    difference = this.EmitValue(LIROpcode::Xor, difference, right);
+                } else if value != 0 && this.FitsUnsigned16(value) {
+                    difference = this.EmitValue(LIROpcode::Xori, difference, right);
+                } else if value != 0 {
+                    difference = this.EmitValue(LIROpcode::Xor, difference, this.EnsureRegister(right));
+                }
+
+                if kind == MIRBinaryKind::ICmpEq { return this.EmitValue(LIROpcode::Sltiu, difference, this.Immediate(1)); }
+                return this.EmitValue(LIROpcode::Sltu, this.Zero(), difference);
+            },
+            MIRBinaryKind::ICmpSlt | MIRBinaryKind::ICmpSge => {
+                let result = (immediate && this.FitsSigned16(value)) ? this.EmitValue(LIROpcode::Slti, this.EnsureRegister(left), right)
+                    : this.EmitValue(LIROpcode::Slt, this.EnsureRegister(left), this.EnsureRegister(right));
+                return kind == MIRBinaryKind::ICmpSlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
+            },
+            MIRBinaryKind::ICmpUlt | MIRBinaryKind::ICmpUge => {
+                let result = (immediate && this.FitsUnsigned16(value)) ? this.EmitValue(LIROpcode::Sltiu, this.EnsureRegister(left), right)
+                    : this.EmitValue(LIROpcode::Sltu, this.EnsureRegister(left), this.EnsureRegister(right));
+                return kind == MIRBinaryKind::ICmpUlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
+            },
+            _ => {
+                let opcode = signed ? LIROpcode::Slt : LIROpcode::Sltu;
+                let result = this.EmitValue(opcode, this.EnsureRegister(right), this.EnsureRegister(left));
+                let strict = kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpUgt;
+                return strict ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
             }
-
-            if kind == MIRBinaryKind::ICmpEq { return this.EmitValue(LIROpcode::Sltiu, difference, this.Immediate(1)); }
-            return this.EmitValue(LIROpcode::Sltu, this.Zero(), difference);
-        } else if kind == MIRBinaryKind::ICmpSlt || kind == MIRBinaryKind::ICmpSge {
-            let result = (immediate && this.FitsSigned16(value)) ? this.EmitValue(LIROpcode::Slti, this.EnsureRegister(left), right)
-                : this.EmitValue(LIROpcode::Slt, this.EnsureRegister(left), this.EnsureRegister(right));
-            return kind == MIRBinaryKind::ICmpSlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
-        } else if kind == MIRBinaryKind::ICmpUlt || kind == MIRBinaryKind::ICmpUge {
-            let result = (immediate && this.FitsUnsigned16(value)) ? this.EmitValue(LIROpcode::Sltiu, this.EnsureRegister(left), right)
-                : this.EmitValue(LIROpcode::Sltu, this.EnsureRegister(left), this.EnsureRegister(right));
-            return kind == MIRBinaryKind::ICmpUlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
-        } else {
-            let opcode = signed ? LIROpcode::Slt : LIROpcode::Sltu;
-            let result = this.EmitValue(opcode, this.EnsureRegister(right), this.EnsureRegister(left));
-            let strict = kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpUgt;
-            return strict ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1));
         }
     }
 
@@ -1208,15 +1263,20 @@ class LIRLowerer {
         let value = this.LowerValue(value_value);
         if value == null { return null; }
 
-        if kind == MIRCastKind::Trunc {
-            if this.IsImmediate(value) { return this.Immediate(this.TruncateValue(this.ImmediateValue(value), this.IntegerWidth(_type))); }
-            return value;
-        } else if kind == MIRCastKind::ZExt {
-            return this.ZeroExtend(value, this.IntegerWidth(value_value->_type));
-        } else if kind == MIRCastKind::SExt {
-            return this.SignExtend(value, this.IntegerWidth(value_value->_type));
-        } else {
-            return value;
+        match kind {
+            MIRCastKind::Trunc => {
+                if this.IsImmediate(value) { return this.Immediate(this.TruncateValue(this.ImmediateValue(value), this.IntegerWidth(_type))); }
+                return value;
+            },
+            MIRCastKind::ZExt => {
+                return this.ZeroExtend(value, this.IntegerWidth(value_value->_type));
+            },
+            MIRCastKind::SExt => {
+                return this.SignExtend(value, this.IntegerWidth(value_value->_type));
+            },
+            _ => {
+                return value;
+            }
         }
     }
 
@@ -1293,14 +1353,19 @@ class LIRLowerer {
     }
 
     fn LowerTerminator(&mut this, terminator: *MIRTerminator) {
-        if terminator->kind == MIRTerminatorKind::Return {
-            this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Branch {
-            this.EmitBranch(this.EdgeTarget((terminator as *MIRBranchInstruction)->target, false));
-        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-            this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Unreachable {
-            this.Emit(LIROpcode::Hlt, null, null, null);
+        match terminator->kind {
+            MIRTerminatorKind::Return => {
+                this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
+            },
+            MIRTerminatorKind::Branch => {
+                this.EmitBranch(this.EdgeTarget((terminator as *MIRBranchInstruction)->target, false));
+            },
+            MIRTerminatorKind::ConditionalBranch => {
+                this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
+            },
+            MIRTerminatorKind::Unreachable => {
+                this.Emit(LIROpcode::Hlt, null, null, null);
+            }
         }
     }
 

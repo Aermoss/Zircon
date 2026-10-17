@@ -129,12 +129,17 @@ class LLVMLowerer {
     }
 
     fn LowerDeclarationThirdPass(&mut this, declaration: *MIRDeclaration) {
-        if declaration->kind == MIRDeclarationKind::Constant {
-            this.LowerConstantDeclarationFirstPass(declaration as *MIRConstantDeclaration);
-        } else if declaration->kind == MIRDeclarationKind::Static {
-            this.LowerStaticDeclarationFirstPass(declaration as *MIRStaticDeclaration);
-        } else if declaration->kind == MIRDeclarationKind::Function {
-            this.LowerFunctionDeclarationFirstPass(declaration as *MIRFunctionDeclaration);
+        match declaration->kind {
+            MIRDeclarationKind::Constant => {
+                this.LowerConstantDeclarationFirstPass(declaration as *MIRConstantDeclaration);
+            },
+            MIRDeclarationKind::Static => {
+                this.LowerStaticDeclarationFirstPass(declaration as *MIRStaticDeclaration);
+            },
+            MIRDeclarationKind::Function => {
+                this.LowerFunctionDeclarationFirstPass(declaration as *MIRFunctionDeclaration);
+            },
+            _ => {}
         }
     }
 
@@ -291,14 +296,19 @@ class LLVMLowerer {
     }
 
     fn LowerValue(&mut this, value: *MIRValue) -> LLVMValueRef {
-        if value->kind == MIRValueKind::Constant {
-            return this.LowerConstant(value as *MIRConstant);
-        } else if value->kind == MIRValueKind::Instruction || value->kind == MIRValueKind::Parameter {
-            return this.values.Get(value, null);
-        } else if value->kind == MIRValueKind::DeclarationReference {
-            return this.declarations.Get((value as *MIRDeclarationReference)->declaration, null);
-        } else {
-            return null;
+        match value->kind {
+            MIRValueKind::Constant => {
+                return this.LowerConstant(value as *MIRConstant);
+            },
+            MIRValueKind::Instruction | MIRValueKind::Parameter => {
+                return this.values.Get(value, null);
+            },
+            MIRValueKind::DeclarationReference => {
+                return this.declarations.Get((value as *MIRDeclarationReference)->declaration, null);
+            },
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -306,59 +316,76 @@ class LLVMLowerer {
         let _type = this.LowerType(constant->_type);
         if _type == null { return null; }
 
-        if constant->kind == MIRConstantKind::Integer {
-            return LLVMConstInt(_type, (constant as *MIRConstantInteger)->value, 0);
-        } else if constant->kind == MIRConstantKind::Float {
-            return LLVMConstReal(_type, (constant as *MIRConstantFloat)->value);
-        } else if constant->kind == MIRConstantKind::String {
-            let value = (constant as *MIRConstantString)->value;
-            return LLVMConstStringInContext2(this.context, value.Data(), value.Length(), 0);
-        } else if constant->kind == MIRConstantKind::Array {
-            let mut elements = Vector<LLVMValueRef>();
+        match constant->kind {
+            MIRConstantKind::Integer => {
+                return LLVMConstInt(_type, (constant as *MIRConstantInteger)->value, 0);
+            },
+            MIRConstantKind::Float => {
+                return LLVMConstReal(_type, (constant as *MIRConstantFloat)->value);
+            },
+            MIRConstantKind::String => {
+                let value = (constant as *MIRConstantString)->value;
+                return LLVMConstStringInContext2(this.context, value.Data(), value.Length(), 0);
+            },
+            MIRConstantKind::Array => {
+                let mut elements = Vector<LLVMValueRef>();
 
-            for element in (constant as *MIRConstantArray)->elements {
-                let lowered_element = this.LowerValue(element);
-                if lowered_element == null { return null; }
-                elements.PushBack(lowered_element);
+                for element in (constant as *MIRConstantArray)->elements {
+                    let lowered_element = this.LowerValue(element);
+                    if lowered_element == null { return null; }
+                    elements.PushBack(lowered_element);
+                }
+
+                let _type = this.LowerType((constant->_type as *MIRArrayType)->element);
+                if _type == null { return null; }
+                return LLVMConstArray2(_type, elements.Data(), elements.Size() as u64);
+            },
+            MIRConstantKind::Structure => {
+                let mut fields = Vector<LLVMValueRef>();
+
+                for field in (constant as *MIRConstantStructure)->fields {
+                    let lowered_field = this.LowerValue(field);
+                    if lowered_field == null { return null; }
+                    fields.PushBack(lowered_field);
+                }
+
+                return LLVMConstNamedStruct(_type, fields.Data(), fields.Size() as u32);
+            },
+            MIRConstantKind::Null => {
+                return LLVMConstNull(_type);
+            },
+            MIRConstantKind::Undef => {
+                return LLVMGetUndef(_type);
+            },
+            MIRConstantKind::Expression => {
+                return this.LowerConstantExpression(constant as *MIRConstantExpression);
+            },
+            _ => {
+                return null;
             }
-
-            let _type = this.LowerType((constant->_type as *MIRArrayType)->element);
-            if _type == null { return null; }
-            return LLVMConstArray2(_type, elements.Data(), elements.Size() as u64);
-        } else if constant->kind == MIRConstantKind::Structure {
-            let mut fields = Vector<LLVMValueRef>();
-
-            for field in (constant as *MIRConstantStructure)->fields {
-                let lowered_field = this.LowerValue(field);
-                if lowered_field == null { return null; }
-                fields.PushBack(lowered_field);
-            }
-
-            return LLVMConstNamedStruct(_type, fields.Data(), fields.Size() as u32);
-        } else if constant->kind == MIRConstantKind::Null {
-            return LLVMConstNull(_type);
-        } else if constant->kind == MIRConstantKind::Undef {
-            return LLVMGetUndef(_type);
-        } else if constant->kind == MIRConstantKind::Expression {
-            return this.LowerConstantExpression(constant as *MIRConstantExpression);
-        } else {
-            return null;
         }
     }
 
     fn LowerConstantExpression(&mut this, expression: *MIRConstantExpression) -> LLVMValueRef {
-        if expression->kind == MIRConstantExpressionKind::Unary {
-            return this.LowerUnaryExpression(expression as *MIRUnaryExpression);
-        } else if expression->kind == MIRConstantExpressionKind::Binary {
-            return this.LowerBinaryExpression(expression as *MIRBinaryExpression);
-        } else if expression->kind == MIRConstantExpressionKind::Cast {
-            return this.LowerCastExpression(expression as *MIRCastExpression);
-        } else if expression->kind == MIRConstantExpressionKind::ArrayGEP {
-            return this.LowerArrayGEPExpression(expression as *MIRArrayGEPExpression);
-        } else if expression->kind == MIRConstantExpressionKind::StructGEP {
-            return this.LowerStructGEPExpression(expression as *MIRStructGEPExpression);
-        } else {
-            return null;
+        match expression->kind {
+            MIRConstantExpressionKind::Unary => {
+                return this.LowerUnaryExpression(expression as *MIRUnaryExpression);
+            },
+            MIRConstantExpressionKind::Binary => {
+                return this.LowerBinaryExpression(expression as *MIRBinaryExpression);
+            },
+            MIRConstantExpressionKind::Cast => {
+                return this.LowerCastExpression(expression as *MIRCastExpression);
+            },
+            MIRConstantExpressionKind::ArrayGEP => {
+                return this.LowerArrayGEPExpression(expression as *MIRArrayGEPExpression);
+            },
+            MIRConstantExpressionKind::StructGEP => {
+                return this.LowerStructGEPExpression(expression as *MIRStructGEPExpression);
+            },
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -403,34 +430,49 @@ class LLVMLowerer {
     }
 
     fn LowerInstruction(&mut this, instruction: *MIRInstruction) -> LLVMValueRef {
-        if instruction->kind == MIRInstructionKind::Alloca {
-            return this.LowerAllocaInstruction(instruction as *MIRAllocaInstruction);
-        } else if instruction->kind == MIRInstructionKind::Load {
-            return this.LowerLoadInstruction(instruction as *MIRLoadInstruction);
-        } else if instruction->kind == MIRInstructionKind::Store {
-            return this.LowerStoreInstruction(instruction as *MIRStoreInstruction);
-        } else if instruction->kind == MIRInstructionKind::ArrayGEP {
-            return this.LowerArrayGEPInstruction(instruction as *MIRArrayGEPInstruction);
-        } else if instruction->kind == MIRInstructionKind::StructGEP {
-            return this.LowerStructGEPInstruction(instruction as *MIRStructGEPInstruction);
-        } else if instruction->kind == MIRInstructionKind::Unary {
-            return this.LowerUnaryInstruction(instruction as *MIRUnaryInstruction);
-        } else if instruction->kind == MIRInstructionKind::Binary {
-            return this.LowerBinaryInstruction(instruction as *MIRBinaryInstruction);
-        } else if instruction->kind == MIRInstructionKind::Call {
-            return this.LowerCallInstruction(instruction as *MIRCallInstruction);
-        } else if instruction->kind == MIRInstructionKind::Cast {
-            return this.LowerCastInstruction(instruction as *MIRCastInstruction);
-        } else if instruction->kind == MIRInstructionKind::Select {
-            return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
-        } else if instruction->kind == MIRInstructionKind::Phi {
-            return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
-        } else if instruction->kind == MIRInstructionKind::Assembly {
-            return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
-        } else if instruction->kind == MIRInstructionKind::Terminator {
-            return this.LowerTerminator(instruction as *MIRTerminator);
-        } else {
-            return null;
+        match instruction->kind {
+            MIRInstructionKind::Alloca => {
+                return this.LowerAllocaInstruction(instruction as *MIRAllocaInstruction);
+            },
+            MIRInstructionKind::Load => {
+                return this.LowerLoadInstruction(instruction as *MIRLoadInstruction);
+            },
+            MIRInstructionKind::Store => {
+                return this.LowerStoreInstruction(instruction as *MIRStoreInstruction);
+            },
+            MIRInstructionKind::ArrayGEP => {
+                return this.LowerArrayGEPInstruction(instruction as *MIRArrayGEPInstruction);
+            },
+            MIRInstructionKind::StructGEP => {
+                return this.LowerStructGEPInstruction(instruction as *MIRStructGEPInstruction);
+            },
+            MIRInstructionKind::Unary => {
+                return this.LowerUnaryInstruction(instruction as *MIRUnaryInstruction);
+            },
+            MIRInstructionKind::Binary => {
+                return this.LowerBinaryInstruction(instruction as *MIRBinaryInstruction);
+            },
+            MIRInstructionKind::Call => {
+                return this.LowerCallInstruction(instruction as *MIRCallInstruction);
+            },
+            MIRInstructionKind::Cast => {
+                return this.LowerCastInstruction(instruction as *MIRCastInstruction);
+            },
+            MIRInstructionKind::Select => {
+                return this.LowerSelectInstruction(instruction as *MIRSelectInstruction);
+            },
+            MIRInstructionKind::Phi => {
+                return this.LowerPhiInstruction(instruction as *MIRPhiInstruction);
+            },
+            MIRInstructionKind::Assembly => {
+                return this.LowerAssemblyInstruction(instruction as *MIRAssemblyInstruction);
+            },
+            MIRInstructionKind::Terminator => {
+                return this.LowerTerminator(instruction as *MIRTerminator);
+            },
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -485,10 +527,12 @@ class LLVMLowerer {
     }
 
     fn LowerResolvedUnary(&mut this, kind: MIRUnaryKind, operand: LLVMValueRef, name: *i8) -> LLVMValueRef {
-        if kind == MIRUnaryKind::Neg { return LLVMBuildNeg(this.builder, operand, name); }
-        else if kind == MIRUnaryKind::FNeg { return LLVMBuildFNeg(this.builder, operand, name); }
-        else if kind == MIRUnaryKind::Not { return LLVMBuildNot(this.builder, operand, name); }
-        else { return null; }
+        match kind {
+            MIRUnaryKind::Neg => { return LLVMBuildNeg(this.builder, operand, name); },
+            MIRUnaryKind::FNeg => { return LLVMBuildFNeg(this.builder, operand, name); },
+            MIRUnaryKind::Not => { return LLVMBuildNot(this.builder, operand, name); },
+            _ => { return null; }
+        }
     }
 
     fn LowerBinaryInstruction(&mut this, binary: *MIRBinaryInstruction) -> LLVMValueRef {
@@ -500,41 +544,43 @@ class LLVMLowerer {
     }
 
     fn LowerResolvedBinary(&mut this, kind: MIRBinaryKind, left: LLVMValueRef, right: LLVMValueRef, name: *i8) -> LLVMValueRef {
-        if kind == MIRBinaryKind::Add { return LLVMBuildAdd(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::Sub { return LLVMBuildSub(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::Mul { return LLVMBuildMul(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::SDiv { return LLVMBuildSDiv(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::UDiv { return LLVMBuildUDiv(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::SRem { return LLVMBuildSRem(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::URem { return LLVMBuildURem(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::And { return LLVMBuildAnd(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::Or { return LLVMBuildOr(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::Xor { return LLVMBuildXor(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::Shl { return LLVMBuildShl(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::LShr { return LLVMBuildLShr(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::AShr { return LLVMBuildAShr(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::FAdd { return LLVMBuildFAdd(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::FSub { return LLVMBuildFSub(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::FMul { return LLVMBuildFMul(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::FDiv { return LLVMBuildFDiv(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::FRem { return LLVMBuildFRem(this.builder, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpEq { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntEQ, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpNe { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntNE, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpSlt { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSLT, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpSgt { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSGT, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpSle { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSLE, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpSge { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSGE, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpUlt { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntULT, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpUgt { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntUGT, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpUle { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntULE, left, right, name); }
-        else if kind == MIRBinaryKind::ICmpUge { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntUGE, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpEq { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOEQ, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpNe { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealONE, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpLt { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLT, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpGt { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGT, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpLe { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLE, left, right, name); }
-        else if kind == MIRBinaryKind::FCmpGe { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGE, left, right, name); }
-        else { return null; }
+        match kind {
+            MIRBinaryKind::Add => { return LLVMBuildAdd(this.builder, left, right, name); },
+            MIRBinaryKind::Sub => { return LLVMBuildSub(this.builder, left, right, name); },
+            MIRBinaryKind::Mul => { return LLVMBuildMul(this.builder, left, right, name); },
+            MIRBinaryKind::SDiv => { return LLVMBuildSDiv(this.builder, left, right, name); },
+            MIRBinaryKind::UDiv => { return LLVMBuildUDiv(this.builder, left, right, name); },
+            MIRBinaryKind::SRem => { return LLVMBuildSRem(this.builder, left, right, name); },
+            MIRBinaryKind::URem => { return LLVMBuildURem(this.builder, left, right, name); },
+            MIRBinaryKind::And => { return LLVMBuildAnd(this.builder, left, right, name); },
+            MIRBinaryKind::Or => { return LLVMBuildOr(this.builder, left, right, name); },
+            MIRBinaryKind::Xor => { return LLVMBuildXor(this.builder, left, right, name); },
+            MIRBinaryKind::Shl => { return LLVMBuildShl(this.builder, left, right, name); },
+            MIRBinaryKind::LShr => { return LLVMBuildLShr(this.builder, left, right, name); },
+            MIRBinaryKind::AShr => { return LLVMBuildAShr(this.builder, left, right, name); },
+            MIRBinaryKind::FAdd => { return LLVMBuildFAdd(this.builder, left, right, name); },
+            MIRBinaryKind::FSub => { return LLVMBuildFSub(this.builder, left, right, name); },
+            MIRBinaryKind::FMul => { return LLVMBuildFMul(this.builder, left, right, name); },
+            MIRBinaryKind::FDiv => { return LLVMBuildFDiv(this.builder, left, right, name); },
+            MIRBinaryKind::FRem => { return LLVMBuildFRem(this.builder, left, right, name); },
+            MIRBinaryKind::ICmpEq => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntEQ, left, right, name); },
+            MIRBinaryKind::ICmpNe => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntNE, left, right, name); },
+            MIRBinaryKind::ICmpSlt => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSLT, left, right, name); },
+            MIRBinaryKind::ICmpSgt => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSGT, left, right, name); },
+            MIRBinaryKind::ICmpSle => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSLE, left, right, name); },
+            MIRBinaryKind::ICmpSge => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntSGE, left, right, name); },
+            MIRBinaryKind::ICmpUlt => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntULT, left, right, name); },
+            MIRBinaryKind::ICmpUgt => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntUGT, left, right, name); },
+            MIRBinaryKind::ICmpUle => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntULE, left, right, name); },
+            MIRBinaryKind::ICmpUge => { return LLVMBuildICmp(this.builder, LLVMIntPredicate::LLVMIntUGE, left, right, name); },
+            MIRBinaryKind::FCmpEq => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOEQ, left, right, name); },
+            MIRBinaryKind::FCmpNe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealONE, left, right, name); },
+            MIRBinaryKind::FCmpLt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLT, left, right, name); },
+            MIRBinaryKind::FCmpGt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGT, left, right, name); },
+            MIRBinaryKind::FCmpLe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLE, left, right, name); },
+            MIRBinaryKind::FCmpGe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGE, left, right, name); },
+            _ => { return null; }
+        }
     }
 
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> LLVMValueRef {
@@ -562,19 +608,21 @@ class LLVMLowerer {
     }
 
     fn LowerResolvedCast(&mut this, kind: MIRCastKind, value: LLVMValueRef, target: LLVMTypeRef, name: *i8) -> LLVMValueRef {
-        if kind == MIRCastKind::Trunc { return LLVMBuildTrunc(this.builder, value, target, name); }
-        else if kind == MIRCastKind::ZExt { return LLVMBuildZExt(this.builder, value, target, name); }
-        else if kind == MIRCastKind::SExt { return LLVMBuildSExt(this.builder, value, target, name); }
-        else if kind == MIRCastKind::FPTrunc { return LLVMBuildFPTrunc(this.builder, value, target, name); }
-        else if kind == MIRCastKind::FPExt { return LLVMBuildFPExt(this.builder, value, target, name); }
-        else if kind == MIRCastKind::FPToSI { return LLVMBuildFPToSI(this.builder, value, target, name); }
-        else if kind == MIRCastKind::FPToUI { return LLVMBuildFPToUI(this.builder, value, target, name); }
-        else if kind == MIRCastKind::SIToFP { return LLVMBuildSIToFP(this.builder, value, target, name); }
-        else if kind == MIRCastKind::UIToFP { return LLVMBuildUIToFP(this.builder, value, target, name); }
-        else if kind == MIRCastKind::PtrToInt { return LLVMBuildPtrToInt(this.builder, value, target, name); }
-        else if kind == MIRCastKind::IntToPtr { return LLVMBuildIntToPtr(this.builder, value, target, name); }
-        else if kind == MIRCastKind::Bitcast { return LLVMBuildBitCast(this.builder, value, target, name); }
-        else { return null; }
+        match kind {
+            MIRCastKind::Trunc => { return LLVMBuildTrunc(this.builder, value, target, name); },
+            MIRCastKind::ZExt => { return LLVMBuildZExt(this.builder, value, target, name); },
+            MIRCastKind::SExt => { return LLVMBuildSExt(this.builder, value, target, name); },
+            MIRCastKind::FPTrunc => { return LLVMBuildFPTrunc(this.builder, value, target, name); },
+            MIRCastKind::FPExt => { return LLVMBuildFPExt(this.builder, value, target, name); },
+            MIRCastKind::FPToSI => { return LLVMBuildFPToSI(this.builder, value, target, name); },
+            MIRCastKind::FPToUI => { return LLVMBuildFPToUI(this.builder, value, target, name); },
+            MIRCastKind::SIToFP => { return LLVMBuildSIToFP(this.builder, value, target, name); },
+            MIRCastKind::UIToFP => { return LLVMBuildUIToFP(this.builder, value, target, name); },
+            MIRCastKind::PtrToInt => { return LLVMBuildPtrToInt(this.builder, value, target, name); },
+            MIRCastKind::IntToPtr => { return LLVMBuildIntToPtr(this.builder, value, target, name); },
+            MIRCastKind::Bitcast => { return LLVMBuildBitCast(this.builder, value, target, name); },
+            _ => { return null; }
+        }
     }
 
     fn LowerSelectInstruction(&mut this, select: *MIRSelectInstruction) -> LLVMValueRef {
@@ -637,16 +685,22 @@ class LLVMLowerer {
     }
 
     fn LowerTerminator(&mut this, terminator: *MIRTerminator) -> LLVMValueRef {
-        if terminator->kind == MIRTerminatorKind::Return {
-            return this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Branch {
-            return this.LowerBranchInstruction(terminator as *MIRBranchInstruction);
-        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-            return this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
-        } else if terminator->kind == MIRTerminatorKind::Unreachable {
-            return this.LowerUnreachableInstruction(terminator as *MIRUnreachableInstruction);
-        } else {
-            return null;
+        match terminator->kind {
+            MIRTerminatorKind::Return => {
+                return this.LowerReturnInstruction(terminator as *MIRReturnInstruction);
+            },
+            MIRTerminatorKind::Branch => {
+                return this.LowerBranchInstruction(terminator as *MIRBranchInstruction);
+            },
+            MIRTerminatorKind::ConditionalBranch => {
+                return this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
+            },
+            MIRTerminatorKind::Unreachable => {
+                return this.LowerUnreachableInstruction(terminator as *MIRUnreachableInstruction);
+            },
+            _ => {
+                return null;
+            }
         }
     }
 
@@ -695,44 +749,53 @@ class LLVMLowerer {
     }
 
     fn LowerType(&mut this, _type: *MIRType) -> LLVMTypeRef {
-        if _type->kind == MIRTypeKind::Void {
-            return LLVMVoidTypeInContext(this.context);
-        } else if _type->kind == MIRTypeKind::Integer {
-            return LLVMIntTypeInContext(this.context, (_type as *MIRIntegerType)->width);
-        } else if _type->kind == MIRTypeKind::Float {
-            if (_type as *MIRFloatType)->width == 64 {
-                return LLVMDoubleTypeInContext(this.context);
-            } else {
-                return LLVMFloatTypeInContext(this.context);
-            }
-        } else if _type->kind == MIRTypeKind::Pointer {
-            let pointer = _type as *MIRPointerType;
-            let pointee = this.LowerType(pointer->pointee);
-            if pointee == null { return null; }
-            return LLVMPointerType(pointee, 0);
-        } else if _type->kind == MIRTypeKind::Array {
-            let array = _type as *MIRArrayType;
-            let element = this.LowerType(array->element);
-            if element == null { return null; }
-            return LLVMArrayType2(element, array->length as u64);
-        } else if _type->kind == MIRTypeKind::Structure {
-            if this.types.Has(_type) {
-                return this.types[_type];
-            } else {
-                let mut fields = Vector<LLVMTypeRef>();
-
-                for field in (_type as *MIRStructureType)->fields {
-                    let lowered_field = this.LowerType(field);
-                    if lowered_field == null { return null; }
-                    fields.PushBack(lowered_field);
+        match _type->kind {
+            MIRTypeKind::Void => {
+                return LLVMVoidTypeInContext(this.context);
+            },
+            MIRTypeKind::Integer => {
+                return LLVMIntTypeInContext(this.context, (_type as *MIRIntegerType)->width);
+            },
+            MIRTypeKind::Float => {
+                if (_type as *MIRFloatType)->width == 64 {
+                    return LLVMDoubleTypeInContext(this.context);
+                } else {
+                    return LLVMFloatTypeInContext(this.context);
                 }
+            },
+            MIRTypeKind::Pointer => {
+                let pointer = _type as *MIRPointerType;
+                let pointee = this.LowerType(pointer->pointee);
+                if pointee == null { return null; }
+                return LLVMPointerType(pointee, 0);
+            },
+            MIRTypeKind::Array => {
+                let array = _type as *MIRArrayType;
+                let element = this.LowerType(array->element);
+                if element == null { return null; }
+                return LLVMArrayType2(element, array->length as u64);
+            },
+            MIRTypeKind::Structure => {
+                if this.types.Has(_type) {
+                    return this.types[_type];
+                } else {
+                    let mut fields = Vector<LLVMTypeRef>();
 
-                return LLVMStructTypeInContext(this.context, fields.Data(), fields.Size() as u32, 0);
+                    for field in (_type as *MIRStructureType)->fields {
+                        let lowered_field = this.LowerType(field);
+                        if lowered_field == null { return null; }
+                        fields.PushBack(lowered_field);
+                    }
+
+                    return LLVMStructTypeInContext(this.context, fields.Data(), fields.Size() as u32, 0);
+                }
+            },
+            MIRTypeKind::Function => {
+                return LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0);
+            },
+            _ => {
+                return null;
             }
-        } else if _type->kind == MIRTypeKind::Function {
-            return LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0);
-        } else {
-            return null;
         }
     }
 }

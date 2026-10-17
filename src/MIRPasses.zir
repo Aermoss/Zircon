@@ -403,69 +403,83 @@ class MIRPromoteAllocas {
     fn ResolveOperands(&mut this, instruction: *mut MIRInstruction) {
         let kind = instruction->kind;
 
-        if kind == MIRInstructionKind::Load {
-            let load = instruction as *mut MIRLoadInstruction;
-            load->pointer = this.Resolve(load->pointer);
-        } else if kind == MIRInstructionKind::Store {
-            let store = instruction as *mut MIRStoreInstruction;
-            (store->value, store->pointer) = (this.Resolve(store->value), this.Resolve(store->pointer));
-        } else if kind == MIRInstructionKind::ArrayGEP {
-            let gep = instruction as *mut MIRArrayGEPInstruction;
-            (gep->pointer, gep->index) = (this.Resolve(gep->pointer), this.Resolve(gep->index));
-        } else if kind == MIRInstructionKind::StructGEP {
-            let gep = instruction as *mut MIRStructGEPInstruction;
-            gep->pointer = this.Resolve(gep->pointer);
-        } else if kind == MIRInstructionKind::Unary {
-            let unary = instruction as *mut MIRUnaryInstruction;
-            unary->operand = this.Resolve(unary->operand);
-        } else if kind == MIRInstructionKind::Binary {
-            let binary = instruction as *mut MIRBinaryInstruction;
-            (binary->left, binary->right) = (this.Resolve(binary->left), this.Resolve(binary->right));
-        } else if kind == MIRInstructionKind::Call {
-            let call = instruction as *mut MIRCallInstruction;
-            call->callee = this.Resolve(call->callee);
+        match kind {
+            MIRInstructionKind::Load => {
+                let load = instruction as *mut MIRLoadInstruction;
+                load->pointer = this.Resolve(load->pointer);
+            },
+            MIRInstructionKind::Store => {
+                let store = instruction as *mut MIRStoreInstruction;
+                (store->value, store->pointer) = (this.Resolve(store->value), this.Resolve(store->pointer));
+            },
+            MIRInstructionKind::ArrayGEP => {
+                let gep = instruction as *mut MIRArrayGEPInstruction;
+                (gep->pointer, gep->index) = (this.Resolve(gep->pointer), this.Resolve(gep->index));
+            },
+            MIRInstructionKind::StructGEP => {
+                let gep = instruction as *mut MIRStructGEPInstruction;
+                gep->pointer = this.Resolve(gep->pointer);
+            },
+            MIRInstructionKind::Unary => {
+                let unary = instruction as *mut MIRUnaryInstruction;
+                unary->operand = this.Resolve(unary->operand);
+            },
+            MIRInstructionKind::Binary => {
+                let binary = instruction as *mut MIRBinaryInstruction;
+                (binary->left, binary->right) = (this.Resolve(binary->left), this.Resolve(binary->right));
+            },
+            MIRInstructionKind::Call => {
+                let call = instruction as *mut MIRCallInstruction;
+                call->callee = this.Resolve(call->callee);
 
-            for i in 0..call->arguments.Size() {
-                call->arguments[i] = this.Resolve(call->arguments[i]);
-            }
-        } else if kind == MIRInstructionKind::Cast {
-            let cast = instruction as *mut MIRCastInstruction;
-            cast->value = this.Resolve(cast->value);
-        } else if kind == MIRInstructionKind::Select {
-            let select = instruction as *mut MIRSelectInstruction;
-            select->condition = this.Resolve(select->condition);
-            select->then_value = this.Resolve(select->then_value);
-            select->else_value = this.Resolve(select->else_value);
-        } else if kind == MIRInstructionKind::Phi {
-            let phi = instruction as *mut MIRPhiInstruction;
+                for i in 0..call->arguments.Size() {
+                    call->arguments[i] = this.Resolve(call->arguments[i]);
+                }
+            },
+            MIRInstructionKind::Cast => {
+                let cast = instruction as *mut MIRCastInstruction;
+                cast->value = this.Resolve(cast->value);
+            },
+            MIRInstructionKind::Select => {
+                let select = instruction as *mut MIRSelectInstruction;
+                select->condition = this.Resolve(select->condition);
+                select->then_value = this.Resolve(select->then_value);
+                select->else_value = this.Resolve(select->else_value);
+            },
+            MIRInstructionKind::Phi => {
+                let phi = instruction as *mut MIRPhiInstruction;
 
-            for i in 0..phi->incomings.Size() {
-                phi->incomings[i].value = this.Resolve(phi->incomings[i].value);
-            }
-        } else if kind == MIRInstructionKind::Assembly {
-            let assembly = instruction as *mut MIRAssemblyInstruction;
+                for i in 0..phi->incomings.Size() {
+                    phi->incomings[i].value = this.Resolve(phi->incomings[i].value);
+                }
+            },
+            MIRInstructionKind::Assembly => {
+                let assembly = instruction as *mut MIRAssemblyInstruction;
 
-            for i in 0..assembly->inputs.Size() {
-                let operand = assembly->inputs[i];
-                let value = this.Resolve(operand->value);
-                if value != operand->value { assembly->inputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
-            }
+                for i in 0..assembly->inputs.Size() {
+                    let operand = assembly->inputs[i];
+                    let value = this.Resolve(operand->value);
+                    if value != operand->value { assembly->inputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+                }
 
-            for i in 0..assembly->outputs.Size() {
-                let operand = assembly->outputs[i];
-                let value = this.Resolve(operand->value);
-                if value != operand->value { assembly->outputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
-            }
-        } else if kind == MIRInstructionKind::Terminator {
-            let terminator = instruction as *mut MIRTerminator;
+                for i in 0..assembly->outputs.Size() {
+                    let operand = assembly->outputs[i];
+                    let value = this.Resolve(operand->value);
+                    if value != operand->value { assembly->outputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+                }
+            },
+            MIRInstructionKind::Terminator => {
+                let terminator = instruction as *mut MIRTerminator;
 
-            if terminator->kind == MIRTerminatorKind::Return {
-                let _return = terminator as *mut MIRReturnInstruction;
-                _return->value = this.Resolve(_return->value);
-            } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-                let branch = terminator as *mut MIRConditionalBranchInstruction;
-                branch->condition = this.Resolve(branch->condition);
-            }
+                if terminator->kind == MIRTerminatorKind::Return {
+                    let _return = terminator as *mut MIRReturnInstruction;
+                    _return->value = this.Resolve(_return->value);
+                } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+                    let branch = terminator as *mut MIRConditionalBranchInstruction;
+                    branch->condition = this.Resolve(branch->condition);
+                }
+            },
+            _ => {}
         }
     }
 

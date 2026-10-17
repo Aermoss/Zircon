@@ -113,22 +113,25 @@ class Parser {
             let _type = token._type;
             index += 1;
 
-            if _type == TokenType::LESS {
-                let increment: u64 = 1;
-                depth += increment;
-            } else if _type == TokenType::GREATER {
-                if depth >= 1 {
-                    let decrement: u64 = 1;
-                    depth -= decrement;
-                } else {
+            match _type {
+                TokenType::LESS => {
+                    depth += 1;
+                },
+                TokenType::GREATER => {
+                    if depth >= 1 {
+                        depth -= 1;
+                    } else {
+                        return false;
+                    }
+                },
+                TokenType::SEMICOLON | TokenType::LBRACE | TokenType::RBRACE => {
                     return false;
+                },
+                _ => {
+                    if _type != TokenType::IDENTIFIER && _type != TokenType::COLON && _type != TokenType::DOUBLE_COLON && _type != TokenType::LPAREN && _type != TokenType::RPAREN
+                        && _type != TokenType::MUL && _type != TokenType::BITWISE_AND && _type != TokenType::MUT && _type != TokenType::CONST && _type != TokenType::LBRACKET && _type != TokenType::RBRACKET
+                            && _type != TokenType::FUNCTION && _type != TokenType::THREE_DOT && _type != TokenType::ARROW && _type != TokenType::INTEGER && _type != TokenType::COMMA { return false; }
                 }
-            } else if _type == TokenType::SEMICOLON || _type == TokenType::LBRACE || _type == TokenType::RBRACE {
-                return false;
-            } else {
-                if _type != TokenType::IDENTIFIER && _type != TokenType::COLON && _type != TokenType::DOUBLE_COLON && _type != TokenType::LPAREN && _type != TokenType::RPAREN
-                    && _type != TokenType::MUL && _type != TokenType::BITWISE_AND && _type != TokenType::MUT && _type != TokenType::CONST && _type != TokenType::LBRACKET && _type != TokenType::RBRACKET
-                        && _type != TokenType::FUNCTION && _type != TokenType::THREE_DOT && _type != TokenType::ARROW && _type != TokenType::INTEGER && _type != TokenType::COMMA { return false; }
             }
 
             if depth == 0 {
@@ -182,107 +185,118 @@ class Parser {
     fn ParsePrimary(&mut this) -> *ASTExpression {
         let token = this.Current();
 
-        if token._type == TokenType::TRUE || token._type == TokenType::FALSE {
-            this.Advance();
-            return this.arena.New<ASTBooleanLiteral>(token._type == TokenType::TRUE, token);
-        } else if token._type == TokenType::CHAR {
-            this.Advance();
+        match token._type {
+            TokenType::TRUE | TokenType::FALSE => {
+                this.Advance();
+                return this.arena.New<ASTBooleanLiteral>(token._type == TokenType::TRUE, token);
+            },
+            TokenType::CHAR => {
+                this.Advance();
 
-            if !(token.value.Size() == 2 && token.value[1] == '\0') && !(token.value.Size() == 1 && token.value[0] == '\0') {
-                Logger::Log("Invalid character literal '" + token.value + "'.", token, LogSeverity::Error);
-                return null;
-            }
+                if !(token.value.Size() == 2 && token.value[1] == '\0') && !(token.value.Size() == 1 && token.value[0] == '\0') {
+                    Logger::Log("Invalid character literal '" + token.value + "'.", token, LogSeverity::Error);
+                    return null;
+                }
 
-            return this.arena.New<ASTCharacterLiteral>(token.value[0] as u32, token);
-        } else if token._type == TokenType::INTEGER {
-            this.Advance();
-            let (mut value, mut suffix, mut base) = (String(), String(), 10u64);
-            let mut index = token.value.Find('u');
+                return this.arena.New<ASTCharacterLiteral>(token.value[0] as u32, token);
+            },
+            TokenType::INTEGER => {
+                this.Advance();
+                let (mut value, mut suffix, mut base) = (String(), String(), 10u64);
+                let mut index = token.value.Find('u');
 
-            if index == -1 {
-                index = token.value.Find('i');
-            }
+                if index == -1 {
+                    index = token.value.Find('i');
+                }
 
-            if index != -1 {
-                value = token.value.SubString(0, index as usize);
-                suffix = token.value.SubString(index as usize);
-            } else {
-                value = token.value;
-            }
+                if index != -1 {
+                    value = token.value.SubString(0, index as usize);
+                    suffix = token.value.SubString(index as usize);
+                } else {
+                    value = token.value;
+                }
 
-            if value.StartsWith("0x") {
-                (value, base) = (value.SubString(2), 16);
-            } else if value.StartsWith("0o") {
-                (value, base) = (value.SubString(2), 8);
-            } else if value.StartsWith("0b") {
-                (value, base) = (value.SubString(2), 2);
-            }
+                if value.StartsWith("0x") {
+                    (value, base) = (value.SubString(2), 16);
+                } else if value.StartsWith("0o") {
+                    (value, base) = (value.SubString(2), 8);
+                } else if value.StartsWith("0b") {
+                    (value, base) = (value.SubString(2), 2);
+                }
 
-            return this.arena.New<ASTIntegerLiteral>(value.ToUnsignedInteger(base), suffix, token);
-        } else if token._type == TokenType::FLOAT {
-            this.Advance();
-            let (mut value, mut suffix) = (String(), String());
-            let mut index = token.value.Find('f');
+                return this.arena.New<ASTIntegerLiteral>(value.ToUnsignedInteger(base), suffix, token);
+            },
+            TokenType::FLOAT => {
+                this.Advance();
+                let (mut value, mut suffix) = (String(), String());
+                let mut index = token.value.Find('f');
 
-            if index != -1 {
-                value = token.value.SubString(0, index as usize);
-                suffix = token.value.SubString(index as usize);
-            } else {
-                value = token.value;
-            }
+                if index != -1 {
+                    value = token.value.SubString(0, index as usize);
+                    suffix = token.value.SubString(index as usize);
+                } else {
+                    value = token.value;
+                }
 
-            return this.arena.New<ASTFloatLiteral>(value.ToFloat(), suffix, token);
-        } else if token._type == TokenType::STRING {
-            this.Advance();
-            return this.arena.New<ASTStringLiteral>(token.value, token);
-        } else if token._type == TokenType::NULL {
-            this.Advance();
-            return this.arena.New<ASTNullLiteral>(token);
-        } else if token._type == TokenType::IDENTIFIER || token._type == TokenType::THIS || token._type == TokenType::OPERATOR || token._type == TokenType::DOUBLE_COLON {
-            return this.arena.New<ASTPathExpression>(this.ParsePath(), token);
-        } else if token._type == TokenType::LBRACKET {
-            this.Advance();
-            let array = this.arena.New<ASTArrayLiteral>(token);
+                return this.arena.New<ASTFloatLiteral>(value.ToFloat(), suffix, token);
+            },
+            TokenType::STRING => {
+                this.Advance();
+                return this.arena.New<ASTStringLiteral>(token.value, token);
+            },
+            TokenType::NULL => {
+                this.Advance();
+                return this.arena.New<ASTNullLiteral>(token);
+            },
+            TokenType::IDENTIFIER | TokenType::THIS | TokenType::OPERATOR | TokenType::DOUBLE_COLON => {
+                return this.arena.New<ASTPathExpression>(this.ParsePath(), token);
+            },
+            TokenType::LBRACKET => {
+                this.Advance();
+                let array = this.arena.New<ASTArrayLiteral>(token);
 
-            if !this.Match(TokenType::RBRACKET) {
-                let expression = this.ParseExpression();
-                if expression == null { return null; }
-                array->elements.PushBack(expression);
-
-                while this.Match(TokenType::COMMA) {
+                if !this.Match(TokenType::RBRACKET) {
                     let expression = this.ParseExpression();
                     if expression == null { return null; }
                     array->elements.PushBack(expression);
-                }
 
-                if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-            } return array;
-        } else if token._type == TokenType::LPAREN {
-            this.Advance();
-            let mut expression = this.ParseExpression();
-            if expression == null { return null; }
+                    while this.Match(TokenType::COMMA) {
+                        let expression = this.ParseExpression();
+                        if expression == null { return null; }
+                        array->elements.PushBack(expression);
+                    }
 
-            if this.Match(TokenType::COMMA) {
-                let tuple = this.arena.New<ASTTupleLiteral>(token);
-                tuple->elements.PushBack(expression);
+                    if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+                } return array;
+            },
+            TokenType::LPAREN => {
+                this.Advance();
+                let mut expression = this.ParseExpression();
+                if expression == null { return null; }
 
-                while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
-                    let expression = this.ParseExpression();
-                    if expression == null { return null; }
+                if this.Match(TokenType::COMMA) {
+                    let tuple = this.arena.New<ASTTupleLiteral>(token);
                     tuple->elements.PushBack(expression);
 
-                    if !this.Match(TokenType::COMMA) {
-                        break;
-                    }
-                } expression = tuple;
-            }
+                    while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
+                        let expression = this.ParseExpression();
+                        if expression == null { return null; }
+                        tuple->elements.PushBack(expression);
 
-            if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-            return expression;
-        } else {
-            this.Advance();
-            Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
-            return null;
+                        if !this.Match(TokenType::COMMA) {
+                            break;
+                        }
+                    } expression = tuple;
+                }
+
+                if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                return expression;
+            },
+            _ => {
+                this.Advance();
+                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+                return null;
+            }
         }
     }
 
@@ -385,109 +399,122 @@ class Parser {
     fn ParseUnaryExpression(&mut this) -> *ASTExpression {
         let token = this.Current();
 
-        if token._type == TokenType::BITWISE_AND {
-            this.Advance();
-            let mutable = this.Match(TokenType::MUT);
-            let expression = this.ParseUnaryExpression();
-            if expression == null { return null; }
-            return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::AddressOf, expression, mutable, token);
-        } else if token._type == TokenType::MUL {
-            this.Advance();
-            let expression = this.ParseUnaryExpression();
-            if expression == null { return null; }
-            return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Dereference, expression, false, token);
-        } else if token._type == TokenType::MINUS {
-            this.Advance();
-            let expression = this.ParseUnaryExpression();
-            if expression == null { return null; }
-            return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Negate, expression, false, token);
-        } else if token._type == TokenType::NOT {
-            this.Advance();
-            let expression = this.ParseUnaryExpression();
-            if expression == null { return null; }
-            return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Not, expression, false, token);
-        } else if token._type == TokenType::NEW {
-            this.Advance();
-            let _type = this.ParseType();
-            if _type == null { return null; }
-            let _new = this.arena.New<ASTNewExpression>(_type, token);
+        match token._type {
+            TokenType::BITWISE_AND => {
+                this.Advance();
+                let mutable = this.Match(TokenType::MUT);
+                let expression = this.ParseUnaryExpression();
+                if expression == null { return null; }
+                return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::AddressOf, expression, mutable, token);
+            },
+            TokenType::MUL => {
+                this.Advance();
+                let expression = this.ParseUnaryExpression();
+                if expression == null { return null; }
+                return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Dereference, expression, false, token);
+            },
+            TokenType::MINUS => {
+                this.Advance();
+                let expression = this.ParseUnaryExpression();
+                if expression == null { return null; }
+                return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Negate, expression, false, token);
+            },
+            TokenType::NOT => {
+                this.Advance();
+                let expression = this.ParseUnaryExpression();
+                if expression == null { return null; }
+                return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Not, expression, false, token);
+            },
+            TokenType::NEW => {
+                this.Advance();
+                let _type = this.ParseType();
+                if _type == null { return null; }
+                let _new = this.arena.New<ASTNewExpression>(_type, token);
 
-            if this.Match(TokenType::LBRACKET) {
-                _new->size = this.ParseExpression();
+                if this.Match(TokenType::LBRACKET) {
+                    _new->size = this.ParseExpression();
 
-                if _new->size == null || !this.ExpectSuccess(TokenType::RBRACKET) {
-                    return null;
-                }
-            } else if this.Match(TokenType::LPAREN) {
-                _new->initialized = true;
-
-                if !this.Match(TokenType::RPAREN) {
-                    while this.Current()._type != TokenType::RPAREN {
-                        let argument = this.ParseExpression();
-                        if argument == null { return null; }
-                        _new->arguments.PushBack(argument);
-                        if !this.Match(TokenType::COMMA) { break; }
+                    if _new->size == null || !this.ExpectSuccess(TokenType::RBRACKET) {
+                        return null;
                     }
+                } else if this.Match(TokenType::LPAREN) {
+                    _new->initialized = true;
 
-                    if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                    if !this.Match(TokenType::RPAREN) {
+                        while this.Current()._type != TokenType::RPAREN {
+                            let argument = this.ParseExpression();
+                            if argument == null { return null; }
+                            _new->arguments.PushBack(argument);
+                            if !this.Match(TokenType::COMMA) { break; }
+                        }
+
+                        if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                    }
+                } return _new;
+            },
+            TokenType::DELETE => {
+                this.Advance();
+                let _delete = this.arena.New<ASTDeleteExpression>(token);
+
+                if this.Match(TokenType::LBRACKET) {
+                    if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+                    _delete->array = true;
                 }
-            } return _new;
-        } else if token._type == TokenType::DELETE {
-            this.Advance();
-            let _delete = this.arena.New<ASTDeleteExpression>(token);
 
-            if this.Match(TokenType::LBRACKET) {
-                if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-                _delete->array = true;
+                _delete->expression = this.ParseExpression();
+                if _delete->expression == null { return null; }
+                return _delete;
+            },
+            TokenType::AWAIT => {
+                this.Advance();
+                let expression = this.ParseUnaryExpression();
+                if expression == null { return null; }
+                return this.arena.New<ASTAwaitExpression>(expression, token);
+            },
+            _ => {
+                return this.ParsePostfix();
             }
-
-            _delete->expression = this.ParseExpression();
-            if _delete->expression == null { return null; }
-            return _delete;
-        } else if token._type == TokenType::AWAIT {
-            this.Advance();
-            let expression = this.ParseUnaryExpression();
-            if expression == null { return null; }
-            return this.arena.New<ASTAwaitExpression>(expression, token);
-        } else {
-            return this.ParsePostfix();
         }
     }
 
     fn GetBinaryPrecedence(&this, _type: TokenType) -> i32 {
-        if _type == TokenType::OR { return 1; }
-        else if _type == TokenType::AND { return 2; }
-        else if _type == TokenType::BITWISE_OR { return 3; }
-        else if _type == TokenType::BITWISE_XOR { return 4; }
-        else if _type == TokenType::BITWISE_AND { return 5; }
-        else if _type == TokenType::EQUAL || _type == TokenType::NOT_EQUAL { return 6; }
-        else if _type == TokenType::LESS || _type == TokenType::LESS_EQUAL || _type == TokenType::GREATER || _type == TokenType::GREATER_EQUAL { return 7; }
-        else if _type == TokenType::LSHIFT || _type == TokenType::RSHIFT { return 8; }
-        else if _type == TokenType::PLUS || _type == TokenType::MINUS { return 9; }
-        else if _type == TokenType::MUL || _type == TokenType::DIV || _type == TokenType::MOD { return 10; }
-        else if _type == TokenType::AS { return 11; }
-        else { return -1; }
+        match _type {
+            TokenType::OR => { return 1; },
+            TokenType::AND => { return 2; },
+            TokenType::BITWISE_OR => { return 3; },
+            TokenType::BITWISE_XOR => { return 4; },
+            TokenType::BITWISE_AND => { return 5; },
+            TokenType::EQUAL | TokenType::NOT_EQUAL => { return 6; },
+            TokenType::LESS | TokenType::LESS_EQUAL | TokenType::GREATER | TokenType::GREATER_EQUAL => { return 7; },
+            TokenType::LSHIFT | TokenType::RSHIFT => { return 8; },
+            TokenType::PLUS | TokenType::MINUS => { return 9; },
+            TokenType::MUL | TokenType::DIV | TokenType::MOD => { return 10; },
+            TokenType::AS => { return 11; },
+            _ => { return -1; }
+        }
     }
 
     fn ParseBinaryKind(&this, _type: TokenType) -> ASTBinaryKind {
-        if _type == TokenType::PLUS { return ASTBinaryKind::Add; }
-        else if _type == TokenType::MINUS { return ASTBinaryKind::Subtract; }
-        else if _type == TokenType::MUL { return ASTBinaryKind::Multiply; }
-        else if _type == TokenType::DIV { return ASTBinaryKind::Divide; }
-        else if _type == TokenType::MOD { return ASTBinaryKind::Modulo; }
-        else if _type == TokenType::EQUAL { return ASTBinaryKind::Equal; }
-        else if _type == TokenType::NOT_EQUAL { return ASTBinaryKind::NotEqual; }
-        else if _type == TokenType::LESS { return ASTBinaryKind::Less; }
-        else if _type == TokenType::LESS_EQUAL { return ASTBinaryKind::LessEqual; }
-        else if _type == TokenType::GREATER { return ASTBinaryKind::Greater; }
-        else if _type == TokenType::GREATER_EQUAL { return ASTBinaryKind::GreaterEqual; }
-        else if _type == TokenType::AND { return ASTBinaryKind::LogicalAnd; }
-        else if _type == TokenType::OR { return ASTBinaryKind::LogicalOr; }
-        else if _type == TokenType::BITWISE_AND { return ASTBinaryKind::BitwiseAnd; }
-        else if _type == TokenType::BITWISE_OR { return ASTBinaryKind::BitwiseOr; }
-        else if _type == TokenType::BITWISE_XOR { return ASTBinaryKind::BitwiseXor; }
-        else if _type == TokenType::LSHIFT { return ASTBinaryKind::LeftShift; }
-        else { return ASTBinaryKind::RightShift; }
+        match _type {
+            TokenType::PLUS => { return ASTBinaryKind::Add; },
+            TokenType::MINUS => { return ASTBinaryKind::Subtract; },
+            TokenType::MUL => { return ASTBinaryKind::Multiply; },
+            TokenType::DIV => { return ASTBinaryKind::Divide; },
+            TokenType::MOD => { return ASTBinaryKind::Modulo; },
+            TokenType::EQUAL => { return ASTBinaryKind::Equal; },
+            TokenType::NOT_EQUAL => { return ASTBinaryKind::NotEqual; },
+            TokenType::LESS => { return ASTBinaryKind::Less; },
+            TokenType::LESS_EQUAL => { return ASTBinaryKind::LessEqual; },
+            TokenType::GREATER => { return ASTBinaryKind::Greater; },
+            TokenType::GREATER_EQUAL => { return ASTBinaryKind::GreaterEqual; },
+            TokenType::AND => { return ASTBinaryKind::LogicalAnd; },
+            TokenType::OR => { return ASTBinaryKind::LogicalOr; },
+            TokenType::BITWISE_AND => { return ASTBinaryKind::BitwiseAnd; },
+            TokenType::BITWISE_OR => { return ASTBinaryKind::BitwiseOr; },
+            TokenType::BITWISE_XOR => { return ASTBinaryKind::BitwiseXor; },
+            TokenType::LSHIFT => { return ASTBinaryKind::LeftShift; },
+            _ => { return ASTBinaryKind::RightShift; }
+        }
     }
 
     fn ParseBinaryExpression(&mut this, min_precedence: i32) -> *ASTExpression {
@@ -749,17 +776,19 @@ class Parser {
     }
 
     fn ParseAssignmentKind(&this, _type: TokenType) -> ASTAssignmentKind {
-        if _type == TokenType::ASSIGN { return ASTAssignmentKind::Assign; }
-        else if _type == TokenType::PLUS_ASSIGN { return ASTAssignmentKind::AddAssign; }
-        else if _type == TokenType::MINUS_ASSIGN { return ASTAssignmentKind::SubtractAssign; }
-        else if _type == TokenType::MUL_ASSIGN { return ASTAssignmentKind::MultiplyAssign; }
-        else if _type == TokenType::DIV_ASSIGN { return ASTAssignmentKind::DivideAssign; }
-        else if _type == TokenType::MOD_ASSIGN { return ASTAssignmentKind::ModuloAssign; }
-        else if _type == TokenType::AND_ASSIGN { return ASTAssignmentKind::AndAssign; }
-        else if _type == TokenType::OR_ASSIGN { return ASTAssignmentKind::OrAssign; }
-        else if _type == TokenType::XOR_ASSIGN { return ASTAssignmentKind::XorAssign; }
-        else if _type == TokenType::LSHIFT_ASSIGN { return ASTAssignmentKind::LeftShiftAssign; }
-        else { return ASTAssignmentKind::RightShiftAssign; }
+        match _type {
+            TokenType::ASSIGN => { return ASTAssignmentKind::Assign; },
+            TokenType::PLUS_ASSIGN => { return ASTAssignmentKind::AddAssign; },
+            TokenType::MINUS_ASSIGN => { return ASTAssignmentKind::SubtractAssign; },
+            TokenType::MUL_ASSIGN => { return ASTAssignmentKind::MultiplyAssign; },
+            TokenType::DIV_ASSIGN => { return ASTAssignmentKind::DivideAssign; },
+            TokenType::MOD_ASSIGN => { return ASTAssignmentKind::ModuloAssign; },
+            TokenType::AND_ASSIGN => { return ASTAssignmentKind::AndAssign; },
+            TokenType::OR_ASSIGN => { return ASTAssignmentKind::OrAssign; },
+            TokenType::XOR_ASSIGN => { return ASTAssignmentKind::XorAssign; },
+            TokenType::LSHIFT_ASSIGN => { return ASTAssignmentKind::LeftShiftAssign; },
+            _ => { return ASTAssignmentKind::RightShiftAssign; }
+        }
     }
 
     fn ParseStatement(&mut this, expression: bool) -> *ASTStatement {
@@ -1160,34 +1189,46 @@ class Parser {
         let attributes = this.ParseAttributes();
         let token = this.Current();
 
-        if token._type == TokenType::FUNCTION {
-            return this.ParseFunctionDeclaration(attributes, false);
-        } else if token._type == TokenType::CLASS {
-            return this.ParseClassDeclaration(attributes);
-        } else if token._type == TokenType::STRUCTURE {
-            return this.ParseStructureDeclaration(attributes);
-        } else if token._type == TokenType::ENUMERATION {
-            if this.Peek(2)._type == TokenType::COLON {
-                return this.ParseEnumerationDeclaration(attributes);
-            } else {
-                return this.ParseVariantDeclaration(attributes);
+        match token._type {
+            TokenType::FUNCTION => {
+                return this.ParseFunctionDeclaration(attributes, false);
+            },
+            TokenType::CLASS => {
+                return this.ParseClassDeclaration(attributes);
+            },
+            TokenType::STRUCTURE => {
+                return this.ParseStructureDeclaration(attributes);
+            },
+            TokenType::ENUMERATION => {
+                if this.Peek(2)._type == TokenType::COLON {
+                    return this.ParseEnumerationDeclaration(attributes);
+                } else {
+                    return this.ParseVariantDeclaration(attributes);
+                }
+            },
+            TokenType::EXTEND => {
+                return this.ParseExtendDeclaration();
+            },
+            TokenType::EXTERN => {
+                return this.ParseExternDeclaration();
+            },
+            TokenType::CONST => {
+                return this.ParseConstantDeclaration();
+            },
+            TokenType::STATIC => {
+                return this.ParseStaticDeclaration(attributes);
+            },
+            TokenType::TYPE => {
+                return this.ParseTypeDeclaration();
+            },
+            TokenType::ASSEMBLY | TokenType::VOLATILE => {
+                return this.ParseAssemblyDeclaration();
+            },
+            _ => {
+                this.Advance();
+                Logger::Log("Expected declaration.", token, LogSeverity::Error);
+                return null;
             }
-        } else if token._type == TokenType::EXTEND {
-            return this.ParseExtendDeclaration();
-        } else if token._type == TokenType::EXTERN {
-            return this.ParseExternDeclaration();
-        } else if token._type == TokenType::CONST {
-            return this.ParseConstantDeclaration();
-        } else if token._type == TokenType::STATIC {
-            return this.ParseStaticDeclaration(attributes);
-        } else if token._type == TokenType::TYPE {
-            return this.ParseTypeDeclaration();
-        } else if token._type == TokenType::ASSEMBLY || token._type == TokenType::VOLATILE {
-            return this.ParseAssemblyDeclaration();
-        } else {
-            this.Advance();
-            Logger::Log("Expected declaration.", token, LogSeverity::Error);
-            return null;
         }
     }
 

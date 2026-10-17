@@ -148,16 +148,21 @@ class Logger {
             log.message += ":";
         }
 
-        if severity == LogSeverity::Info {
-            log.message += " \x1b[36mInfo:\x1b[0m ";
-        } else if severity == LogSeverity::Warning {
-            log.message += " \x1b[35mWarning:\x1b[0m ";
-        } else if severity == LogSeverity::Error {
-            log.message += " \x1b[31mError:\x1b[0m ";
-            logger->has_error = true;
-        } else if severity == LogSeverity::Fatal {
-            log.message += " \x1b[31mFatal Error:\x1b[0m ";
-            logger->has_error = true;
+        match severity {
+            LogSeverity::Info => {
+                log.message += " \x1b[36mInfo:\x1b[0m ";
+            },
+            LogSeverity::Warning => {
+                log.message += " \x1b[35mWarning:\x1b[0m ";
+            },
+            LogSeverity::Error => {
+                log.message += " \x1b[31mError:\x1b[0m ";
+                logger->has_error = true;
+            },
+            LogSeverity::Fatal => {
+                log.message += " \x1b[31mFatal Error:\x1b[0m ";
+                logger->has_error = true;
+            }
         }
 
         log.message += message;

@@ -636,38 +636,55 @@ class HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRTypeKind::Never {
-            return (this as *HIRNeverType)->ToString();
-        } else if this.kind == HIRTypeKind::Void {
-            return (this as *HIRVoidType)->ToString();
-        } else if this.kind == HIRTypeKind::Boolean {
-            return (this as *HIRBooleanType)->ToString();
-        } else if this.kind == HIRTypeKind::Character {
-            return (this as *HIRCharacterType)->ToString();
-        } else if this.kind == HIRTypeKind::Integer {
-            return (this as *HIRIntegerType)->ToString();
-        } else if this.kind == HIRTypeKind::Float {
-            return (this as *HIRFloatType)->ToString();
-        } else if this.kind == HIRTypeKind::Pointer {
-            return (this as *HIRPointerType)->ToString();
-        } else if this.kind == HIRTypeKind::Reference {
-            return (this as *HIRReferenceType)->ToString();
-        } else if this.kind == HIRTypeKind::Array {
-            return (this as *HIRArrayType)->ToString();
-        } else if this.kind == HIRTypeKind::Tuple {
-            return (this as *HIRTupleType)->ToString();
-        } else if this.kind == HIRTypeKind::Function {
-            return (this as *HIRFunctionType)->ToString();
-        } else if this.kind == HIRTypeKind::Class {
-            return (this as *HIRClassType)->ToString();
-        } else if this.kind == HIRTypeKind::Structure {
-            return (this as *HIRStructureType)->ToString();
-        } else if this.kind == HIRTypeKind::Enumeration {
-            return (this as *HIREnumerationType)->ToString();
-        } else if this.kind == HIRTypeKind::Variant {
-            return (this as *HIRVariantType)->ToString();
-        } else {
-            return "<invalid type>".ToString();
+        match this.kind {
+            HIRTypeKind::Never => {
+                return (this as *HIRNeverType)->ToString();
+            },
+            HIRTypeKind::Void => {
+                return (this as *HIRVoidType)->ToString();
+            },
+            HIRTypeKind::Boolean => {
+                return (this as *HIRBooleanType)->ToString();
+            },
+            HIRTypeKind::Character => {
+                return (this as *HIRCharacterType)->ToString();
+            },
+            HIRTypeKind::Integer => {
+                return (this as *HIRIntegerType)->ToString();
+            },
+            HIRTypeKind::Float => {
+                return (this as *HIRFloatType)->ToString();
+            },
+            HIRTypeKind::Pointer => {
+                return (this as *HIRPointerType)->ToString();
+            },
+            HIRTypeKind::Reference => {
+                return (this as *HIRReferenceType)->ToString();
+            },
+            HIRTypeKind::Array => {
+                return (this as *HIRArrayType)->ToString();
+            },
+            HIRTypeKind::Tuple => {
+                return (this as *HIRTupleType)->ToString();
+            },
+            HIRTypeKind::Function => {
+                return (this as *HIRFunctionType)->ToString();
+            },
+            HIRTypeKind::Class => {
+                return (this as *HIRClassType)->ToString();
+            },
+            HIRTypeKind::Structure => {
+                return (this as *HIRStructureType)->ToString();
+            },
+            HIRTypeKind::Enumeration => {
+                return (this as *HIREnumerationType)->ToString();
+            },
+            HIRTypeKind::Variant => {
+                return (this as *HIRVariantType)->ToString();
+            },
+            _ => {
+                return "<invalid type>".ToString();
+            }
         }
     }
 }
@@ -933,64 +950,87 @@ class HIRPattern {
     }
 
     pub fn IsIrrefutable(&this) -> bool {
-        if this.kind == HIRPatternKind::Wildcard || this.kind == HIRPatternKind::Rest || this.kind == HIRPatternKind::Identifier {
-            return true;
-        } else if this.kind == HIRPatternKind::Literal {
-            return false;
-        } else if this.kind == HIRPatternKind::Tuple {
-            for pattern in (this as *HIRTuplePattern)->patterns {
-                if !pattern->IsIrrefutable() { return false; }
-            } return true;
-        } else if this.kind == HIRPatternKind::Field {
-            return (this as *HIRFieldPattern)->pattern->IsIrrefutable();
-        } else if this.kind == HIRPatternKind::Structure {
-            for pattern in (this as *HIRStructurePattern)->patterns {
-                if !pattern->IsIrrefutable() { return false; }
-            } return true;
-        } else if this.kind == HIRPatternKind::Variant {
-            let variant = this as *HIRVariantPattern;
-
-            if (variant->member->_type as *HIRVariantType)->declaration->members.Size() != 1 {
+        match this.kind {
+            HIRPatternKind::Wildcard | HIRPatternKind::Rest | HIRPatternKind::Identifier => {
+                return true;
+            },
+            HIRPatternKind::Literal => {
                 return false;
-            }
+            },
+            HIRPatternKind::Tuple => {
+                for pattern in (this as *HIRTuplePattern)->patterns {
+                    if !pattern->IsIrrefutable() { return false; }
+                } return true;
+            },
+            HIRPatternKind::Field => {
+                return (this as *HIRFieldPattern)->pattern->IsIrrefutable();
+            },
+            HIRPatternKind::Structure => {
+                for pattern in (this as *HIRStructurePattern)->patterns {
+                    if !pattern->IsIrrefutable() { return false; }
+                } return true;
+            },
+            HIRPatternKind::Variant => {
+                let variant = this as *HIRVariantPattern;
 
-            for pattern in variant->patterns {
-                if !pattern->IsIrrefutable() { return false; }
-            } return true;
-        } else if this.kind == HIRPatternKind::Or {
-            for pattern in (this as *HIROrPattern)->patterns {
-                if pattern->IsIrrefutable() { return true; }
-            } return false;
-        } else if this.kind == HIRPatternKind::Dereference {
-            return (this as *HIRDereferencePattern)->pattern->IsIrrefutable();
+                if (variant->member->_type as *HIRVariantType)->declaration->members.Size() != 1 {
+                    return false;
+                }
+
+                for pattern in variant->patterns {
+                    if !pattern->IsIrrefutable() { return false; }
+                } return true;
+            },
+            HIRPatternKind::Or => {
+                for pattern in (this as *HIROrPattern)->patterns {
+                    if pattern->IsIrrefutable() { return true; }
+                } return false;
+            },
+            HIRPatternKind::Dereference => {
+                return (this as *HIRDereferencePattern)->pattern->IsIrrefutable();
+            },
+            _ => {}
         } return false;
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRPatternKind::Wildcard {
-            return (this as *HIRWildcardPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Rest {
-            return (this as *HIRRestPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Literal {
-            return (this as *HIRLiteralPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Identifier {
-            return (this as *HIRIdentifierPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Tuple {
-            return (this as *HIRTuplePattern)->ToString();
-        } else if this.kind == HIRPatternKind::Field {
-            return (this as *HIRFieldPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Structure {
-            return (this as *HIRStructurePattern)->ToString();
-        } else if this.kind == HIRPatternKind::Enumeration {
-            return (this as *HIREnumerationPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Variant {
-            return (this as *HIRVariantPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Or {
-            return (this as *HIROrPattern)->ToString();
-        } else if this.kind == HIRPatternKind::Dereference {
-            return (this as *HIRDereferencePattern)->ToString();
-        } else {
-            return "<invalid pattern>".ToString();
+        match this.kind {
+            HIRPatternKind::Wildcard => {
+                return (this as *HIRWildcardPattern)->ToString();
+            },
+            HIRPatternKind::Rest => {
+                return (this as *HIRRestPattern)->ToString();
+            },
+            HIRPatternKind::Literal => {
+                return (this as *HIRLiteralPattern)->ToString();
+            },
+            HIRPatternKind::Identifier => {
+                return (this as *HIRIdentifierPattern)->ToString();
+            },
+            HIRPatternKind::Tuple => {
+                return (this as *HIRTuplePattern)->ToString();
+            },
+            HIRPatternKind::Field => {
+                return (this as *HIRFieldPattern)->ToString();
+            },
+            HIRPatternKind::Structure => {
+                return (this as *HIRStructurePattern)->ToString();
+            },
+            HIRPatternKind::Enumeration => {
+                return (this as *HIREnumerationPattern)->ToString();
+            },
+            HIRPatternKind::Variant => {
+                return (this as *HIRVariantPattern)->ToString();
+            },
+            HIRPatternKind::Or => {
+                return (this as *HIROrPattern)->ToString();
+            },
+            HIRPatternKind::Dereference => {
+                return (this as *HIRDereferencePattern)->ToString();
+            },
+            _ => {
+                return "<invalid pattern>".ToString();
+            }
         }
     }
 }
@@ -1177,90 +1217,132 @@ class HIRExpression {
     }
 
     pub fn Precedence(&this) -> u8 {
-        if this.kind == HIRExpressionKind::Assignment {
-            return 10;
-        } else if this.kind == HIRExpressionKind::Ternary {
-            return 20;
-        } else if this.kind == HIRExpressionKind::Binary {
-            let binary = this as *HIRBinaryExpression;
+        match this.kind {
+            HIRExpressionKind::Assignment => {
+                return 10;
+            },
+            HIRExpressionKind::Ternary => {
+                return 20;
+            },
+            HIRExpressionKind::Binary => {
+                let binary = this as *HIRBinaryExpression;
 
-            if binary->kind == HIRBinaryKind::LogicalOr {
-                return 30;
-            } else if binary->kind == HIRBinaryKind::LogicalAnd {
-                return 40;
-            } else if binary->kind == HIRBinaryKind::BitwiseOr {
-                return 50;
-            } else if binary->kind == HIRBinaryKind::BitwiseXor {
-                return 60;
-            } else if binary->kind == HIRBinaryKind::BitwiseAnd {
-                return 70;
-            } else if binary->kind == HIRBinaryKind::Equal || binary->kind == HIRBinaryKind::NotEqual {
-                return 80;
-            } else if binary->kind == HIRBinaryKind::Less || binary->kind == HIRBinaryKind::LessEqual || binary->kind == HIRBinaryKind::Greater || binary->kind == HIRBinaryKind::GreaterEqual {
-                return 90;
-            } else if binary->kind == HIRBinaryKind::LeftShift || binary->kind == HIRBinaryKind::RightShift {
-                return 100;
-            } else if binary->kind == HIRBinaryKind::Add || binary->kind == HIRBinaryKind::Subtract {
-                return 110;
-            } else if binary->kind == HIRBinaryKind::Multiply || binary->kind == HIRBinaryKind::Divide || binary->kind == HIRBinaryKind::Modulo {
-                return 120;
-            } else {
-                return 0;
+                match binary->kind {
+                    HIRBinaryKind::LogicalOr => {
+                        return 30;
+                    },
+                    HIRBinaryKind::LogicalAnd => {
+                        return 40;
+                    },
+                    HIRBinaryKind::BitwiseOr => {
+                        return 50;
+                    },
+                    HIRBinaryKind::BitwiseXor => {
+                        return 60;
+                    },
+                    HIRBinaryKind::BitwiseAnd => {
+                        return 70;
+                    },
+                    HIRBinaryKind::Equal | HIRBinaryKind::NotEqual => {
+                        return 80;
+                    },
+                    HIRBinaryKind::Less | HIRBinaryKind::LessEqual | HIRBinaryKind::Greater | HIRBinaryKind::GreaterEqual => {
+                        return 90;
+                    },
+                    HIRBinaryKind::LeftShift | HIRBinaryKind::RightShift => {
+                        return 100;
+                    },
+                    HIRBinaryKind::Add | HIRBinaryKind::Subtract => {
+                        return 110;
+                    },
+                    HIRBinaryKind::Multiply | HIRBinaryKind::Divide | HIRBinaryKind::Modulo => {
+                        return 120;
+                    },
+                    _ => {
+                        return 0;
+                    }
+                }
+            },
+            HIRExpressionKind::Unary | HIRExpressionKind::New | HIRExpressionKind::Delete => {
+                return 130;
+            },
+            HIRExpressionKind::Cast => {
+                return 140;
+            },
+            HIRExpressionKind::Call | HIRExpressionKind::Constructor | HIRExpressionKind::Destructor | HIRExpressionKind::IndexAccess | HIRExpressionKind::TupleAccess | HIRExpressionKind::FieldAccess | HIRExpressionKind::MemberAccess | HIRExpressionKind::TagAccess => {
+                return 150;
+            },
+            _ => {
+                return 160;
             }
-        } else if this.kind == HIRExpressionKind::Unary || this.kind == HIRExpressionKind::New || this.kind == HIRExpressionKind::Delete {
-            return 130;
-        } else if this.kind == HIRExpressionKind::Cast {
-            return 140;
-        } else if this.kind == HIRExpressionKind::Call || this.kind == HIRExpressionKind::Constructor || this.kind == HIRExpressionKind::Destructor || this.kind == HIRExpressionKind::IndexAccess || this.kind == HIRExpressionKind::TupleAccess || this.kind == HIRExpressionKind::FieldAccess || this.kind == HIRExpressionKind::MemberAccess || this.kind == HIRExpressionKind::TagAccess {
-            return 150;
-        } else {
-            return 160;
         }
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRExpressionKind::Literal {
-            return (this as *HIRLiteral)->ToString();
-        } else if this.kind == HIRExpressionKind::BindingReference {
-            return (this as *HIRBindingReference)->ToString();
-        } else if this.kind == HIRExpressionKind::DeclarationReference {
-            return (this as *HIRDeclarationReference)->ToString();
-        } else if this.kind == HIRExpressionKind::Assignment {
-            return (this as *HIRAssignmentExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Unary {
-            return (this as *HIRUnaryExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Binary {
-            return (this as *HIRBinaryExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Ternary {
-            return (this as *HIRTernaryExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Call {
-            return (this as *HIRCallExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Cast {
-            return (this as *HIRCastExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::IndexAccess {
-            return (this as *HIRIndexAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::TupleAccess {
-            return (this as *HIRTupleAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::FieldAccess {
-            return (this as *HIRFieldAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::MemberAccess {
-            return (this as *HIRMemberAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::TagAccess {
-            return (this as *HIRTagAccessExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::New {
-            return (this as *HIRNewExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Delete {
-            return (this as *HIRDeleteExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Constructor {
-            return (this as *HIRConstructorExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Destructor {
-            return (this as *HIRDestructorExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Intrinsic {
-            return (this as *HIRIntrinsicExpression)->ToString();
-        } else if this.kind == HIRExpressionKind::Deferred {
-            return (this as *HIRDeferredExpression)->ToString();
-        } else {
-            return "<invalid expression>".ToString();
+        match this.kind {
+            HIRExpressionKind::Literal => {
+                return (this as *HIRLiteral)->ToString();
+            },
+            HIRExpressionKind::BindingReference => {
+                return (this as *HIRBindingReference)->ToString();
+            },
+            HIRExpressionKind::DeclarationReference => {
+                return (this as *HIRDeclarationReference)->ToString();
+            },
+            HIRExpressionKind::Assignment => {
+                return (this as *HIRAssignmentExpression)->ToString();
+            },
+            HIRExpressionKind::Unary => {
+                return (this as *HIRUnaryExpression)->ToString();
+            },
+            HIRExpressionKind::Binary => {
+                return (this as *HIRBinaryExpression)->ToString();
+            },
+            HIRExpressionKind::Ternary => {
+                return (this as *HIRTernaryExpression)->ToString();
+            },
+            HIRExpressionKind::Call => {
+                return (this as *HIRCallExpression)->ToString();
+            },
+            HIRExpressionKind::Cast => {
+                return (this as *HIRCastExpression)->ToString();
+            },
+            HIRExpressionKind::IndexAccess => {
+                return (this as *HIRIndexAccessExpression)->ToString();
+            },
+            HIRExpressionKind::TupleAccess => {
+                return (this as *HIRTupleAccessExpression)->ToString();
+            },
+            HIRExpressionKind::FieldAccess => {
+                return (this as *HIRFieldAccessExpression)->ToString();
+            },
+            HIRExpressionKind::MemberAccess => {
+                return (this as *HIRMemberAccessExpression)->ToString();
+            },
+            HIRExpressionKind::TagAccess => {
+                return (this as *HIRTagAccessExpression)->ToString();
+            },
+            HIRExpressionKind::New => {
+                return (this as *HIRNewExpression)->ToString();
+            },
+            HIRExpressionKind::Delete => {
+                return (this as *HIRDeleteExpression)->ToString();
+            },
+            HIRExpressionKind::Constructor => {
+                return (this as *HIRConstructorExpression)->ToString();
+            },
+            HIRExpressionKind::Destructor => {
+                return (this as *HIRDestructorExpression)->ToString();
+            },
+            HIRExpressionKind::Intrinsic => {
+                return (this as *HIRIntrinsicExpression)->ToString();
+            },
+            HIRExpressionKind::Deferred => {
+                return (this as *HIRDeferredExpression)->ToString();
+            },
+            _ => {
+                return "<invalid expression>".ToString();
+            }
         }
     }
 }
@@ -1277,28 +1359,40 @@ class HIRLiteral : HIRExpression {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRLiteralKind::Boolean {
-            return (this as *HIRBooleanLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Character {
-            return (this as *HIRCharacterLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Integer {
-            return (this as *HIRIntegerLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Float {
-            return (this as *HIRFloatLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::String {
-            return (this as *HIRStringLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Array {
-            return (this as *HIRArrayLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Tuple {
-            return (this as *HIRTupleLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Structure {
-            return (this as *HIRStructureLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Variant {
-            return (this as *HIRVariantLiteral)->ToString();
-        } else if this.kind == HIRLiteralKind::Null {
-            return (this as *HIRNullLiteral)->ToString();
-        } else {
-            return "<invalid literal>".ToString();
+        match this.kind {
+            HIRLiteralKind::Boolean => {
+                return (this as *HIRBooleanLiteral)->ToString();
+            },
+            HIRLiteralKind::Character => {
+                return (this as *HIRCharacterLiteral)->ToString();
+            },
+            HIRLiteralKind::Integer => {
+                return (this as *HIRIntegerLiteral)->ToString();
+            },
+            HIRLiteralKind::Float => {
+                return (this as *HIRFloatLiteral)->ToString();
+            },
+            HIRLiteralKind::String => {
+                return (this as *HIRStringLiteral)->ToString();
+            },
+            HIRLiteralKind::Array => {
+                return (this as *HIRArrayLiteral)->ToString();
+            },
+            HIRLiteralKind::Tuple => {
+                return (this as *HIRTupleLiteral)->ToString();
+            },
+            HIRLiteralKind::Structure => {
+                return (this as *HIRStructureLiteral)->ToString();
+            },
+            HIRLiteralKind::Variant => {
+                return (this as *HIRVariantLiteral)->ToString();
+            },
+            HIRLiteralKind::Null => {
+                return (this as *HIRNullLiteral)->ToString();
+            },
+            _ => {
+                return "<invalid literal>".ToString();
+            }
         }
     }
 }
@@ -1508,11 +1602,13 @@ enum HIRUnaryKind: u8 {
 
 extend HIRUnaryKind {
     pub fn ToString(this) -> String {
-        if this == HIRUnaryKind::AddressOf { return '&'.ToString(); }
-        else if this == HIRUnaryKind::Dereference { return '*'.ToString(); }
-        else if this == HIRUnaryKind::Negate { return '-'.ToString(); }
-        else if this == HIRUnaryKind::Not { return '!'.ToString(); }
-        else { return "<invalid unary>".ToString(); }
+        match this {
+            HIRUnaryKind::AddressOf => { return '&'.ToString(); },
+            HIRUnaryKind::Dereference => { return '*'.ToString(); },
+            HIRUnaryKind::Negate => { return '-'.ToString(); },
+            HIRUnaryKind::Not => { return '!'.ToString(); },
+            _ => { return "<invalid unary>".ToString(); }
+        }
     }
 }
 
@@ -1548,25 +1644,27 @@ enum HIRBinaryKind: u8 {
 
 extend HIRBinaryKind {
     pub fn ToString(this) -> String {
-        if this == HIRBinaryKind::Add { return '+'.ToString(); }
-        else if this == HIRBinaryKind::Subtract { return '-'.ToString(); }
-        else if this == HIRBinaryKind::Multiply { return '*'.ToString(); }
-        else if this == HIRBinaryKind::Divide { return '/'.ToString(); }
-        else if this == HIRBinaryKind::Modulo { return '%'.ToString(); }
-        else if this == HIRBinaryKind::Equal { return "==".ToString(); }
-        else if this == HIRBinaryKind::NotEqual { return "!=".ToString(); }
-        else if this == HIRBinaryKind::Less { return '<'.ToString(); }
-        else if this == HIRBinaryKind::LessEqual { return "<=".ToString(); }
-        else if this == HIRBinaryKind::Greater { return '>'.ToString(); }
-        else if this == HIRBinaryKind::GreaterEqual { return ">=".ToString(); }
-        else if this == HIRBinaryKind::LogicalAnd { return "&&".ToString(); }
-        else if this == HIRBinaryKind::LogicalOr { return "||".ToString(); }
-        else if this == HIRBinaryKind::BitwiseAnd { return '&'.ToString(); }
-        else if this == HIRBinaryKind::BitwiseOr { return '|'.ToString(); }
-        else if this == HIRBinaryKind::BitwiseXor { return '^'.ToString(); }
-        else if this == HIRBinaryKind::LeftShift { return "<<".ToString(); }
-        else if this == HIRBinaryKind::RightShift { return ">>".ToString(); }
-        else { return "<invalid binary>".ToString(); }
+        match this {
+            HIRBinaryKind::Add => { return '+'.ToString(); },
+            HIRBinaryKind::Subtract => { return '-'.ToString(); },
+            HIRBinaryKind::Multiply => { return '*'.ToString(); },
+            HIRBinaryKind::Divide => { return '/'.ToString(); },
+            HIRBinaryKind::Modulo => { return '%'.ToString(); },
+            HIRBinaryKind::Equal => { return "==".ToString(); },
+            HIRBinaryKind::NotEqual => { return "!=".ToString(); },
+            HIRBinaryKind::Less => { return '<'.ToString(); },
+            HIRBinaryKind::LessEqual => { return "<=".ToString(); },
+            HIRBinaryKind::Greater => { return '>'.ToString(); },
+            HIRBinaryKind::GreaterEqual => { return ">=".ToString(); },
+            HIRBinaryKind::LogicalAnd => { return "&&".ToString(); },
+            HIRBinaryKind::LogicalOr => { return "||".ToString(); },
+            HIRBinaryKind::BitwiseAnd => { return '&'.ToString(); },
+            HIRBinaryKind::BitwiseOr => { return '|'.ToString(); },
+            HIRBinaryKind::BitwiseXor => { return '^'.ToString(); },
+            HIRBinaryKind::LeftShift => { return "<<".ToString(); },
+            HIRBinaryKind::RightShift => { return ">>".ToString(); },
+            _ => { return "<invalid binary>".ToString(); }
+        }
     }
 }
 
@@ -1932,32 +2030,46 @@ class HIRStatement {
     }
 
     pub fn ToString(&this, indent: usize) -> String {
-        if this.kind == HIRStatementKind::Block {
-            return (this as *HIRBlockStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Variable {
-            return (' ' * indent * 4) + (this as *HIRLetStatement)->ToString();
-        } else if this.kind == HIRStatementKind::Expression {
-            return (' ' * indent * 4) + (this as *HIRExpressionStatement)->ToString();
-        } else if this.kind == HIRStatementKind::If {
-            return (' ' * indent * 4) + (this as *HIRIfStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::While {
-            return (' ' * indent * 4) + (this as *HIRWhileStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Loop {
-            return (' ' * indent * 4) + (this as *HIRLoopStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::For {
-            return (' ' * indent * 4) + (this as *HIRForStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Match {
-            return (' ' * indent * 4) + (this as *HIRMatchStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Return {
-            return (' ' * indent * 4) + (this as *HIRReturnStatement)->ToString(indent);
-        } else if this.kind == HIRStatementKind::Break {
-            return (' ' * indent * 4) + (this as *HIRBreakStatement)->ToString();
-        } else if this.kind == HIRStatementKind::Continue {
-            return (' ' * indent * 4) + (this as *HIRContinueStatement)->ToString();
-        } else if this.kind == HIRStatementKind::Assembly {
-            return (' ' * indent * 4) + (this as *HIRAssemblyStatement)->ToString();
-        } else {
-            return (' ' * indent * 4) + "<invalid statement>".ToString();
+        match this.kind {
+            HIRStatementKind::Block => {
+                return (this as *HIRBlockStatement)->ToString(indent);
+            },
+            HIRStatementKind::Variable => {
+                return (' ' * indent * 4) + (this as *HIRLetStatement)->ToString();
+            },
+            HIRStatementKind::Expression => {
+                return (' ' * indent * 4) + (this as *HIRExpressionStatement)->ToString();
+            },
+            HIRStatementKind::If => {
+                return (' ' * indent * 4) + (this as *HIRIfStatement)->ToString(indent);
+            },
+            HIRStatementKind::While => {
+                return (' ' * indent * 4) + (this as *HIRWhileStatement)->ToString(indent);
+            },
+            HIRStatementKind::Loop => {
+                return (' ' * indent * 4) + (this as *HIRLoopStatement)->ToString(indent);
+            },
+            HIRStatementKind::For => {
+                return (' ' * indent * 4) + (this as *HIRForStatement)->ToString(indent);
+            },
+            HIRStatementKind::Match => {
+                return (' ' * indent * 4) + (this as *HIRMatchStatement)->ToString(indent);
+            },
+            HIRStatementKind::Return => {
+                return (' ' * indent * 4) + (this as *HIRReturnStatement)->ToString(indent);
+            },
+            HIRStatementKind::Break => {
+                return (' ' * indent * 4) + (this as *HIRBreakStatement)->ToString();
+            },
+            HIRStatementKind::Continue => {
+                return (' ' * indent * 4) + (this as *HIRContinueStatement)->ToString();
+            },
+            HIRStatementKind::Assembly => {
+                return (' ' * indent * 4) + (this as *HIRAssemblyStatement)->ToString();
+            },
+            _ => {
+                return (' ' * indent * 4) + "<invalid statement>".ToString();
+            }
         }
     }
 }
@@ -2294,34 +2406,49 @@ class HIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == HIRDeclarationKind::Parameter {
-            return (this as *HIRParameterDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Function {
-            return (this as *HIRFunctionDeclaration)->ToString(0);
-        } else if this.kind == HIRDeclarationKind::Field {
-            return (this as *HIRFieldDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Class {
-            return (this as *HIRClassDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Structure {
-            return (this as *HIRStructureDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::EnumerationMember {
-            return (this as *HIREnumerationMember)->ToString();
-        } else if this.kind == HIRDeclarationKind::Enumeration {
-            return (this as *HIREnumerationDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::VariantMember {
-            return (this as *HIRVariantMember)->ToString();
-        } else if this.kind == HIRDeclarationKind::Variant {
-            return (this as *HIRVariantDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Extend {
-            return (this as *HIRExtendDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Constant {
-            return (this as *HIRConstantDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Static {
-            return (this as *HIRStaticDeclaration)->ToString();
-        } else if this.kind == HIRDeclarationKind::Assembly {
-            return (this as *HIRAssemblyDeclaration)->ToString();
-        } else {
-            return "<invalid declaration>".ToString();
+        match this.kind {
+            HIRDeclarationKind::Parameter => {
+                return (this as *HIRParameterDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Function => {
+                return (this as *HIRFunctionDeclaration)->ToString(0);
+            },
+            HIRDeclarationKind::Field => {
+                return (this as *HIRFieldDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Class => {
+                return (this as *HIRClassDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Structure => {
+                return (this as *HIRStructureDeclaration)->ToString();
+            },
+            HIRDeclarationKind::EnumerationMember => {
+                return (this as *HIREnumerationMember)->ToString();
+            },
+            HIRDeclarationKind::Enumeration => {
+                return (this as *HIREnumerationDeclaration)->ToString();
+            },
+            HIRDeclarationKind::VariantMember => {
+                return (this as *HIRVariantMember)->ToString();
+            },
+            HIRDeclarationKind::Variant => {
+                return (this as *HIRVariantDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Extend => {
+                return (this as *HIRExtendDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Constant => {
+                return (this as *HIRConstantDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Static => {
+                return (this as *HIRStaticDeclaration)->ToString();
+            },
+            HIRDeclarationKind::Assembly => {
+                return (this as *HIRAssemblyDeclaration)->ToString();
+            },
+            _ => {
+                return "<invalid declaration>".ToString();
+            }
         }
     }
 }
@@ -3062,77 +3189,113 @@ class HIRBuilder {
             if (kind == HIRBinaryKind::Divide || kind == HIRBinaryKind::Modulo) && right == 0 { return null; }
             let (signed, width) = (_type->IsSigned(), _type->Width());
 
-            if kind == HIRBinaryKind::Add {
-                return this.IntegerLiteral(this.MaskToWidth(left + right, width), _type);
-            } else if kind == HIRBinaryKind::Subtract {
-                return this.IntegerLiteral(this.MaskToWidth(left - right, width), _type);
-            } else if kind == HIRBinaryKind::Multiply {
-                return this.IntegerLiteral(this.MaskToWidth(left * right, width), _type);
-            } else if kind == HIRBinaryKind::Divide {
-                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 : left / right, width), _type);
-            } else if kind == HIRBinaryKind::Modulo {
-                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 : left % right, width), _type);
-            } else if kind == HIRBinaryKind::BitwiseAnd {
-                return this.IntegerLiteral(left & right, _type);
-            } else if kind == HIRBinaryKind::BitwiseOr {
-                return this.IntegerLiteral(left | right, _type);
-            } else if kind == HIRBinaryKind::BitwiseXor {
-                return this.IntegerLiteral(left ^ right, _type);
-            } else if kind == HIRBinaryKind::LeftShift {
-                return this.IntegerLiteral(this.MaskToWidth(left << right, width), _type);
-            } else if kind == HIRBinaryKind::RightShift {
-                return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) >> right as i64) as u64 : left >> right, width), _type);
-            } else if kind == HIRBinaryKind::Equal {
-                return this.BooleanLiteral(left == right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::NotEqual {
-                return this.BooleanLiteral(left != right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::Less {
-                return this.BooleanLiteral(signed ? this.SignExtend(left, width) < this.SignExtend(right, width) : left < right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::LessEqual {
-                return this.BooleanLiteral(signed ? this.SignExtend(left, width) <= this.SignExtend(right, width) : left <= right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::Greater {
-                return this.BooleanLiteral(signed ? this.SignExtend(left, width) > this.SignExtend(right, width) : left > right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::GreaterEqual {
-                return this.BooleanLiteral(signed ? this.SignExtend(left, width) >= this.SignExtend(right, width) : left >= right, this.context->BooleanType());
-            } else { return null; }
+            match kind {
+                HIRBinaryKind::Add => {
+                    return this.IntegerLiteral(this.MaskToWidth(left + right, width), _type);
+                },
+                HIRBinaryKind::Subtract => {
+                    return this.IntegerLiteral(this.MaskToWidth(left - right, width), _type);
+                },
+                HIRBinaryKind::Multiply => {
+                    return this.IntegerLiteral(this.MaskToWidth(left * right, width), _type);
+                },
+                HIRBinaryKind::Divide => {
+                    return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 : left / right, width), _type);
+                },
+                HIRBinaryKind::Modulo => {
+                    return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 : left % right, width), _type);
+                },
+                HIRBinaryKind::BitwiseAnd => {
+                    return this.IntegerLiteral(left & right, _type);
+                },
+                HIRBinaryKind::BitwiseOr => {
+                    return this.IntegerLiteral(left | right, _type);
+                },
+                HIRBinaryKind::BitwiseXor => {
+                    return this.IntegerLiteral(left ^ right, _type);
+                },
+                HIRBinaryKind::LeftShift => {
+                    return this.IntegerLiteral(this.MaskToWidth(left << right, width), _type);
+                },
+                HIRBinaryKind::RightShift => {
+                    return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) >> right as i64) as u64 : left >> right, width), _type);
+                },
+                HIRBinaryKind::Equal => {
+                    return this.BooleanLiteral(left == right, this.context->BooleanType());
+                },
+                HIRBinaryKind::NotEqual => {
+                    return this.BooleanLiteral(left != right, this.context->BooleanType());
+                },
+                HIRBinaryKind::Less => {
+                    return this.BooleanLiteral(signed ? this.SignExtend(left, width) < this.SignExtend(right, width) : left < right, this.context->BooleanType());
+                },
+                HIRBinaryKind::LessEqual => {
+                    return this.BooleanLiteral(signed ? this.SignExtend(left, width) <= this.SignExtend(right, width) : left <= right, this.context->BooleanType());
+                },
+                HIRBinaryKind::Greater => {
+                    return this.BooleanLiteral(signed ? this.SignExtend(left, width) > this.SignExtend(right, width) : left > right, this.context->BooleanType());
+                },
+                HIRBinaryKind::GreaterEqual => {
+                    return this.BooleanLiteral(signed ? this.SignExtend(left, width) >= this.SignExtend(right, width) : left >= right, this.context->BooleanType());
+                },
+                _ => { return null; }
+            }
         } else if left->kind == HIRLiteralKind::Float && right->kind == HIRLiteralKind::Float {
             let left = (left as *HIRFloatLiteral)->value;
             let right = (right as *HIRFloatLiteral)->value;
 
-            if kind == HIRBinaryKind::Add {
-                return this.FloatLiteral(left + right, _type);
-            } else if kind == HIRBinaryKind::Subtract {
-                return this.FloatLiteral(left - right, _type);
-            } else if kind == HIRBinaryKind::Multiply {
-                return this.FloatLiteral(left * right, _type);
-            } else if kind == HIRBinaryKind::Divide {
-                return this.FloatLiteral(left / right, _type);
-            } else if kind == HIRBinaryKind::Equal {
-                return this.BooleanLiteral(left == right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::NotEqual {
-                return this.BooleanLiteral(left != right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::Less {
-                return this.BooleanLiteral(left < right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::LessEqual {
-                return this.BooleanLiteral(left <= right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::Greater {
-                return this.BooleanLiteral(left > right, this.context->BooleanType());
-            } else if kind == HIRBinaryKind::GreaterEqual {
-                return this.BooleanLiteral(left >= right, this.context->BooleanType());
-            } else { return null; }
+            match kind {
+                HIRBinaryKind::Add => {
+                    return this.FloatLiteral(left + right, _type);
+                },
+                HIRBinaryKind::Subtract => {
+                    return this.FloatLiteral(left - right, _type);
+                },
+                HIRBinaryKind::Multiply => {
+                    return this.FloatLiteral(left * right, _type);
+                },
+                HIRBinaryKind::Divide => {
+                    return this.FloatLiteral(left / right, _type);
+                },
+                HIRBinaryKind::Equal => {
+                    return this.BooleanLiteral(left == right, this.context->BooleanType());
+                },
+                HIRBinaryKind::NotEqual => {
+                    return this.BooleanLiteral(left != right, this.context->BooleanType());
+                },
+                HIRBinaryKind::Less => {
+                    return this.BooleanLiteral(left < right, this.context->BooleanType());
+                },
+                HIRBinaryKind::LessEqual => {
+                    return this.BooleanLiteral(left <= right, this.context->BooleanType());
+                },
+                HIRBinaryKind::Greater => {
+                    return this.BooleanLiteral(left > right, this.context->BooleanType());
+                },
+                HIRBinaryKind::GreaterEqual => {
+                    return this.BooleanLiteral(left >= right, this.context->BooleanType());
+                },
+                _ => { return null; }
+            }
         } else if left->kind == HIRLiteralKind::Boolean && right->kind == HIRLiteralKind::Boolean {
             let left = (left as *HIRBooleanLiteral)->value;
             let right = (right as *HIRBooleanLiteral)->value;
 
-            if kind == HIRBinaryKind::BitwiseAnd || kind == HIRBinaryKind::LogicalAnd {
-                return this.BooleanLiteral(left && right, _type);
-            } else if kind == HIRBinaryKind::BitwiseOr || kind == HIRBinaryKind::LogicalOr {
-                return this.BooleanLiteral(left || right, _type);
-            } else if kind == HIRBinaryKind::BitwiseXor || kind == HIRBinaryKind::NotEqual {
-                return this.BooleanLiteral(left != right, _type);
-            } else if kind == HIRBinaryKind::Equal {
-                return this.BooleanLiteral(left == right, _type);
-            } else { return null; }
+            match kind {
+                HIRBinaryKind::BitwiseAnd | HIRBinaryKind::LogicalAnd => {
+                    return this.BooleanLiteral(left && right, _type);
+                },
+                HIRBinaryKind::BitwiseOr | HIRBinaryKind::LogicalOr => {
+                    return this.BooleanLiteral(left || right, _type);
+                },
+                HIRBinaryKind::BitwiseXor | HIRBinaryKind::NotEqual => {
+                    return this.BooleanLiteral(left != right, _type);
+                },
+                HIRBinaryKind::Equal => {
+                    return this.BooleanLiteral(left == right, _type);
+                },
+                _ => { return null; }
+            }
         } else { return null; }
     }
 
