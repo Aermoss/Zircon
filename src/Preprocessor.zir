@@ -27,9 +27,9 @@ class Preprocessor {
 
     fn Current(&this) -> Token {
         if this.index >= this.tokens.Size() {
-            return this.tokens[this.tokens.Size() - 1];
+            this.tokens[this.tokens.Size() - 1]
         } else {
-            return this.tokens[this.index];
+            this.tokens[this.index]
         }
     }
 
@@ -37,9 +37,9 @@ class Preprocessor {
         let index = this.index + offset;
 
         if index >= this.tokens.Size() {
-            return this.tokens[this.tokens.Size() - 1];
+            this.tokens[this.tokens.Size() - 1]
         } else {
-            return this.tokens[index];
+            this.tokens[index]
         }
     }
 
@@ -48,15 +48,17 @@ class Preprocessor {
 
         if this.index < this.tokens.Size() {
             this.index += 1;
-        } return token;
+        }
+
+        token
     }
 
     fn Match(&mut this, _type: TokenType) -> bool {
         if this.Current()._type == _type {
             this.Advance();
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 
@@ -67,34 +69,40 @@ class Preprocessor {
             Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
         } else {
             this.Advance();
-        } return token;
+        }
+
+        token
     }
 
     pub fn Condition(&this) -> bool {
         for condition in this.conditions {
             if !condition { return false; }
-        } return true;
+        }
+
+        true
     }
 
     fn ProcessPrimary(&mut this) -> bool {
         if this.Match(TokenType::TRUE) {
-            return true;
+            true
         } else if this.Match(TokenType::FALSE) {
-            return false;
+            false
         } else if this.Match(TokenType::LPAREN) {
             let result = this.ProcessExpression();
             this.Expect(TokenType::RPAREN);
-            return result;
+            result
         } else {
             let name = this.Expect(TokenType::IDENTIFIER).value;
-            return this.defines.Contains(name);
+            this.defines.Contains(name)
         }
     }
 
     fn ProcessNotExpression(&mut this) -> bool {
         if this.Match(TokenType::NOT) {
             return !this.ProcessNotExpression();
-        } return this.ProcessPrimary();
+        }
+
+        this.ProcessPrimary()
     }
 
     fn ProcessAndExpression(&mut this) -> bool {
@@ -104,7 +112,9 @@ class Preprocessor {
             this.Advance();
             let right = this.ProcessNotExpression();
             result = result && right;
-        } return result;
+        }
+
+        result
     }
 
     fn ProcessOrExpression(&mut this) -> bool {
@@ -114,11 +124,13 @@ class Preprocessor {
             this.Advance();
             let right = this.ProcessAndExpression();
             result = result || right;
-        } return result;
+        }
+
+        result
     }
 
     fn ProcessExpression(&mut this) -> bool {
-        return this.ProcessOrExpression();
+        this.ProcessOrExpression()
     }
 
     fn ProcessInclude(&mut this, result: &mut Vector<Token>) {
@@ -266,6 +278,8 @@ class Preprocessor {
                 result.PushBack(token);
                 break;
             }
-        } return result;
+        }
+
+        result
     }
 }

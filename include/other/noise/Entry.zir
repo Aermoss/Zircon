@@ -44,15 +44,15 @@ fn Hash(x: i32, y: i32, seed: i32) -> i32 {
         x_index += 256;
     }
 
-    return hash[x_index as usize] as i32;
+    hash[x_index as usize] as i32
 }
 
 fn Lerp(x: f64, y: f64, t: f64) -> f64 {
-    return x + t * (y - x);
+    x + t * (y - x)
 }
 
 fn Smooth(x: f64, y: f64, t: f64) -> f64 {
-    return Lerp(x, y, t * t * (3.0 - 2.0 * t));
+    Lerp(x, y, t * t * (3.0 - 2.0 * t))
 }
 
 fn Noise(x: f64, y: f64, seed: i32) -> f64 {
@@ -66,7 +66,7 @@ fn Noise(x: f64, y: f64, seed: i32) -> f64 {
     let v = Hash(x_int + 1, y_int + 1, seed);
     let low = Smooth(s as f64, t as f64, x_frac);
     let high = Smooth(u as f64, v as f64, x_frac);
-    return Smooth(low, high, y_frac);
+    Smooth(low, high, y_frac)
 }
 
 fn Perlin(x: f64, y: f64, freq: f64, depth: i32, seed: i32) -> f64 {
@@ -84,5 +84,7 @@ fn Perlin(x: f64, y: f64, freq: f64, depth: i32, seed: i32) -> f64 {
         xa *= 2.0;
         ya *= 2.0;
         i += 1;
-    } return fin / div;
+    }
+
+    fin / div
 }

@@ -95,7 +95,9 @@ fn MIROperands(instruction: *MIRInstruction) -> Vector<*MIRValue> {
             }
         },
         _ => {}
-    } return result;
+    }
+
+    result
 }
 
 fn MIRSuccessors(block: *MIRBlock) -> Vector<*MIRBlock> {
@@ -116,7 +118,9 @@ fn MIRSuccessors(block: *MIRBlock) -> Vector<*MIRBlock> {
             }
         },
         _ => {}
-    } return result;
+    }
+
+    result
 }
 
 fn MIRBuildAdjacency(count: usize, sources: &Vector<usize>, targets: &Vector<usize>, offsets: &mut Vector<usize>, list: &mut Vector<usize>) {
@@ -163,7 +167,7 @@ class MIRControlFlow {
     MIRControlFlow(&mut this) {}
 
     pub fn Index(&this, block: *MIRBlock) -> usize {
-        return this.indices.Get(block, MIR_NO_BLOCK);
+        this.indices.Get(block, MIR_NO_BLOCK)
     }
 
     pub fn Compute(&mut this, function: *MIRFunctionDeclaration) {
@@ -251,6 +255,8 @@ class MIRControlFlow {
         while first != second {
             while first > second { first = this.idom[first]; }
             while second > first { second = this.idom[second]; }
-        } return first;
+        }
+
+        first
     }
 }

@@ -75,29 +75,35 @@ class LIRAllocator {
     }
 
     fn IsAllocatable(&this, register: u8) -> bool {
-        return (register >= LIR_S1 && register <= LIR_S11) || (register >= LIR_T0 && register < LIR_T5) || (register >= LIR_A0 && register <= LIR_A7);
+        (register >= LIR_S1 && register <= LIR_S11) || (register >= LIR_T0 && register < LIR_T5) || (register >= LIR_A0 && register <= LIR_A7)
     }
 
     fn VirtualIndex(&this, operand: *LIROperand) -> i64 {
         if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
             return (operand as *LIRVirtualRegister)->index as i64;
-        } return -1;
+        }
+
+        -1
     }
 
     fn PhysicalIndex(&this, operand: *LIROperand) -> i64 {
         if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical {
             return (operand as *LIRPhysicalRegister)->index as i64;
-        } return -1;
+        }
+
+        -1
     }
 
     fn UsedRegister(&this, operand: *LIROperand) -> *LIROperand {
         if operand != null && operand->kind == LIROperandKind::Memory {
             return (operand as *LIRMemoryOperand)->base;
-        } return operand;
+        }
+
+        operand
     }
 
     fn IsTerminator(&this, instruction: *LIRInstruction) -> bool {
-        return instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt;
+        instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt
     }
 
     fn SetBit(&this, bits: &mut Vector<u64>, base: usize, index: u32) {
@@ -105,7 +111,7 @@ class LIRAllocator {
     }
 
     fn TestBit(&this, bits: &Vector<u64>, base: usize, index: u32) -> bool {
-        return (bits[base + (index / 64) as usize] & (1u64 << ((index % 64) as u64))) != 0;
+        (bits[base + (index / 64) as usize] & (1u64 << ((index % 64) as u64))) != 0
     }
 
     fn Extend(&mut this, register: u32, position: u32) {
@@ -376,7 +382,9 @@ class LIRAllocator {
             if range.start <= end && start <= range.end {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     fn Spill(&mut this, register: u32) {
@@ -529,7 +537,9 @@ class LIRAllocator {
             uses.PushBack(scratch);
             uses.PushBack(slot);
             this.after.PushBack(this.context->arena.New<LIRInstruction>(LIROpcode::Sw, defines, uses));
-        } return scratch;
+        }
+
+        scratch
     }
 
     fn RewriteOperand(&mut this, operand: *LIROperand, load: bool) -> *LIROperand {
@@ -551,7 +561,9 @@ class LIRAllocator {
         } else if interval.register < 0 {
             Logger::Log("Virtual register v" + String::FromInteger(index) + " has no register in '" + this.function->name + "'.", LogSeverity::Error);
             return this.physical[LIR_ZERO as usize];
-        } return this.physical[interval.register as usize];
+        }
+
+        this.physical[interval.register as usize]
     }
 
     fn Rewrite(&mut this) {

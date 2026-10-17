@@ -237,7 +237,9 @@ class GenericDeclaration {
 
         if instance->active == HIRLoweringPass::None {
             this.LowerInstance(instance);
-        } return instance;
+        }
+
+        instance
     }
 }
 

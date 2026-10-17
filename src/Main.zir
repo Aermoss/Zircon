@@ -72,7 +72,7 @@ class Timer {
 
     pub fn Get(&mut this) -> f64 {
         QueryPerformanceCounter(&mut this.counter);
-        return (this.counter as f64) / (this.frequency as f64);
+        (this.counter as f64) / (this.frequency as f64)
     }
 }
 
@@ -96,7 +96,7 @@ fn Execute(command: *i8) -> u32 {
 
     CloseHandle(process_info.hProcess);
     CloseHandle(process_info.hThread);
-    return exit_code;
+    exit_code
 }
 #[else]
 class _TimeSpec {
@@ -164,7 +164,7 @@ class Timer {
         let mut ts: _TimeSpec;
         (ts.sec, ts.nsec) = (0, 0);
         clock_gettime(0, &ts);
-        return (ts.sec as f64) + (ts.nsec as f64) / 1000000000.0;
+        (ts.sec as f64) + (ts.nsec as f64) / 1000000000.0
     }
 }
 
@@ -185,7 +185,7 @@ fn Execute(command: *i8) -> u32 {
 
     let mut status: i32 = 0;
     waitpid(pid, &status, 0);
-    return ((status >> 8) & 0xFF) as u32;
+    ((status >> 8) & 0xFF) as u32
 }
 #[endif]
 
@@ -239,7 +239,7 @@ fn GetWindowsSDKPath() -> String {
     }
 
     FindClose(find_handle);
-    return path;
+    path
 }
 
 fn GetMSVCPath() -> String {
@@ -359,7 +359,7 @@ fn GetMSVCPath() -> String {
     }
 
     FindClose(find_handle3);
-    return path;
+    path
 }
 #[endif]
 
@@ -1005,5 +1005,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         if SplitPath(output_file).left.Empty() { output_file = JoinPath(String("."), output_file); }
 #[endif]
         WriteLine("Program finished with exit code: " + String::FromInteger(Execute(output_file.Data()) as u64) + ".");
-    } return 0;
+    }
+
+    0
 }

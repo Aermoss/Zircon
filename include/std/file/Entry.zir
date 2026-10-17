@@ -98,7 +98,7 @@ fn _ReadFile(path: &String) -> String {
     }
 
     CloseHandle(handle);
-    return content;
+    content
 }
 
 fn _WriteFile(path: &String, content: &String) -> bool {
@@ -112,7 +112,7 @@ fn _WriteFile(path: &String, content: &String) -> bool {
     let mut written: u32 = 0;
     let success = WriteFile(handle, content.Data(), content.Length() as u32, &mut written, null);
     CloseHandle(handle);
-    return success != 0;
+    success != 0
 }
 
 fn GetTemporaryPath() -> String {
@@ -120,10 +120,10 @@ fn GetTemporaryPath() -> String {
     let length = GetTempPathA(sizeof(buffer) as u32, &mut buffer[0]);
 
     if length > 0 && length < sizeof(buffer) as u32 {
-        return String(&buffer[0] as *i8, 0, length as usize);
+        String(&buffer[0] as *i8, 0, length as usize)
     } else {
         WriteLine("\x1b[31mFailed to get temporary path.\x1b[0m");
-        return String();
+        String()
     }
 }
 
@@ -134,20 +134,22 @@ fn AbsolutePath(path: &String) -> String {
 
     if length > 0 && length < MAX_PATH as u32 {
         return String(&buffer[0] as *i8, 0, length as usize);
-    } return path;
+    }
+
+    path
 }
 
 fn PathExists(path: &String) -> bool {
-    return GetFileAttributesA(path.Data()) != INVALID_FILE_ATTRIBUTES;
+    GetFileAttributesA(path.Data()) != INVALID_FILE_ATTRIBUTES
 }
 
 fn FileExists(path: &String) -> bool {
     let attributes = GetFileAttributesA(path.Data());
 
     if attributes != INVALID_FILE_ATTRIBUTES {
-        return (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+        (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0
     } else {
-        return false;
+        false
     }
 }
 
@@ -155,14 +157,14 @@ fn FolderExists(path: &String) -> bool {
     let attributes = GetFileAttributesA(path.Data());
 
     if attributes != INVALID_FILE_ATTRIBUTES {
-        return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
     } else {
-        return false;
+        false
     }
 }
 
 fn RemoveFile(path: &String) -> bool {
-    return DeleteFileA(path.Data()) != 0;
+    DeleteFileA(path.Data()) != 0
 }
 #[else]
 const PATH_SEPERATOR: i8 = '/';
@@ -327,7 +329,7 @@ fn _ReadFile(path: &String) -> String {
     }
 
     close(fd);
-    return content;
+    content
 }
 
 fn _WriteFile(path: &String, content: &String) -> bool {
@@ -341,11 +343,11 @@ fn _WriteFile(path: &String, content: &String) -> bool {
 
     write(fd, content.Data(), content.Length());
     close(fd);
-    return true;
+    true
 }
 
 fn GetTemporaryPath() -> String {
-    return String("/tmp/");
+    String("/tmp/")
 }
 
 fn AbsolutePath(path: &String) -> String {
@@ -354,11 +356,13 @@ fn AbsolutePath(path: &String) -> String {
 
     if result != null {
         return String(&buffer[0] as *i8);
-    } return path;
+    }
+
+    path
 }
 
 fn PathExists(path: &String) -> bool {
-    return access(path.Data(), F_OK) == 0;
+    access(path.Data(), F_OK) == 0
 }
 
 fn FileExists(path: &String) -> bool {
@@ -390,7 +394,7 @@ fn FolderExists(path: &String) -> bool {
 }
 
 fn RemoveFile(path: &String) -> bool {
-    return unlink(path.Data()) == 0;
+    unlink(path.Data()) == 0
 }
 #[endif]
 
@@ -400,9 +404,9 @@ fn JoinPath(directory: &String, file: &String) -> String {
     }
 
     if directory[directory.Length() - 1] == '\\' || directory[directory.Length() - 1] == '/' {
-        return directory + file;
+        directory + file
     } else {
-        return directory + PATH_SEPERATOR + file;
+        directory + PATH_SEPERATOR + file
     }
 }
 
@@ -429,7 +433,7 @@ fn SplitExtension(path: String) -> (String, String) {
 
     let name = String(path, 0, index);
     let extension = String(path, index, path.Length());
-    return (name, extension);
+    (name, extension)
 }
 
 fn SplitPath(path: String) -> (String, String) {
@@ -451,5 +455,5 @@ fn SplitPath(path: String) -> (String, String) {
 
     let directory = String(path, 0, index);
     let file = String(path, index + 1, path.Length());
-    return (directory, file);
+    (directory, file)
 }

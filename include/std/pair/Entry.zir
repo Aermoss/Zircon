@@ -36,6 +36,6 @@ class Pair<L, R> {
 
     pub fn operator=(&mut this, other: &Pair<L, R>) -> &Pair<L, R> {
         (this.left, this.right) = (other.left, other.right);
-        return this;
+        this
     }
 }

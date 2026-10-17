@@ -27,11 +27,11 @@ class Map<K, V> {
 
     ~Map(&mut this) {}
 
-    pub fn Data(&this) -> *Pair<K, V> { return this.vector.Data(); }
-    pub fn Data(&mut this) -> *mut Pair<K, V> { return this.vector.Data(); }
+    pub fn Data(&this) -> *Pair<K, V> { this.vector.Data() }
+    pub fn Data(&mut this) -> *mut Pair<K, V> { this.vector.Data() }
 
-    pub fn Empty(&this) -> bool { return this.vector.Empty(); }
-    pub fn Size(&this) -> usize { return this.vector.Size(); }
+    pub fn Empty(&this) -> bool { this.vector.Empty() }
+    pub fn Size(&this) -> usize { this.vector.Size() }
 
     pub fn Clear(&mut this) {
         this.vector.Clear();
@@ -46,7 +46,9 @@ class Map<K, V> {
 
         for pair in this.vector {
             keys.PushBack(pair.left);
-        } return keys;
+        }
+
+        keys
     }
 
     pub fn Values(&this) -> Vector<V> {
@@ -54,7 +56,9 @@ class Map<K, V> {
 
         for pair in this.vector {
             values.PushBack(pair.right);
-        } return values;
+        }
+
+        values
     }
 
     pub fn Has(&this, key: K) -> bool {
@@ -62,7 +66,9 @@ class Map<K, V> {
             if pair.left == key {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     pub fn Get(&this, key: K, default: V) -> V {
@@ -70,7 +76,9 @@ class Map<K, V> {
             if pair.left == key {
                 return pair.right;
             }
-        } return default;
+        }
+
+        default
     }
 
     pub fn Remove(&mut this, key: K) {
@@ -87,12 +95,14 @@ class Map<K, V> {
             if this.vector[i].left == key {
                 return i as isize;
             }
-        } return -1;
+        }
+
+        -1
     }
 
     pub fn operator=(&mut this, other: &Map<K, V>) -> &mut Map<K, V> {
         this.vector = other.vector;
-        return this;
+        this
     }
 
     pub fn operator[](&mut this, key: K) -> &mut V {
@@ -103,30 +113,30 @@ class Map<K, V> {
         }
 
         this.vector.PushBack(Pair<K, V>(key));
-        return this.vector[this.vector.Size() - 1].right;
+        this.vector[this.vector.Size() - 1].right
     }
 
     pub fn operator[](&this, index: usize) -> &Pair<K, V> {
-        return this.vector[index];
+        this.vector[index]
     }
 
     pub fn operator[](&mut this, index: usize) -> &mut Pair<K, V> {
-        return this.vector[index];
+        this.vector[index]
     }
 
     pub fn Begin(&this) -> *Pair<K, V> {
-        return this.vector.Begin();
+        this.vector.Begin()
     }
 
     pub fn End(&this) -> *Pair<K, V> {
-        return this.vector.End();
+        this.vector.End()
     }
 
     pub fn Begin(&mut this) -> *mut Pair<K, V> {
-        return this.vector.Begin();
+        this.vector.Begin()
     }
 
     pub fn End(&mut this) -> *mut Pair<K, V> {
-        return this.vector.End();
+        this.vector.End()
     }
 }

@@ -43,7 +43,7 @@ class MIRLowerer {
         this.module = this.context.arena.New<MIRModule>();
         this.builder = MIRBuilder(&mut this.context, this.module);
         this.LowerModule(module);
-        return this.module;
+        this.module
     }
 
     fn LowerModule(&mut this, module: *HIRModule) {
@@ -175,9 +175,9 @@ class MIRLowerer {
 
     fn LowerLinkage(&this, linkage: HIRDeclarationLinkage) -> MIRDeclarationLinkage {
         match linkage {
-            HIRDeclarationLinkage::Private => { return MIRDeclarationLinkage::Private; },
-            HIRDeclarationLinkage::Internal => { return MIRDeclarationLinkage::Internal; },
-            _ => { return MIRDeclarationLinkage::External; },
+            HIRDeclarationLinkage::Private => MIRDeclarationLinkage::Private,
+            HIRDeclarationLinkage::Internal => MIRDeclarationLinkage::Internal,
+            _ => MIRDeclarationLinkage::External,
         }
     }
 
@@ -195,24 +195,24 @@ class MIRLowerer {
     }
 
     fn IsAggregate(&mut this, _type: *HIRType) -> bool {
-        return _type != null && _type->HasSpecialMembers();
+        _type != null && _type->HasSpecialMembers()
     }
 
     fn IsIndirectAggregate(&mut this, _type: *HIRType) -> bool {
         if !this.IsAggregate(_type) { return false; }
         let size = _type->Size();
-        return (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial();
+        (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial()
     }
 
     fn LowerAggregateType(&mut this, _type: *HIRType) -> *MIRType {
         let lowered_type = this.LowerType(_type);
 
         if !this.IsAggregate(_type) {
-            return lowered_type;
+            lowered_type
         } else if this.IsIndirectAggregate(_type) {
-            return this.context.PointerType(lowered_type);
+            this.context.PointerType(lowered_type)
         } else {
-            return this.context.IntegerType(_type->Size() as u32 * 8);
+            this.context.IntegerType(_type->Size() as u32 * 8)
         }
     }
 
@@ -908,7 +908,9 @@ class MIRLowerer {
                 },
                 _ => {}
             }
-        } return this.LowerExpression(expression);
+        }
+
+        this.LowerExpression(expression)
     }
 
     fn LowerPlaceExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
@@ -933,32 +935,18 @@ class MIRLowerer {
         }
 
         match expression->kind {
-            HIRExpressionKind::IndexAccess => {
-                return this.LowerIndexAccessExpression(expression as *HIRIndexAccessExpression);
-            },
-            HIRExpressionKind::TupleAccess => {
-                return this.LowerTupleAccessExpression(expression as *HIRTupleAccessExpression);
-            },
-            HIRExpressionKind::FieldAccess => {
-                return this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression);
-            },
-            HIRExpressionKind::MemberAccess => {
-                return this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression);
-            },
-            HIRExpressionKind::TagAccess => {
-                return this.LowerTagAccessExpression(expression as *HIRTagAccessExpression);
-            },
-            HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference => {
-                return this.LowerUnaryExpression(expression as *HIRUnaryExpression);
-            },
-            HIRExpressionKind::Ternary if expression->category == HIRExpressionCategory::Place => {
-                return this.LowerTernaryPlaceExpression(expression as *HIRTernaryExpression);
-            },
+            HIRExpressionKind::IndexAccess => this.LowerIndexAccessExpression(expression as *HIRIndexAccessExpression),
+            HIRExpressionKind::TupleAccess => this.LowerTupleAccessExpression(expression as *HIRTupleAccessExpression),
+            HIRExpressionKind::FieldAccess => this.LowerFieldAccessExpression(expression as *HIRFieldAccessExpression),
+            HIRExpressionKind::MemberAccess => this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression),
+            HIRExpressionKind::TagAccess => this.LowerTagAccessExpression(expression as *HIRTagAccessExpression),
+            HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
+            HIRExpressionKind::Ternary if expression->category == HIRExpressionCategory::Place => this.LowerTernaryPlaceExpression(expression as *HIRTernaryExpression),
             _ => {
                 let alloca = this.builder.BuildAlloca("temporary".ToString(), this.LowerType(expression->_type));
                 this.LowerExpressionTo(expression, alloca);
                 this.temporaries[expression] = alloca;
-                return alloca;
+                alloca
             }
         }
     }
@@ -1016,49 +1004,27 @@ class MIRLowerer {
         }
 
         match expression->kind {
-            HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Tuple && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant => {
-                return this.LowerLiteral(expression as *HIRLiteral);
-            },
-            HIRExpressionKind::Intrinsic => {
-                return this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression);
-            },
-            HIRExpressionKind::Assignment => {
-                return this.LowerAssignmentExpression(expression as *HIRAssignmentExpression);
-            },
-            HIRExpressionKind::Call if !this.IsAggregate(expression->_type) => {
-                return this.LowerCallExpression(expression as *HIRCallExpression, null);
-            },
-            HIRExpressionKind::Destructor => {
-                return this.LowerDestructorExpression(expression as *HIRDestructorExpression);
-            },
-            HIRExpressionKind::New => {
-                return this.LowerNewExpression(expression as *HIRNewExpression);
-            },
-            HIRExpressionKind::Delete => {
-                return this.LowerDeleteExpression(expression as *HIRDeleteExpression);
-            },
-            HIRExpressionKind::Cast => {
-                return this.LowerCastExpression(expression as *HIRCastExpression);
-            },
-            HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference => {
-                return this.LowerUnaryExpression(expression as *HIRUnaryExpression);
-            },
-            HIRExpressionKind::Binary => {
-                return this.LowerBinaryExpression(expression as *HIRBinaryExpression);
-            },
-            HIRExpressionKind::Ternary if !this.IsAggregate(expression->_type) => {
-                return this.LowerTernaryExpression(expression as *HIRTernaryExpression);
-            },
+            HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Tuple && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant => this.LowerLiteral(expression as *HIRLiteral),
+            HIRExpressionKind::Intrinsic => this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression),
+            HIRExpressionKind::Assignment => this.LowerAssignmentExpression(expression as *HIRAssignmentExpression),
+            HIRExpressionKind::Call if !this.IsAggregate(expression->_type) => this.LowerCallExpression(expression as *HIRCallExpression, null),
+            HIRExpressionKind::Destructor => this.LowerDestructorExpression(expression as *HIRDestructorExpression),
+            HIRExpressionKind::New => this.LowerNewExpression(expression as *HIRNewExpression),
+            HIRExpressionKind::Delete => this.LowerDeleteExpression(expression as *HIRDeleteExpression),
+            HIRExpressionKind::Cast => this.LowerCastExpression(expression as *HIRCastExpression),
+            HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
+            HIRExpressionKind::Binary => this.LowerBinaryExpression(expression as *HIRBinaryExpression),
+            HIRExpressionKind::Ternary if !this.IsAggregate(expression->_type) => this.LowerTernaryExpression(expression as *HIRTernaryExpression),
             HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsVoid() || expression->_type->IsNever() => {
                 this.LowerControlExpression(expression, null);
                 this.EnsureReachable();
-                return this.builder.ConstantUndef(this.LowerType(expression->_type));
+                this.builder.ConstantUndef(this.LowerType(expression->_type))
             },
             _ => {
                 let place = this.LowerPlaceExpression(expression);
                 if place == null { return null; }
                 if place->_type->kind == MIRTypeKind::Function { return place; }
-                return this.builder.BuildLoad("load".ToString(), place);
+                this.builder.BuildLoad("load".ToString(), place)
             }
         }
     }
@@ -1067,18 +1033,10 @@ class MIRLowerer {
         let _type = this.LowerType(literal->_type);
 
         match literal->kind {
-            HIRLiteralKind::Boolean => {
-                return this.builder.ConstantInteger((literal as *HIRBooleanLiteral)->value ? 1 : 0, _type);
-            },
-            HIRLiteralKind::Character => {
-                return this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as u64, _type);
-            },
-            HIRLiteralKind::Integer => {
-                return this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type);
-            },
-            HIRLiteralKind::Float => {
-                return this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type);
-            },
+            HIRLiteralKind::Boolean => this.builder.ConstantInteger((literal as *HIRBooleanLiteral)->value ? 1 : 0, _type),
+            HIRLiteralKind::Character => this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as u64, _type),
+            HIRLiteralKind::Integer => this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type),
+            HIRLiteralKind::Float => this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type),
             HIRLiteralKind::String => {
                 let value = (literal as *HIRStringLiteral)->value;
                 let mut _static: *MIRStaticDeclaration = null;
@@ -1094,14 +1052,10 @@ class MIRLowerer {
                 }
 
                 let reference = this.builder.ReferenceDeclaration(_static);
-                return this.builder.BuildCast("string.cast".ToString(), MIRCastKind::Bitcast, reference, _type);
+                this.builder.BuildCast("string.cast".ToString(), MIRCastKind::Bitcast, reference, _type)
             },
-            HIRLiteralKind::Null => {
-                return this.builder.ConstantNull(_type);
-            },
-            _ => {
-                return null;
-            }
+            HIRLiteralKind::Null => this.builder.ConstantNull(_type),
+            _ => null
         }
     }
 
@@ -1156,7 +1110,7 @@ class MIRLowerer {
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
         let value = intrinsic->kind == HIRIntrinsicKind::SizeOf ? intrinsic->_type->Size() : intrinsic->_type->Alignment();
-        return this.builder.ConstantInteger(value as u64, this.LowerType((intrinsic as *HIRExpression)->_type));
+        this.builder.ConstantInteger(value as u64, this.LowerType((intrinsic as *HIRExpression)->_type))
     }
 
     fn LowerAssignmentExpression(&mut this, assignment: *HIRAssignmentExpression) -> *MIRValue {
@@ -1164,7 +1118,7 @@ class MIRLowerer {
         let value = this.LowerExpression(assignment->right);
         if place == null || value == null { return null; }
         this.builder.BuildStore(value, place);
-        return value;
+        value
     }
 
     fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>) -> Vector<*MIRValue> {
@@ -1193,7 +1147,9 @@ class MIRLowerer {
                 if value == null { return Vector<*MIRValue>(); }
                 lowered_arguments.PushBack(value);
             }
-        } return lowered_arguments;
+        }
+
+        lowered_arguments
     }
 
     fn LowerCallExpression(&mut this, call: *HIRCallExpression, destination: *MIRValue) -> *MIRValue {
@@ -1219,7 +1175,9 @@ class MIRLowerer {
             return destination;
         } else if destination != null {
             this.builder.BuildStore(result, destination);
-        } return result;
+        }
+
+        result
     }
 
     fn LowerConstructorExpression(&mut this, constructor: *HIRConstructorExpression, destination: *MIRValue) -> *MIRValue {
@@ -1231,7 +1189,7 @@ class MIRLowerer {
         types.RemoveAt(0);
         arguments += this.LowerCallArguments(constructor->arguments, types);
         this.builder.BuildCall("constructor".ToString(), callee, arguments);
-        return destination;
+        destination
     }
 
     fn LowerDestructorExpression(&mut this, destructor: *HIRDestructorExpression) -> *MIRValue {
@@ -1242,7 +1200,7 @@ class MIRLowerer {
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(instance);
         this.builder.BuildCall("destructor".ToString(), callee, arguments);
-        return null;
+        null
     }
 
     fn LowerRuntimeFunction(&mut this, name: String, parameter_types: &Vector<*MIRType>, _return: *MIRType) -> *MIRFunctionDeclaration {
@@ -1265,12 +1223,12 @@ class MIRLowerer {
         if this.runtime_functions.Has(name) { return this.runtime_functions[name]; }
         let function = this.builder.BuildFunction(name, parameters, _return, MIRDeclarationLinkage::External);
         this.runtime_functions[name] = function;
-        return function;
+        function
     }
 
     fn ArrayCookieSize(&mut this, element: *HIRType) -> u64 {
         let (pointer_size, alignment) = (this.target_info.pointer_size as u64, element->Alignment() as u64);
-        return alignment > pointer_size ? alignment : pointer_size;
+        alignment > pointer_size ? alignment : pointer_size
     }
 
     fn LowerNewExpression(&mut this, _new: *HIRNewExpression) -> *MIRValue {
@@ -1334,7 +1292,9 @@ class MIRLowerer {
                 arguments += this.LowerCallArguments(_new->arguments, types);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments);
             }
-        } return pointer;
+        }
+
+        pointer
     }
 
     fn LowerDeleteExpression(&mut this, _delete: *HIRDeleteExpression) -> *MIRValue {
@@ -1392,7 +1352,7 @@ class MIRLowerer {
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(raw_pointer);
         this.builder.BuildCall("delete".ToString(), callee, arguments);
-        return null;
+        null
     }
 
     fn UpcastPointer(&mut this, mut value: *MIRValue, mut source: *HIRType, path: &Vector<u32>) -> *MIRValue {
@@ -1400,7 +1360,9 @@ class MIRLowerer {
             let destination = (source as *HIRClassType)->declaration->parents[index as usize];
             value = this.builder.BuildStructGEP("cast.base".ToString(), value, index, this.context.PointerType(this.LowerType(destination)));
             source = destination;
-        } return value;
+        }
+
+        value
     }
 
     fn LowerCastExpression(&mut this, cast: *HIRCastExpression) -> *MIRValue {
@@ -1520,7 +1482,9 @@ class MIRLowerer {
                     return this.builder.BuildCast("cast".ToString(), MIRCastKind::Trunc, value, this.LowerType(target_type));
                 }
             }
-        } return value;
+        }
+
+        value
     }
 
     fn LowerIndexAccessExpression(&mut this, index_access: *HIRIndexAccessExpression) -> *MIRValue {
@@ -1537,21 +1501,21 @@ class MIRLowerer {
 
         let index = this.LowerExpression(index_access->index);
         if value == null || index == null { return null; }
-        return this.builder.BuildArrayGEP("index.access".ToString(), value, index);
+        this.builder.BuildArrayGEP("index.access".ToString(), value, index)
     }
 
     fn LowerTupleAccessExpression(&mut this, tuple_access: *HIRTupleAccessExpression) -> *MIRValue {
         let instance = this.LowerPlaceExpression(tuple_access->instance);
         if instance == null { return null; }
         let element_type = this.context.PointerType(this.LowerType(tuple_access->_type));
-        return this.builder.BuildStructGEP("tuple.access".ToString(), instance, tuple_access->index as u32, element_type);
+        this.builder.BuildStructGEP("tuple.access".ToString(), instance, tuple_access->index as u32, element_type)
     }
 
     fn LowerFieldAccessExpression(&mut this, field_access: *HIRFieldAccessExpression) -> *MIRValue {
         let instance = this.LowerPlaceExpression(field_access->instance);
         if instance == null { return null; }
         let field_type = this.context.PointerType(this.LowerType(field_access->_type));
-        return this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type);
+        this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type)
     }
 
     fn LowerMemberAccessExpression(&mut this, member_access: *HIRMemberAccessExpression) -> *MIRValue {
@@ -1569,37 +1533,33 @@ class MIRLowerer {
         if instance == null { return null; }
         let pointer = this.builder.BuildCast("member.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(member_type));
         let index = member_access->field->index + 1;
-        return this.builder.BuildStructGEP("member.access".ToString(), pointer, index as u32, this.context.PointerType(fields[index]));
+        this.builder.BuildStructGEP("member.access".ToString(), pointer, index as u32, this.context.PointerType(fields[index]))
     }
 
     fn LowerTagAccessExpression(&mut this, tag_access: *HIRTagAccessExpression) -> *MIRValue {
         let instance = this.LowerPlaceExpression(tag_access->instance);
         if instance == null { return null; }
-        return this.builder.BuildCast("tag.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(this.context.IntegerType(8)));
+        this.builder.BuildCast("tag.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(this.context.IntegerType(8)))
     }
 
     fn LowerUnaryExpression(&mut this, unary: *HIRUnaryExpression) -> *MIRValue {
         if unary->kind == HIRUnaryKind::AddressOf {
-            return this.LowerPlaceExpression(unary->operand);
+            this.LowerPlaceExpression(unary->operand)
         } else {
             let operand = this.LowerExpression(unary->operand);
             if operand == null { return null; }
 
             match unary->kind {
-                HIRUnaryKind::Dereference => {
-                    return operand;
-                },
+                HIRUnaryKind::Dereference => operand,
                 HIRUnaryKind::Negate => {
                     if unary->operand->_type->IsFloat() {
-                        return this.builder.BuildUnary("neg".ToString(), MIRUnaryKind::FNeg, operand);
+                        this.builder.BuildUnary("neg".ToString(), MIRUnaryKind::FNeg, operand)
                     } else {
-                        return this.builder.BuildUnary("neg".ToString(), MIRUnaryKind::Neg, operand);
+                        this.builder.BuildUnary("neg".ToString(), MIRUnaryKind::Neg, operand)
                     }
                 },
-                HIRUnaryKind::Not => {
-                    return this.builder.BuildUnary("not".ToString(), MIRUnaryKind::Not, operand);
-                },
-                _ => { return null; }
+                HIRUnaryKind::Not => this.builder.BuildUnary("not".ToString(), MIRUnaryKind::Not, operand),
+                _ => null
             }
         }
     }
@@ -1655,135 +1615,59 @@ class MIRLowerer {
 
         if left_type->IsBoolean() && right_type->IsBoolean() {
             match binary->kind {
-                HIRBinaryKind::BitwiseAnd => {
-                    return this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseOr => {
-                    return this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseXor => {
-                    return this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type);
-                },
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
+                HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
+                HIRBinaryKind::BitwiseXor => this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type),
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                _ => null
             }
         } else if left_type->IsCharacter() && right_type->IsCharacter() {
             match binary->kind {
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                HIRBinaryKind::Less => {
-                    return this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, left, right, result_type);
-                },
-                HIRBinaryKind::LessEqual => {
-                    return this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, left, right, result_type);
-                },
-                HIRBinaryKind::Greater => {
-                    return this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, left, right, result_type);
-                },
-                HIRBinaryKind::GreaterEqual => {
-                    return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, left, right, result_type),
+                _ => null
             }
         } else if left_type->IsInteger() && right_type->IsInteger() {
             let signed = left_type->IsSigned();
 
             match binary->kind {
-                HIRBinaryKind::Add => {
-                    return this.builder.BuildBinary("add".ToString(), MIRBinaryKind::Add, left, right, result_type);
-                },
-                HIRBinaryKind::Subtract => {
-                    return this.builder.BuildBinary("sub".ToString(), MIRBinaryKind::Sub, left, right, result_type);
-                },
-                HIRBinaryKind::Multiply => {
-                    return this.builder.BuildBinary("mul".ToString(), MIRBinaryKind::Mul, left, right, result_type);
-                },
-                HIRBinaryKind::Divide => {
-                    return this.builder.BuildBinary("div".ToString(), signed ? MIRBinaryKind::SDiv : MIRBinaryKind::UDiv, left, right, result_type);
-                },
-                HIRBinaryKind::Modulo => {
-                    return this.builder.BuildBinary("rem".ToString(), signed ? MIRBinaryKind::SRem : MIRBinaryKind::URem, left, right, result_type);
-                },
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                HIRBinaryKind::Less => {
-                    return this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type);
-                },
-                HIRBinaryKind::LessEqual => {
-                    return this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type);
-                },
-                HIRBinaryKind::Greater => {
-                    return this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type);
-                },
-                HIRBinaryKind::GreaterEqual => {
-                    return this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseAnd => {
-                    return this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseOr => {
-                    return this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseXor => {
-                    return this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type);
-                },
-                HIRBinaryKind::LeftShift => {
-                    return this.builder.BuildBinary("shl".ToString(), MIRBinaryKind::Shl, left, right, result_type);
-                },
-                HIRBinaryKind::RightShift => {
-                    return this.builder.BuildBinary("shr".ToString(), signed ? MIRBinaryKind::AShr : MIRBinaryKind::LShr, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Add => this.builder.BuildBinary("add".ToString(), MIRBinaryKind::Add, left, right, result_type),
+                HIRBinaryKind::Subtract => this.builder.BuildBinary("sub".ToString(), MIRBinaryKind::Sub, left, right, result_type),
+                HIRBinaryKind::Multiply => this.builder.BuildBinary("mul".ToString(), MIRBinaryKind::Mul, left, right, result_type),
+                HIRBinaryKind::Divide => this.builder.BuildBinary("div".ToString(), signed ? MIRBinaryKind::SDiv : MIRBinaryKind::UDiv, left, right, result_type),
+                HIRBinaryKind::Modulo => this.builder.BuildBinary("rem".ToString(), signed ? MIRBinaryKind::SRem : MIRBinaryKind::URem, left, right, result_type),
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type),
+                HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
+                HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
+                HIRBinaryKind::BitwiseXor => this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type),
+                HIRBinaryKind::LeftShift => this.builder.BuildBinary("shl".ToString(), MIRBinaryKind::Shl, left, right, result_type),
+                HIRBinaryKind::RightShift => this.builder.BuildBinary("shr".ToString(), signed ? MIRBinaryKind::AShr : MIRBinaryKind::LShr, left, right, result_type),
+                _ => null
             }
         } else if left_type->IsFloat() && right_type->IsFloat() {
             match binary->kind {
-                HIRBinaryKind::Add => {
-                    return this.builder.BuildBinary("add".ToString(), MIRBinaryKind::FAdd, left, right, result_type);
-                },
-                HIRBinaryKind::Subtract => {
-                    return this.builder.BuildBinary("sub".ToString(), MIRBinaryKind::FSub, left, right, result_type);
-                },
-                HIRBinaryKind::Multiply => {
-                    return this.builder.BuildBinary("mul".ToString(), MIRBinaryKind::FMul, left, right, result_type);
-                },
-                HIRBinaryKind::Divide => {
-                    return this.builder.BuildBinary("div".ToString(), MIRBinaryKind::FDiv, left, right, result_type);
-                },
-                HIRBinaryKind::Modulo => {
-                    return this.builder.BuildBinary("rem".ToString(), MIRBinaryKind::FRem, left, right, result_type);
-                },
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::FCmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::FCmpNe, left, right, result_type);
-                },
-                HIRBinaryKind::Less => {
-                    return this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::FCmpLt, left, right, result_type);
-                },
-                HIRBinaryKind::LessEqual => {
-                    return this.builder.BuildBinary("le".ToString(), MIRBinaryKind::FCmpLe, left, right, result_type);
-                },
-                HIRBinaryKind::Greater => {
-                    return this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::FCmpGt, left, right, result_type);
-                },
-                HIRBinaryKind::GreaterEqual => {
-                    return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::FCmpGe, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Add => this.builder.BuildBinary("add".ToString(), MIRBinaryKind::FAdd, left, right, result_type),
+                HIRBinaryKind::Subtract => this.builder.BuildBinary("sub".ToString(), MIRBinaryKind::FSub, left, right, result_type),
+                HIRBinaryKind::Multiply => this.builder.BuildBinary("mul".ToString(), MIRBinaryKind::FMul, left, right, result_type),
+                HIRBinaryKind::Divide => this.builder.BuildBinary("div".ToString(), MIRBinaryKind::FDiv, left, right, result_type),
+                HIRBinaryKind::Modulo => this.builder.BuildBinary("rem".ToString(), MIRBinaryKind::FRem, left, right, result_type),
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::FCmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::FCmpNe, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::FCmpLt, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), MIRBinaryKind::FCmpLe, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::FCmpGt, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::FCmpGe, left, right, result_type),
+                _ => null
             }
         } else if left_type->IsPointer() && right_type->IsPointer() {
             match binary->kind {
@@ -1794,85 +1678,47 @@ class MIRLowerer {
                     let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, right, size_type);
                     let difference = this.builder.BuildBinary("ptr.diff.bytes".ToString(), MIRBinaryKind::Sub, left, right, size_type);
                     let size_value = this.builder.ConstantInteger(element_type.Size() as u64, size_type);
-                    return this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type);
+                    this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type)
                 },
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                HIRBinaryKind::Greater => {
-                    return this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, left, right, result_type);
-                },
-                HIRBinaryKind::GreaterEqual => {
-                    return this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, left, right, result_type);
-                },
-                HIRBinaryKind::Less => {
-                    return this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, left, right, result_type);
-                },
-                HIRBinaryKind::LessEqual => {
-                    return this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), MIRBinaryKind::ICmpUgt, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), MIRBinaryKind::ICmpUge, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), MIRBinaryKind::ICmpUlt, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), MIRBinaryKind::ICmpUle, left, right, result_type),
+                _ => null
             }
         } else if (left_type->IsPointer() && right_type->IsInteger()) || (left_type->IsInteger() && right_type->IsPointer()) {
             let mut pointer = left_type->IsPointer() ? left : right;
             let mut index = left_type->IsPointer() ? right : left;
 
             match binary->kind {
-                HIRBinaryKind::Add => {
-                    return this.builder.BuildArrayGEP("ptr.add".ToString(), pointer, index);
-                },
-                HIRBinaryKind::Subtract if left_type->IsPointer() => {
-                    return this.builder.BuildArrayGEP("ptr.sub".ToString(), pointer, this.builder.BuildUnary("ptr.neg".ToString(), MIRUnaryKind::Neg, index));
-                },
-                _ => { return null; }
+                HIRBinaryKind::Add => this.builder.BuildArrayGEP("ptr.add".ToString(), pointer, index),
+                HIRBinaryKind::Subtract if left_type->IsPointer() => this.builder.BuildArrayGEP("ptr.sub".ToString(), pointer, this.builder.BuildUnary("ptr.neg".ToString(), MIRUnaryKind::Neg, index)),
+                _ => null
             }
         } else if (left_type->IsFunction() && right_type->IsNullPointer()) || (left_type->IsNullPointer() && right_type->IsFunction()) {
             match binary->kind {
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                _ => null
             }
         } else if left_type->IsEnumeration() && right_type->IsEnumeration() {
             let signed = left_type->IsSigned();
 
             match binary->kind {
-                HIRBinaryKind::Equal => {
-                    return this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type);
-                },
-                HIRBinaryKind::NotEqual => {
-                    return this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type);
-                },
-                HIRBinaryKind::Less => {
-                    return this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type);
-                },
-                HIRBinaryKind::LessEqual => {
-                    return this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type);
-                },
-                HIRBinaryKind::Greater => {
-                    return this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type);
-                },
-                HIRBinaryKind::GreaterEqual => {
-                    return this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseAnd => {
-                    return this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseOr => {
-                    return this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type);
-                },
-                HIRBinaryKind::BitwiseXor => {
-                    return this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type);
-                },
-                _ => { return null; }
+                HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
+                HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type),
+                HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
+                HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
+                HIRBinaryKind::BitwiseXor => this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type),
+                _ => null
             }
-        } else { return null; }
+        } else { null }
     }
 
     fn LowerTernaryPlaceExpression(&mut this, ternary: *HIRTernaryExpression) -> *MIRValue {
@@ -1910,7 +1756,7 @@ class MIRLowerer {
         let phi = this.builder.BuildPhi("ternary.place".ToString(), then_place->_type);
         phi->AddIncoming(then_place, then_block);
         phi->AddIncoming(else_place, else_block);
-        return phi;
+        phi
     }
 
     fn LowerTernaryExpressionTo(&mut this, ternary: *HIRTernaryExpression, destination: *MIRValue) {
@@ -1976,41 +1822,21 @@ class MIRLowerer {
         let phi = this.builder.BuildPhi("ternary".ToString(), then_value->_type);
         phi->AddIncoming(then_value, then_block);
         phi->AddIncoming(else_value, else_block);
-        return phi;
+        phi
     }
 
     fn TestPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
         match pattern->kind {
-            HIRPatternKind::Literal => {
-                return this.TestLiteralPattern(pattern as *HIRLiteralPattern, target);
-            },
-            HIRPatternKind::Range => {
-                return this.TestRangePattern(pattern as *HIRRangePattern, target);
-            },
-            HIRPatternKind::Tuple => {
-                return this.TestTuplePattern(pattern as *HIRTuplePattern, target);
-            },
-            HIRPatternKind::Field => {
-                return this.TestPattern((pattern as *HIRFieldPattern)->pattern, target);
-            },
-            HIRPatternKind::Structure => {
-                return this.TestStructurePattern(pattern as *HIRStructurePattern, target);
-            },
-            HIRPatternKind::Enumeration => {
-                return this.TestEnumerationPattern(pattern as *HIREnumerationPattern, target);
-            },
-            HIRPatternKind::Variant => {
-                return this.TestVariantPattern(pattern as *HIRVariantPattern, target);
-            },
-            HIRPatternKind::Or => {
-                return this.TestOrPattern(pattern as *HIROrPattern, target);
-            },
-            HIRPatternKind::Dereference => {
-                return this.TestPattern((pattern as *HIRDereferencePattern)->pattern, this.builder.BuildLoad("pattern.deref".ToString(), target));
-            },
-            _ => {
-                return this.builder.ConstantInteger(1, this.context.IntegerType(1));
-            }
+            HIRPatternKind::Literal => this.TestLiteralPattern(pattern as *HIRLiteralPattern, target),
+            HIRPatternKind::Range => this.TestRangePattern(pattern as *HIRRangePattern, target),
+            HIRPatternKind::Tuple => this.TestTuplePattern(pattern as *HIRTuplePattern, target),
+            HIRPatternKind::Field => this.TestPattern((pattern as *HIRFieldPattern)->pattern, target),
+            HIRPatternKind::Structure => this.TestStructurePattern(pattern as *HIRStructurePattern, target),
+            HIRPatternKind::Enumeration => this.TestEnumerationPattern(pattern as *HIREnumerationPattern, target),
+            HIRPatternKind::Variant => this.TestVariantPattern(pattern as *HIRVariantPattern, target),
+            HIRPatternKind::Or => this.TestOrPattern(pattern as *HIROrPattern, target),
+            HIRPatternKind::Dereference => this.TestPattern((pattern as *HIRDereferencePattern)->pattern, this.builder.BuildLoad("pattern.deref".ToString(), target)),
+            _ => this.builder.ConstantInteger(1, this.context.IntegerType(1))
         }
     }
 
@@ -2019,7 +1845,7 @@ class MIRLowerer {
         if literal == null { return null; }
         let value = this.builder.BuildLoad("pattern.load".ToString(), target);
         let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
-        return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
+        this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1))
     }
 
     fn TestRangePattern(&mut this, range: *HIRRangePattern, target: *MIRValue) -> *MIRValue {
@@ -2040,7 +1866,9 @@ class MIRLowerer {
             let kind = range->inclusive ? (signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle) : (signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt);
             let compare = this.builder.BuildBinary("pattern.le".ToString(), kind, value, end, bool_type);
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, compare, bool_type);
-        } return condition;
+        }
+
+        condition
     }
 
     fn TestTuplePattern(&mut this, tuple: *HIRTuplePattern, target: *MIRValue) -> *MIRValue {
@@ -2055,7 +1883,9 @@ class MIRLowerer {
             let result = this.TestPattern(tuple->patterns[i], place);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
-        } return condition;
+        }
+
+        condition
     }
 
     fn TestStructurePattern(&mut this, structure: *HIRStructurePattern, target: *MIRValue) -> *MIRValue {
@@ -2079,13 +1909,15 @@ class MIRLowerer {
             let result = this.TestPattern(field->pattern, place);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
-        } return condition;
+        }
+
+        condition
     }
 
     fn TestEnumerationPattern(&mut this, enumeration: *HIREnumerationPattern, target: *MIRValue) -> *MIRValue {
         let value = this.LowerExpression(enumeration->member->value);
         if value == null { return null; }
-        return this.builder.BuildBinary("pattern.eq".ToString(), MIRBinaryKind::ICmpEq, this.builder.BuildLoad("pattern.load".ToString(), target), value, this.context.IntegerType(1));
+        this.builder.BuildBinary("pattern.eq".ToString(), MIRBinaryKind::ICmpEq, this.builder.BuildLoad("pattern.load".ToString(), target), value, this.context.IntegerType(1))
     }
 
     fn TestVariantPattern(&mut this, variant: *HIRVariantPattern, target: *MIRValue) -> *MIRValue {
@@ -2149,7 +1981,7 @@ class MIRLowerer {
         let phi = this.builder.BuildPhi("variant.result".ToString(), bool_type);
         phi->AddIncoming(this.builder.ConstantInteger(0, bool_type), tag_block);
         phi->AddIncoming(condition, fields_block);
-        return phi;
+        phi
     }
 
     fn TestOrPattern(&mut this, or: *HIROrPattern, target: *MIRValue) -> *MIRValue {
@@ -2160,7 +1992,9 @@ class MIRLowerer {
             let result = this.TestPattern(pattern, target);
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.or".ToString(), MIRBinaryKind::Or, condition, result, bool_type);
-        } return condition;
+        }
+
+        condition
     }
 
     fn BindPattern(&mut this, pattern: *HIRPattern) {
@@ -2205,19 +2039,19 @@ class MIRLowerer {
 
     pub fn LowerType(&mut this, _type: *HIRType) -> *MIRType {
         if _type->IsNever() || _type->IsVoid() {
-            return this.context.VoidType();
+            this.context.VoidType()
         } else if _type->IsBoolean() || _type->IsCharacter() || _type->IsInteger() || _type->IsEnumeration() {
-            return this.context.IntegerType(_type->Width());
+            this.context.IntegerType(_type->Width())
         } else if _type->IsFloat() {
-            return this.context.FloatType(_type->Width());
+            this.context.FloatType(_type->Width())
         } else if _type->IsPointer() {
             let pointee = this.LowerType(_type->Pointee());
             if pointee == null { return null; }
-            return this.context.PointerType(pointee);
+            this.context.PointerType(pointee)
         } else if _type->IsArray() {
             let element = this.LowerType(_type->Element());
             if element == null { return null; }
-            return this.context.ArrayType(element, _type->Length());
+            this.context.ArrayType(element, _type->Length())
         } else if _type->IsTuple() {
             let mut elements = Vector<*MIRType>();
 
@@ -2227,10 +2061,10 @@ class MIRLowerer {
                 elements.PushBack(lowered_element);
             }
 
-            return this.context.StructureType(elements);
+            this.context.StructureType(elements)
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let declaration = this.types.Get(_type, null);
-            return declaration != null ? declaration->_type : null;
+            declaration != null ? declaration->_type : null
         } else if _type->IsFunction() {
             let mut parameters = Vector<*MIRType>();
             let mut _return = this.LowerAggregateType(_type->Return());
@@ -2247,9 +2081,9 @@ class MIRLowerer {
                 parameters.PushBack(lowered_parameter);
             }
 
-            return this.context.FunctionType(parameters, _return);
+            this.context.FunctionType(parameters, _return)
         } else {
-            return null;
+            null
         }
     }
 }

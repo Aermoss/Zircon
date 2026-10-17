@@ -45,7 +45,7 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(_type);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Set(&mut this, name: &String, pattern: *HIRPattern, node: *ASTNode) -> *Symbol {
@@ -58,7 +58,7 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(pattern);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Set(&mut this, name: &String, expression: *HIRExpression, node: *ASTNode) -> *Symbol {
@@ -71,7 +71,7 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(expression);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Set(&mut this, name: &String, statement: *HIRStatement, node: *ASTNode) -> *Symbol {
@@ -84,7 +84,7 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(statement);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Set(&mut this, name: &String, declaration: *HIRDeclaration, overload: bool, node: *ASTNode) -> *Symbol {
@@ -121,7 +121,7 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(declaration);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Set(&mut this, name: &String, generic: *mut GenericDeclaration, node: *ASTNode) -> *Symbol {
@@ -134,11 +134,11 @@ class Scope {
 
         let symbol: *Symbol = new Symbol(generic);
         this.symbols[name].PushBack(symbol);
-        return symbol;
+        symbol
     }
 
     pub fn Get(&this, name: &String) -> Vector<*Symbol> {
-        return this.symbols.Get(name, Vector<*Symbol>());
+        this.symbols.Get(name, Vector<*Symbol>())
     }
 
     pub fn Get(&this, name: &String, kind: SymbolKind) -> Vector<*Symbol> {
@@ -148,11 +148,13 @@ class Scope {
             if symbol->kind == kind {
                 result.PushBack(symbol);
             }
-        } return result;
+        }
+
+        result
     }
 
     pub fn Has(&this, name: &String) -> bool {
-        return this.symbols.Has(name);
+        this.symbols.Has(name)
     }
 
     pub fn Has(&this, name: &String, kind: SymbolKind) -> bool {
@@ -160,6 +162,8 @@ class Scope {
             if symbol->kind == kind {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 }

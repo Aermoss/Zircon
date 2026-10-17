@@ -29,27 +29,13 @@ class MIRType {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            MIRTypeKind::Void => {
-                return (this as *MIRVoidType)->ToString();
-            },
-            MIRTypeKind::Integer => {
-                return (this as *MIRIntegerType)->ToString();
-            },
-            MIRTypeKind::Float => {
-                return (this as *MIRFloatType)->ToString();
-            },
-            MIRTypeKind::Pointer => {
-                return (this as *MIRPointerType)->ToString();
-            },
-            MIRTypeKind::Array => {
-                return (this as *MIRArrayType)->ToString();
-            },
-            MIRTypeKind::Structure => {
-                return (this as *MIRStructureType)->ToString();
-            },
-            MIRTypeKind::Function => {
-                return (this as *MIRFunctionType)->ToString();
-            }
+            MIRTypeKind::Void => (this as *MIRVoidType)->ToString(),
+            MIRTypeKind::Integer => (this as *MIRIntegerType)->ToString(),
+            MIRTypeKind::Float => (this as *MIRFloatType)->ToString(),
+            MIRTypeKind::Pointer => (this as *MIRPointerType)->ToString(),
+            MIRTypeKind::Array => (this as *MIRArrayType)->ToString(),
+            MIRTypeKind::Structure => (this as *MIRStructureType)->ToString(),
+            MIRTypeKind::Function => (this as *MIRFunctionType)->ToString()
         }
     }
 }
@@ -58,7 +44,7 @@ class MIRVoidType : MIRType {
     MIRVoidType(&mut this) : MIRType(MIRTypeKind::Void) {}
 
     pub fn ToString(&this) -> String {
-        return "void".ToString();
+        "void".ToString()
     }
 }
 
@@ -70,7 +56,7 @@ class MIRIntegerType : MIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return 'i' + String::FromInteger(this.width as u64);
+        'i' + String::FromInteger(this.width as u64)
     }
 }
 
@@ -82,7 +68,7 @@ class MIRFloatType : MIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return 'f' + String::FromInteger(this.width as u64);
+        'f' + String::FromInteger(this.width as u64)
     }
 }
 
@@ -94,7 +80,7 @@ class MIRPointerType : MIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '*' + this.pointee->ToString();
+        '*' + this.pointee->ToString()
     }
 }
 
@@ -107,7 +93,7 @@ class MIRArrayType : MIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']';
+        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
     }
 }
 
@@ -133,13 +119,17 @@ class MIRStructureType : MIRType {
         for i in 0..this.fields.Size() {
             if i != 0 { result += ", "; }
             result += this.fields[i]->ToString();
-        } return result + " }";
+        }
+
+        result + " }"
     }
 
     pub fn ToString(&this) -> String {
         if this.name.Empty()  {
             return this.ToDefinitionString();
-        } return '%' + this.name;
+        }
+
+        '%' + this.name
     }
 }
 
@@ -161,7 +151,9 @@ class MIRFunctionType : MIRType {
 
         if this._return->kind != MIRTypeKind::Void {
             result += " -> " + this._return->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -185,18 +177,10 @@ class MIRValue {
         }
 
         match this.kind {
-            MIRValueKind::Constant => {
-                return _type->ToString() + ' ' + (this as *MIRConstant)->ToString();
-            },
-            MIRValueKind::Instruction => {
-                return _type->ToString() + ' ' + (this as *MIRInstruction)->ToString();
-            },
-            MIRValueKind::DeclarationReference => {
-                return _type->ToString() + ' ' + (this as *MIRDeclarationReference)->ToString();
-            },
-            MIRValueKind::Parameter => {
-                return _type->ToString() + ' ' + (this as *MIRParameter)->ToString();
-            }
+            MIRValueKind::Constant => _type->ToString() + ' ' + (this as *MIRConstant)->ToString(),
+            MIRValueKind::Instruction => _type->ToString() + ' ' + (this as *MIRInstruction)->ToString(),
+            MIRValueKind::DeclarationReference => _type->ToString() + ' ' + (this as *MIRDeclarationReference)->ToString(),
+            MIRValueKind::Parameter => _type->ToString() + ' ' + (this as *MIRParameter)->ToString()
         }
     }
 }
@@ -214,30 +198,14 @@ class MIRConstant : MIRValue {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            MIRConstantKind::Integer => {
-                return (this as *MIRConstantInteger)->ToString();
-            },
-            MIRConstantKind::Float => {
-                return (this as *MIRConstantFloat)->ToString();
-            },
-            MIRConstantKind::String => {
-                return (this as *MIRConstantString)->ToString();
-            },
-            MIRConstantKind::Array => {
-                return (this as *MIRConstantArray)->ToString();
-            },
-            MIRConstantKind::Structure => {
-                return (this as *MIRConstantStructure)->ToString();
-            },
-            MIRConstantKind::Null => {
-                return (this as *MIRConstantNull)->ToString();
-            },
-            MIRConstantKind::Expression => {
-                return (this as *MIRConstantExpression)->ToString();
-            },
-            MIRConstantKind::Undef => {
-                return (this as *MIRConstantUndef)->ToString();
-            }
+            MIRConstantKind::Integer => (this as *MIRConstantInteger)->ToString(),
+            MIRConstantKind::Float => (this as *MIRConstantFloat)->ToString(),
+            MIRConstantKind::String => (this as *MIRConstantString)->ToString(),
+            MIRConstantKind::Array => (this as *MIRConstantArray)->ToString(),
+            MIRConstantKind::Structure => (this as *MIRConstantStructure)->ToString(),
+            MIRConstantKind::Null => (this as *MIRConstantNull)->ToString(),
+            MIRConstantKind::Expression => (this as *MIRConstantExpression)->ToString(),
+            MIRConstantKind::Undef => (this as *MIRConstantUndef)->ToString()
         }
     }
 }
@@ -252,7 +220,9 @@ class MIRConstantInteger : MIRConstant {
     pub fn ToString(&this) -> String {
         if (this._type as *MIRIntegerType)->width == 1 {
             return (this.value != 0 ? "true" : "false").ToString();
-        } return String::FromInteger(this.value as i64);
+        }
+
+        String::FromInteger(this.value as i64)
     }
 }
 
@@ -264,7 +234,7 @@ class MIRConstantFloat : MIRConstant {
     }
 
     pub fn ToString(&this) -> String {
-        return String::FromFloat(this.value);
+        String::FromFloat(this.value)
     }
 }
 
@@ -276,7 +246,7 @@ class MIRConstantString : MIRConstant {
     }
 
     pub fn ToString(&this) -> String {
-        return '"' + this.value.Escape() + '"';
+        '"' + this.value.Escape() + '"'
     }
 }
 
@@ -293,7 +263,9 @@ class MIRConstantArray : MIRConstant {
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
-        } return result + ']';
+        }
+
+        result + ']'
     }
 }
 
@@ -310,7 +282,9 @@ class MIRConstantStructure : MIRConstant {
         for i in 0..this.fields.Size() {
             if i != 0 { result += ", "; }
             result += this.fields[i]->ToString();
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -318,7 +292,7 @@ class MIRConstantNull : MIRConstant {
     MIRConstantNull(&mut this, _type: *MIRType) : MIRConstant(MIRConstantKind::Null, _type) {}
 
     pub fn ToString(&this) -> String {
-        return "null".ToString();
+        "null".ToString()
     }
 }
 
@@ -326,7 +300,7 @@ class MIRConstantUndef : MIRConstant {
     MIRConstantUndef(&mut this, _type: *MIRType) : MIRConstant(MIRConstantKind::Undef, _type) {}
 
     pub fn ToString(&this) -> String {
-        return "undef".ToString();
+        "undef".ToString()
     }
 }
 
@@ -343,21 +317,11 @@ class MIRConstantExpression : MIRConstant {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            MIRConstantExpressionKind::Unary => {
-                return (this as *MIRUnaryExpression)->ToString();
-            },
-            MIRConstantExpressionKind::Binary => {
-                return (this as *MIRBinaryExpression)->ToString();
-            },
-            MIRConstantExpressionKind::Cast => {
-                return (this as *MIRCastExpression)->ToString();
-            },
-            MIRConstantExpressionKind::ArrayGEP => {
-                return (this as *MIRArrayGEPExpression)->ToString();
-            },
-            MIRConstantExpressionKind::StructGEP => {
-                return (this as *MIRStructGEPExpression)->ToString();
-            }
+            MIRConstantExpressionKind::Unary => (this as *MIRUnaryExpression)->ToString(),
+            MIRConstantExpressionKind::Binary => (this as *MIRBinaryExpression)->ToString(),
+            MIRConstantExpressionKind::Cast => (this as *MIRCastExpression)->ToString(),
+            MIRConstantExpressionKind::ArrayGEP => (this as *MIRArrayGEPExpression)->ToString(),
+            MIRConstantExpressionKind::StructGEP => (this as *MIRStructGEPExpression)->ToString()
         }
     }
 }
@@ -369,9 +333,9 @@ enum MIRUnaryKind: u8 {
 extend MIRUnaryKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRUnaryKind::Neg => { return "neg".ToString(); },
-            MIRUnaryKind::FNeg => { return "fneg".ToString(); },
-            MIRUnaryKind::Not => { return "not".ToString(); }
+            MIRUnaryKind::Neg => "neg".ToString(),
+            MIRUnaryKind::FNeg => "fneg".ToString(),
+            MIRUnaryKind::Not => "not".ToString()
         }
     }
 }
@@ -385,7 +349,7 @@ class MIRUnaryExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.operand->ToString();
+        this.kind.ToString() + ' ' + this.operand->ToString()
     }
 }
 
@@ -400,40 +364,40 @@ enum MIRBinaryKind: u8 {
 extend MIRBinaryKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRBinaryKind::Add => { return "add".ToString(); },
-            MIRBinaryKind::Sub => { return "sub".ToString(); },
-            MIRBinaryKind::Mul => { return "mul".ToString(); },
-            MIRBinaryKind::SDiv => { return "sdiv".ToString(); },
-            MIRBinaryKind::UDiv => { return "udiv".ToString(); },
-            MIRBinaryKind::SRem => { return "srem".ToString(); },
-            MIRBinaryKind::URem => { return "urem".ToString(); },
-            MIRBinaryKind::And => { return "and".ToString(); },
-            MIRBinaryKind::Or => { return "or".ToString(); },
-            MIRBinaryKind::Xor => { return "xor".ToString(); },
-            MIRBinaryKind::Shl => { return "shl".ToString(); },
-            MIRBinaryKind::LShr => { return "lshr".ToString(); },
-            MIRBinaryKind::AShr => { return "ashr".ToString(); },
-            MIRBinaryKind::FAdd => { return "fadd".ToString(); },
-            MIRBinaryKind::FSub => { return "fsub".ToString(); },
-            MIRBinaryKind::FMul => { return "fmul".ToString(); },
-            MIRBinaryKind::FDiv => { return "fdiv".ToString(); },
-            MIRBinaryKind::FRem => { return "frem".ToString(); },
-            MIRBinaryKind::ICmpEq => { return "icmp eq".ToString(); },
-            MIRBinaryKind::ICmpNe => { return "icmp ne".ToString(); },
-            MIRBinaryKind::ICmpSlt => { return "icmp slt".ToString(); },
-            MIRBinaryKind::ICmpSgt => { return "icmp sgt".ToString(); },
-            MIRBinaryKind::ICmpSle => { return "icmp sle".ToString(); },
-            MIRBinaryKind::ICmpSge => { return "icmp sge".ToString(); },
-            MIRBinaryKind::ICmpUlt => { return "icmp ult".ToString(); },
-            MIRBinaryKind::ICmpUgt => { return "icmp ugt".ToString(); },
-            MIRBinaryKind::ICmpUle => { return "icmp ule".ToString(); },
-            MIRBinaryKind::ICmpUge => { return "icmp uge".ToString(); },
-            MIRBinaryKind::FCmpEq => { return "fcmp eq".ToString(); },
-            MIRBinaryKind::FCmpNe => { return "fcmp ne".ToString(); },
-            MIRBinaryKind::FCmpLt => { return "fcmp lt".ToString(); },
-            MIRBinaryKind::FCmpGt => { return "fcmp gt".ToString(); },
-            MIRBinaryKind::FCmpLe => { return "fcmp le".ToString(); },
-            MIRBinaryKind::FCmpGe => { return "fcmp ge".ToString(); }
+            MIRBinaryKind::Add => "add".ToString(),
+            MIRBinaryKind::Sub => "sub".ToString(),
+            MIRBinaryKind::Mul => "mul".ToString(),
+            MIRBinaryKind::SDiv => "sdiv".ToString(),
+            MIRBinaryKind::UDiv => "udiv".ToString(),
+            MIRBinaryKind::SRem => "srem".ToString(),
+            MIRBinaryKind::URem => "urem".ToString(),
+            MIRBinaryKind::And => "and".ToString(),
+            MIRBinaryKind::Or => "or".ToString(),
+            MIRBinaryKind::Xor => "xor".ToString(),
+            MIRBinaryKind::Shl => "shl".ToString(),
+            MIRBinaryKind::LShr => "lshr".ToString(),
+            MIRBinaryKind::AShr => "ashr".ToString(),
+            MIRBinaryKind::FAdd => "fadd".ToString(),
+            MIRBinaryKind::FSub => "fsub".ToString(),
+            MIRBinaryKind::FMul => "fmul".ToString(),
+            MIRBinaryKind::FDiv => "fdiv".ToString(),
+            MIRBinaryKind::FRem => "frem".ToString(),
+            MIRBinaryKind::ICmpEq => "icmp eq".ToString(),
+            MIRBinaryKind::ICmpNe => "icmp ne".ToString(),
+            MIRBinaryKind::ICmpSlt => "icmp slt".ToString(),
+            MIRBinaryKind::ICmpSgt => "icmp sgt".ToString(),
+            MIRBinaryKind::ICmpSle => "icmp sle".ToString(),
+            MIRBinaryKind::ICmpSge => "icmp sge".ToString(),
+            MIRBinaryKind::ICmpUlt => "icmp ult".ToString(),
+            MIRBinaryKind::ICmpUgt => "icmp ugt".ToString(),
+            MIRBinaryKind::ICmpUle => "icmp ule".ToString(),
+            MIRBinaryKind::ICmpUge => "icmp uge".ToString(),
+            MIRBinaryKind::FCmpEq => "fcmp eq".ToString(),
+            MIRBinaryKind::FCmpNe => "fcmp ne".ToString(),
+            MIRBinaryKind::FCmpLt => "fcmp lt".ToString(),
+            MIRBinaryKind::FCmpGt => "fcmp gt".ToString(),
+            MIRBinaryKind::FCmpLe => "fcmp le".ToString(),
+            MIRBinaryKind::FCmpGe => "fcmp ge".ToString()
         }
     }
 }
@@ -448,7 +412,7 @@ class MIRBinaryExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.left->ToString() + ", " + this.right->ToString();
+        this.kind.ToString() + ' ' + this.left->ToString() + ", " + this.right->ToString()
     }
 }
 
@@ -461,18 +425,18 @@ enum MIRCastKind: u8 {
 extend MIRCastKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRCastKind::Trunc => { return "trunc".ToString(); },
-            MIRCastKind::ZExt => { return "zext".ToString(); },
-            MIRCastKind::SExt => { return "sext".ToString(); },
-            MIRCastKind::FPTrunc => { return "fptrunc".ToString(); },
-            MIRCastKind::FPExt => { return "fpext".ToString(); },
-            MIRCastKind::FPToSI => { return "fptosi".ToString(); },
-            MIRCastKind::FPToUI => { return "fptoui".ToString(); },
-            MIRCastKind::SIToFP => { return "sitofp".ToString(); },
-            MIRCastKind::UIToFP => { return "uitofp".ToString(); },
-            MIRCastKind::PtrToInt => { return "ptrtoint".ToString(); },
-            MIRCastKind::IntToPtr => { return "inttoptr".ToString(); },
-            MIRCastKind::Bitcast => { return "bitcast".ToString(); }
+            MIRCastKind::Trunc => "trunc".ToString(),
+            MIRCastKind::ZExt => "zext".ToString(),
+            MIRCastKind::SExt => "sext".ToString(),
+            MIRCastKind::FPTrunc => "fptrunc".ToString(),
+            MIRCastKind::FPExt => "fpext".ToString(),
+            MIRCastKind::FPToSI => "fptosi".ToString(),
+            MIRCastKind::FPToUI => "fptoui".ToString(),
+            MIRCastKind::SIToFP => "sitofp".ToString(),
+            MIRCastKind::UIToFP => "uitofp".ToString(),
+            MIRCastKind::PtrToInt => "ptrtoint".ToString(),
+            MIRCastKind::IntToPtr => "inttoptr".ToString(),
+            MIRCastKind::Bitcast => "bitcast".ToString()
         }
     }
 }
@@ -486,7 +450,7 @@ class MIRCastExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString();
+        this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString()
     }
 }
 
@@ -499,7 +463,7 @@ class MIRArrayGEPExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return "getelementptr " + this.pointer->ToString() + ", " + this.index->ToString();
+        "getelementptr " + this.pointer->ToString() + ", " + this.index->ToString()
     }
 }
 
@@ -512,7 +476,7 @@ class MIRStructGEPExpression : MIRConstantExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64);
+        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64)
     }
 }
 
@@ -583,13 +547,17 @@ class MIRInstruction : MIRValue {
             MIRInstructionKind::Terminator => {
                 result += (this as *MIRTerminator)->ToString();
             }
-        } return result;
+        }
+
+        result
     }
 
     pub fn ToString(&this) -> String {
         if this.name.Empty()  {
             Logger::Log("Referencing an unnamed instruction!", LogSeverity::Fatal);
-        } return '%' + this.name;
+        }
+
+        '%' + this.name
     }
 }
 
@@ -601,7 +569,7 @@ class MIRAllocaInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return "alloca " + this._type->ToString();
+        "alloca " + this._type->ToString()
     }
 }
 
@@ -616,7 +584,7 @@ class MIRLoadInstruction : MIRInstruction {
     pub fn ToString(&this) -> String {
         let mut result = "load " + this._type->ToString() + ", " + this.pointer->ToString();
         if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
-        return result;
+        result
     }
 }
 
@@ -632,7 +600,7 @@ class MIRStoreInstruction : MIRInstruction {
     pub fn ToString(&this) -> String {
         let mut result = "store " + this.value->ToString() + ", " + this.pointer->ToString();
         if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
-        return result;
+        result
     }
 }
 
@@ -645,7 +613,7 @@ class MIRArrayGEPInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return "getelementptr " + this.pointer->ToString() + ", " + this.index->ToString();
+        "getelementptr " + this.pointer->ToString() + ", " + this.index->ToString()
     }
 }
 
@@ -658,7 +626,7 @@ class MIRStructGEPInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64);
+        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64)
     }
 }
 
@@ -671,7 +639,7 @@ class MIRUnaryInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.operand->ToString();
+        this.kind.ToString() + ' ' + this.operand->ToString()
     }
 }
 
@@ -685,7 +653,7 @@ class MIRBinaryInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.left->ToString() + ", " + this.right->ToString();
+        this.kind.ToString() + ' ' + this.left->ToString() + ", " + this.right->ToString()
     }
 }
 
@@ -703,7 +671,9 @@ class MIRCallInstruction : MIRInstruction {
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -716,7 +686,7 @@ class MIRCastInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString();
+        this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString()
     }
 }
 
@@ -730,7 +700,7 @@ class MIRSelectInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        return "select " + this.condition->ToString() + ", " + this.then_value->ToString() + ", " + this.else_value->ToString();
+        "select " + this.condition->ToString() + ", " + this.then_value->ToString() + ", " + this.else_value->ToString()
     }
 }
 
@@ -760,7 +730,9 @@ class MIRPhiInstruction : MIRInstruction {
         for i in 0..this.incomings.Size() {
             if i != 0 { result += ", "; }
             result += '[' + this.incomings[i].value->ToString() + ", " + this.incomings[i].block->ToString() + ']';
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -814,7 +786,9 @@ class MIRAssemblyInstruction : MIRInstruction {
                 if i != 0 { result += ", "; }
                 result += this.clobbers[i];
             }
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -831,18 +805,10 @@ class MIRTerminator : MIRInstruction {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            MIRTerminatorKind::Return => {
-                return (this as *MIRReturnInstruction)->ToString();
-            },
-            MIRTerminatorKind::Branch => {
-                return (this as *MIRBranchInstruction)->ToString();
-            },
-            MIRTerminatorKind::ConditionalBranch => {
-                return (this as *MIRConditionalBranchInstruction)->ToString();
-            },
-            MIRTerminatorKind::Unreachable => {
-                return (this as *MIRUnreachableInstruction)->ToString();
-            }
+            MIRTerminatorKind::Return => (this as *MIRReturnInstruction)->ToString(),
+            MIRTerminatorKind::Branch => (this as *MIRBranchInstruction)->ToString(),
+            MIRTerminatorKind::ConditionalBranch => (this as *MIRConditionalBranchInstruction)->ToString(),
+            MIRTerminatorKind::Unreachable => (this as *MIRUnreachableInstruction)->ToString()
         }
     }
 }
@@ -859,7 +825,9 @@ class MIRReturnInstruction : MIRTerminator {
 
         if this.value != null {
             result += ' ' + this.value->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -871,7 +839,7 @@ class MIRBranchInstruction : MIRTerminator {
     }
 
     pub fn ToString(&this) -> String {
-        return "branch " + this.target->ToString();
+        "branch " + this.target->ToString()
     }
 }
 
@@ -885,7 +853,7 @@ class MIRConditionalBranchInstruction : MIRTerminator {
     }
 
     pub fn ToString(&this) -> String {
-        return "branch " + this.condition->ToString() + ", " + this.then_target->ToString() + ", " + this.else_target->ToString();
+        "branch " + this.condition->ToString() + ", " + this.then_target->ToString() + ", " + this.else_target->ToString()
     }
 }
 
@@ -893,7 +861,7 @@ class MIRUnreachableInstruction : MIRTerminator {
     MIRUnreachableInstruction(&mut this, _type: *MIRType) : MIRTerminator(MIRTerminatorKind::Unreachable, _type) {}
 
     pub fn ToString(&this) -> String {
-        return "unreachable".ToString();
+        "unreachable".ToString()
     }
 }
 
@@ -905,7 +873,7 @@ class MIRDeclarationReference : MIRValue {
     }
 
     pub fn ToString(&this) -> String {
-        return "@\"" + this.declaration->name + '"';
+        "@\"" + this.declaration->name + '"'
     }
 }
 
@@ -930,11 +898,11 @@ class MIRParameter : MIRValue {
             result += "@byval(" + this.byval->ToString() + ") ";
         }
 
-        return result + this._type->ToString();
+        result + this._type->ToString()
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.name;
+        '%' + this.name
     }
 }
 
@@ -949,11 +917,11 @@ class MIRBlock {
     }
 
     pub fn HasTerminator(&this) -> bool {
-        return this.terminator != null;
+        this.terminator != null
     }
 
     pub fn GetTerminator(&this) -> *mut MIRTerminator {
-        return this.terminator;
+        this.terminator
     }
 
     pub fn SetTerminator(&mut this, terminator: *mut MIRTerminator) {
@@ -981,11 +949,13 @@ class MIRBlock {
 
         if this.terminator != null {
             result += "\n  " + this.terminator->ToString();
-        } return result;
+        }
+
+        result
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.name;
+        '%' + this.name
     }
 }
 
@@ -1002,21 +972,11 @@ class MIRDeclaration {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            MIRDeclarationKind::Type => {
-                return (this as *MIRTypeDeclaration)->ToString();
-            },
-            MIRDeclarationKind::Function => {
-                return (this as *MIRFunctionDeclaration)->ToString();
-            },
-            MIRDeclarationKind::Constant => {
-                return (this as *MIRConstantDeclaration)->ToString();
-            },
-            MIRDeclarationKind::Static => {
-                return (this as *MIRStaticDeclaration)->ToString();
-            },
-            MIRDeclarationKind::Assembly => {
-                return (this as *MIRAssemblyDeclaration)->ToString();
-            }
+            MIRDeclarationKind::Type => (this as *MIRTypeDeclaration)->ToString(),
+            MIRDeclarationKind::Function => (this as *MIRFunctionDeclaration)->ToString(),
+            MIRDeclarationKind::Constant => (this as *MIRConstantDeclaration)->ToString(),
+            MIRDeclarationKind::Static => (this as *MIRStaticDeclaration)->ToString(),
+            MIRDeclarationKind::Assembly => (this as *MIRAssemblyDeclaration)->ToString()
         }
     }
 }
@@ -1052,7 +1012,9 @@ class MIRTypeDeclaration : MIRTypedDeclaration {
             result += (this._type as *MIRStructureType)->ToDefinitionString();
         } else {
             result += this._type->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1090,7 +1052,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         let count = this.names.Get(name, 0);
         this.names[name] = count + 1;
         if count == 0 { return name; }
-        return name + '.' + String::FromInteger(count as u64);
+        name + '.' + String::FromInteger(count as u64)
     }
 
     pub fn ToString(&this) -> String {
@@ -1113,7 +1075,9 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
                 let block: *MIRBlock = this.blocks[i];
                 result += block->ToDefinitionString() + '\n';
             } result += '}';
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1125,7 +1089,7 @@ class MIRConstantDeclaration : MIRTypedDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        return "const @\"" + this.name + "\": " + this._type->ToString() + " = " + this.initializer->ToString();
+        "const @\"" + this.name + "\": " + this._type->ToString() + " = " + this.initializer->ToString()
     }
 }
 
@@ -1142,7 +1106,9 @@ class MIRStaticDeclaration : MIRLinkableDeclaration {
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1154,7 +1120,7 @@ class MIRAssemblyDeclaration : MIRDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        return "asm {" + this.text + '}';
+        "asm {" + this.text + '}'
     }
 }
 
@@ -1185,7 +1151,9 @@ class MIRModule {
 
             result += declaration->ToString();
             previous = declaration;
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1195,35 +1163,35 @@ class MIRContext {
     MIRContext(&mut this) {}
 
     pub fn VoidType(&mut this) -> *MIRType {
-        return this.arena.New<MIRVoidType>();
+        this.arena.New<MIRVoidType>()
     }
 
     pub fn IntegerType(&mut this, width: u32) -> *MIRType {
-        return this.arena.New<MIRIntegerType>(width);
+        this.arena.New<MIRIntegerType>(width)
     }
 
     pub fn FloatType(&mut this, width: u32) -> *MIRType {
-        return this.arena.New<MIRFloatType>(width);
+        this.arena.New<MIRFloatType>(width)
     }
 
     pub fn PointerType(&mut this, pointee: *MIRType) -> *MIRType {
-        return this.arena.New<MIRPointerType>(pointee);
+        this.arena.New<MIRPointerType>(pointee)
     }
 
     pub fn ArrayType(&mut this, element: *MIRType, length: usize) -> *MIRType {
-        return this.arena.New<MIRArrayType>(element, length);
+        this.arena.New<MIRArrayType>(element, length)
     }
 
     pub fn StructureType(&mut this, name: String) -> *MIRType {
-        return this.arena.New<MIRStructureType>(name);
+        this.arena.New<MIRStructureType>(name)
     }
 
     pub fn StructureType(&mut this, fields: Vector<*MIRType>) -> *MIRType {
-        return this.arena.New<MIRStructureType>(fields);
+        this.arena.New<MIRStructureType>(fields)
     }
 
     pub fn FunctionType(&mut this, parameters: Vector<*MIRType>, _return: *MIRType) -> *MIRType {
-        return this.arena.New<MIRFunctionType>(parameters, _return);
+        this.arena.New<MIRFunctionType>(parameters, _return)
     }
 }
 
@@ -1240,57 +1208,57 @@ class MIRBuilder {
     }
 
     pub fn ConstantInteger(&mut this, value: u64, _type: *MIRType) -> *mut MIRConstantInteger {
-        return this.context->arena.New<MIRConstantInteger>(value, _type);
+        this.context->arena.New<MIRConstantInteger>(value, _type)
     }
 
     pub fn ConstantFloat(&mut this, value: f64, _type: *MIRType) -> *mut MIRConstantFloat {
-        return this.context->arena.New<MIRConstantFloat>(value, _type);
+        this.context->arena.New<MIRConstantFloat>(value, _type)
     }
 
     pub fn ConstantString(&mut this, value: String, _type: *MIRType) -> *mut MIRConstantString {
-        return this.context->arena.New<MIRConstantString>(value, _type);
+        this.context->arena.New<MIRConstantString>(value, _type)
     }
 
     pub fn ConstantArray(&mut this, values: Vector<*MIRValue>, _type: *MIRType) -> *mut MIRConstantArray {
-        return this.context->arena.New<MIRConstantArray>(values, _type);
+        this.context->arena.New<MIRConstantArray>(values, _type)
     }
 
     pub fn ConstantStruct(&mut this, values: Vector<*MIRValue>, _type: *MIRType) -> *mut MIRConstantStructure {
-        return this.context->arena.New<MIRConstantStructure>(values, _type);
+        this.context->arena.New<MIRConstantStructure>(values, _type)
     }
 
     pub fn ConstantNull(&mut this, _type: *MIRType) -> *mut MIRConstantNull {
-        return this.context->arena.New<MIRConstantNull>(_type);
+        this.context->arena.New<MIRConstantNull>(_type)
     }
 
     pub fn ConstantUndef(&mut this, _type: *MIRType) -> *mut MIRConstantUndef {
-        return this.context->arena.New<MIRConstantUndef>(_type);
+        this.context->arena.New<MIRConstantUndef>(_type)
     }
 
     pub fn ConstantUnary(&mut this, kind: MIRUnaryKind, operand: *MIRValue) -> *mut MIRUnaryExpression {
-        return this.context->arena.New<MIRUnaryExpression>(kind, operand, operand->_type);
+        this.context->arena.New<MIRUnaryExpression>(kind, operand, operand->_type)
     }
 
     pub fn ConstantBinary(&mut this, kind: MIRBinaryKind, left: *MIRValue, right: *MIRValue, _type: *MIRType) -> *mut MIRBinaryExpression {
-        return this.context->arena.New<MIRBinaryExpression>(kind, left, right, _type);
+        this.context->arena.New<MIRBinaryExpression>(kind, left, right, _type)
     }
 
     pub fn ConstantCast(&mut this, kind: MIRCastKind, value: *MIRValue, _type: *MIRType) -> *mut MIRCastExpression {
-        return this.context->arena.New<MIRCastExpression>(kind, value, _type);
+        this.context->arena.New<MIRCastExpression>(kind, value, _type)
     }
 
     pub fn ConstantArrayGEP(&mut this, pointer: *MIRValue, index: *MIRValue) -> *mut MIRArrayGEPExpression {
-        return this.context->arena.New<MIRArrayGEPExpression>(pointer, index, pointer->_type);
+        this.context->arena.New<MIRArrayGEPExpression>(pointer, index, pointer->_type)
     }
 
     pub fn ConstantStructGEP(&mut this, pointer: *MIRValue, index: u32, _type: *MIRType) -> *mut MIRStructGEPExpression {
-        return this.context->arena.New<MIRStructGEPExpression>(pointer, index, _type);
+        this.context->arena.New<MIRStructGEPExpression>(pointer, index, _type)
     }
 
     pub fn BuildAlloca(&mut this, name: String, _type: *MIRType) -> *mut MIRAllocaInstruction {
         let alloca = this.context->arena.New<MIRAllocaInstruction>(name, _type, this.context->PointerType(_type));
         this.function->AddAllocaInstruction(alloca);
-        return alloca;
+        alloca
     }
 
     pub fn BuildLoad(&mut this, name: String, pointer: *MIRValue) -> *mut MIRLoadInstruction {
@@ -1301,13 +1269,13 @@ class MIRBuilder {
 
         let load = this.context->arena.New<MIRLoadInstruction>(name, pointer, (pointer->_type as *MIRPointerType)->pointee);
         this.block->AddInstruction(load);
-        return load;
+        load
     }
 
     pub fn BuildStore(&mut this, value: *MIRValue, pointer: *MIRValue) -> *mut MIRStoreInstruction {
         let store = this.context->arena.New<MIRStoreInstruction>(value, pointer, this.context->VoidType());
         this.block->AddInstruction(store);
-        return store;
+        store
     }
 
     pub fn BuildArrayGEP(&mut this, name: String, pointer: *MIRValue, index: *MIRValue) -> *mut MIRValue {
@@ -1317,7 +1285,7 @@ class MIRBuilder {
 
         let gep = this.context->arena.New<MIRArrayGEPInstruction>(name, pointer, index, pointer->_type);
         this.block->AddInstruction(gep);
-        return gep;
+        gep
     }
 
     pub fn BuildStructGEP(&mut this, name: String, pointer: *MIRValue, index: u32, _type: *MIRType) -> *mut MIRValue {
@@ -1327,7 +1295,7 @@ class MIRBuilder {
 
         let gep = this.context->arena.New<MIRStructGEPInstruction>(name, pointer, index, _type);
         this.block->AddInstruction(gep);
-        return gep;
+        gep
     }
 
     pub fn BuildUnary(&mut this, name: String, kind: MIRUnaryKind, operand: *MIRValue) -> *mut MIRValue {
@@ -1337,7 +1305,7 @@ class MIRBuilder {
 
         let unary = this.context->arena.New<MIRUnaryInstruction>(name, kind, operand, operand->_type);
         this.block->AddInstruction(unary);
-        return unary;
+        unary
     }
 
     pub fn BuildBinary(&mut this, name: String, kind: MIRBinaryKind, left: *MIRValue, right: *MIRValue, _type: *MIRType) -> *mut MIRValue {
@@ -1347,13 +1315,13 @@ class MIRBuilder {
 
         let binary = this.context->arena.New<MIRBinaryInstruction>(name, kind, left, right, _type);
         this.block->AddInstruction(binary);
-        return binary;
+        binary
     }
 
     pub fn BuildCall(&mut this, name: String, callee: *MIRValue, arguments: Vector<*MIRValue>) -> *mut MIRCallInstruction {
         let call = this.context->arena.New<MIRCallInstruction>(name, callee, arguments, (callee->_type as *MIRFunctionType)->_return);
         this.block->AddInstruction(call);
-        return call;
+        call
     }
 
     pub fn BuildCast(&mut this, name: String, kind: MIRCastKind, value: *MIRValue, _type: *MIRType) -> *mut MIRValue {
@@ -1363,53 +1331,53 @@ class MIRBuilder {
 
         let cast = this.context->arena.New<MIRCastInstruction>(name, kind, value, _type);
         this.block->AddInstruction(cast);
-        return cast;
+        cast
     }
 
     pub fn BuildSelect(&mut this, name: String, condition: *MIRValue, then_value: *MIRValue, else_value: *MIRValue, _type: *MIRType) -> *mut MIRSelectInstruction {
         let select = this.context->arena.New<MIRSelectInstruction>(name, condition, then_value, else_value, _type);
         this.block->AddInstruction(select);
-        return select;
+        select
     }
 
     pub fn BuildPhi(&mut this, name: String, _type: *MIRType) -> *mut MIRPhiInstruction {
         let phi = this.context->arena.New<MIRPhiInstruction>(name, _type);
         this.block->AddInstruction(phi);
-        return phi;
+        phi
     }
 
     pub fn BuildAssemblyOperand(&mut this, name: String, value: *MIRValue) -> *mut MIRAssemblyOperand {
-        return this.context->arena.New<MIRAssemblyOperand>(name, value);
+        this.context->arena.New<MIRAssemblyOperand>(name, value)
     }
 
     pub fn BuildAssembly(&mut this, _volatile: bool, text: String, inputs: Vector<*MIRAssemblyOperand>, outputs: Vector<*MIRAssemblyOperand>, clobbers: Vector<String>) -> *mut MIRAssemblyInstruction {
         let assembly = this.context->arena.New<MIRAssemblyInstruction>(_volatile, text, inputs, outputs, clobbers, this.context->VoidType());
         this.block->AddInstruction(assembly);
-        return assembly;
+        assembly
     }
 
     pub fn BuildReturn(&mut this, value: *MIRValue) -> *mut MIRReturnInstruction {
         let _return = this.context->arena.New<MIRReturnInstruction>(value, this.context->VoidType());
         this.block->SetTerminator(_return);
-        return _return;
+        _return
     }
 
     pub fn BuildBranch(&mut this, target: *MIRBlock) -> *mut MIRBranchInstruction {
         let branch = this.context->arena.New<MIRBranchInstruction>(target, this.context->VoidType());
         this.block->SetTerminator(branch);
-        return branch;
+        branch
     }
 
     pub fn BuildConditionalBranch(&mut this, condition: *MIRValue, then_target: *MIRBlock, else_target: *MIRBlock) -> *mut MIRConditionalBranchInstruction {
         let branch = this.context->arena.New<MIRConditionalBranchInstruction>(condition, then_target, else_target, this.context->VoidType());
         this.block->SetTerminator(branch);
-        return branch;
+        branch
     }
 
     pub fn BuildUnreachable(&mut this) -> *mut MIRUnreachableInstruction {
         let unreachable = this.context->arena.New<MIRUnreachableInstruction>(this.context->VoidType());
         this.block->SetTerminator(unreachable);
-        return unreachable;
+        unreachable
     }
 
     pub fn ReferenceDeclaration(&mut this, declaration: *MIRTypedDeclaration) -> *mut MIRDeclarationReference {
@@ -1421,17 +1389,17 @@ class MIRBuilder {
             _type = declaration->_type;
         }
 
-        return this.context->arena.New<MIRDeclarationReference>(declaration, _type);
+        this.context->arena.New<MIRDeclarationReference>(declaration, _type)
     }
 
     pub fn BuildParameter(&mut this, name: String, index: u32, _type: *MIRType) -> *mut MIRParameter {
-        return this.context->arena.New<MIRParameter>(name, index, _type);
+        this.context->arena.New<MIRParameter>(name, index, _type)
     }
 
     pub fn BuildBlock(&mut this, name: String) -> *mut MIRBlock {
         let block = this.context->arena.New<MIRBlock>(name);
         this.function->AddBlock(block);
-        return block;
+        block
     }
 
     pub fn SetCurrentBlock(&mut this, block: *mut MIRBlock) {
@@ -1439,13 +1407,13 @@ class MIRBuilder {
     }
 
     pub fn GetCurrentBlock(&this) -> *mut MIRBlock {
-        return this.block;
+        this.block
     }
 
     pub fn BuildType(&mut this, name: String, _type: *MIRType) -> *mut MIRTypeDeclaration {
         let type_declaration = this.context->arena.New<MIRTypeDeclaration>(name, _type);
         this.module->declarations.PushBack(type_declaration);
-        return type_declaration;
+        type_declaration
     }
 
     pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage) -> *mut MIRFunctionDeclaration {
@@ -1454,7 +1422,7 @@ class MIRBuilder {
         let _type = this.context->FunctionType(parameter_types, _return);
         let function = this.context->arena.New<MIRFunctionDeclaration>(name, parameters, _return, _type, linkage);
         this.module->declarations.PushBack(function);
-        return function;
+        function
     }
 
     pub fn SetCurrentFunction(&mut this, function: *mut MIRFunctionDeclaration) {
@@ -1462,24 +1430,24 @@ class MIRBuilder {
     }
 
     pub fn GetCurrentFunction(&this) -> *mut MIRFunctionDeclaration {
-        return this.function;
+        this.function
     }
 
     pub fn BuildConstant(&mut this, name: String, _type: *MIRType, initializer: *MIRValue) -> *mut MIRConstantDeclaration {
         let constant = this.context->arena.New<MIRConstantDeclaration>(name, _type, initializer);
         this.module->declarations.PushBack(constant);
-        return constant;
+        constant
     }
 
     pub fn BuildStatic(&mut this, name: String, _type: *MIRType, mutable: bool, initializer: *MIRValue, linkage: MIRDeclarationLinkage) -> *mut MIRStaticDeclaration {
         let _static = this.context->arena.New<MIRStaticDeclaration>(name, _type, mutable, initializer, linkage);
         this.module->declarations.PushBack(_static);
-        return _static;
+        _static
     }
 
     pub fn BuildAssembly(&mut this, text: String) -> *mut MIRAssemblyDeclaration {
         let assembly = this.context->arena.New<MIRAssemblyDeclaration>(text);
         this.module->declarations.PushBack(assembly);
-        return assembly;
+        assembly
     }
 }

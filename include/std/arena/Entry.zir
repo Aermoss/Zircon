@@ -68,7 +68,7 @@ class Arena {
     }
 
     pub fn Allocate(&mut this, size: usize) -> *mut void {
-        return this.AllocateAligned(size, ARENA_DEFAULT_ALIGNMENT);
+        this.AllocateAligned(size, ARENA_DEFAULT_ALIGNMENT)
     }
 
     pub fn AllocateAligned(&mut this, size: usize, align: usize) -> *mut void {
@@ -99,7 +99,9 @@ class Arena {
                     return null;
                 }
             }
-        } return null;
+        }
+
+        null
     }
 
     pub fn New<T>(&mut this, args...) -> *mut T {
@@ -112,7 +114,7 @@ class Arena {
         construct(destructor, pointer, InvokeDestructor<T>);
         destructor->next = this.destructor;
         this.destructor = destructor;
-        return pointer as *mut T;
+        pointer as *mut T
     }
 
     pub fn Reset(&mut this) {
@@ -132,7 +134,9 @@ class Arena {
         while current != null {
             total += current->used;
             current = current->next;
-        } return total;
+        }
+
+        total
     }
 
     pub fn TotalCapacity(&this) -> usize {
@@ -142,7 +146,9 @@ class Arena {
         while current != null {
             total += current->capacity;
             current = current->next;
-        } return total;
+        }
+
+        total
     }
 
     pub fn ChunkCount(&this) -> usize {
@@ -152,7 +158,9 @@ class Arena {
         while current != null {
             current = current->next;
             count += 1;
-        } return count;
+        }
+
+        count
     }
 
     fn GrowChain(&mut this, min_bytes: usize) -> bool {
@@ -172,7 +180,9 @@ class Arena {
         } else {
             this.tail->next = chunk;
             this.tail = chunk;
-        } return true;
+        }
+
+        true
     }
 
     fn InvokeDestructors(&mut this) {

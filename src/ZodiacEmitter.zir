@@ -79,7 +79,9 @@ class ZodiacEmitter {
             for global in module->globals {
                 this.EmitGlobal(global);
             }
-        } return this.output;
+        }
+
+        this.output
     }
 
     fn Symbol(&this, name: &String) -> String {
@@ -95,11 +97,13 @@ class ZodiacEmitter {
             } else {
                 result += "_" + String::FromInteger(character as u8 as u64, 16);
             }
-        } return result;
+        }
+
+        result
     }
 
     fn Label(&this, block: *LIRBlock) -> String {
-        return "__LBB" + String::FromInteger(this.function_index as u64) + '_' + String::FromInteger(block->index as u64);
+        "__LBB" + String::FromInteger(this.function_index as u64) + '_' + String::FromInteger(block->index as u64)
     }
 
     fn Operand(&mut this, operand: *LIROperand) -> String {
@@ -111,21 +115,15 @@ class ZodiacEmitter {
                     Logger::Log("Unallocated virtual register in '" + this.function->name + "'.", LogSeverity::Error);
                 }
 
-                return LIRRegisterName((register as *LIRPhysicalRegister)->index);
+                LIRRegisterName((register as *LIRPhysicalRegister)->index)
             },
-            LIROperandKind::Immediate => {
-                return String::FromInteger((operand as *LIRImmediateOperand)->value);
-            },
+            LIROperandKind::Immediate => String::FromInteger((operand as *LIRImmediateOperand)->value),
             LIROperandKind::Memory => {
                 let memory = operand as *LIRMemoryOperand;
-                return String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')';
+                String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')'
             },
-            LIROperandKind::Block => {
-                return this.Label((operand as *LIRBlockOperand)->block);
-            },
-            LIROperandKind::Symbol => {
-                return this.Symbol((operand as *LIRSymbolOperand)->name);
-            }
+            LIROperandKind::Block => this.Label((operand as *LIRBlockOperand)->block),
+            LIROperandKind::Symbol => this.Symbol((operand as *LIRSymbolOperand)->name)
         }
     }
 
@@ -138,7 +136,7 @@ class ZodiacEmitter {
     }
 
     fn AlignUp(&this, value: u32, alignment: u32) -> u32 {
-        return ((value + alignment - 1) / alignment) * alignment;
+        ((value + alignment - 1) / alignment) * alignment
     }
 
     fn IsFramePointer(&this, operand: *LIROperand) -> bool {
@@ -146,7 +144,7 @@ class ZodiacEmitter {
             return this.IsFramePointer((operand as *LIRMemoryOperand)->base);
         }
 
-        return operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical && (operand as *LIRPhysicalRegister)->index == LIR_FP;
+        operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical && (operand as *LIRPhysicalRegister)->index == LIR_FP
     }
 
     fn UsesFramePointer(&this, function: *LIRFunction) -> bool {
@@ -160,12 +158,14 @@ class ZodiacEmitter {
                     if this.IsFramePointer(operand) { return true; }
                 }
             }
-        } return false;
+        }
+
+        false
     }
 
     fn FrameSize(&this) -> u32 {
         let function = this.function;
-        return this.AlignUp(function->frame_size + function->saved_registers.Size() as u32 * 4 + function->outgoing_size, 4);
+        this.AlignUp(function->frame_size + function->saved_registers.Size() as u32 * 4 + function->outgoing_size, 4)
     }
 
     fn EmitPrologue(&mut this) {
@@ -243,12 +243,12 @@ class ZodiacEmitter {
 
     fn InvertBranch(&this, opcode: LIROpcode) -> LIROpcode {
         match opcode {
-            LIROpcode::Beq => { return LIROpcode::Bne; },
-            LIROpcode::Bne => { return LIROpcode::Beq; },
-            LIROpcode::Blt => { return LIROpcode::Bge; },
-            LIROpcode::Bge => { return LIROpcode::Blt; },
-            LIROpcode::Bltu => { return LIROpcode::Bgeu; },
-            _ => { return LIROpcode::Bltu; }
+            LIROpcode::Beq => LIROpcode::Bne,
+            LIROpcode::Bne => LIROpcode::Beq,
+            LIROpcode::Blt => LIROpcode::Bge,
+            LIROpcode::Bge => LIROpcode::Blt,
+            LIROpcode::Bltu => LIROpcode::Bgeu,
+            _ => LIROpcode::Bltu
         }
     }
 

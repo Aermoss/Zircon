@@ -64,7 +64,9 @@ class ScopeManager {
                     return child;
                 }
             }
-        } return null;
+        }
+
+        null
     }
 
     fn LookupSymbol(&this, scope: *Scope, segment: &ASTPathSegment, path: *ASTPath) -> Vector<*Symbol> {
@@ -88,7 +90,9 @@ class ScopeManager {
             } else {
                 symbols.PushBack(symbol);
             }
-        } return symbols;
+        }
+
+        symbols
     }
 
     pub fn ResolveScope(&this, path: *ASTPath) -> *Scope {
@@ -113,7 +117,9 @@ class ScopeManager {
         for i in 1..(path->segments.Size() - 1) {
             if scope == null { break; }
             scope = this.LookupScope(scope, path->segments[i], path);
-        } return scope;
+        }
+
+        scope
     }
 
     pub fn Resolve(&this, path: *ASTPath, test: bool) -> Vector<*Symbol> {
@@ -140,7 +146,9 @@ class ScopeManager {
 
         if !test {
             Logger::Log("Symbol '" + path->segments.Back().name + "' not found.", path, LogSeverity::Error);
-        } return Vector<*Symbol>();
+        }
+
+        Vector<*Symbol>()
     }
 
     pub fn ResolveType(&this, path: *ASTPath, test: bool) -> Vector<*Symbol> {
@@ -181,7 +189,9 @@ class ScopeManager {
 
         if !test {
             Logger::Log("Symbol '" + path->segments.Back().name + "' not found.", path, LogSeverity::Error);
-        } return Vector<*Symbol>();
+        }
+
+        Vector<*Symbol>()
     }
 
     pub fn ResolveCandidates(&this, path: *ASTPath, values: &Vector<*HIRExpression>, test: bool) -> Vector<*HIRFunctionDeclaration> {
@@ -247,7 +257,9 @@ class ScopeManager {
             } else {
                 Logger::Log("Symbol '" + path->segments.Back().name + "' not found.", path, LogSeverity::Error);
             }
-        } return result;
+        }
+
+        result
     }
 }
 

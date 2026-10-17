@@ -231,7 +231,7 @@ class Logger {
     }
 
     pub fn HasError() -> bool {
-        return logger->has_error;
+        logger->has_error
     }
 }
 

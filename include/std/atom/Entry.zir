@@ -21,7 +21,7 @@ fn AtomicExchange8(target: *mut u8, value: u8) -> u8 {
         lock xchgb %sil, (%rdi)
     } -> sil(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicExchange16(target: *mut i16, value: i16) -> i16 {
@@ -31,7 +31,7 @@ fn AtomicExchange16(target: *mut i16, value: i16) -> i16 {
         lock xchgw %si, (%rdi)
     } -> si(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicExchange32(target: *mut u32, value: u32) -> u32 {
@@ -41,7 +41,7 @@ fn AtomicExchange32(target: *mut u32, value: u32) -> u32 {
         lock xchgl %esi, (%rdi)
     } -> esi(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicExchange64(target: *mut u64, value: u64) -> u64 {
@@ -51,7 +51,7 @@ fn AtomicExchange64(target: *mut u64, value: u64) -> u64 {
         lock xchgq %rsi, (%rdi)
     } -> rsi(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicCompareExchange8(target: *mut u8, expected: u8, desired: u8) -> u8 {
@@ -61,7 +61,7 @@ fn AtomicCompareExchange8(target: *mut u8, expected: u8, desired: u8) -> u8 {
         lock cmpxchgb %sil, (%rdi)
     } -> al(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicCompareExchange16(target: *mut i16, expected: i16, desired: i16) -> i16 {
@@ -71,7 +71,7 @@ fn AtomicCompareExchange16(target: *mut i16, expected: i16, desired: i16) -> i16
         lock cmpxchgw %si, (%rdi)
     } -> ax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicCompareExchange32(target: *mut u32, expected: u32, desired: u32) -> u32 {
@@ -81,7 +81,7 @@ fn AtomicCompareExchange32(target: *mut u32, expected: u32, desired: u32) -> u32
         lock cmpxchgl %esi, (%rdi)
     } -> eax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicCompareExchange64(target: *mut u64, expected: u64, desired: u64) -> u64 {
@@ -91,7 +91,7 @@ fn AtomicCompareExchange64(target: *mut u64, expected: u64, desired: u64) -> u64
         lock cmpxchgq %rsi, (%rdi)
     } -> rax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicCompareExchangeBool8(target: *mut u8, expected: u8, desired: u8) -> bool {
@@ -102,7 +102,7 @@ fn AtomicCompareExchangeBool8(target: *mut u8, expected: u8, desired: u8) -> boo
         sete %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicCompareExchangeBool16(target: *mut i16, expected: i16, desired: i16) -> bool {
@@ -113,7 +113,7 @@ fn AtomicCompareExchangeBool16(target: *mut i16, expected: i16, desired: i16) ->
         sete %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicCompareExchangeBool32(target: *mut u32, expected: u32, desired: u32) -> bool {
@@ -124,7 +124,7 @@ fn AtomicCompareExchangeBool32(target: *mut u32, expected: u32, desired: u32) ->
         sete %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicCompareExchangeBool64(target: *mut u64, expected: u64, desired: u64) -> bool {
@@ -135,7 +135,7 @@ fn AtomicCompareExchangeBool64(target: *mut u64, expected: u64, desired: u64) ->
         sete %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicLoad8(target: *u8) -> u8 {
@@ -146,7 +146,7 @@ fn AtomicLoad8(target: *u8) -> u8 {
         lfence
     } -> al(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicLoad16(target: *i16) -> i16 {
@@ -157,7 +157,7 @@ fn AtomicLoad16(target: *i16) -> i16 {
         lfence
     } -> ax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicLoad32(target: *u32) -> u32 {
@@ -168,7 +168,7 @@ fn AtomicLoad32(target: *u32) -> u32 {
         lfence
     } -> eax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicLoad64(target: *u64) -> u64 {
@@ -179,7 +179,7 @@ fn AtomicLoad64(target: *u64) -> u64 {
         lfence
     } -> rax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchAdd8(target: *mut u8, value: u8) -> u8 {
@@ -189,7 +189,7 @@ fn AtomicFetchAdd8(target: *mut u8, value: u8) -> u8 {
         lock xaddb %al, (%rdi)
     } -> al(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchAdd16(target: *mut i16, value: i16) -> i16 {
@@ -199,7 +199,7 @@ fn AtomicFetchAdd16(target: *mut i16, value: i16) -> i16 {
         lock xaddw %ax, (%rdi)
     } -> ax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchAdd32(target: *mut u32, value: u32) -> u32 {
@@ -209,7 +209,7 @@ fn AtomicFetchAdd32(target: *mut u32, value: u32) -> u32 {
         lock xaddl %eax, (%rdi)
     } -> eax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchAdd64(target: *mut u64, value: u64) -> u64 {
@@ -219,7 +219,7 @@ fn AtomicFetchAdd64(target: *mut u64, value: u64) -> u64 {
         lock xaddq %rax, (%rdi)
     } -> rax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchSub8(target: *mut u8, value: u8) -> u8 {
@@ -229,7 +229,7 @@ fn AtomicFetchSub8(target: *mut u8, value: u8) -> u8 {
         lock xaddb %al, (%rdi)
     } -> al(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchSub16(target: *mut i16, value: i16) -> i16 {
@@ -239,7 +239,7 @@ fn AtomicFetchSub16(target: *mut i16, value: i16) -> i16 {
         lock xaddw %ax, (%rdi)
     } -> ax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchSub32(target: *mut u32, value: u32) -> u32 {
@@ -249,7 +249,7 @@ fn AtomicFetchSub32(target: *mut u32, value: u32) -> u32 {
         lock xaddl %eax, (%rdi)
     } -> eax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchSub64(target: *mut u64, value: u64) -> u64 {
@@ -259,7 +259,7 @@ fn AtomicFetchSub64(target: *mut u64, value: u64) -> u64 {
         lock xaddq %rax, (%rdi)
     } -> rax(result) : memory;
 
-    return result;
+    result
 }
 
 fn AtomicFetchAnd8(target: *mut u8, value: u8) -> u8 {
@@ -272,7 +272,9 @@ fn AtomicFetchAnd8(target: *mut u8, value: u8) -> u8 {
 
         old = AtomicLoad8(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchAnd16(target: *mut i16, value: i16) -> i16 {
@@ -285,7 +287,9 @@ fn AtomicFetchAnd16(target: *mut i16, value: i16) -> i16 {
 
         old = AtomicLoad16(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchAnd32(target: *mut u32, value: u32) -> u32 {
@@ -298,7 +302,9 @@ fn AtomicFetchAnd32(target: *mut u32, value: u32) -> u32 {
 
         old = AtomicLoad32(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchAnd64(target: *mut u64, value: u64) -> u64 {
@@ -311,7 +317,9 @@ fn AtomicFetchAnd64(target: *mut u64, value: u64) -> u64 {
 
         old = AtomicLoad64(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchOr8(target: *mut u8, value: u8) -> u8 {
@@ -324,7 +332,9 @@ fn AtomicFetchOr8(target: *mut u8, value: u8) -> u8 {
 
         old = AtomicLoad8(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchOr16(target: *mut i16, value: i16) -> i16 {
@@ -337,7 +347,9 @@ fn AtomicFetchOr16(target: *mut i16, value: i16) -> i16 {
 
         old = AtomicLoad16(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchOr32(target: *mut u32, value: u32) -> u32 {
@@ -350,7 +362,9 @@ fn AtomicFetchOr32(target: *mut u32, value: u32) -> u32 {
 
         old = AtomicLoad32(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchOr64(target: *mut u64, value: u64) -> u64 {
@@ -363,7 +377,9 @@ fn AtomicFetchOr64(target: *mut u64, value: u64) -> u64 {
 
         old = AtomicLoad64(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchXor8(target: *mut u8, value: u8) -> u8 {
@@ -376,7 +392,9 @@ fn AtomicFetchXor8(target: *mut u8, value: u8) -> u8 {
 
         old = AtomicLoad8(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchXor16(target: *mut i16, value: i16) -> i16 {
@@ -389,7 +407,9 @@ fn AtomicFetchXor16(target: *mut i16, value: i16) -> i16 {
 
         old = AtomicLoad16(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchXor32(target: *mut u32, value: u32) -> u32 {
@@ -402,7 +422,9 @@ fn AtomicFetchXor32(target: *mut u32, value: u32) -> u32 {
 
         old = AtomicLoad32(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchXor64(target: *mut u64, value: u64) -> u64 {
@@ -415,7 +437,9 @@ fn AtomicFetchXor64(target: *mut u64, value: u64) -> u64 {
 
         old = AtomicLoad64(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNot8(target: *mut u8) -> u8 {
@@ -428,7 +452,9 @@ fn AtomicFetchNot8(target: *mut u8) -> u8 {
 
         old = AtomicLoad8(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNot16(target: *mut i16) -> i16 {
@@ -441,7 +467,9 @@ fn AtomicFetchNot16(target: *mut i16) -> i16 {
 
         old = AtomicLoad16(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNot32(target: *mut u32) -> u32 {
@@ -454,7 +482,9 @@ fn AtomicFetchNot32(target: *mut u32) -> u32 {
 
         old = AtomicLoad32(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNot64(target: *mut u64) -> u64 {
@@ -467,7 +497,9 @@ fn AtomicFetchNot64(target: *mut u64) -> u64 {
 
         old = AtomicLoad64(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNeg8(target: *mut u8) -> u8 {
@@ -480,7 +512,9 @@ fn AtomicFetchNeg8(target: *mut u8) -> u8 {
 
         old = AtomicLoad8(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNeg16(target: *mut i16) -> i16 {
@@ -493,7 +527,9 @@ fn AtomicFetchNeg16(target: *mut i16) -> i16 {
 
         old = AtomicLoad16(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNeg32(target: *mut u32) -> u32 {
@@ -506,7 +542,9 @@ fn AtomicFetchNeg32(target: *mut u32) -> u32 {
 
         old = AtomicLoad32(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicFetchNeg64(target: *mut u64) -> u64 {
@@ -519,7 +557,9 @@ fn AtomicFetchNeg64(target: *mut u64) -> u64 {
 
         old = AtomicLoad64(target);
         AtomicPause();
-    } return old;
+    }
+
+    old
 }
 
 fn AtomicIncrement8(target: *mut u8) {
@@ -578,7 +618,7 @@ fn AtomicBitTestAndSet32(target: *mut u32, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTestAndSet64(target: *mut u64, bit: u8) -> bool {
@@ -589,7 +629,7 @@ fn AtomicBitTestAndSet64(target: *mut u64, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTestAndReset32(target: *mut u32, bit: u8) -> bool {
@@ -600,7 +640,7 @@ fn AtomicBitTestAndReset32(target: *mut u32, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTestAndReset64(target: *mut u64, bit: u8) -> bool {
@@ -611,7 +651,7 @@ fn AtomicBitTestAndReset64(target: *mut u64, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTestAndComplement32(target: *mut u32, bit: u8) -> bool {
@@ -622,7 +662,7 @@ fn AtomicBitTestAndComplement32(target: *mut u32, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTestAndComplement64(target: *mut u64, bit: u8) -> bool {
@@ -633,7 +673,7 @@ fn AtomicBitTestAndComplement64(target: *mut u64, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTest32(target: *u32, bit: u8) -> bool {
@@ -644,7 +684,7 @@ fn AtomicBitTest32(target: *u32, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicBitTest64(target: *u64, bit: u8) -> bool {
@@ -655,7 +695,7 @@ fn AtomicBitTest64(target: *u64, bit: u8) -> bool {
         setc %al
     } -> al(result) : memory;
 
-    return result != 0;
+    result != 0
 }
 
 fn AtomicMemoryFence() {
@@ -693,18 +733,18 @@ class Atomic<T> {
 
     pub fn Load(&this) -> T {
         if sizeof(T) == 1 {
-            return AtomicLoad8(&this.value as *u8) as T;
+            AtomicLoad8(&this.value as *u8) as T
         } else if sizeof(T) == 2 {
-            return AtomicLoad16(&this.value as *i16) as T;
+            AtomicLoad16(&this.value as *i16) as T
         } else if sizeof(T) == 4 {
-            return AtomicLoad32(&this.value as *u32) as T;
+            AtomicLoad32(&this.value as *u32) as T
         } else if sizeof(T) == 8 {
-            return AtomicLoad64(&this.value as *u64) as T;
+            AtomicLoad64(&this.value as *u64) as T
         } else {
             AtomicLoadFence();
             let value = this.value;
             AtomicLoadFence();
-            return value;
+            value
         }
     }
 
@@ -726,63 +766,63 @@ class Atomic<T> {
 
     pub fn Exchange(&mut this, value: T) -> T {
         if sizeof(T) == 1 {
-            return AtomicExchange8(&this.value as *mut u8, value as u8) as T;
+            AtomicExchange8(&this.value as *mut u8, value as u8) as T
         } else if sizeof(T) == 2 {
-            return AtomicExchange16(&this.value as *mut i16, value as i16) as T;
+            AtomicExchange16(&this.value as *mut i16, value as i16) as T
         } else if sizeof(T) == 4 {
-            return AtomicExchange32(&this.value as *mut u32, value as u32) as T;
+            AtomicExchange32(&this.value as *mut u32, value as u32) as T
         } else if sizeof(T) == 8 {
-            return AtomicExchange64(&this.value as *mut u64, value as u64) as T;
+            AtomicExchange64(&this.value as *mut u64, value as u64) as T
         } else {
             AtomicStoreFence();
             let old = this.value;
             this.value = value;
             AtomicStoreFence();
-            return old;
+            old
         }
     }
 
     pub fn CompareExchange(&mut this, expected: T, desired: T) -> bool {
         if sizeof(T) == 1 {
-            return AtomicCompareExchangeBool8(&this.value as *mut u8, expected as u8, desired as u8);
+            AtomicCompareExchangeBool8(&this.value as *mut u8, expected as u8, desired as u8)
         } else if sizeof(T) == 2 {
-            return AtomicCompareExchangeBool16(&this.value as *mut i16, expected as i16, desired as i16);
+            AtomicCompareExchangeBool16(&this.value as *mut i16, expected as i16, desired as i16)
         } else if sizeof(T) == 4 {
-            return AtomicCompareExchangeBool32(&this.value as *mut u32, expected as u32, desired as u32);
+            AtomicCompareExchangeBool32(&this.value as *mut u32, expected as u32, desired as u32)
         } else if sizeof(T) == 8 {
-            return AtomicCompareExchangeBool64(&this.value as *mut u64, expected as u64, desired as u64);
+            AtomicCompareExchangeBool64(&this.value as *mut u64, expected as u64, desired as u64)
         } else {
             AtomicMemoryFence();
 
             if this.value == expected {
                 this.value = desired;
                 AtomicMemoryFence();
-                return true;
+                true
             } else {
                 AtomicMemoryFence();
-                return false;
+                false
             }
         }
     }
 
     pub fn operator==(&this, other: T) -> bool {
-        return this.Load() == other;
+        this.Load() == other
     }
 
     pub fn operator!=(&this, other: T) -> bool {
-        return this.Load() != other;
+        this.Load() != other
     }
 
     pub fn operator==(&this, other: &Atomic<T>) -> bool {
-        return this.Load() == other.Load();
+        this.Load() == other.Load()
     }
 
     pub fn operator!=(&this, other: &Atomic<T>) -> bool {
-        return this.Load() != other.Load();
+        this.Load() != other.Load()
     }
 
     pub fn operator=(&mut this, value: T) -> &mut Atomic<T> {
         this.Store(value);
-        return this;
+        this
     }
 }

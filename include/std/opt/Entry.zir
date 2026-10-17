@@ -21,21 +21,21 @@ enum Option<T> {
 
     pub fn IsSome(&this) -> bool {
         match this {
-            Option<T>::Some(_) => { return true; },
-            Option<T>::None => { return false; }
+            Option<T>::Some(_) => true,
+            Option<T>::None => false
         }
     }
 
     pub fn IsNone(&this) -> bool {
         match this {
-            Option<T>::Some(_) => { return false; },
-            Option<T>::None => { return true; }
+            Option<T>::Some(_) => false,
+            Option<T>::None => true
         }
     }
 
     pub fn Unwrap(&this) -> T {
         match this {
-            Option<T>::Some(value) => { return value; },
+            Option<T>::Some(value) => value,
             Option<T>::None => {
                 WriteLine("Panicked: called Unwrap() on a None value.");
                 Exit(1);
@@ -45,8 +45,8 @@ enum Option<T> {
 
     pub fn UnwrapOr(&this, default: T) -> T {
         match this {
-            Option<T>::Some(value) => { return value; },
-            Option<T>::None => { return default; }
+            Option<T>::Some(value) => value,
+            Option<T>::None => default
         }
     }
 }

@@ -23,8 +23,8 @@ enum MIRPassKind: u8 {
 extend MIRPassKind {
     pub fn ToString(this) -> String {
         match this {
-            MIRPassKind::ReorderBlocks => { return "reorder-blocks".ToString(); },
-            MIRPassKind::PromoteAllocas => { return "promote-allocas".ToString(); }
+            MIRPassKind::ReorderBlocks => "reorder-blocks".ToString(),
+            MIRPassKind::PromoteAllocas => "promote-allocas".ToString()
         }
     }
 }
@@ -57,11 +57,11 @@ class MIRPassManager {
         match kind {
             MIRPassKind::ReorderBlocks => {
                 let mut pass = MIRReorderBlocks();
-                return pass.Run(function);
+                pass.Run(function)
             },
             MIRPassKind::PromoteAllocas => {
                 let mut pass = MIRPromoteAllocas(this.context);
-                return pass.Run(function);
+                pass.Run(function)
             }
         }
     }
@@ -138,7 +138,7 @@ class MIRReorderBlocks {
         }
 
         function->blocks = blocks;
-        return changed;
+        changed
     }
 }
 
@@ -176,33 +176,27 @@ class MIRPromoteAllocas {
         this.SimplifyPhis();
         this.ResolveAll();
         this.RemoveDeadPhis();
-        return true;
+        true
     }
 
     fn IsScalar(&this, _type: *MIRType) -> bool {
-        return _type->kind == MIRTypeKind::Integer || _type->kind == MIRTypeKind::Pointer || _type->kind == MIRTypeKind::Float;
+        _type->kind == MIRTypeKind::Integer || _type->kind == MIRTypeKind::Pointer || _type->kind == MIRTypeKind::Float
     }
 
     fn SameType(&this, first: *MIRType, second: *MIRType) -> bool {
         if first->kind != second->kind {
-            return false;
+            false
         } else {
             match first->kind {
-                MIRTypeKind::Integer => {
-                    return (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width;
-                },
-                MIRTypeKind::Float => {
-                    return (first as *MIRFloatType)->width == (second as *MIRFloatType)->width;
-                },
-                _ => {
-                    return true;
-                }
+                MIRTypeKind::Integer => (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width,
+                MIRTypeKind::Float => (first as *MIRFloatType)->width == (second as *MIRFloatType)->width,
+                _ => true
             }
         }
     }
 
     fn Slot(&this, value: *MIRValue) -> usize {
-        return this.slots.Get(value, MIR_NO_BLOCK);
+        this.slots.Get(value, MIR_NO_BLOCK)
     }
 
     fn FindPromotableAllocas(&mut this) {
@@ -385,7 +379,9 @@ class MIRPromoteAllocas {
     fn Resolve(&this, mut value: *MIRValue) -> *MIRValue {
         while value != null && this.replacements.Has(value) {
             value = this.replacements.Get(value, null);
-        } return value;
+        }
+
+        value
     }
 
     fn SimplifyPhis(&mut this) {

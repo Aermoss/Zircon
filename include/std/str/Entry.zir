@@ -26,7 +26,9 @@ extern "C" {
             } else {
                 i += 1;
             }
-        } return 0;
+        }
+
+        0
     }
 
     fn strcmp(s1: *i8, s2: *i8) -> i32 {
@@ -38,7 +40,7 @@ extern "C" {
             } i += 1;
         }
 
-        return (s1[i] as i32) - (s2[i] as i32);
+        (s1[i] as i32) - (s2[i] as i32)
     }
 
     fn strncmp(s1: *i8, s2: *i8, n: usize) -> i32 {
@@ -50,7 +52,9 @@ extern "C" {
             if s1[i] == 0 {
                 break;
             }
-        } return 0;
+        }
+
+        0
     }
 }
 
@@ -152,12 +156,12 @@ class String {
         this.Release();
     }
 
-    pub fn Data(&this) -> *i8 { return this.data; }
-    pub fn Data(&mut this) -> *mut i8 { return this.data; }
+    pub fn Data(&this) -> *i8 { this.data }
+    pub fn Data(&mut this) -> *mut i8 { this.data }
 
-    pub fn Empty(&this) -> bool { return this.length == 0; }
-    pub fn Size(&this) -> usize { return this.length + 1; }
-    pub fn Length(&this) -> usize { return this.length; }
+    pub fn Empty(&this) -> bool { this.length == 0 }
+    pub fn Size(&this) -> usize { this.length + 1 }
+    pub fn Length(&this) -> usize { this.length }
 
     fn Allocate(&mut this, length: usize) {
         (this.data, this.length) = (new i8[length + 1], length);
@@ -175,8 +179,8 @@ class String {
     }
 
     pub fn FromInteger(mut value: u64, base: u64) -> String {
-        if base < 2 || base > 36 { return String(); }
-        else if value == 0 { return String("0"); }
+        if base < 2 || base > 36 { String() }
+        else if value == 0 { String("0") }
         else {
             let mut result = String();
 
@@ -185,37 +189,37 @@ class String {
                 value /= base;
             }
 
-            return result.Reverse();
+            result.Reverse()
         }
     }
 
     pub fn FromInteger(value: u64) -> String {
-        return String::FromInteger(value, 10);
+        String::FromInteger(value, 10)
     }
 
     pub fn FromInteger(value: i64, base: i64) -> String {
         if base < 2 || base > 36 {
-            return String();
+            String()
         } else if value >= 0 {
-            return String::FromInteger(value as u64, base as u64);
+            String::FromInteger(value as u64, base as u64)
         } else if base != 10 {
-            return String::FromInteger((!value + 1) as u64, base as u64);
+            String::FromInteger((!value + 1) as u64, base as u64)
         } else {
-            return '-' + String::FromInteger((!value + 1) as u64, base as u64);
+            '-' + String::FromInteger((!value + 1) as u64, base as u64)
         }
     }
 
     pub fn FromInteger(value: i64) -> String {
-        return String::FromInteger(value, 10);
+        String::FromInteger(value, 10)
     }
 
     pub fn FromFloat(mut value: f64, precision: usize) -> String {
-        if value != value { return "nan".ToString(); }
-        else if value == (1.0 / 0.0) { return "inf".ToString(); }
-        else if value == (-1.0 / 0.0) { return "-inf".ToString(); }
-        else if value == 0.0 { return "0.0".ToString(); }
+        if value != value { "nan".ToString() }
+        else if value == (1.0 / 0.0) { "inf".ToString() }
+        else if value == (-1.0 / 0.0) { "-inf".ToString() }
+        else if value == 0.0 { "0.0".ToString() }
         else if value < 0.0 {
-            return '-' + String::FromFloat(-value, precision);
+            '-' + String::FromFloat(-value, precision)
         } else {
             let mut exponent: i64 = 0;
 
@@ -267,12 +271,14 @@ class String {
                 } else {
                     result += '+' + String::FromInteger(exponent);
                 }
-            } return result;
+            }
+
+            result
         }
     }
 
     pub fn FromFloat(mut value: f64) -> String {
-        return String::FromFloat(value, 6);
+        String::FromFloat(value, 6)
     }
 
     fn ParseUnsigned(&this, base: u64, negative: &mut bool) -> u64 {
@@ -291,22 +297,22 @@ class String {
 
         while i < this.length {
             let c = this.data[i];
-            let mut value: u64 = 0;
-
-            if c >= '0' && c <= '9' {
-                value = (c - '0') as u64;
+            let value: u64 = if c >= '0' && c <= '9' {
+                (c - '0') as u64
             } else if c >= 'A' && c <= 'Z' {
-                value = (c - 'A' + 10) as u64;
+                (c - 'A' + 10) as u64
             } else if c >= 'a' && c <= 'z' {
-                value = (c - 'a' + 10) as u64;
+                (c - 'a' + 10) as u64
             } else {
                 break;
-            }
+            };
 
             if value >= base { break; }
             result = result * base + value;
             i += 1;
-        } return result;
+        }
+
+        result
     }
 
     pub fn ToUnsignedInteger(&this, base: u64) -> u64 {
@@ -315,11 +321,13 @@ class String {
 
         if negative {
             return !value + 1;
-        } return value;
+        }
+
+        value
     }
 
     pub fn ToUnsignedInteger(&this) -> u64 {
-        return this.ToUnsignedInteger(10);
+        this.ToUnsignedInteger(10)
     }
 
     pub fn ToInteger(&this, base: i64) -> i64 {
@@ -328,11 +336,13 @@ class String {
 
         if negative {
             return -(value as i64);
-        } return value as i64;
+        }
+
+        value as i64
     }
 
     pub fn ToInteger(&this) -> i64 {
-        return this.ToInteger(10);
+        this.ToInteger(10)
     }
 
     pub fn ToFloat(&this) -> f64 {
@@ -405,7 +415,9 @@ class String {
 
         if negative {
             return -value;
-        } return value;
+        }
+
+        value
     }
 
     pub fn ToLower(&this) -> String {
@@ -416,7 +428,9 @@ class String {
             let mut c = this.data[i];
             if c >= 'A' && c <= 'Z' { c += 32; }
             result.data[i] = c;
-        } return result;
+        }
+
+        result
     }
 
     pub fn ToUpper(&this) -> String {
@@ -427,7 +441,9 @@ class String {
             let mut c = this.data[i];
             if c >= 'a' && c <= 'z' { c -= 32; }
             result.data[i] = c;
-        } return result;
+        }
+
+        result
     }
 
     pub fn Reverse(&this) -> String {
@@ -436,7 +452,9 @@ class String {
 
         for i in 0..this.length {
             result.data[i] = this.data[this.length - 1 - i];
-        } return result;
+        }
+
+        result
     }
 
     pub fn Escape(&this) -> String {
@@ -460,23 +478,25 @@ class String {
             } else {
                 result += this.data[i];
             }
-        } return result;
+        }
+
+        result
     }
 
     pub fn Replace(&this, from: &String, to: &String) -> String {
-        return this.Replace(from.data, to.data, from.length);
+        this.Replace(from.data, to.data, from.length)
     }
 
     pub fn Replace(&this, from: *i8, to: &String) -> String {
-        return this.Replace(from, to.data, strlen(from));
+        this.Replace(from, to.data, strlen(from))
     }
 
     pub fn Replace(&this, from: &String, to: *i8) -> String {
-        return this.Replace(from.data, to, from.length);
+        this.Replace(from.data, to, from.length)
     }
 
     pub fn Replace(&this, from: *i8, to: *i8) -> String {
-        return this.Replace(from, to, strlen(from));
+        this.Replace(from, to, strlen(from))
     }
 
     fn Replace(&this, from: *i8, to: *i8, length: usize) -> String {
@@ -505,14 +525,16 @@ class String {
                 result += this.data[i];
                 i += 1;
             }
-        } return result;
+        }
+
+        result
     }
 
     pub fn SubString(&this, start: usize) -> String {
         if start < this.length {
-            return String(this.data + start);
+            String(this.data + start)
         } else {
-            return String();
+            String()
         }
     }
 
@@ -526,34 +548,36 @@ class String {
 
             for i in 0..length {
                 result += this.data[start + i];
-            } return result;
+            }
+
+            result
         } else {
-            return String();
+            String()
         }
     }
 
     pub fn Contains(&this, substring: &String) -> bool {
-        return this.Contains(substring.data, substring.length);
+        this.Contains(substring.data, substring.length)
     }
 
     pub fn Contains(&this, substring: *i8) -> bool {
-        return this.Contains(substring, strlen(substring));
+        this.Contains(substring, strlen(substring))
     }
 
     fn Contains(&this, substring: *i8, length: usize) -> bool {
-        return this.Find(substring, length) != -1;
+        this.Find(substring, length) != -1
     }
 
     pub fn Contains(&this, character: i8) -> bool {
-        return this.Find(character) != -1;
+        this.Find(character) != -1
     }
 
     pub fn StartsWith(&this, prefix: &String) -> bool {
-        return this.StartsWith(prefix.data, prefix.length);
+        this.StartsWith(prefix.data, prefix.length)
     }
 
     pub fn StartsWith(&this, prefix: *i8) -> bool {
-        return this.StartsWith(prefix, strlen(prefix));
+        this.StartsWith(prefix, strlen(prefix))
     }
 
     fn StartsWith(&this, prefix: *i8, length: usize) -> bool {
@@ -565,20 +589,22 @@ class String {
             if this.data[i] != prefix[i] {
                 return false;
             }
-        } return true;
+        }
+
+        true
     }
 
     pub fn StartsWith(&this, character: i8) -> bool {
         if this.length == 0 { return false; }
-        return this.data[0] == character;
+        this.data[0] == character
     }
 
     pub fn EndsWith(&this, suffix: &String) -> bool {
-        return this.EndsWith(suffix.data, suffix.length);
+        this.EndsWith(suffix.data, suffix.length)
     }
 
     pub fn EndsWith(&this, suffix: *i8) -> bool {
-        return this.EndsWith(suffix, strlen(suffix));
+        this.EndsWith(suffix, strlen(suffix))
     }
 
     fn EndsWith(&this, suffix: *i8, length: usize) -> bool {
@@ -591,20 +617,22 @@ class String {
             if this.data[start + i] != suffix[i] {
                 return false;
             }
-        } return true;
+        }
+
+        true
     }
 
     pub fn EndsWith(&this, character: i8) -> bool {
         if this.length == 0 { return false; }
-        return this.data[this.length - 1] == character;
+        this.data[this.length - 1] == character
     }
 
     pub fn Split(&this, delimiter: &String) -> Vector<String> {
-        return this.Split(delimiter.data, delimiter.length);
+        this.Split(delimiter.data, delimiter.length)
     }
 
     pub fn Split(&this, delimiter: *i8) -> Vector<String> {
-        return this.Split(delimiter, strlen(delimiter));
+        this.Split(delimiter, strlen(delimiter))
     }
 
     fn Split(&this, delimiter: *i8, length: usize) -> Vector<String> {
@@ -648,7 +676,9 @@ class String {
 
         if !current.Empty() {
             result.PushBack(current);
-        } return result;
+        }
+
+        result
     }
 
     pub fn Split(&this, delimiter: i8) -> Vector<String> {
@@ -666,15 +696,17 @@ class String {
 
         if !current.Empty() {
             result.PushBack(current);
-        } return result;
+        }
+
+        result
     }
 
     pub fn Count(&this, substring: &String) -> usize {
-        return this.Count(substring.data, substring.length);
+        this.Count(substring.data, substring.length)
     }
 
     pub fn Count(&this, substring: *i8) -> usize {
-        return this.Count(substring, strlen(substring));
+        this.Count(substring, strlen(substring))
     }
 
     fn Count(&this, substring: *i8, length: usize) -> usize {
@@ -700,7 +732,9 @@ class String {
             } else {
                 i += 1;
             }
-        } return count;
+        }
+
+        count
     }
 
     pub fn Count(&this, character: i8) -> usize {
@@ -710,15 +744,17 @@ class String {
             if this.data[i] == character {
                 count += 1;
             }
-        } return count;
+        }
+
+        count
     }
 
     pub fn Find(&this, substring: &String) -> isize {
-        return this.Find(substring.data, substring.length);
+        this.Find(substring.data, substring.length)
     }
 
     pub fn Find(&this, substring: *i8) -> isize {
-        return this.Find(substring, strlen(substring));
+        this.Find(substring, strlen(substring))
     }
 
     fn Find(&this, substring: *i8, length: usize) -> isize {
@@ -739,7 +775,9 @@ class String {
             if found {
                 return i as isize;
             }
-        } return -1;
+        }
+
+        -1
     }
 
     pub fn Find(&this, character: i8) -> isize {
@@ -747,7 +785,9 @@ class String {
             if this.data[i] == character {
                 return i as isize;
             }
-        } return -1;
+        }
+
+        -1
     }
 
     pub fn Strip(&this) -> String {
@@ -763,7 +803,7 @@ class String {
             end -= 1;
         }
 
-        return this.SubString(start, end - start);
+        this.SubString(start, end - start)
     }
 
     pub fn Hash(&this) -> u64 {
@@ -773,11 +813,13 @@ class String {
             let character = this.data[i];
             hash = hash ^ (character as u64 & 0xFF);
             hash = hash * 0x100000001b3;
-        } return hash;
+        }
+
+        hash
     }
 
     pub fn operator=(&mut this, other: &String) -> &mut String {
-        return this.operator=(other.data);
+        this.operator=(other.data)
     }
 
     pub fn operator=(&mut this, string: *i8) -> &mut String {
@@ -790,18 +832,18 @@ class String {
 
         this.Allocate(strlen(string));
         memcpy(this.data, string, this.length);
-        return this;
+        this
     }
 
     pub fn operator=(&mut this, character: i8) -> &mut String {
         this.Release();
         this.Allocate(1);
         this.data[0] = character;
-        return this;
+        this
     }
 
     pub fn operator+=(&mut this, other: &String) -> &mut String {
-        return this.operator+=(other.data);
+        this.operator+=(other.data)
     }
 
     pub fn operator+=(&mut this, string: *i8) -> &mut String {
@@ -816,7 +858,7 @@ class String {
         }
 
         memcpy((this.data + length), string, string_length);
-        return this;
+        this
     }
 
     pub fn operator+=(&mut this, character: i8) -> &mut String {
@@ -829,124 +871,126 @@ class String {
         }
 
         this.data[length] = character;
-        return this;
+        this
     }
 
     pub fn operator+(&this, other: &String) -> String {
-        return this.operator+(other.data);
+        this.operator+(other.data)
     }
 
     pub fn operator+(&this, string: *i8) -> String {
         let mut result = String(this.data);
         result += string;
-        return result;
+        result
     }
 
     pub fn operator+(&this, character: i8) -> String {
         let mut result = String(this.data);
         result += character;
-        return result;
+        result
     }
 
     pub fn operator*=(&mut this, count: usize) -> &mut String {
         if count <= 0 {
             this.Release();
             this.Allocate(0);
-            return this;
+            this
         } else {
             let temp = String(this.data);
 
             for i in 0..(count - 1) {
                 this.operator+=(temp.data);
-            } return this;
+            }
+
+            this
         }
     }
 
     pub fn operator*(&this, count: usize) -> String {
         let mut result = String(this.data);
         result *= count;
-        return result;
+        result
     }
 
     pub fn operator==(&this, other: &String) -> bool {
         if this.data == null || other.data == null { return false; }
         if this.length != other.length { return false; }
-        return strcmp(this.data, other.data) == 0;
+        strcmp(this.data, other.data) == 0
     }
 
     pub fn operator==(&this, string: *i8) -> bool {
         if this.data == null || string == null { return false; }
         if this.length != strlen(string) { return false; }
-        return strcmp(this.data, string) == 0;
+        strcmp(this.data, string) == 0
     }
 
     pub fn operator==(&this, character: i8) -> bool {
         if this.data == null { return false; }
         if this.length != 1 { return false; }
-        return this.data[0] == character;
+        this.data[0] == character
     }
 
     pub fn operator!=(&this, other: &String) -> bool {
-        return !(this == other);
+        !(this == other)
     }
 
     pub fn operator!=(&this, string: *i8) -> bool {
-        return !(this == string);
+        !(this == string)
     }
 
     pub fn operator!=(&this, character: i8) -> bool {
-        return !(this == character);
+        !(this == character)
     }
 
     pub fn operator[](&this, index: usize) -> &i8 {
-        return this.data[index];
+        this.data[index]
     }
 
     pub fn operator[](&mut this, index: usize) -> &mut i8 {
-        return this.data[index];
+        this.data[index]
     }
 
     pub fn Begin(&this) -> *i8 {
-        return this.data;
+        this.data
     }
 
     pub fn End(&this) -> *i8 {
-        return this.data + this.length;
+        this.data + this.length
     }
 
     pub fn Begin(&mut this) -> *mut i8 {
-        return this.data;
+        this.data
     }
 
     pub fn End(&mut this) -> *mut i8 {
-        return this.data + this.length;
+        this.data + this.length
     }
 }
 
 extend i8 {
     pub fn ToString(this) -> String {
-        return String(this);
+        String(this)
     }
 
     pub fn operator+(this, string: &String) -> String {
-        return String(this) + string;
+        String(this) + string
     }
 
     pub fn operator*(this, count: usize) -> String {
-        return String(this) * count;
+        String(this) * count
     }
 }
 
 extend *i8 {
     pub fn ToString(this) -> String {
-        return String(this);
+        String(this)
     }
 
     pub fn operator+(this, string: &String) -> String {
-        return String(this) + string;
+        String(this) + string
     }
 
     pub fn operator*(this, count: usize) -> String {
-        return String(this) * count;
+        String(this) * count
     }
 }

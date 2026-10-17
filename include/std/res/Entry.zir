@@ -21,21 +21,21 @@ enum Result<T, E> {
 
     pub fn IsOk(&this) -> bool {
         match this {
-            Result<T, E>::Ok(_) => { return true; },
-            Result<T, E>::Err(_) => { return false; }
+            Result<T, E>::Ok(_) => true,
+            Result<T, E>::Err(_) => false
         }
     }
 
     pub fn IsErr(&this) -> bool {
         match this {
-            Result<T, E>::Ok(_) => { return false; },
-            Result<T, E>::Err(_) => { return true; }
+            Result<T, E>::Ok(_) => false,
+            Result<T, E>::Err(_) => true
         }
     }
 
     pub fn Unwrap(&this) -> T {
         match this {
-            Result<T, E>::Ok(value) => { return value; },
+            Result<T, E>::Ok(value) => value,
             Result<T, E>::Err(_) => {
                 WriteLine("Panicked: called Unwrap() on an Err value.");
                 Exit(1);
@@ -45,8 +45,8 @@ enum Result<T, E> {
 
     pub fn UnwrapOr(&this, default: T) -> T {
         match this {
-            Result<T, E>::Ok(value) => { return value; },
-            Result<T, E>::Err(_) => { return default; }
+            Result<T, E>::Ok(value) => value,
+            Result<T, E>::Err(_) => default
         }
     }
 
@@ -56,7 +56,7 @@ enum Result<T, E> {
                 WriteLine("Panicked: called UnwrapErr() on an Ok value.");
                 Exit(1);
             },
-            Result<T, E>::Err(err) => { return err; }
+            Result<T, E>::Err(err) => err
         }
     }
 }

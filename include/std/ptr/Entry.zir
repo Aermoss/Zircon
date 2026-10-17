@@ -77,30 +77,30 @@ class Shared<T> {
 
     pub fn Ptr(&this) -> *mut T {
         if this.control == null { return null; }
-        return this.control->ptr;
+        this.control->ptr
     }
 
     pub fn StrongCount(&this) -> u64 {
         if this.control == null { return 0; }
-        return AtomicLoad64(&this.control->strong);
+        AtomicLoad64(&this.control->strong)
     }
 
     pub fn WeakCount(&this) -> u64 {
         if this.control == null { return 0; }
         let weak = AtomicLoad64(&this.control->weak);
-        return weak > 0 ? weak - 1 : 0;
+        weak > 0 ? weak - 1 : 0
     }
 
     pub fn Valid(&this) -> bool {
-        return this.Ptr() != null;
+        this.Ptr() != null
     }
 
     pub fn operator->(&this) -> *mut T {
-        return this.Ptr();
+        this.Ptr()
     }
 
     pub fn operator*(&this) -> &mut T {
-        return *this.Ptr();
+        *this.Ptr()
     }
 
     pub fn operator=(&mut this, other: &Shared<T>) -> &mut Shared<T> {
@@ -121,23 +121,25 @@ class Shared<T> {
 
             count = AtomicLoad64(&other.control->strong);
             AtomicPause();
-        } return this;
+        }
+
+        this
     }
 
     pub fn operator!=(&this, other: &Shared<T>) -> bool {
-        return this.Ptr() != other.Ptr();
+        this.Ptr() != other.Ptr()
     }
 
     pub fn operator==(&this, other: &Shared<T>) -> bool {
-        return this.Ptr() == other.Ptr();
+        this.Ptr() == other.Ptr()
     }
 
     pub fn operator!=(&this, other: *T) -> bool {
-        return this.Ptr() != other;
+        this.Ptr() != other
     }
 
     pub fn operator==(&this, other: *T) -> bool {
-        return this.Ptr() == other;
+        this.Ptr() == other
     }
 
     pub fn ToWeak(&this) -> Weak<T> {
@@ -145,7 +147,7 @@ class Shared<T> {
         if this.control == null { return result; }
         AtomicFetchAdd64(&mut this.control->weak, 1);
         result.control = this.control;
-        return result;
+        result
     }
 }
 
@@ -186,7 +188,7 @@ class Weak<T> {
 
     pub fn Expired(&this) -> bool {
         if this.control == null { return true; }
-        return AtomicLoad64(&this.control->strong) == 0;
+        AtomicLoad64(&this.control->strong) == 0
     }
 
     pub fn Lock(&this) -> Shared<T> {
@@ -206,18 +208,20 @@ class Weak<T> {
 
             count = AtomicLoad64(&this.control->strong);
             AtomicPause();
-        } return result;
+        }
+
+        result
     }
 
     pub fn StrongCount(&this) -> u64 {
         if this.control == null { return 0; }
-        return AtomicLoad64(&this.control->strong);
+        AtomicLoad64(&this.control->strong)
     }
 
     pub fn WeakCount(&this) -> u64 {
         if this.control == null { return 0; }
         let weak = AtomicLoad64(&this.control->weak);
-        return weak > 0 ? weak - 1 : 0;
+        weak > 0 ? weak - 1 : 0
     }
 
     pub fn operator=(&mut this, shared: &Shared<T>) -> &mut Weak<T> {
@@ -226,7 +230,7 @@ class Weak<T> {
         if shared.control == null { return this; }
         AtomicFetchAdd64(&mut shared.control->weak, 1);
         this.control = shared.control;
-        return this;
+        this
     }
 
     pub fn operator=(&mut this, other: &Weak<T>) -> &mut Weak<T> {
@@ -235,6 +239,6 @@ class Weak<T> {
         if other.control == null { return this; }
         AtomicFetchAdd64(&mut other.control->weak, 1);
         this.control = other.control;
-        return this;
+        this
     }
 }

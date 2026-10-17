@@ -94,7 +94,7 @@ class Target {
             return TargetInfo(4, 4, 4);
         }
 
-        return TargetInfo(LLVMPointerSize(this.layout) as usize, LLVMPointerSize(this.layout) as usize, 16);
+        TargetInfo(LLVMPointerSize(this.layout) as usize, LLVMPointerSize(this.layout) as usize, 16)
     }
 
     pub fn Emit(&this, module: LLVMModuleRef, file_name: &String, file_type: LLVMCodeGenFileType) -> String {
@@ -112,6 +112,8 @@ class Target {
 
         if message != null {
             LLVMDisposeMessage(message);
-        } return result;
+        }
+
+        result
     }
 }

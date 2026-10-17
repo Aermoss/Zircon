@@ -115,7 +115,9 @@ class Thread {
             let status = thrd_join(this.thread, &mut res);
             this.joined = true;
             return res;
-        } return 0;
+        }
+
+        0
     }
 
     pub fn Detach(&mut this) {
@@ -126,7 +128,7 @@ class Thread {
     }
 
     pub fn GetId(&this) -> u32 {
-        return this.thread._Tid;
+        this.thread._Tid
     }
 
     pub fn Sleep(&this, seconds: i64, nanoseconds: i32) {
@@ -168,11 +170,11 @@ class Mutex {
     }
 
     pub fn TryLock(&mut this) -> bool {
-        return mtx_trylock(&mut this.mutex) == thrd_success;
+        mtx_trylock(&mut this.mutex) == thrd_success
     }
 
     pub fn Handle(&mut this) -> *mut mtx_t {
-        return &mut this.mutex;
+        &mut this.mutex
     }
 }
 

@@ -36,16 +36,16 @@ class Vector<T> {
         this.Release();
     }
 
-    pub fn Data(&this) -> *T { return this.data; }
-    pub fn Front(&this) -> &T { return this.data; }
-    pub fn Back(&this) -> &T { return this.data[this.size - 1]; }
+    pub fn Data(&this) -> *T { this.data }
+    pub fn Front(&this) -> &T { this.data }
+    pub fn Back(&this) -> &T { this.data[this.size - 1] }
 
-    pub fn Data(&mut this) -> *mut T { return this.data; }
-    pub fn Front(&mut this) -> &mut T { return this.data; }
-    pub fn Back(&mut this) -> &mut T { return this.data[this.size - 1]; }
+    pub fn Data(&mut this) -> *mut T { this.data }
+    pub fn Front(&mut this) -> &mut T { this.data }
+    pub fn Back(&mut this) -> &mut T { this.data[this.size - 1] }
 
-    pub fn Empty(&this) -> bool { return this.size == 0; }
-    pub fn Size(&this) -> usize { return this.size; }
+    pub fn Empty(&this) -> bool { this.size == 0 }
+    pub fn Size(&this) -> usize { this.size }
 
     fn Allocate(&mut this, capacity: usize) {
         (this.data, this.capacity) = (new T[capacity], capacity);
@@ -105,7 +105,9 @@ class Vector<T> {
 
         for i in 0..this.size {
             result.data[i] = this.data[this.size - 1 - i];
-        } return result;
+        }
+
+        result
     }
 
     pub fn PushBack(&mut this, value: T) {
@@ -119,7 +121,7 @@ class Vector<T> {
 
     pub fn PopBack(&mut this) -> T {
         this.size -= 1;
-        return this.data[this.size];
+        this.data[this.size]
     }
 
     pub fn Insert(&mut this, index: usize, value: T) {
@@ -144,7 +146,7 @@ class Vector<T> {
         }
 
         this.size -= 1;
-        return temp;
+        temp
     }
 
     pub fn Remove(&mut this, value: T) {
@@ -164,7 +166,9 @@ class Vector<T> {
             if this.data[i] == value {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     pub fn Index(&this, value: T) -> isize {
@@ -172,7 +176,9 @@ class Vector<T> {
             if this.data[i] == value {
                 return i as isize;
             }
-        } return -1;
+        }
+
+        -1
     }
 
     pub fn operator+(&this, other: &Vector<T>) -> Vector<T> {
@@ -185,7 +191,9 @@ class Vector<T> {
 
         for i in 0..other.size {
             result.data[this.size + i] = other.data[i];
-        } return result;
+        }
+
+        result
     }
 
     pub fn operator+=(&mut this, other: &Vector<T>) -> &mut Vector<T> {
@@ -194,7 +202,9 @@ class Vector<T> {
 
         for i in 0..other.size {
             this.data[old_size + i] = other.data[i];
-        } return this;
+        }
+
+        this
     }
 
     pub fn operator=(&mut this, other: &Vector<T>) -> &mut Vector<T> {
@@ -208,30 +218,30 @@ class Vector<T> {
         }
 
         this.size = other.size;
-        return this;
+        this
     }
 
     pub fn operator[](&this, index: usize) -> &T {
-        return this.data[index];
+        this.data[index]
     }
 
     pub fn operator[](&mut this, index: usize) -> &mut T {
-        return this.data[index];
+        this.data[index]
     }
 
     pub fn Begin(&this) -> *T {
-        return this.data;
+        this.data
     }
 
     pub fn End(&this) -> *T {
-        return this.data + this.size;
+        this.data + this.size
     }
 
     pub fn Begin(&mut this) -> *mut T {
-        return this.data;
+        this.data
     }
 
     pub fn End(&mut this) -> *mut T {
-        return this.data + this.size;
+        this.data + this.size
     }
 }

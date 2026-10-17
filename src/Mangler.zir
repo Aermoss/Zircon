@@ -18,7 +18,7 @@
 
 class Mangler {
     pub fn IsMangled(name: &String) -> bool {
-        return name.StartsWith("$z");
+        name.StartsWith("$z")
     }
 
     fn MangleType(_type: *HIRType) -> String {
@@ -96,7 +96,9 @@ class Mangler {
             }
         } else {
             Logger::Log("Mangler", "Unknown type '" + _type->ToString() + "'.", LogSeverity::Error);
-        } return result;
+        }
+
+        result
     }
 
     fn MangleTypeSubstituted(_type: *HIRType, substitution_table: &mut Map<*HIRType, String>) -> String {
@@ -123,7 +125,9 @@ class Mangler {
 
         if result.Length() >= String::FromInteger(substitution_table.Size() as u64).Length() + 2 {
             substitution_table[_type] = result;
-        } return result;
+        }
+
+        result
     }
 
     pub fn MangleName(name: &String, types: &Vector<*HIRType>, mut names: Vector<String>) -> String {
@@ -164,7 +168,9 @@ class Mangler {
 
         if names.Size() > 1 || !types.Empty() || has_namespace {
             result += "E";
-        } return result;
+        }
+
+        result
     }
 
     pub fn MangleFunction(name: &String, _type: *HIRType, types: &Vector<*HIRType>, mut names: Vector<String>) -> String {
@@ -211,6 +217,8 @@ class Mangler {
 
         for param in _type->Parameters() {
             result += Mangler::MangleTypeSubstituted(param, substitution_table);
-        } return result;
+        }
+
+        result
     }
 }

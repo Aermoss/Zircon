@@ -5,7 +5,7 @@ fn Divide(a: f64, b: f64) -> Result<f64, String> {
         return Result<f64, String>::Err("division by zero".ToString());
     }
 
-    return Result<f64, String>::Ok(a / b);
+    Result<f64, String>::Ok(a / b)
 }
 
 fn Find(haystack: *i8, needle: i8) -> Option<usize> {
@@ -17,7 +17,7 @@ fn Find(haystack: *i8, needle: i8) -> Option<usize> {
         } i += 1;
     }
 
-    return Option<usize>::None;
+    Option<usize>::None
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
@@ -50,5 +50,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
         WriteLine("Not found (expected)");
     }
 
-    return 0;
+    0
 }

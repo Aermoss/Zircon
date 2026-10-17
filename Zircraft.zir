@@ -51,17 +51,17 @@ extern "C" {
 
 fn Lerp2(a: f64, b: f64, t: f64) -> f64 {
     let value = a + (b - a) * t;
-    if a < b && value > b { return b; }
-    else if a > b && value < b { return b; }
-    else { return value; }
+    if a < b && value > b { b }
+    else if a > b && value < b { b }
+    else { value }
 }
 
 fn ToRadians(degrees: f32) -> f32 {
-    return degrees * ((M_PI as f32) / 180.0);
+    degrees * ((M_PI as f32) / 180.0)
 }
 
 fn ToDegrees(radians: f32) -> f32 {
-    return radians * (180.0 / (M_PI as f32));
+    radians * (180.0 / (M_PI as f32))
 }
 
 class Vector2 {
@@ -81,120 +81,120 @@ class Vector2 {
     }
 
     pub fn ToString(&this) -> String {
-        return "Vector2(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ")";
+        "Vector2(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ")"
     }
 
     pub fn Length(&this) -> f32 {
-        return sqrtf(this.x * this.x + this.y * this.y);
+        sqrtf(this.x * this.x + this.y * this.y)
     }
 
     pub fn Normalize(&this) -> Vector2 {
         let length = this.Length();
-        return Vector2(this.x / length, this.y / length);
+        Vector2(this.x / length, this.y / length)
     }
 
     pub fn Absolute(&this) -> Vector2 {
-        return Vector2(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32);
+        Vector2(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32)
     }
 
     pub fn Floor(&this) -> Vector2 {
-        return Vector2(floorf(this.x), floorf(this.y));
+        Vector2(floorf(this.x), floorf(this.y))
     }
 
     pub fn Ceil(&this) -> Vector2 {
-        return Vector2(ceilf(this.x), ceilf(this.y));
+        Vector2(ceilf(this.x), ceilf(this.y))
     }
 
     pub fn Round(&this) -> Vector2 {
-        return Vector2(roundf(this.x), roundf(this.y));
+        Vector2(roundf(this.x), roundf(this.y))
     }
 
     pub fn operator+(&this, other: &Vector2) -> Vector2 {
-        return Vector2(this.x + other.x, this.y + other.y);
+        Vector2(this.x + other.x, this.y + other.y)
     }
 
     pub fn operator+=(&mut this, other: &Vector2) -> &Vector2 {
         this.x += other.x;
         this.y += other.y;
-        return this;
+        this
     }
 
     pub fn operator-(&this, other: &Vector2) -> Vector2 {
-        return Vector2(this.x - other.x, this.y - other.y);
+        Vector2(this.x - other.x, this.y - other.y)
     }
 
     pub fn operator-=(&mut this, other: &Vector2) -> &Vector2 {
         this.x -= other.x;
         this.y -= other.y;
-        return this;
+        this
     }
 
     pub fn operator*(&this, other: &Vector2) -> Vector2 {
-        return Vector2(this.x * other.x, this.y * other.y);
+        Vector2(this.x * other.x, this.y * other.y)
     }
 
     pub fn operator*=(&mut this, other: &Vector2) -> &Vector2 {
         this.x *= other.x;
         this.y *= other.y;
-        return this;
+        this
     }
 
     pub fn operator*(&this, scalar: f32) -> Vector2 {
-        return Vector2(this.x * scalar, this.y * scalar);
+        Vector2(this.x * scalar, this.y * scalar)
     }
 
     pub fn operator*=(&mut this, scalar: f32) -> &Vector2 {
         this.x *= scalar;
         this.y *= scalar;
-        return this;
+        this
     }
 
     pub fn operator/(&this, other: &Vector2) -> Vector2 {
-        return Vector2(this.x / other.x, this.y / other.y);
+        Vector2(this.x / other.x, this.y / other.y)
     }
 
     pub fn operator/=(&mut this, other: &Vector2) -> &Vector2 {
         this.x /= other.x;
         this.y /= other.y;
-        return this;
+        this
     }
 
     pub fn operator/(&this, scalar: f32) -> Vector2 {
-        return Vector2(this.x / scalar, this.y / scalar);
+        Vector2(this.x / scalar, this.y / scalar)
     }
 
     pub fn operator/=(&mut this, scalar: f32) -> &Vector2 {
         this.x /= scalar;
         this.y /= scalar;
-        return this;
+        this
     }
 
     pub fn operator%(&this, other: &Vector2) -> Vector2 {
-        return Vector2(this.x % other.x, this.y % other.y);
+        Vector2(this.x % other.x, this.y % other.y)
     }
 
     pub fn operator%=(&mut this, other: &Vector2) -> &Vector2 {
         this.x %= other.x;
         this.y %= other.y;
-        return this;
+        this
     }
 
     pub fn operator%(&this, scalar: f32) -> Vector2 {
-        return Vector2(this.x % scalar, this.y % scalar);
+        Vector2(this.x % scalar, this.y % scalar)
     }
 
     pub fn operator%=(&mut this, scalar: f32) -> &Vector2 {
         this.x %= scalar;
         this.y %= scalar;
-        return this;
+        this
     }
 
     pub fn operator==(&this, other: &Vector2) -> bool {
-        return this.x == other.x && this.y == other.y;
+        this.x == other.x && this.y == other.y
     }
 
     pub fn operator!=(&this, other: &Vector2) -> bool {
-        return this.x != other.x || this.y != other.y;
+        this.x != other.x || this.y != other.y
     }
 }
 
@@ -216,128 +216,128 @@ class Vector3 {
     }
 
     pub fn ToString(&this) -> String {
-        return "Vector3(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ", " + String::FromFloat(this.z as f64) + ")";
+        "Vector3(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ", " + String::FromFloat(this.z as f64) + ")"
     }
 
     pub fn Length(&this) -> f32 {
-        return sqrtf(this.x * this.x + this.y * this.y + this.z * this.z);
+        sqrtf(this.x * this.x + this.y * this.y + this.z * this.z)
     }
 
     pub fn Normalize(&this) -> Vector3 {
         let length = this.Length();
-        return Vector3(this.x / length, this.y / length, this.z / length);
+        Vector3(this.x / length, this.y / length, this.z / length)
     }
 
     pub fn Absolute(&this) -> Vector3 {
-        return Vector3(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32, fabs(this.z as f64) as f32);
+        Vector3(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32, fabs(this.z as f64) as f32)
     }
 
     pub fn Floor(&this) -> Vector3 {
-        return Vector3(floorf(this.x), floorf(this.y), floorf(this.z));
+        Vector3(floorf(this.x), floorf(this.y), floorf(this.z))
     }
 
     pub fn Ceil(&this) -> Vector3 {
-        return Vector3(ceilf(this.x), ceilf(this.y), ceilf(this.z));
+        Vector3(ceilf(this.x), ceilf(this.y), ceilf(this.z))
     }
 
     pub fn Round(&this) -> Vector3 {
-        return Vector3(roundf(this.x), roundf(this.y), roundf(this.z));
+        Vector3(roundf(this.x), roundf(this.y), roundf(this.z))
     }
 
     pub fn operator+(&this, other: &Vector3) -> Vector3 {
-        return Vector3(this.x + other.x, this.y + other.y, this.z + other.z);
+        Vector3(this.x + other.x, this.y + other.y, this.z + other.z)
     }
 
     pub fn operator+=(&mut this, other: &Vector3) -> &Vector3 {
         this.x += other.x;
         this.y += other.y;
         this.z += other.z;
-        return this;
+        this
     }
 
     pub fn operator-(&this, other: &Vector3) -> Vector3 {
-        return Vector3(this.x - other.x, this.y - other.y, this.z - other.z);
+        Vector3(this.x - other.x, this.y - other.y, this.z - other.z)
     }
 
     pub fn operator-=(&mut this, other: &Vector3) -> &Vector3 {
         this.x -= other.x;
         this.y -= other.y;
         this.z -= other.z;
-        return this;
+        this
     }
 
     pub fn operator*(&this, other: &Vector3) -> Vector3 {
-        return Vector3(this.x * other.x, this.y * other.y, this.z * other.z);
+        Vector3(this.x * other.x, this.y * other.y, this.z * other.z)
     }
 
     pub fn operator*=(&mut this, other: &Vector3) -> &Vector3 {
         this.x *= other.x;
         this.y *= other.y;
         this.z *= other.z;
-        return this;
+        this
     }
 
     pub fn operator*(&this, scalar: f32) -> Vector3 {
-        return Vector3(this.x * scalar, this.y * scalar, this.z * scalar);
+        Vector3(this.x * scalar, this.y * scalar, this.z * scalar)
     }
 
     pub fn operator*=(&mut this, scalar: f32) -> &Vector3 {
         this.x *= scalar;
         this.y *= scalar;
         this.z *= scalar;
-        return this;
+        this
     }
 
     pub fn operator/(&this, other: &Vector3) -> Vector3 {
-        return Vector3(this.x / other.x, this.y / other.y, this.z / other.z);
+        Vector3(this.x / other.x, this.y / other.y, this.z / other.z)
     }
 
     pub fn operator/=(&mut this, other: &Vector3) -> &Vector3 {
         this.x /= other.x;
         this.y /= other.y;
         this.z /= other.z;
-        return this;
+        this
     }
 
     pub fn operator/(&this, scalar: f32) -> Vector3 {
-        return Vector3(this.x / scalar, this.y / scalar, this.z / scalar);
+        Vector3(this.x / scalar, this.y / scalar, this.z / scalar)
     }
 
     pub fn operator/=(&mut this, scalar: f32) -> &Vector3 {
         this.x /= scalar;
         this.y /= scalar;
         this.z /= scalar;
-        return this;
+        this
     }
 
     pub fn operator%(&this, other: &Vector3) -> Vector3 {
-        return Vector3(this.x % other.x, this.y % other.y, this.z % other.z);
+        Vector3(this.x % other.x, this.y % other.y, this.z % other.z)
     }
 
     pub fn operator%=(&mut this, other: &Vector3) -> &Vector3 {
         this.x %= other.x;
         this.y %= other.y;
         this.z %= other.z;
-        return this;
+        this
     }
 
     pub fn operator%(&this, scalar: f32) -> Vector3 {
-        return Vector3(this.x % scalar, this.y % scalar, this.z % scalar);
+        Vector3(this.x % scalar, this.y % scalar, this.z % scalar)
     }
 
     pub fn operator%=(&mut this, scalar: f32) -> &Vector3 {
         this.x %= scalar;
         this.y %= scalar;
         this.z %= scalar;
-        return this;
+        this
     }
 
     pub fn operator==(&this, other: &Vector3) -> bool {
-        return this.x == other.x && this.y == other.y && this.z == other.z;
+        this.x == other.x && this.y == other.y && this.z == other.z
     }
 
     pub fn operator!=(&this, other: &Vector3) -> bool {
-        return this.x != other.x || this.y != other.y || this.z != other.z;
+        this.x != other.x || this.y != other.y || this.z != other.z
     }
 }
 
@@ -360,36 +360,36 @@ class Vector4 {
     }
 
     pub fn ToString(&this) -> String {
-        return "Vector4(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ", " + String::FromFloat(this.z as f64) + ", " + String::FromFloat(this.w as f64) + ")";
+        "Vector4(" + String::FromFloat(this.x as f64) + ", " + String::FromFloat(this.y as f64) + ", " + String::FromFloat(this.z as f64) + ", " + String::FromFloat(this.w as f64) + ")"
     }
 
     pub fn Length(&this) -> f32 {
-        return sqrtf(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+        sqrtf(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w)
     }
 
     pub fn Normalize(&this) -> Vector4 {
         let length = this.Length();
-        return Vector4(this.x / length, this.y / length, this.z / length, this.w / length);
+        Vector4(this.x / length, this.y / length, this.z / length, this.w / length)
     }
 
     pub fn Absolute(&this) -> Vector4 {
-        return Vector4(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32, fabs(this.z as f64) as f32, fabs(this.w as f64) as f32);
+        Vector4(fabs(this.x as f64) as f32, fabs(this.y as f64) as f32, fabs(this.z as f64) as f32, fabs(this.w as f64) as f32)
     }
 
     pub fn Floor(&this) -> Vector4 {
-        return Vector4(floorf(this.x), floorf(this.y), floorf(this.z), floorf(this.w));
+        Vector4(floorf(this.x), floorf(this.y), floorf(this.z), floorf(this.w))
     }
 
     pub fn Ceil(&this) -> Vector4 {
-        return Vector4(ceilf(this.x), ceilf(this.y), ceilf(this.z), ceilf(this.w));
+        Vector4(ceilf(this.x), ceilf(this.y), ceilf(this.z), ceilf(this.w))
     }
 
     pub fn Round(&this) -> Vector4 {
-        return Vector4(roundf(this.x), roundf(this.y), roundf(this.z), roundf(this.w));
+        Vector4(roundf(this.x), roundf(this.y), roundf(this.z), roundf(this.w))
     }
 
     pub fn operator+(&this, other: &Vector4) -> Vector4 {
-        return Vector4(this.x + other.x, this.y + other.y, this.z + other.z, this.w + other.w);
+        Vector4(this.x + other.x, this.y + other.y, this.z + other.z, this.w + other.w)
     }
 
     pub fn operator+=(&mut this, other: &Vector4) -> &Vector4 {
@@ -397,11 +397,11 @@ class Vector4 {
         this.y += other.y;
         this.z += other.z;
         this.w += other.w;
-        return this;
+        this
     }
 
     pub fn operator-(&this, other: &Vector4) -> Vector4 {
-        return Vector4(this.x - other.x, this.y - other.y, this.z - other.z, this.w - other.w);
+        Vector4(this.x - other.x, this.y - other.y, this.z - other.z, this.w - other.w)
     }
 
     pub fn operator-=(&mut this, other: &Vector4) -> &Vector4 {
@@ -409,11 +409,11 @@ class Vector4 {
         this.y -= other.y;
         this.z -= other.z;
         this.w -= other.w;
-        return this;
+        this
     }
 
     pub fn operator*(&this, other: &Vector4) -> Vector4 {
-        return Vector4(this.x * other.x, this.y * other.y, this.z * other.z, this.w * other.w);
+        Vector4(this.x * other.x, this.y * other.y, this.z * other.z, this.w * other.w)
     }
 
     pub fn operator*=(&mut this, other: &Vector4) -> &Vector4 {
@@ -421,11 +421,11 @@ class Vector4 {
         this.y *= other.y;
         this.z *= other.z;
         this.w *= other.w;
-        return this;
+        this
     }
 
     pub fn operator*(&this, scalar: f32) -> Vector4 {
-        return Vector4(this.x * scalar, this.y * scalar, this.z * scalar, this.w * scalar);
+        Vector4(this.x * scalar, this.y * scalar, this.z * scalar, this.w * scalar)
     }
 
     pub fn operator*=(&mut this, scalar: f32) -> &Vector4 {
@@ -433,11 +433,11 @@ class Vector4 {
         this.y *= scalar;
         this.z *= scalar;
         this.w *= scalar;
-        return this;
+        this
     }
 
     pub fn operator/(&this, other: &Vector4) -> Vector4 {
-        return Vector4(this.x / other.x, this.y / other.y, this.z / other.z, this.w / other.w);
+        Vector4(this.x / other.x, this.y / other.y, this.z / other.z, this.w / other.w)
     }
 
     pub fn operator/=(&mut this, other: &Vector4) -> &Vector4 {
@@ -445,11 +445,11 @@ class Vector4 {
         this.y /= other.y;
         this.z /= other.z;
         this.w /= other.w;
-        return this;
+        this
     }
 
     pub fn operator/(&this, scalar: f32) -> Vector4 {
-        return Vector4(this.x / scalar, this.y / scalar, this.z / scalar, this.w / scalar);
+        Vector4(this.x / scalar, this.y / scalar, this.z / scalar, this.w / scalar)
     }
 
     pub fn operator/=(&mut this, scalar: f32) -> &Vector4 {
@@ -457,11 +457,11 @@ class Vector4 {
         this.y /= scalar;
         this.z /= scalar;
         this.w /= scalar;
-        return this;
+        this
     }
 
     pub fn operator%(&this, other: &Vector4) -> Vector4 {
-        return Vector4(this.x % other.x, this.y % other.y, this.z % other.z, this.w % other.w);
+        Vector4(this.x % other.x, this.y % other.y, this.z % other.z, this.w % other.w)
     }
 
     pub fn operator%=(&mut this, other: &Vector4) -> &Vector4 {
@@ -469,11 +469,11 @@ class Vector4 {
         this.y %= other.y;
         this.z %= other.z;
         this.w %= other.w;
-        return this;
+        this
     }
 
     pub fn operator%(&this, scalar: f32) -> Vector4 {
-        return Vector4(this.x % scalar, this.y % scalar, this.z % scalar, this.w % scalar);
+        Vector4(this.x % scalar, this.y % scalar, this.z % scalar, this.w % scalar)
     }
 
     pub fn operator%=(&mut this, scalar: f32) -> &Vector4 {
@@ -481,15 +481,15 @@ class Vector4 {
         this.y %= scalar;
         this.z %= scalar;
         this.w %= scalar;
-        return this;
+        this
     }
 
     pub fn operator==(&this, other: &Vector4) -> bool {
-        return this.x == other.x && this.y == other.y && this.z == other.z && this.w == other.w;
+        this.x == other.x && this.y == other.y && this.z == other.z && this.w == other.w
     }
 
     pub fn operator!=(&this, other: &Vector4) -> bool {
-        return this.x != other.x || this.y != other.y || this.z != other.z || this.w != other.w;
+        this.x != other.x || this.y != other.y || this.z != other.z || this.w != other.w
     }
 }
 
@@ -524,7 +524,9 @@ class Matrix4 {
                     sum += this.values[row + i * 4] * other.values[i + col * 4];
                 } result.values[row + col * 4] = sum;
             }
-        } return result;
+        }
+
+        result
     }
 
     pub fn operator*=(&mut this, other: &Matrix4) -> &Matrix4 {
@@ -532,7 +534,9 @@ class Matrix4 {
 
         for i in 0usize..16 {
             this.values[i] = result.values[i];
-        } return this;
+        }
+
+        this
     }
 }
 
@@ -544,7 +548,7 @@ fn Orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f3
     result.values[0 + 3 * 4] = -(right + left) / (right - left);
     result.values[1 + 3 * 4] = -(top + bottom) / (top - bottom);
     result.values[2 + 3 * 4] = -(far + near) / (far - near);
-    return result;
+    result
 }
 
 fn Perspective(fov: f32, aspect: f32, near: f32, far: f32) -> Matrix4 {
@@ -554,7 +558,7 @@ fn Perspective(fov: f32, aspect: f32, near: f32, far: f32) -> Matrix4 {
     result.values[2 + 2 * 4] = -(far + near) / (far - near);
     result.values[2 + 3 * 4] = -(2.0 * far * near) / (far - near);
     result.values[3 + 2 * 4] = -1.0;
-    return result;
+    result
 }
 
 fn Translate(translation: Vector3) -> Matrix4 {
@@ -562,7 +566,7 @@ fn Translate(translation: Vector3) -> Matrix4 {
     result.values[0 + 3 * 4] = translation.x;
     result.values[1 + 3 * 4] = translation.y;
     result.values[2 + 3 * 4] = translation.z;
-    return result;
+    result
 }
 
 fn Rotate(angle: f32, mut axis: Vector3) -> Matrix4 {
@@ -578,7 +582,7 @@ fn Rotate(angle: f32, mut axis: Vector3) -> Matrix4 {
     result.values[0 + 2 * 4] = axis.z * axis.x * t + axis.y * s;
     result.values[1 + 2 * 4] = axis.z * axis.y * t - axis.x * s;
     result.values[2 + 2 * 4] = axis.z * axis.z * t + c;
-    return result;
+    result
 }
 
 fn Scale(scale: Vector3) -> Matrix4 {
@@ -586,15 +590,15 @@ fn Scale(scale: Vector3) -> Matrix4 {
     result.values[0 + 0 * 4] = scale.x;
     result.values[1 + 1 * 4] = scale.y;
     result.values[2 + 2 * 4] = scale.z;
-    return result;
+    result
 }
 
 fn Dot(a: &Vector3, b: &Vector3) -> f32 {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    a.x * b.x + a.y * b.y + a.z * b.z
 }
 
 fn Cross(a: &Vector3, b: &Vector3) -> Vector3 {
-    return Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+    Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
 }
 
 fn LookAt(eye: &Vector3, target: &Vector3, up: &Vector3) -> Matrix4 {
@@ -614,7 +618,7 @@ fn LookAt(eye: &Vector3, target: &Vector3, up: &Vector3) -> Matrix4 {
     result.values[0 + 3 * 4] = -Dot(r, eye);
     result.values[1 + 3 * 4] = -Dot(u, eye);
     result.values[2 + 3 * 4] = -Dot(f, eye);
-    return result;
+    result
 }
 
 class Logger {
@@ -734,7 +738,7 @@ class Shader {
     }
 
     pub fn GetUniformLocation(&this, name: *i8) -> i32 {
-        return glGetUniformLocation(this.id, name);
+        glGetUniformLocation(this.id, name)
     }
 
     pub fn Bind(&this) {
@@ -814,11 +818,11 @@ class Subchunk {
     ~Subchunk(&mut this) {}
 
     fn IndexFromPosition(&this, position: &Vector3) -> usize {
-        return (position.x as usize) + (position.y as usize) * SUBCHUNK_WIDTH + (position.z as usize) * SUBCHUNK_WIDTH * SUBCHUNK_HEIGHT;
+        (position.x as usize) + (position.y as usize) * SUBCHUNK_WIDTH + (position.z as usize) * SUBCHUNK_WIDTH * SUBCHUNK_HEIGHT
     }
 
     pub fn GetBlockLight(&this, position: &Vector3) -> u8 {
-        return this.lights[this.IndexFromPosition(position)] & 0x0F;
+        this.lights[this.IndexFromPosition(position)] & 0x0F
     }
 
     pub fn SetBlockLight(&mut this, position: &Vector3, value: u8) {
@@ -827,7 +831,7 @@ class Subchunk {
     }
 
     pub fn GetSkylight(&this, position: &Vector3) -> u8 {
-        return (this.lights[this.IndexFromPosition(position)] >> 4) & 0x0F;
+        (this.lights[this.IndexFromPosition(position)] >> 4) & 0x0F
     }
 
     pub fn SetSkylight(&mut this, position: &Vector3, value: u8) {
@@ -836,21 +840,23 @@ class Subchunk {
     }
 
     pub fn GetRawLight(&this, position: &Vector3) -> u8 {
-        return this.lights[this.IndexFromPosition(position)];
+        this.lights[this.IndexFromPosition(position)]
     }
 
     pub fn Smooth(&this, mut a: f32, mut b: f32, mut c: f32, mut d: f32) -> f32 {
         if a != 0.0 || b != 0.0 || c != 0.0 || d != 0.0 {
             let l = fminf(a, fminf(b, fminf(c, d)));
             (a, b, c, d) = (fmaxf(a, l), fmaxf(b, l), fmaxf(c, l), fmaxf(d, l));
-        } return (a + b + c + d) / 4.0;
+        }
+
+        (a + b + c + d) / 4.0
     }
 
     fn AmbientOcclusion(&this, s1: f32, s2: f32, c: f32) -> f32 {
         if s1 != 0.0 && s2 != 0.0 {
-            return 0.25;
+            0.25
         } else {
-            return 1.0 - (s1 + s2 + c) / 4.0;
+            1.0 - (s1 + s2 + c) / 4.0
         }
     }
 
@@ -860,7 +866,7 @@ class Subchunk {
         result.PushBack(this.AmbientOcclusion(s4, s7, s6));
         result.PushBack(this.AmbientOcclusion(s5, s7, s8));
         result.PushBack(this.AmbientOcclusion(s2, s5, s3));
-        return result;
+        result
     }
 
     fn GetSmoothFaceLight(&this, light: f32, light1: f32, light2: f32, light3: f32, light4: f32, light5: f32, light6: f32, light7: f32, light8: f32) -> Vector<f32> {
@@ -869,7 +875,7 @@ class Subchunk {
         result.PushBack(this.Smooth(light, light4, light7, light6));
         result.PushBack(this.Smooth(light, light5, light7, light8));
         result.PushBack(this.Smooth(light, light2, light5, light3));
-        return result;
+        result
     }
 
     fn GetNeighbourVoxels(&this, direction: &Vector3, index: usize) -> Vector<Vector3> {
@@ -929,7 +935,9 @@ class Subchunk {
             result.PushBack(direction + Vector3( 1.0, -1.0, 0.0));
             result.PushBack(direction + Vector3( 0.0, -1.0, 0.0));
             result.PushBack(direction + Vector3(-1.0, -1.0, 0.0));
-        } return result;
+        }
+
+        result
     }
 
     pub fn GetLight(&this, number: u8, index: usize, position: &Vector3, direction: &Vector3) -> Vector<f32> {
@@ -954,7 +962,7 @@ class Subchunk {
             result.PushBack(chunk->parent->GetLight(position) as f32);
             result.PushBack(chunk->parent->GetLight(position) as f32);
             result.PushBack(chunk->parent->GetLight(position) as f32);
-            return result;
+            result
         } else {
             let mut positions = Vector<Vector3>();
             positions.PushBack(direction);
@@ -965,7 +973,7 @@ class Subchunk {
                 lights.PushBack(chunk->parent->GetLight(position) as f32);
             }
 
-            return this.GetSmoothFaceLight(lights[0], lights[1], lights[2], lights[3], lights[4], lights[5], lights[6], lights[7], lights[8]);
+            this.GetSmoothFaceLight(lights[0], lights[1], lights[2], lights[3], lights[4], lights[5], lights[6], lights[7], lights[8])
         }
     }
 
@@ -991,7 +999,7 @@ class Subchunk {
             result.PushBack(chunk->parent->GetSkylight(position) as f32);
             result.PushBack(chunk->parent->GetSkylight(position) as f32);
             result.PushBack(chunk->parent->GetSkylight(position) as f32);
-            return result;
+            result
         } else {
             let mut positions = Vector<Vector3>();
             positions.PushBack(direction);
@@ -1002,7 +1010,7 @@ class Subchunk {
                 lights.PushBack(chunk->parent->GetSkylight(position) as f32);
             }
 
-            return this.GetSmoothFaceLight(lights[0], lights[1], lights[2], lights[3], lights[4], lights[5], lights[6], lights[7], lights[8]);
+            this.GetSmoothFaceLight(lights[0], lights[1], lights[2], lights[3], lights[4], lights[5], lights[6], lights[7], lights[8])
         }
     }
 
@@ -1029,7 +1037,7 @@ class Subchunk {
         }
 
         if light_source {
-            return result;
+            result
         } else {
             let positions = this.GetNeighbourVoxels(direction, index);
             let mut lights = Vector<f32>();
@@ -1042,7 +1050,9 @@ class Subchunk {
 
             for i in 0usize..4 {
                 result[i] = result[i] * faceAmbientOcclusion[i];
-            } return result;
+            }
+
+            result
         }
     }
 
@@ -1056,10 +1066,10 @@ class Subchunk {
 
     pub fn GetBlock(&this, position: &Vector3) -> u8 {
         if position.x >= 0.0 && position.x < SUBCHUNK_WIDTH as f32 && position.y >= 0.0 && position.y < SUBCHUNK_HEIGHT as f32 && position.z >= 0.0 && position.z < SUBCHUNK_DEPTH as f32 {
-            return this.blocks[this.IndexFromPosition(position)];
+            this.blocks[this.IndexFromPosition(position)]
         } else {
             Logger::Error("Trying to get block out of bounds.");
-            return 0;
+            0
         }
     }
 
@@ -1096,7 +1106,7 @@ class Subchunk {
             return 0;
         }
 
-        return chunk->subchunks[(y >> 4) as usize]->blocks[(x & 15) as usize + (y & 15) as usize * SUBCHUNK_WIDTH + (z & 15) as usize * SUBCHUNK_WIDTH * SUBCHUNK_HEIGHT];
+        chunk->subchunks[(y >> 4) as usize]->blocks[(x & 15) as usize + (y & 15) as usize * SUBCHUNK_WIDTH + (z & 15) as usize * SUBCHUNK_WIDTH * SUBCHUNK_HEIGHT]
     }
 
     pub fn Update(&mut this) {
@@ -1456,7 +1466,7 @@ class World {
     fn GetHash(&this, x: i32, z: i32) -> usize {
         let h1 = (x as usize) * 73856093;
         let h2 = (z as usize) * 19349663;
-        return (h1 ^ h2) % HASH_SIZE;
+        (h1 ^ h2) % HASH_SIZE
     }
 
     pub fn AddChunk(&mut this, chunk: Shared<Chunk>) {
@@ -1494,7 +1504,7 @@ class World {
         }
 
         mtx_unlock(&mut this.chunk_mutex);
-        return Shared<Chunk>();
+        Shared<Chunk>()
     }
 
     pub fn GetRawLight(&mut this, position: &Vector3) -> u8 {
@@ -1503,9 +1513,9 @@ class World {
 
         if chunk.Valid() {
             let subchunk_position = (position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
-            return chunk->subchunks[subchunk_position.y as usize]->GetRawLight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)));
+            chunk->subchunks[subchunk_position.y as usize]->GetRawLight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)))
         } else {
-            return 15 << 4;
+            15 << 4
         }
     }
 
@@ -1515,9 +1525,9 @@ class World {
 
         if chunk.Valid() {
             let subchunk_position = (position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
-            return chunk->subchunks[subchunk_position.y as usize]->GetBlockLight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)));
+            chunk->subchunks[subchunk_position.y as usize]->GetBlockLight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)))
         } else {
-            return 0;
+            0
         }
     }
 
@@ -1527,9 +1537,9 @@ class World {
 
         if chunk.Valid() {
             let subchunk_position = (position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
-            return chunk->subchunks[subchunk_position.y as usize]->GetSkylight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)));
+            chunk->subchunks[subchunk_position.y as usize]->GetSkylight(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)))
         } else {
-            return 15;
+            15
         }
     }
 
@@ -1552,9 +1562,9 @@ class World {
 
         if chunk.Valid() {
             let subchunk_position = (position / Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)).Floor();
-            return chunk->subchunks[subchunk_position.y as usize]->GetBlock(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)));
+            chunk->subchunks[subchunk_position.y as usize]->GetBlock(position - (subchunk_position * Vector3(SUBCHUNK_WIDTH as f32, SUBCHUNK_HEIGHT as f32, SUBCHUNK_DEPTH as f32)))
         } else {
-            return 0;
+            0
         }
     }
 
@@ -1573,7 +1583,7 @@ class World {
         }
 
         this.AddChunk(chunk);
-        return chunk;
+        chunk
     }
 
     pub fn GeneratorThread(&mut this) {
@@ -2177,7 +2187,7 @@ class World {
             }
         }
 
-        return RaycastResult(false, Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0));
+        RaycastResult(false, Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0))
     }
 
     pub fn Update(&mut this, delta_time: f64, player: &Player) {
@@ -2245,7 +2255,7 @@ class Collider {
     ~Collider(&mut this) {}
 
     pub fn Collide(&this, other: &Collider) -> bool {
-        return this.min.x < other.max.x && this.max.x > other.min.x && this.min.y < other.max.y && this.max.y > other.min.y && this.min.z < other.max.z && this.max.z > other.min.z;
+        this.min.x < other.max.x && this.max.x > other.min.x && this.min.y < other.max.y && this.max.y > other.min.y && this.min.z < other.max.z && this.max.z > other.min.z
     }
 
     pub fn Collide(&this, other: &Collider, velocity: Vector3) -> Pair<f32, Vector3> {
@@ -2270,7 +2280,7 @@ class Collider {
         let exit = fminf(fminf(x_exit, y_exit), z_exit);
 
         if entry > exit {
-            return Pair<f32, Vector3>(0.0, Vector3(0.0, 0.0, 0.0));
+            Pair<f32, Vector3>(0.0, Vector3(0.0, 0.0, 0.0))
         } else {
             let mut normal = Vector3(0.0, 0.0, 0.0);
 
@@ -2282,12 +2292,12 @@ class Collider {
                 normal.z = velocity.z > 0.0 ? -1.0 : 1.0;
             }
 
-            return Pair<f32, Vector3>(entry, normal);
+            Pair<f32, Vector3>(entry, normal)
         }
     }
 
     pub fn operator+(&this, position: Vector3) -> Collider {
-        return Collider(this.min + position, this.max + position);
+        Collider(this.min + position, this.max + position)
     }
 }
 
@@ -2494,17 +2504,15 @@ class Player {
             }
         }
 
-        let mut friction: Vector3;
-
-        if this.flying {
-            friction = Vector3(5.0, 5.0, 5.0);
+        let friction: Vector3 = if this.flying {
+            Vector3(5.0, 5.0, 5.0)
         } else if this.grounded {
-            friction = Vector3(20.0, 20.0, 20.0);
+            Vector3(20.0, 20.0, 20.0)
         } else if this.velocity.y > 0.0 {
-            friction = Vector3(1.8, 0.0, 1.8);
+            Vector3(1.8, 0.0, 1.8)
         } else {
-            friction = Vector3(1.8, 0.4, 1.8);
-        }
+            Vector3(1.8, 0.4, 1.8)
+        };
 
         this.grounded = false;
         this.velocity += this.acceleration * friction * (delta_time as f32);
@@ -2590,13 +2598,11 @@ class Player {
         }
 
         this.translation += this.velocity * (delta_time as f32);
-        let mut gravity: Vector3;
-
-        if this.flying {
-            gravity = Vector3(0.0, 0.0, 0.0);
+        let gravity: Vector3 = if this.flying {
+            Vector3(0.0, 0.0, 0.0)
         } else {
-            gravity = Vector3(0.0, -32.0, 0.0);
-        }
+            Vector3(0.0, -32.0, 0.0)
+        };
 
         this.velocity += gravity * (delta_time as f32);
 
@@ -2759,5 +2765,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+    0
 }

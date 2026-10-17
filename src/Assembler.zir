@@ -58,6 +58,8 @@ class Assembler {
 
         if message != null {
             LLVMDisposeMessage(message);
-        } return this.module;
+        }
+
+        this.module
     }
 }

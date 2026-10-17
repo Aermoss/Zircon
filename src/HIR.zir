@@ -29,51 +29,51 @@ class HIRType {
         this.kind = kind;
     }
 
-    pub fn IsMutable(&this) -> bool { return (this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->mutable) || (this.kind == HIRTypeKind::Reference && (this as *HIRReferenceType)->mutable); }
-    pub fn IsLiteral(&this) -> bool { return (this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal) || (this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal); }
-    pub fn IsSigned(&this) -> bool { return this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->signed; }
+    pub fn IsMutable(&this) -> bool { (this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->mutable) || (this.kind == HIRTypeKind::Reference && (this as *HIRReferenceType)->mutable) }
+    pub fn IsLiteral(&this) -> bool { (this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal) || (this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal) }
+    pub fn IsSigned(&this) -> bool { this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->signed }
 
-    pub fn IsNever(&this) -> bool { return this.kind == HIRTypeKind::Never; }
-    pub fn IsVoid(&this) -> bool { return this.kind == HIRTypeKind::Void; }
-    pub fn IsBoolean(&this) -> bool { return this.kind == HIRTypeKind::Boolean; }
-    pub fn IsCharacter(&this) -> bool { return this.kind == HIRTypeKind::Character; }
-    pub fn IsInteger(&this) -> bool { return this.kind == HIRTypeKind::Integer; }
-    pub fn IsIntegerPointer(&this) -> bool { return this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->native; }
-    pub fn IsIntegerLiteral(&this) -> bool { return this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal; }
-    pub fn IsFloat(&this) -> bool { return this.kind == HIRTypeKind::Float; }
-    pub fn IsFloatLiteral(&this) -> bool { return this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal; }
-    pub fn IsPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer || this.kind == HIRTypeKind::Reference; }
-    pub fn IsNullPointer(&this) -> bool { return this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->_null == true; }
-    pub fn IsReference(&this) -> bool { return this.kind == HIRTypeKind::Reference; }
-    pub fn IsArray(&this) -> bool { return this.kind == HIRTypeKind::Array; }
-    pub fn IsTuple(&this) -> bool { return this.kind == HIRTypeKind::Tuple; }
-    pub fn IsFunction(&this) -> bool { return this.kind == HIRTypeKind::Function; }
-    pub fn IsClass(&this) -> bool { return this.kind == HIRTypeKind::Class; }
-    pub fn IsStructure(&this) -> bool { return this.kind == HIRTypeKind::Structure; }
-    pub fn IsEnumeration(&this) -> bool { return this.kind == HIRTypeKind::Enumeration; }
-    pub fn IsVariant(&this) -> bool { return this.kind == HIRTypeKind::Variant; }
+    pub fn IsNever(&this) -> bool { this.kind == HIRTypeKind::Never }
+    pub fn IsVoid(&this) -> bool { this.kind == HIRTypeKind::Void }
+    pub fn IsBoolean(&this) -> bool { this.kind == HIRTypeKind::Boolean }
+    pub fn IsCharacter(&this) -> bool { this.kind == HIRTypeKind::Character }
+    pub fn IsInteger(&this) -> bool { this.kind == HIRTypeKind::Integer }
+    pub fn IsIntegerPointer(&this) -> bool { this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->native }
+    pub fn IsIntegerLiteral(&this) -> bool { this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal }
+    pub fn IsFloat(&this) -> bool { this.kind == HIRTypeKind::Float }
+    pub fn IsFloatLiteral(&this) -> bool { this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal }
+    pub fn IsPointer(&this) -> bool { this.kind == HIRTypeKind::Pointer || this.kind == HIRTypeKind::Reference }
+    pub fn IsNullPointer(&this) -> bool { this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->_null == true }
+    pub fn IsReference(&this) -> bool { this.kind == HIRTypeKind::Reference }
+    pub fn IsArray(&this) -> bool { this.kind == HIRTypeKind::Array }
+    pub fn IsTuple(&this) -> bool { this.kind == HIRTypeKind::Tuple }
+    pub fn IsFunction(&this) -> bool { this.kind == HIRTypeKind::Function }
+    pub fn IsClass(&this) -> bool { this.kind == HIRTypeKind::Class }
+    pub fn IsStructure(&this) -> bool { this.kind == HIRTypeKind::Structure }
+    pub fn IsEnumeration(&this) -> bool { this.kind == HIRTypeKind::Enumeration }
+    pub fn IsVariant(&this) -> bool { this.kind == HIRTypeKind::Variant }
 
     pub fn IsTrivial(&this) -> bool {
-        if this.IsNever() || this.IsVoid() || this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() {
-            return true;
+        if this.IsNever() || this.IsVoid() || this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() || this.IsFunction() || this.IsEnumeration() {
+            true
         } else if this.IsArray() {
-            return (this as *HIRArrayType)->element->IsTrivial();
+            (this as *HIRArrayType)->element->IsTrivial()
         } else if this.IsTuple() {
             for element in (this as *HIRTupleType)->elements {
                 if !element->IsTrivial() {
                     return false;
                 }
-            } return true;
-        } else if this.IsFunction() {
-            return true;
+            }
+
+            true
         } else if this.IsStructure() {
             for field in (this as *HIRStructureType)->declaration->fields {
                 if !field->_type->IsTrivial() {
                     return false;
                 }
-            } return true;
-        } else if this.IsEnumeration() {
-            return true;
+            }
+
+            true
         } else if this.IsVariant() {
             for member in (this as *HIRVariantType)->declaration->members {
                 for field in member->fields {
@@ -81,9 +81,11 @@ class HIRType {
                         return false;
                     }
                 }
-            } return true;
+            }
+
+            true
         } else {
-            return false;
+            false
         }
     }
 
@@ -106,7 +108,9 @@ class HIRType {
             path.PushBack(i as u32);
             path += parent_path;
             result = field;
-        } return result;
+        }
+
+        result
     }
 
     pub fn FindParentPath(&this, other: &HIRType, path: &mut Vector<u32>) -> bool {
@@ -120,7 +124,9 @@ class HIRType {
             }
 
             path.PopBack();
-        } return false;
+        }
+
+        false
     }
 
     pub fn IsDerivedFrom(&this, other: &HIRType) -> bool {
@@ -128,7 +134,9 @@ class HIRType {
             if *parent == other || parent->IsDerivedFrom(other) {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     pub fn IsCompatible(&this, other: &HIRType) -> bool {
@@ -154,7 +162,9 @@ class HIRType {
             if other.IsDerivedFrom(this) {
                 return true;
             }
-        } return this == other;
+        }
+
+        this == other
     }
 
     pub fn IsMutabilityCompatible(&this, other: &HIRType) -> bool {
@@ -170,7 +180,7 @@ class HIRType {
         }
 
         if left->IsArray() && right->IsArray() {
-            return left->Element().IsMutabilityCompatible(right->Element());
+            left->Element().IsMutabilityCompatible(right->Element())
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
@@ -178,9 +188,11 @@ class HIRType {
 
             for i in 0..lefts.Size() {
                 if !lefts[i]->IsMutabilityCompatible(rights[i]) { return false; }
-            } return true;
+            }
+
+            true
         } else {
-            return true;
+            true
         }
     }
 
@@ -197,7 +209,7 @@ class HIRType {
         }
 
         if left->IsArray() && right->IsArray() {
-            return left->Length() == right->Length() && left->Element().IsSame(right->Element());
+            left->Length() == right->Length() && left->Element().IsSame(right->Element())
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
@@ -205,23 +217,27 @@ class HIRType {
 
             for i in 0..lefts.Size() {
                 if !lefts[i]->IsSame(rights[i]) { return false; }
-            } return true;
+            }
+
+            true
         } else {
-            return this == other;
+            this == other
         }
     }
 
     pub fn ContainsLiteral(&this) -> bool {
         if this.IsArray() {
-            return this.Element().ContainsLiteral();
+            this.Element().ContainsLiteral()
         } else if this.IsTuple() {
             for element in (this as *HIRTupleType)->elements {
                 if element->ContainsLiteral() {
                     return true;
                 }
-            } return false;
+            }
+
+            false
         } else {
-            return this.IsLiteral();
+            this.IsLiteral()
         }
     }
 
@@ -244,7 +260,7 @@ class HIRType {
 
         if reference_mismatch { score -= 10; }
         if mutability_mismatch { score -= 1; }
-        return score;
+        score
     }
 
     pub fn ScoreParameter(&this, other: &HIRType) -> u64 {
@@ -290,7 +306,9 @@ class HIRType {
             if other.IsDerivedFrom(this) {
                 return 70;
             }
-        } return 0;
+        }
+
+        0
     }
 
     pub fn Pointee(&this) -> &HIRType {
@@ -299,9 +317,9 @@ class HIRType {
         }
 
         if this.IsReference() {
-            return (this as *HIRReferenceType)->referent;
+            (this as *HIRReferenceType)->referent
         } else {
-            return (this as *HIRPointerType)->pointee;
+            (this as *HIRPointerType)->pointee
         }
     }
 
@@ -310,29 +328,31 @@ class HIRType {
             Logger::Log("HIRType", "Not a boolean, character, integer, float or enumeration!", LogSeverity::Fatal);
         }
 
-        if this.IsBoolean() { return 1; }
-        else if this.IsCharacter() { return 8; }
-        else if this.IsInteger() { return (this as *HIRIntegerType)->width; }
-        else if this.IsFloat() { return (this as *HIRFloatType)->width; }
-        else { return (this as *HIREnumerationType)->underlying->width; }
+        if this.IsBoolean() { 1 }
+        else if this.IsCharacter() { 8 }
+        else if this.IsInteger() { (this as *HIRIntegerType)->width }
+        else if this.IsFloat() { (this as *HIRFloatType)->width }
+        else { (this as *HIREnumerationType)->underlying->width }
     }
 
     pub fn Alignment(&this) -> usize {
         if this.IsBoolean() {
-            return 1;
+            1
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
-            return (this.Width() / 8) as usize;
+            (this.Width() / 8) as usize
         } else if this.IsPointer() || this.IsFunction() {
-            return llvm_lowerer->target->Info().pointer_size;
+            llvm_lowerer->target->Info().pointer_size
         } else if this.IsArray() {
-            return this.Element().Alignment();
+            this.Element().Alignment()
         } else if this.IsTuple() {
             let mut alignment: usize = 1;
 
             for element in (this as *HIRTupleType)->elements {
                 let element_alignment = element->Alignment();
                 if element_alignment > alignment { alignment = element_alignment; }
-            } return alignment;
+            }
+
+            alignment
         } else if this.HasFields() {
             let mut alignment: usize = 1;
 
@@ -346,7 +366,9 @@ class HIRType {
             for field in this.Fields() {
                 let field_alignment = field->_type->Alignment();
                 if field_alignment > alignment { alignment = field_alignment; }
-            } return alignment;
+            }
+
+            alignment
         } else if this.IsVariant() {
             let mut alignment: usize = 1;
 
@@ -355,23 +377,25 @@ class HIRType {
                     let field_alignment = field->_type->Alignment();
                     if field_alignment > alignment { alignment = field_alignment; }
                 }
-            } return alignment;
+            }
+
+            alignment
         } else {
-            return 1;
+            1
         }
     }
 
     pub fn Size(&this) -> usize {
         if this.IsNever() || this.IsVoid() {
-            return 0;
+            0
         } else if this.IsBoolean() {
-            return 1;
+            1
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
-            return (this.Width() / 8) as usize;
+            (this.Width() / 8) as usize
         } else if this.IsPointer() || this.IsFunction() {
-            return llvm_lowerer->target->Info().pointer_size;
+            llvm_lowerer->target->Info().pointer_size
         } else if this.IsArray() {
-            return this.Element().Size() * this.Length();
+            this.Element().Size() * this.Length()
         } else if this.IsTuple() {
             let mut size: usize = 0;
             let mut alignment: usize = 1;
@@ -386,7 +410,7 @@ class HIRType {
 
             let remainder = size % alignment;
             if remainder != 0 { size += alignment - remainder; }
-            return size;
+            size
         } else if this.HasFields() {
             let mut size: usize = 0;
             let mut alignment: usize = 1;
@@ -411,7 +435,7 @@ class HIRType {
 
             let remainder = size % alignment;
             if remainder != 0 { size += alignment - remainder; }
-            return size;
+            size
         } else if this.IsVariant() {
             let mut size: usize = 0;
             let mut alignment: usize = 1;
@@ -434,34 +458,42 @@ class HIRType {
 
             let remainder = size % alignment;
             if remainder != 0 { size += alignment - remainder; }
-            return size;
+            size
         } else {
-            return 0;
+            0
         }
     }
 
     pub fn Length(&this) -> usize {
         if !this.IsArray() {
             Logger::Log("HIRType", "Not an array!", LogSeverity::Fatal);
-        } return (this as *HIRArrayType)->length;
+        }
+
+        (this as *HIRArrayType)->length
     }
 
     pub fn Element(&this) -> &HIRType {
         if !this.IsArray() {
             Logger::Log("HIRType", "Not an array!", LogSeverity::Fatal);
-        } return (this as *HIRArrayType)->element;
+        }
+
+        (this as *HIRArrayType)->element
     }
 
     pub fn Parameters(&this) -> &Vector<*HIRType> {
         if !this.IsFunction() {
             Logger::Log("HIRType", "Not a function!", LogSeverity::Fatal);
-        } return (this as *HIRFunctionType)->parameters;
+        }
+
+        (this as *HIRFunctionType)->parameters
     }
 
     pub fn Return(&this) -> &HIRType {
         if !this.IsFunction() {
             Logger::Log("HIRType", "Not a function!", LogSeverity::Fatal);
-        } return (this as *HIRFunctionType)->_return;
+        }
+
+        (this as *HIRFunctionType)->_return
     }
 
     pub fn Fields(&this) -> &Vector<*HIRFieldDeclaration> {
@@ -470,18 +502,18 @@ class HIRType {
         }
 
         if this.IsClass() {
-            return (this as *HIRClassType)->declaration->fields;
+            (this as *HIRClassType)->declaration->fields
         } else {
-            return (this as *HIRStructureType)->declaration->fields;
+            (this as *HIRStructureType)->declaration->fields
         }
     }
 
     pub fn HasFields(&this) -> bool {
-        return this.IsClass() || this.IsStructure();
+        this.IsClass() || this.IsStructure()
     }
 
     pub fn HasSpecialMembers(&this) -> bool {
-        return this.IsClass() || this.IsStructure() || this.IsVariant() || this.IsArray() || this.IsTuple();
+        this.IsClass() || this.IsStructure() || this.IsVariant() || this.IsArray() || this.IsTuple()
     }
 
     pub fn Index(&this, name: &String) -> isize {
@@ -491,7 +523,9 @@ class HIRType {
             if fields[i]->name == name {
                 return i as isize;
             }
-        } return -1;
+        }
+
+        -1
     }
 
     pub fn Methods(&this) -> &Vector<*mut HIRFunctionDeclaration> {
@@ -500,16 +534,16 @@ class HIRType {
         }
 
         if this.IsClass() {
-            return (this as *HIRClassType)->declaration->methods;
+            (this as *HIRClassType)->declaration->methods
         } else if this.IsStructure() {
-            return (this as *HIRStructureType)->declaration->methods;
+            (this as *HIRStructureType)->declaration->methods
         } else {
-            return (this as *HIRVariantType)->declaration->methods;
+            (this as *HIRVariantType)->declaration->methods
         }
     }
 
     pub fn HasMethods(&this) -> bool {
-        return this.IsClass() || this.IsStructure() || this.IsVariant();
+        this.IsClass() || this.IsStructure() || this.IsVariant()
     }
 
     pub fn GetCandidates(&this, name: &String, node: *ASTNode, test: bool) -> Vector<*HIRFunctionDeclaration> {
@@ -537,7 +571,9 @@ class HIRType {
             } else {
                 Logger::Log("Invalid arguments for method: '" + name + "'.", node, LogSeverity::Error);
             }
-        } return result;
+        }
+
+        result
     }
 
     fn CollectMethods(&this, name: &String, result: &mut Vector<*HIRFunctionDeclaration>, found: &mut bool) {
@@ -560,12 +596,12 @@ class HIRType {
 
     pub fn operator==(&this, other: &HIRType) -> bool {
         if (this.IsNever() && other.IsNever()) || (this.IsVoid() && other.IsVoid()) || (this.IsBoolean() && other.IsBoolean()) || (this.IsCharacter() && other.IsCharacter()) {
-            return true;
+            true
         } else if this.IsInteger() && other.IsInteger() {
             let (left, right) = (this as *HIRIntegerType, other as *HIRIntegerType);
-            return left->signed == right->signed && left->width == right->width && left->native == right->native;
+            left->signed == right->signed && left->width == right->width && left->native == right->native
         } else if this.IsFloat() && other.IsFloat() {
-            return (this as *HIRFloatType)->width == (other as *HIRFloatType)->width;
+            (this as *HIRFloatType)->width == (other as *HIRFloatType)->width
         } else if this.IsPointer() && other.IsPointer() {
             let (mut left, mut right): (*HIRType, *HIRType) = (null, null);
 
@@ -581,10 +617,10 @@ class HIRType {
                 right = (other as *HIRPointerType)->pointee;
             }
 
-            return *left == *right;
+            *left == *right
         } else if this.IsArray() && other.IsArray() {
             let (left, right) = (this as *HIRArrayType, other as *HIRArrayType);
-            return left->element == right->element && left->length == right->length;
+            left->element == right->element && left->length == right->length
         } else if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
 
@@ -595,7 +631,9 @@ class HIRType {
                     if left_element == null || right_element == null { return false; }
                     if *left_element != *right_element { return false; }
                 }
-            } return true;
+            }
+
+            true
         } else if this.IsFunction() && other.IsFunction() {
             let (left, right) = (this as *HIRFunctionType, other as *HIRFunctionType);
 
@@ -617,71 +655,43 @@ class HIRType {
             if left_return != right_return {
                 if left_return == null || right_return == null { return false; }
                 if *left_return != *right_return { return false; }
-            } return true;
+            }
+
+            true
         } else if this.IsClass() && other.IsClass() {
-            return (this as *HIRClassType)->declaration == (other as *HIRClassType)->declaration;
+            (this as *HIRClassType)->declaration == (other as *HIRClassType)->declaration
         } else if this.IsStructure() && other.IsStructure() {
-            return (this as *HIRStructureType)->declaration == (other as *HIRStructureType)->declaration;
+            (this as *HIRStructureType)->declaration == (other as *HIRStructureType)->declaration
         } else if this.IsEnumeration() && other.IsEnumeration() {
-            return (this as *HIREnumerationType)->declaration == (other as *HIREnumerationType)->declaration;
+            (this as *HIREnumerationType)->declaration == (other as *HIREnumerationType)->declaration
         } else if this.IsVariant() && other.IsVariant() {
-            return (this as *HIRVariantType)->declaration == (other as *HIRVariantType)->declaration;
+            (this as *HIRVariantType)->declaration == (other as *HIRVariantType)->declaration
         } else {
-            return false;
+            false
         }
     }
 
     pub fn operator!=(&this, other: &HIRType) -> bool {
-        return !(this == other);
+        !(this == other)
     }
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            HIRTypeKind::Never => {
-                return (this as *HIRNeverType)->ToString();
-            },
-            HIRTypeKind::Void => {
-                return (this as *HIRVoidType)->ToString();
-            },
-            HIRTypeKind::Boolean => {
-                return (this as *HIRBooleanType)->ToString();
-            },
-            HIRTypeKind::Character => {
-                return (this as *HIRCharacterType)->ToString();
-            },
-            HIRTypeKind::Integer => {
-                return (this as *HIRIntegerType)->ToString();
-            },
-            HIRTypeKind::Float => {
-                return (this as *HIRFloatType)->ToString();
-            },
-            HIRTypeKind::Pointer => {
-                return (this as *HIRPointerType)->ToString();
-            },
-            HIRTypeKind::Reference => {
-                return (this as *HIRReferenceType)->ToString();
-            },
-            HIRTypeKind::Array => {
-                return (this as *HIRArrayType)->ToString();
-            },
-            HIRTypeKind::Tuple => {
-                return (this as *HIRTupleType)->ToString();
-            },
-            HIRTypeKind::Function => {
-                return (this as *HIRFunctionType)->ToString();
-            },
-            HIRTypeKind::Class => {
-                return (this as *HIRClassType)->ToString();
-            },
-            HIRTypeKind::Structure => {
-                return (this as *HIRStructureType)->ToString();
-            },
-            HIRTypeKind::Enumeration => {
-                return (this as *HIREnumerationType)->ToString();
-            },
-            HIRTypeKind::Variant => {
-                return (this as *HIRVariantType)->ToString();
-            }
+            HIRTypeKind::Never => (this as *HIRNeverType)->ToString(),
+            HIRTypeKind::Void => (this as *HIRVoidType)->ToString(),
+            HIRTypeKind::Boolean => (this as *HIRBooleanType)->ToString(),
+            HIRTypeKind::Character => (this as *HIRCharacterType)->ToString(),
+            HIRTypeKind::Integer => (this as *HIRIntegerType)->ToString(),
+            HIRTypeKind::Float => (this as *HIRFloatType)->ToString(),
+            HIRTypeKind::Pointer => (this as *HIRPointerType)->ToString(),
+            HIRTypeKind::Reference => (this as *HIRReferenceType)->ToString(),
+            HIRTypeKind::Array => (this as *HIRArrayType)->ToString(),
+            HIRTypeKind::Tuple => (this as *HIRTupleType)->ToString(),
+            HIRTypeKind::Function => (this as *HIRFunctionType)->ToString(),
+            HIRTypeKind::Class => (this as *HIRClassType)->ToString(),
+            HIRTypeKind::Structure => (this as *HIRStructureType)->ToString(),
+            HIRTypeKind::Enumeration => (this as *HIREnumerationType)->ToString(),
+            HIRTypeKind::Variant => (this as *HIRVariantType)->ToString()
         }
     }
 }
@@ -690,7 +700,7 @@ class HIRNeverType : HIRType {
     HIRNeverType(&mut this) : HIRType(HIRTypeKind::Never) {}
 
     pub fn ToString(&this) -> String {
-        return '!'.ToString();
+        '!'.ToString()
     }
 }
 
@@ -698,7 +708,7 @@ class HIRVoidType : HIRType {
     HIRVoidType(&mut this) : HIRType(HIRTypeKind::Void) {}
 
     pub fn ToString(&this) -> String {
-        return "void".ToString();
+        "void".ToString()
     }
 }
 
@@ -706,7 +716,7 @@ class HIRBooleanType : HIRType {
     HIRBooleanType(&mut this) : HIRType(HIRTypeKind::Boolean) {}
 
     pub fn ToString(&this) -> String {
-        return "bool".ToString();
+        "bool".ToString()
     }
 }
 
@@ -714,7 +724,7 @@ class HIRCharacterType : HIRType {
     HIRCharacterType(&mut this) : HIRType(HIRTypeKind::Character) {}
 
     pub fn ToString(&this) -> String {
-        return "char".ToString();
+        "char".ToString()
     }
 }
 
@@ -731,12 +741,12 @@ class HIRIntegerType : HIRType {
     pub fn ToString(&this) -> String {
         if !this.literal {
             if !this.native {
-                return (this.signed ? 'i' : 'u') + String::FromInteger(this.width as u64);
+                (this.signed ? 'i' : 'u') + String::FromInteger(this.width as u64)
             } else {
-                return (this.signed ? "isize" : "usize").ToString();
+                (this.signed ? "isize" : "usize").ToString()
             }
         } else {
-            return "<integer literal>".ToString();
+            "<integer literal>".ToString()
         }
     }
 }
@@ -751,9 +761,9 @@ class HIRFloatType : HIRType {
 
     pub fn ToString(&this) -> String {
         if !this.literal {
-            return 'f' + String::FromInteger(this.width as u64);
+            'f' + String::FromInteger(this.width as u64)
         } else {
-            return "<float literal>".ToString();
+            "<float literal>".ToString()
         }
     }
 }
@@ -768,7 +778,7 @@ class HIRPointerType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return (this.mutable ? "*mut " : "*") + this.pointee->ToString();
+        (this.mutable ? "*mut " : "*") + this.pointee->ToString()
     }
 }
 
@@ -781,7 +791,7 @@ class HIRReferenceType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return (this.mutable ? "&mut " : "&") + this.referent->ToString();
+        (this.mutable ? "&mut " : "&") + this.referent->ToString()
     }
 }
 
@@ -797,7 +807,7 @@ class HIRArrayType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']';
+        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
     }
 }
 
@@ -817,7 +827,9 @@ class HIRTupleType : HIRType {
         for i in 0..this.elements.Size() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -839,7 +851,9 @@ class HIRFunctionType : HIRType {
 
         if this._return->kind != HIRTypeKind::Void {
             result += " -> " + this._return->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -851,7 +865,7 @@ class HIRClassType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.declaration->name;
+        '%' + this.declaration->name
     }
 }
 
@@ -863,7 +877,7 @@ class HIRStructureType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.declaration->name;
+        '%' + this.declaration->name
     }
 }
 
@@ -876,7 +890,7 @@ class HIREnumerationType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.declaration->name;
+        '%' + this.declaration->name
     }
 }
 
@@ -888,7 +902,7 @@ class HIRVariantType : HIRType {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.declaration->name;
+        '%' + this.declaration->name
     }
 }
 
@@ -944,47 +958,25 @@ class HIRPattern {
                 return (this as *HIRDereferencePattern)->pattern->IsIrrefutable();
             },
             _ => {}
-        } return false;
+        }
+
+        false
     }
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            HIRPatternKind::Wildcard => {
-                return (this as *HIRWildcardPattern)->ToString();
-            },
-            HIRPatternKind::Rest => {
-                return (this as *HIRRestPattern)->ToString();
-            },
-            HIRPatternKind::Literal => {
-                return (this as *HIRLiteralPattern)->ToString();
-            },
-            HIRPatternKind::Range => {
-                return (this as *HIRRangePattern)->ToString();
-            },
-            HIRPatternKind::Identifier => {
-                return (this as *HIRIdentifierPattern)->ToString();
-            },
-            HIRPatternKind::Tuple => {
-                return (this as *HIRTuplePattern)->ToString();
-            },
-            HIRPatternKind::Field => {
-                return (this as *HIRFieldPattern)->ToString();
-            },
-            HIRPatternKind::Structure => {
-                return (this as *HIRStructurePattern)->ToString();
-            },
-            HIRPatternKind::Enumeration => {
-                return (this as *HIREnumerationPattern)->ToString();
-            },
-            HIRPatternKind::Variant => {
-                return (this as *HIRVariantPattern)->ToString();
-            },
-            HIRPatternKind::Or => {
-                return (this as *HIROrPattern)->ToString();
-            },
-            HIRPatternKind::Dereference => {
-                return (this as *HIRDereferencePattern)->ToString();
-            }
+            HIRPatternKind::Wildcard => (this as *HIRWildcardPattern)->ToString(),
+            HIRPatternKind::Rest => (this as *HIRRestPattern)->ToString(),
+            HIRPatternKind::Literal => (this as *HIRLiteralPattern)->ToString(),
+            HIRPatternKind::Range => (this as *HIRRangePattern)->ToString(),
+            HIRPatternKind::Identifier => (this as *HIRIdentifierPattern)->ToString(),
+            HIRPatternKind::Tuple => (this as *HIRTuplePattern)->ToString(),
+            HIRPatternKind::Field => (this as *HIRFieldPattern)->ToString(),
+            HIRPatternKind::Structure => (this as *HIRStructurePattern)->ToString(),
+            HIRPatternKind::Enumeration => (this as *HIREnumerationPattern)->ToString(),
+            HIRPatternKind::Variant => (this as *HIRVariantPattern)->ToString(),
+            HIRPatternKind::Or => (this as *HIROrPattern)->ToString(),
+            HIRPatternKind::Dereference => (this as *HIRDereferencePattern)->ToString()
         }
     }
 }
@@ -993,7 +985,7 @@ class HIRWildcardPattern : HIRPattern {
     HIRWildcardPattern(&mut this) : HIRPattern(HIRPatternKind::Wildcard) {}
 
     pub fn ToString(&this) -> String {
-        return '_'.ToString();
+        '_'.ToString()
     }
 }
 
@@ -1001,7 +993,7 @@ class HIRRestPattern : HIRPattern {
     HIRRestPattern(&mut this) : HIRPattern(HIRPatternKind::Rest) {}
 
     pub fn ToString(&this) -> String {
-        return "..".ToString();
+        "..".ToString()
     }
 }
 
@@ -1013,7 +1005,7 @@ class HIRLiteralPattern : HIRPattern {
     }
 
     pub fn ToString(&this) -> String {
-        return this.literal->ToString();
+        this.literal->ToString()
     }
 }
 
@@ -1031,7 +1023,7 @@ class HIRRangePattern : HIRPattern {
         if this.start != null { result += this.start->ToString(); }
         result += this.inclusive ? "..=" : "..";
         if this.end != null { result += this.end->ToString(); }
-        return result;
+        result
     }
 }
 
@@ -1048,7 +1040,7 @@ class HIRIdentifierPattern : HIRPattern {
     pub fn ToString(&this) -> String {
         let mut result = String();
         if this.mutable { result += "mut "; }
-        return result + this.name;
+        result + this.name
     }
 }
 
@@ -1066,7 +1058,9 @@ class HIRTuplePattern : HIRPattern {
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -1079,7 +1073,7 @@ class HIRFieldPattern : HIRPattern {
     }
 
     pub fn ToString(&this) -> String {
-        return this.name + ": " + this.pattern->ToString();
+        this.name + ": " + this.pattern->ToString()
     }
 }
 
@@ -1097,7 +1091,9 @@ class HIRStructurePattern : HIRPattern {
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
-        } return result + " }";
+        }
+
+        result + " }"
     }
 }
 
@@ -1109,7 +1105,7 @@ class HIREnumerationPattern : HIRPattern {
     }
 
     pub fn ToString(&this) -> String {
-        return this.member->name;
+        this.member->name
     }
 }
 
@@ -1127,7 +1123,9 @@ class HIRVariantPattern : HIRPattern {
         for i in 0..this.patterns.Size() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -1140,7 +1138,7 @@ class HIRDereferencePattern : HIRPattern {
     }
 
     pub fn ToString(&this) -> String {
-        return '*' + this.pattern->ToString();
+        '*' + this.pattern->ToString()
     }
 }
 
@@ -1157,7 +1155,9 @@ class HIROrPattern : HIRPattern {
         for i in 0..this.patterns.Size() {
             if i != 0 { result += " | "; }
             result += this.patterns[i]->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1191,172 +1191,78 @@ class HIRExpression {
 
     pub fn Precedence(&this) -> u8 {
         match this.kind {
-            HIRExpressionKind::Assignment => {
-                return 10;
-            },
-            HIRExpressionKind::Ternary => {
-                return 20;
-            },
+            HIRExpressionKind::Assignment => 10,
+            HIRExpressionKind::Ternary => 20,
             HIRExpressionKind::Binary => {
                 let binary = this as *HIRBinaryExpression;
 
                 match binary->kind {
-                    HIRBinaryKind::LogicalOr => {
-                        return 30;
-                    },
-                    HIRBinaryKind::LogicalAnd => {
-                        return 40;
-                    },
-                    HIRBinaryKind::BitwiseOr => {
-                        return 50;
-                    },
-                    HIRBinaryKind::BitwiseXor => {
-                        return 60;
-                    },
-                    HIRBinaryKind::BitwiseAnd => {
-                        return 70;
-                    },
-                    HIRBinaryKind::Equal | HIRBinaryKind::NotEqual => {
-                        return 80;
-                    },
-                    HIRBinaryKind::Less | HIRBinaryKind::LessEqual | HIRBinaryKind::Greater | HIRBinaryKind::GreaterEqual => {
-                        return 90;
-                    },
-                    HIRBinaryKind::LeftShift | HIRBinaryKind::RightShift => {
-                        return 100;
-                    },
-                    HIRBinaryKind::Add | HIRBinaryKind::Subtract => {
-                        return 110;
-                    },
-                    HIRBinaryKind::Multiply | HIRBinaryKind::Divide | HIRBinaryKind::Modulo => {
-                        return 120;
-                    }
+                    HIRBinaryKind::LogicalOr => 30,
+                    HIRBinaryKind::LogicalAnd => 40,
+                    HIRBinaryKind::BitwiseOr => 50,
+                    HIRBinaryKind::BitwiseXor => 60,
+                    HIRBinaryKind::BitwiseAnd => 70,
+                    HIRBinaryKind::Equal | HIRBinaryKind::NotEqual => 80,
+                    HIRBinaryKind::Less | HIRBinaryKind::LessEqual | HIRBinaryKind::Greater | HIRBinaryKind::GreaterEqual => 90,
+                    HIRBinaryKind::LeftShift | HIRBinaryKind::RightShift => 100,
+                    HIRBinaryKind::Add | HIRBinaryKind::Subtract => 110,
+                    HIRBinaryKind::Multiply | HIRBinaryKind::Divide | HIRBinaryKind::Modulo => 120
                 }
             },
-            HIRExpressionKind::Unary | HIRExpressionKind::New | HIRExpressionKind::Delete => {
-                return 130;
-            },
-            HIRExpressionKind::Cast => {
-                return 140;
-            },
-            HIRExpressionKind::Call | HIRExpressionKind::Constructor | HIRExpressionKind::Destructor | HIRExpressionKind::IndexAccess | HIRExpressionKind::TupleAccess | HIRExpressionKind::FieldAccess | HIRExpressionKind::MemberAccess | HIRExpressionKind::TagAccess => {
-                return 150;
-            },
-            _ => {
-                return 160;
-            }
+            HIRExpressionKind::Unary | HIRExpressionKind::New | HIRExpressionKind::Delete => 130,
+            HIRExpressionKind::Cast => 140,
+            HIRExpressionKind::Call | HIRExpressionKind::Constructor | HIRExpressionKind::Destructor | HIRExpressionKind::IndexAccess | HIRExpressionKind::TupleAccess | HIRExpressionKind::FieldAccess | HIRExpressionKind::MemberAccess | HIRExpressionKind::TagAccess => 150,
+            _ => 160
         }
     }
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            HIRExpressionKind::Literal => {
-                return (this as *HIRLiteral)->ToString();
-            },
-            HIRExpressionKind::BindingReference => {
-                return (this as *HIRBindingReference)->ToString();
-            },
-            HIRExpressionKind::DeclarationReference => {
-                return (this as *HIRDeclarationReference)->ToString();
-            },
-            HIRExpressionKind::Assignment => {
-                return (this as *HIRAssignmentExpression)->ToString();
-            },
-            HIRExpressionKind::Unary => {
-                return (this as *HIRUnaryExpression)->ToString();
-            },
-            HIRExpressionKind::Binary => {
-                return (this as *HIRBinaryExpression)->ToString();
-            },
-            HIRExpressionKind::Ternary => {
-                return (this as *HIRTernaryExpression)->ToString();
-            },
-            HIRExpressionKind::Call => {
-                return (this as *HIRCallExpression)->ToString();
-            },
-            HIRExpressionKind::Cast => {
-                return (this as *HIRCastExpression)->ToString();
-            },
-            HIRExpressionKind::IndexAccess => {
-                return (this as *HIRIndexAccessExpression)->ToString();
-            },
-            HIRExpressionKind::TupleAccess => {
-                return (this as *HIRTupleAccessExpression)->ToString();
-            },
-            HIRExpressionKind::FieldAccess => {
-                return (this as *HIRFieldAccessExpression)->ToString();
-            },
-            HIRExpressionKind::MemberAccess => {
-                return (this as *HIRMemberAccessExpression)->ToString();
-            },
-            HIRExpressionKind::TagAccess => {
-                return (this as *HIRTagAccessExpression)->ToString();
-            },
-            HIRExpressionKind::New => {
-                return (this as *HIRNewExpression)->ToString();
-            },
-            HIRExpressionKind::Delete => {
-                return (this as *HIRDeleteExpression)->ToString();
-            },
-            HIRExpressionKind::Constructor => {
-                return (this as *HIRConstructorExpression)->ToString();
-            },
-            HIRExpressionKind::Destructor => {
-                return (this as *HIRDestructorExpression)->ToString();
-            },
-            HIRExpressionKind::Intrinsic => {
-                return (this as *HIRIntrinsicExpression)->ToString();
-            },
-            HIRExpressionKind::Deferred => {
-                return (this as *HIRDeferredExpression)->ToString();
-            },
-            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => {
-                return this.ToString(0);
-            }
+            HIRExpressionKind::Literal => (this as *HIRLiteral)->ToString(),
+            HIRExpressionKind::BindingReference => (this as *HIRBindingReference)->ToString(),
+            HIRExpressionKind::DeclarationReference => (this as *HIRDeclarationReference)->ToString(),
+            HIRExpressionKind::Assignment => (this as *HIRAssignmentExpression)->ToString(),
+            HIRExpressionKind::Unary => (this as *HIRUnaryExpression)->ToString(),
+            HIRExpressionKind::Binary => (this as *HIRBinaryExpression)->ToString(),
+            HIRExpressionKind::Ternary => (this as *HIRTernaryExpression)->ToString(),
+            HIRExpressionKind::Call => (this as *HIRCallExpression)->ToString(),
+            HIRExpressionKind::Cast => (this as *HIRCastExpression)->ToString(),
+            HIRExpressionKind::IndexAccess => (this as *HIRIndexAccessExpression)->ToString(),
+            HIRExpressionKind::TupleAccess => (this as *HIRTupleAccessExpression)->ToString(),
+            HIRExpressionKind::FieldAccess => (this as *HIRFieldAccessExpression)->ToString(),
+            HIRExpressionKind::MemberAccess => (this as *HIRMemberAccessExpression)->ToString(),
+            HIRExpressionKind::TagAccess => (this as *HIRTagAccessExpression)->ToString(),
+            HIRExpressionKind::New => (this as *HIRNewExpression)->ToString(),
+            HIRExpressionKind::Delete => (this as *HIRDeleteExpression)->ToString(),
+            HIRExpressionKind::Constructor => (this as *HIRConstructorExpression)->ToString(),
+            HIRExpressionKind::Destructor => (this as *HIRDestructorExpression)->ToString(),
+            HIRExpressionKind::Intrinsic => (this as *HIRIntrinsicExpression)->ToString(),
+            HIRExpressionKind::Deferred => (this as *HIRDeferredExpression)->ToString(),
+            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => this.ToString(0)
         }
     }
 
     pub fn ToString(&this, indent: usize) -> String {
         match this.kind {
-            HIRExpressionKind::Block => {
-                return (this as *HIRBlockExpression)->ToString(indent);
-            },
-            HIRExpressionKind::If => {
-                return (this as *HIRIfExpression)->ToString(indent);
-            },
-            HIRExpressionKind::While => {
-                return (this as *HIRWhileExpression)->ToString(indent);
-            },
-            HIRExpressionKind::Loop => {
-                return (this as *HIRLoopExpression)->ToString(indent);
-            },
-            HIRExpressionKind::For => {
-                return (this as *HIRForExpression)->ToString(indent);
-            },
-            HIRExpressionKind::Match => {
-                return (this as *HIRMatchExpression)->ToString(indent);
-            },
-            HIRExpressionKind::Return => {
-                return (this as *HIRReturnExpression)->ToString(indent);
-            },
-            HIRExpressionKind::Break => {
-                return (this as *HIRBreakExpression)->ToString(indent);
-            },
-            HIRExpressionKind::Continue => {
-                return (this as *HIRContinueExpression)->ToString(indent);
-            },
-            _ => {
-                return this.ToString();
-            }
+            HIRExpressionKind::Block => (this as *HIRBlockExpression)->ToString(indent),
+            HIRExpressionKind::If => (this as *HIRIfExpression)->ToString(indent),
+            HIRExpressionKind::While => (this as *HIRWhileExpression)->ToString(indent),
+            HIRExpressionKind::Loop => (this as *HIRLoopExpression)->ToString(indent),
+            HIRExpressionKind::For => (this as *HIRForExpression)->ToString(indent),
+            HIRExpressionKind::Match => (this as *HIRMatchExpression)->ToString(indent),
+            HIRExpressionKind::Return => (this as *HIRReturnExpression)->ToString(indent),
+            HIRExpressionKind::Break => (this as *HIRBreakExpression)->ToString(indent),
+            HIRExpressionKind::Continue => (this as *HIRContinueExpression)->ToString(indent),
+            _ => this.ToString()
         }
     }
 
     pub fn IsBlockLike(&this) -> bool {
-        return this.kind == HIRExpressionKind::Block || this.kind == HIRExpressionKind::If || this.kind == HIRExpressionKind::While || this.kind == HIRExpressionKind::Loop || this.kind == HIRExpressionKind::For || this.kind == HIRExpressionKind::Match;
+        this.kind == HIRExpressionKind::Block || this.kind == HIRExpressionKind::If || this.kind == HIRExpressionKind::While || this.kind == HIRExpressionKind::Loop || this.kind == HIRExpressionKind::For || this.kind == HIRExpressionKind::Match
     }
 
     pub fn IsControl(&this) -> bool {
-        return this.IsBlockLike() || this.kind == HIRExpressionKind::Return || this.kind == HIRExpressionKind::Break || this.kind == HIRExpressionKind::Continue;
+        this.IsBlockLike() || this.kind == HIRExpressionKind::Return || this.kind == HIRExpressionKind::Break || this.kind == HIRExpressionKind::Continue
     }
 }
 
@@ -1373,36 +1279,16 @@ class HIRLiteral : HIRExpression {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            HIRLiteralKind::Boolean => {
-                return (this as *HIRBooleanLiteral)->ToString();
-            },
-            HIRLiteralKind::Character => {
-                return (this as *HIRCharacterLiteral)->ToString();
-            },
-            HIRLiteralKind::Integer => {
-                return (this as *HIRIntegerLiteral)->ToString();
-            },
-            HIRLiteralKind::Float => {
-                return (this as *HIRFloatLiteral)->ToString();
-            },
-            HIRLiteralKind::String => {
-                return (this as *HIRStringLiteral)->ToString();
-            },
-            HIRLiteralKind::Array => {
-                return (this as *HIRArrayLiteral)->ToString();
-            },
-            HIRLiteralKind::Tuple => {
-                return (this as *HIRTupleLiteral)->ToString();
-            },
-            HIRLiteralKind::Structure => {
-                return (this as *HIRStructureLiteral)->ToString();
-            },
-            HIRLiteralKind::Variant => {
-                return (this as *HIRVariantLiteral)->ToString();
-            },
-            HIRLiteralKind::Null => {
-                return (this as *HIRNullLiteral)->ToString();
-            }
+            HIRLiteralKind::Boolean => (this as *HIRBooleanLiteral)->ToString(),
+            HIRLiteralKind::Character => (this as *HIRCharacterLiteral)->ToString(),
+            HIRLiteralKind::Integer => (this as *HIRIntegerLiteral)->ToString(),
+            HIRLiteralKind::Float => (this as *HIRFloatLiteral)->ToString(),
+            HIRLiteralKind::String => (this as *HIRStringLiteral)->ToString(),
+            HIRLiteralKind::Array => (this as *HIRArrayLiteral)->ToString(),
+            HIRLiteralKind::Tuple => (this as *HIRTupleLiteral)->ToString(),
+            HIRLiteralKind::Structure => (this as *HIRStructureLiteral)->ToString(),
+            HIRLiteralKind::Variant => (this as *HIRVariantLiteral)->ToString(),
+            HIRLiteralKind::Null => (this as *HIRNullLiteral)->ToString()
         }
     }
 }
@@ -1415,7 +1301,7 @@ class HIRBooleanLiteral : HIRLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        return (this.value ? "true" : "false").ToString();
+        (this.value ? "true" : "false").ToString()
     }
 }
 
@@ -1427,7 +1313,7 @@ class HIRCharacterLiteral : HIRLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        return '\'' + String(this.value as i8).Escape() + '\'';
+        '\'' + String(this.value as i8).Escape() + '\''
     }
 }
 
@@ -1439,7 +1325,7 @@ class HIRIntegerLiteral : HIRLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        return String::FromInteger(this.value);
+        String::FromInteger(this.value)
     }
 }
 
@@ -1451,7 +1337,7 @@ class HIRFloatLiteral : HIRLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        return String::FromFloat(this.value);
+        String::FromFloat(this.value)
     }
 }
 
@@ -1463,7 +1349,7 @@ class HIRStringLiteral : HIRLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        return '"' + this.value.Escape() + '"';
+        '"' + this.value.Escape() + '"'
     }
 }
 
@@ -1480,7 +1366,9 @@ class HIRArrayLiteral : HIRLiteral {
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
             result += this.elements[i]->ToString();
-        } return result + ']';
+        }
+
+        result + ']'
     }
 }
 
@@ -1497,7 +1385,9 @@ class HIRTupleLiteral : HIRLiteral {
         for i in 0..this.elements.Size() {
             if i > 0 { result += ", "; }
             result += this.elements[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -1514,7 +1404,9 @@ class HIRStructureLiteral : HIRLiteral {
         for i in 0..this.fields.Size() {
             if i > 0 { result += ", "; }
             result += this.fields[i]->ToString();
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -1537,7 +1429,9 @@ class HIRVariantLiteral : HIRLiteral {
             }
 
             result += this.fields[i]->ToString();
-        } return result + (this.member->structure ? '}' : ')');
+        }
+
+        result + (this.member->structure ? '}' : ')')
     }
 }
 
@@ -1545,7 +1439,7 @@ class HIRNullLiteral : HIRLiteral {
     HIRNullLiteral(&mut this, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Null, _type) {}
 
     pub fn ToString(&this) -> String {
-        return "null".ToString();
+        "null".ToString()
     }
 }
 
@@ -1557,7 +1451,7 @@ class HIRBindingReference : HIRExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.binding->name;
+        '%' + this.binding->name
     }
 }
 
@@ -1570,15 +1464,9 @@ class HIRDeclarationReference : HIRExpression {
 
     pub fn ToString(&this) -> String {
         match this.declaration->kind {
-            HIRDeclarationKind::Parameter => {
-                return '%' + this.declaration->name;
-            },
-            HIRDeclarationKind::Function => {
-                return "@\"" + this.declaration->name + '"';
-            },
-            _ => {
-                return '@' + this.declaration->name;
-            }
+            HIRDeclarationKind::Parameter => '%' + this.declaration->name,
+            HIRDeclarationKind::Function => "@\"" + this.declaration->name + '"',
+            _ => '@' + this.declaration->name
         }
     }
 }
@@ -1606,7 +1494,9 @@ class HIRAssignmentExpression : HIRExpression {
             result += '(' + this.right->ToString() + ')';
         } else {
             result += this.right->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1617,10 +1507,10 @@ enum HIRUnaryKind: u8 {
 extend HIRUnaryKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRUnaryKind::AddressOf => { return '&'.ToString(); },
-            HIRUnaryKind::Dereference => { return '*'.ToString(); },
-            HIRUnaryKind::Negate => { return '-'.ToString(); },
-            HIRUnaryKind::Not => { return '!'.ToString(); }
+            HIRUnaryKind::AddressOf => '&'.ToString(),
+            HIRUnaryKind::Dereference => '*'.ToString(),
+            HIRUnaryKind::Negate => '-'.ToString(),
+            HIRUnaryKind::Not => '!'.ToString()
         }
     }
 }
@@ -1644,7 +1534,9 @@ class HIRUnaryExpression : HIRExpression {
             result += '(' + this.operand->ToString() + ')';
         } else {
             result += this.operand->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1658,24 +1550,24 @@ enum HIRBinaryKind: u8 {
 extend HIRBinaryKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRBinaryKind::Add => { return '+'.ToString(); },
-            HIRBinaryKind::Subtract => { return '-'.ToString(); },
-            HIRBinaryKind::Multiply => { return '*'.ToString(); },
-            HIRBinaryKind::Divide => { return '/'.ToString(); },
-            HIRBinaryKind::Modulo => { return '%'.ToString(); },
-            HIRBinaryKind::Equal => { return "==".ToString(); },
-            HIRBinaryKind::NotEqual => { return "!=".ToString(); },
-            HIRBinaryKind::Less => { return '<'.ToString(); },
-            HIRBinaryKind::LessEqual => { return "<=".ToString(); },
-            HIRBinaryKind::Greater => { return '>'.ToString(); },
-            HIRBinaryKind::GreaterEqual => { return ">=".ToString(); },
-            HIRBinaryKind::LogicalAnd => { return "&&".ToString(); },
-            HIRBinaryKind::LogicalOr => { return "||".ToString(); },
-            HIRBinaryKind::BitwiseAnd => { return '&'.ToString(); },
-            HIRBinaryKind::BitwiseOr => { return '|'.ToString(); },
-            HIRBinaryKind::BitwiseXor => { return '^'.ToString(); },
-            HIRBinaryKind::LeftShift => { return "<<".ToString(); },
-            HIRBinaryKind::RightShift => { return ">>".ToString(); }
+            HIRBinaryKind::Add => '+'.ToString(),
+            HIRBinaryKind::Subtract => '-'.ToString(),
+            HIRBinaryKind::Multiply => '*'.ToString(),
+            HIRBinaryKind::Divide => '/'.ToString(),
+            HIRBinaryKind::Modulo => '%'.ToString(),
+            HIRBinaryKind::Equal => "==".ToString(),
+            HIRBinaryKind::NotEqual => "!=".ToString(),
+            HIRBinaryKind::Less => '<'.ToString(),
+            HIRBinaryKind::LessEqual => "<=".ToString(),
+            HIRBinaryKind::Greater => '>'.ToString(),
+            HIRBinaryKind::GreaterEqual => ">=".ToString(),
+            HIRBinaryKind::LogicalAnd => "&&".ToString(),
+            HIRBinaryKind::LogicalOr => "||".ToString(),
+            HIRBinaryKind::BitwiseAnd => '&'.ToString(),
+            HIRBinaryKind::BitwiseOr => '|'.ToString(),
+            HIRBinaryKind::BitwiseXor => '^'.ToString(),
+            HIRBinaryKind::LeftShift => "<<".ToString(),
+            HIRBinaryKind::RightShift => ">>".ToString()
         }
     }
 }
@@ -1705,7 +1597,9 @@ class HIRBinaryExpression : HIRExpression {
             result += '(' + this.right->ToString() + ')';
         } else {
             result += this.right->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1743,7 +1637,9 @@ class HIRTernaryExpression : HIRExpression {
             result += '(' + this.else_value->ToString() + ')';
         } else {
             result += this.else_value->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1767,7 +1663,9 @@ class HIRCallExpression : HIRExpression {
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -1787,7 +1685,7 @@ class HIRCastExpression : HIRExpression {
             result += this.value->ToString();
         }
 
-        return result + " as " + this._type->ToString();
+        result + " as " + this._type->ToString()
     }
 }
 
@@ -1808,7 +1706,7 @@ class HIRIndexAccessExpression : HIRExpression {
             result += this.value->ToString();
         }
 
-        return result + '[' + this.index->ToString() + ']';
+        result + '[' + this.index->ToString() + ']'
     }
 }
 
@@ -1829,7 +1727,7 @@ class HIRTupleAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + '.' + String::FromInteger(this.index as u64);
+        result + '.' + String::FromInteger(this.index as u64)
     }
 }
 
@@ -1850,7 +1748,7 @@ class HIRFieldAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + '.' + this.field->name;
+        result + '.' + this.field->name
     }
 }
 
@@ -1872,7 +1770,7 @@ class HIRMemberAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + '.' + this.member->name;
+        result + '.' + this.member->name
     }
 }
 
@@ -1892,7 +1790,7 @@ class HIRTagAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        return result + ".tag";
+        result + ".tag"
     }
 }
 
@@ -1919,7 +1817,9 @@ class HIRNewExpression : HIRExpression {
                 if i != 0 { result += ", "; }
                 result += this.arguments[i]->ToString();
             } result += ')';
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1940,7 +1840,9 @@ class HIRDeleteExpression : HIRExpression {
             result += '(' + this.value->ToString() + ')';
         } else {
             result += this.value->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -1964,7 +1866,9 @@ class HIRConstructorExpression : HIRExpression {
         for i in 0..this.arguments.Size() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
-        } return result + ')';
+        }
+
+        result + ')'
     }
 }
 
@@ -1985,7 +1889,7 @@ class HIRDestructorExpression : HIRExpression {
             result += this.callee->ToString();
         }
 
-        return result + '(' + this.instance->ToString() + ')';
+        result + '(' + this.instance->ToString() + ')'
     }
 }
 
@@ -1996,8 +1900,8 @@ enum HIRIntrinsicKind: u8 {
 extend HIRIntrinsicKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRIntrinsicKind::SizeOf => { return "sizeof".ToString(); },
-            HIRIntrinsicKind::AlignOf => { return "alignof".ToString(); }
+            HIRIntrinsicKind::SizeOf => "sizeof".ToString(),
+            HIRIntrinsicKind::AlignOf => "alignof".ToString()
         }
     }
 }
@@ -2011,7 +1915,7 @@ class HIRIntrinsicExpression : HIRExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return this.kind.ToString() + '(' + this._type->ToString() + ')';
+        this.kind.ToString() + '(' + this._type->ToString() + ')'
     }
 }
 
@@ -2023,7 +1927,7 @@ class HIRDeferredExpression : HIRExpression {
     }
 
     pub fn ToString(&this) -> String {
-        return "<deferred expression>".ToString();
+        "<deferred expression>".ToString()
     }
 }
 
@@ -2059,7 +1963,9 @@ class HIRBlockExpression : HIRExpression {
 
         for destructor in this.destructors {
             result += (' ' * (indent + 1) * 4) + destructor->ToString() + '\n';
-        } return result + (' ' * indent * 4) + '}';
+        }
+
+        result + (' ' * indent * 4) + '}'
     }
 }
 
@@ -2077,9 +1983,9 @@ class HIRCondition {
 
     pub fn ToString(&this) -> String {
         if this.pattern != null {
-            return "let " + this.pattern->ToString() + " = " + this.expression->ToString();
+            "let " + this.pattern->ToString() + " = " + this.expression->ToString()
         } else {
-            return this.expression->ToString();
+            this.expression->ToString()
         }
     }
 }
@@ -2099,7 +2005,9 @@ class HIRIfExpression : HIRExpression {
 
         if this.else_body != null {
             result += " else " + this.else_body->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2118,7 +2026,9 @@ class HIRWhileExpression : HIRExpression {
 
         if this.else_body != null {
             result += " else " + this.else_body->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2129,7 +2039,7 @@ class HIRLoopExpression : HIRExpression {
     HIRLoopExpression(&mut this, _type: *HIRType) : HIRExpression(HIRExpressionKind::Loop, _type) {}
 
     pub fn ToString(&this, indent: usize) -> String {
-        return "loop " + this.body->ToString(indent);
+        "loop " + this.body->ToString(indent)
     }
 }
 
@@ -2146,7 +2056,7 @@ class HIRForExpression : HIRExpression {
     }
 
     pub fn ToString(&this, indent: usize) -> String {
-        return "for " + this.iterator->ToString() + ", " + this.condition->ToString() + ", " + this.step->ToString() + ' ' + this.body->ToString(indent);
+        "for " + this.iterator->ToString() + ", " + this.condition->ToString() + ", " + this.step->ToString() + ' ' + this.body->ToString(indent)
     }
 }
 
@@ -2161,13 +2071,17 @@ class HIRPatternChecker {
                 HIRPatternKind::Wildcard | HIRPatternKind::Identifier | HIRPatternKind::Rest => { return null; },
                 _ => { return pattern; }
             }
-        } return null;
+        }
+
+        null
     }
 
     pub fn NormalizeType(&this, _type: *HIRType) -> *HIRType {
         if _type->IsReference() {
             return _type->Pointee();
-        } return _type;
+        }
+
+        _type
     }
 
     fn MemberKey(&this, member: *HIREnumerationMember) -> String {
@@ -2175,7 +2089,9 @@ class HIRPatternChecker {
 
         if value->kind == HIRExpressionKind::Literal && (value as *HIRLiteral)->kind == HIRLiteralKind::Integer {
             return "e" + String::FromInteger((value as *HIRIntegerLiteral)->value);
-        } return "m" + member->name;
+        }
+
+        "m" + member->name
     }
 
     fn LiteralKey(&this, literal: *HIRExpression) -> String {
@@ -2186,27 +2102,27 @@ class HIRPatternChecker {
         let value = literal as *HIRLiteral;
 
         match value->kind {
-            HIRLiteralKind::Boolean => { return (value as *HIRBooleanLiteral)->value ? "true".ToString() : "false".ToString(); },
-            HIRLiteralKind::Integer => { return "i" + String::FromInteger((value as *HIRIntegerLiteral)->value); },
-            HIRLiteralKind::Character => { return "c" + String::FromInteger((value as *HIRCharacterLiteral)->value as u64); },
-            _ => { return "?" + literal->ToString(); }
+            HIRLiteralKind::Boolean => (value as *HIRBooleanLiteral)->value ? "true".ToString() : "false".ToString(),
+            HIRLiteralKind::Integer => "i" + String::FromInteger((value as *HIRIntegerLiteral)->value),
+            HIRLiteralKind::Character => "c" + String::FromInteger((value as *HIRCharacterLiteral)->value as u64),
+            _ => "?" + literal->ToString()
         }
     }
 
     pub fn IsRange(&this, _type: *HIRType) -> bool {
-        return _type->IsCharacter() || (_type->IsInteger() && !_type->IsLiteral() && _type->Width() <= 64);
+        _type->IsCharacter() || (_type->IsInteger() && !_type->IsLiteral() && _type->Width() <= 64)
     }
 
     fn RangeMax(&this, _type: *HIRType) -> u64 {
         let width = _type->Width();
         if width >= 64 { return 0xFFFFFFFFFFFFFFFFu64; }
-        return (1u64 << width) - 1;
+        (1u64 << width) - 1
     }
 
     fn Bias(&this, value: u64, _type: *HIRType) -> u64 {
         let masked = value & this.RangeMax(_type);
         if !_type->IsSigned() { return masked; }
-        return masked ^ (1u64 << (_type->Width() - 1));
+        masked ^ (1u64 << (_type->Width() - 1))
     }
 
     pub fn BoundValue(&this, bound: *HIRExpression, _type: *HIRType) -> u64 {
@@ -2214,7 +2130,9 @@ class HIRPatternChecker {
 
         if literal->kind == HIRLiteralKind::Character {
             return this.Bias((literal as *HIRCharacterLiteral)->value as u64, _type);
-        } return this.Bias((literal as *HIRIntegerLiteral)->value, _type);
+        }
+
+        this.Bias((literal as *HIRIntegerLiteral)->value, _type)
     }
 
     fn RangeOf(&this, pattern: *HIRPattern, _type: *HIRType, low: &mut u64, high: &mut u64) -> bool {
@@ -2235,7 +2153,9 @@ class HIRPatternChecker {
                 high = this.BoundValue(range->end, _type);
                 if !range->inclusive { high -= 1; }
             } return true;
-        } return false;
+        }
+
+        false
     }
 
     fn Split(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<u64> {
@@ -2260,7 +2180,9 @@ class HIRPatternChecker {
                 points[j - 1] = swap;
                 j -= 1;
             }
-        } return points;
+        }
+
+        points
     }
 
     fn SpecializeRange(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<Vector<*HIRPattern>> {
@@ -2279,12 +2201,14 @@ class HIRPatternChecker {
             for i in 1..row.Size() {
                 rest.PushBack(row[i]);
             } specialized.PushBack(rest);
-        } return specialized;
+        }
+
+        specialized
     }
 
     fn PieceEnd(&this, points: &Vector<u64>, index: usize, high: u64) -> u64 {
         if index + 1 < points.Size() { return points[index + 1] - 1; }
-        return high;
+        high
     }
 
     fn UsefulRange(&this, rows: &Vector<Vector<*HIRPattern>>, vector: &Vector<*HIRPattern>, types: &Vector<*HIRType>, _type: *HIRType) -> bool {
@@ -2299,7 +2223,9 @@ class HIRPatternChecker {
             if this.Useful(this.SpecializeRange(rows, _type, points[i], this.PieceEnd(points, i, high)), rest, this.Tail(types)) {
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     fn MissingRange(&this, rows: &Vector<Vector<*HIRPattern>>, types: &Vector<*HIRType>, _type: *HIRType, witness: &mut Vector<String>) -> bool {
@@ -2315,7 +2241,9 @@ class HIRPatternChecker {
                 for value in inner { witness.PushBack(value); }
                 return true;
             }
-        } return false;
+        }
+
+        false
     }
 
     fn FormatBound(&this, _type: *HIRType, value: u64) -> String {
@@ -2329,25 +2257,27 @@ class HIRPatternChecker {
 
         if width < 64 && (unbiased & (1u64 << (width - 1))) != 0 {
             return String::FromInteger((unbiased | !this.RangeMax(_type)) as i64);
-        } return String::FromInteger(unbiased as i64);
+        }
+
+        String::FromInteger(unbiased as i64)
     }
 
     fn FormatRange(&this, _type: *HIRType, low: u64, high: u64) -> String {
         if low == high { return this.FormatBound(_type, low); }
-        return this.FormatBound(_type, low) + "..=" + this.FormatBound(_type, high);
+        this.FormatBound(_type, low) + "..=" + this.FormatBound(_type, high)
     }
 
     fn Key(&this, pattern: *HIRPattern) -> String {
         match pattern->kind {
-            HIRPatternKind::Literal => { return this.LiteralKey((pattern as *HIRLiteralPattern)->literal); },
-            HIRPatternKind::Enumeration => { return this.MemberKey((pattern as *HIREnumerationPattern)->member); },
-            HIRPatternKind::Variant => { return (pattern as *HIRVariantPattern)->member->name; },
-            _ => { return String(); }
+            HIRPatternKind::Literal => this.LiteralKey((pattern as *HIRLiteralPattern)->literal),
+            HIRPatternKind::Enumeration => this.MemberKey((pattern as *HIREnumerationPattern)->member),
+            HIRPatternKind::Variant => (pattern as *HIRVariantPattern)->member->name,
+            _ => String()
         }
     }
 
     pub fn IsFinite(&this, _type: *HIRType) -> bool {
-        return _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() || _type->IsStructure() || _type->IsTuple();
+        _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() || _type->IsStructure() || _type->IsTuple()
     }
 
     pub fn Constructors(&this, _type: *HIRType) -> Vector<String> {
@@ -2370,13 +2300,17 @@ class HIRPatternChecker {
             }
         } else if _type->IsStructure() || _type->IsTuple() {
             keys.PushBack(String());
-        } return keys;
+        }
+
+        keys
     }
 
     fn VariantMember(&this, _type: *HIRType, key: &String) -> *HIRVariantMember {
         for member in (_type as *HIRVariantType)->declaration->members {
             if member->name == key { return member; }
-        } return null;
+        }
+
+        null
     }
 
     pub fn FieldTypes(&this, _type: *HIRType, key: &String) -> Vector<*HIRType> {
@@ -2397,7 +2331,9 @@ class HIRPatternChecker {
             for element in (_type as *HIRTupleType)->elements {
                 types.PushBack(element);
             }
-        } return types;
+        }
+
+        types
     }
 
     fn FindField(&this, patterns: &Vector<*HIRPattern>, name: &String) -> *HIRPattern {
@@ -2405,7 +2341,9 @@ class HIRPatternChecker {
             if pattern->kind == HIRPatternKind::Field && (pattern as *HIRFieldPattern)->name == name {
                 return pattern;
             }
-        } return null;
+        }
+
+        null
     }
 
     fn Fields(&this, pattern: *HIRPattern, arity: usize) -> Vector<*HIRPattern> {
@@ -2442,7 +2380,9 @@ class HIRPatternChecker {
 
         while fields.Size() < arity {
             fields.PushBack(null);
-        } return fields;
+        }
+
+        fields
     }
 
     fn ExpandRow(&this, row: &Vector<*HIRPattern>, rows: &mut Vector<Vector<*HIRPattern>>) {
@@ -2464,7 +2404,9 @@ class HIRPatternChecker {
 
         for row in rows {
             this.ExpandRow(row, expanded);
-        } return expanded;
+        }
+
+        expanded
     }
 
     pub fn Specialize(&this, rows: &Vector<Vector<*HIRPattern>>, key: &String, arity: usize) -> Vector<Vector<*HIRPattern>> {
@@ -2489,7 +2431,9 @@ class HIRPatternChecker {
             }
 
             specialized.PushBack(fields);
-        } return specialized;
+        }
+
+        specialized
     }
 
     fn Default(&this, rows: &Vector<Vector<*HIRPattern>>) -> Vector<Vector<*HIRPattern>> {
@@ -2502,7 +2446,9 @@ class HIRPatternChecker {
             for i in 1..row.Size() {
                 rest.PushBack(row[i]);
             } defaulted.PushBack(rest);
-        } return defaulted;
+        }
+
+        defaulted
     }
 
     fn Heads(&this, rows: &Vector<Vector<*HIRPattern>>) -> Vector<String> {
@@ -2513,7 +2459,9 @@ class HIRPatternChecker {
             if head == null { continue; }
             let key = this.Key(head);
             if !keys.Contains(key) { keys.PushBack(key); }
-        } return keys;
+        }
+
+        keys
     }
 
     fn IsComplete(&this, heads: &Vector<String>, _type: *HIRType) -> bool {
@@ -2521,7 +2469,9 @@ class HIRPatternChecker {
 
         for key in this.Constructors(_type) {
             if !heads.Contains(key) { return false; }
-        } return true;
+        }
+
+        true
     }
 
     fn Tail(&this, types: &Vector<*HIRType>) -> Vector<*HIRType> {
@@ -2529,7 +2479,9 @@ class HIRPatternChecker {
 
         for i in 1..types.Size() {
             tail.PushBack(types[i]);
-        } return tail;
+        }
+
+        tail
     }
 
     pub fn Useful(&this, rows: &Vector<Vector<*HIRPattern>>, vector: &Vector<*HIRPattern>, types: &Vector<*HIRType>) -> bool {
@@ -2573,7 +2525,7 @@ class HIRPatternChecker {
 
         let mut rest = Vector<*HIRPattern>();
         for i in 1..vector.Size() { rest.PushBack(vector[i]); }
-        return this.Useful(this.Default(expanded), rest, this.Tail(types));
+        this.Useful(this.Default(expanded), rest, this.Tail(types))
     }
 
     pub fn Missing(&this, rows: &Vector<Vector<*HIRPattern>>, types: &Vector<*HIRType>, witness: &mut Vector<String>) -> bool {
@@ -2625,7 +2577,9 @@ class HIRPatternChecker {
 
         for value in inner {
             witness.PushBack(value);
-        } return true;
+        }
+
+        true
     }
 
     fn FormatFields(&this, names: &Vector<String>, fields: &Vector<String>) -> String {
@@ -2645,7 +2599,9 @@ class HIRPatternChecker {
         if omitted {
             if !result.Empty() { result += ", "; }
             result += "..";
-        } return " { " + result + " }";
+        }
+
+        " { " + result + " }"
     }
 
     pub fn Format(&this, _type: *HIRType, key: &String, fields: &Vector<String>) -> String {
@@ -2688,7 +2644,9 @@ class HIRPatternChecker {
                 if i != 0 { result += ", "; }
                 result += fields[i];
             } return result + ")";
-        } return '_'.ToString();
+        }
+
+        '_'.ToString()
     }
 }
 
@@ -2705,7 +2663,7 @@ class HIRMatchArm {
     pub fn ToString(&this, indent: usize) -> String {
         let mut result = this.pattern->ToString();
         if this.guard != null { result += " if " + this.guard->ToString(); }
-        return result + " => " + this.body->ToString(indent);
+        result + " => " + this.body->ToString(indent)
     }
 }
 
@@ -2751,11 +2709,13 @@ class HIRMatchExpression : HIRExpression {
 
         if checker.Missing(rows, types, witness) {
             missing.PushBack(witness[0]);
-        } return missing;
+        }
+
+        missing
     }
 
     pub fn IsExhaustive(&this) -> bool {
-        return this.Uncovered().Empty();
+        this.Uncovered().Empty()
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2766,7 +2726,7 @@ class HIRMatchExpression : HIRExpression {
             result += (' ' * (indent + 1) * 4) + this.arms[i]->ToString(indent + 1);
         }
 
-        return result + '\n' + (' ' * indent * 4) + '}';
+        result + '\n' + (' ' * indent * 4) + '}'
     }
 }
 
@@ -2783,7 +2743,9 @@ class HIRReturnExpression : HIRExpression {
 
         if this.value != null {
             return result + ' ' + this.value->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2800,7 +2762,9 @@ class HIRBreakExpression : HIRExpression {
 
         if this.value != null {
             return result + ' ' + this.value->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2812,7 +2776,7 @@ class HIRContinueExpression : HIRExpression {
     }
 
     pub fn ToString(&this, indent: usize) -> String {
-        return DestructorsToString(this.destructors, indent) + "continue";
+        DestructorsToString(this.destructors, indent) + "continue"
     }
 }
 
@@ -2828,20 +2792,14 @@ class HIRStatement {
     }
 
     pub fn HasBlock(&this) -> bool {
-        return this.kind == HIRStatementKind::Assembly || (this.kind == HIRStatementKind::Expression && (this as *HIRExpressionStatement)->expression->IsBlockLike());
+        this.kind == HIRStatementKind::Assembly || (this.kind == HIRStatementKind::Expression && (this as *HIRExpressionStatement)->expression->IsBlockLike())
     }
 
     pub fn ToString(&this, indent: usize) -> String {
         match this.kind {
-            HIRStatementKind::Variable => {
-                return (' ' * indent * 4) + (this as *HIRLetStatement)->ToString(indent);
-            },
-            HIRStatementKind::Expression => {
-                return (' ' * indent * 4) + (this as *HIRExpressionStatement)->expression->ToString(indent);
-            },
-            HIRStatementKind::Assembly => {
-                return (' ' * indent * 4) + (this as *HIRAssemblyStatement)->ToString();
-            }
+            HIRStatementKind::Variable => (' ' * indent * 4) + (this as *HIRLetStatement)->ToString(indent),
+            HIRStatementKind::Expression => (' ' * indent * 4) + (this as *HIRExpressionStatement)->expression->ToString(indent),
+            HIRStatementKind::Assembly => (' ' * indent * 4) + (this as *HIRAssemblyStatement)->ToString()
         }
     }
 }
@@ -2851,7 +2809,9 @@ fn DestructorsToString(destructors: &Vector<*HIRExpression>, indent: usize) -> S
 
     for destructor in destructors {
         result += destructor->ToString() + '\n' + (' ' * indent * 4);
-    } return result;
+    }
+
+    result
 }
 
 class HIRLetStatement : HIRStatement {
@@ -2872,7 +2832,9 @@ class HIRLetStatement : HIRStatement {
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2884,7 +2846,7 @@ class HIRExpressionStatement : HIRStatement {
     }
 
     pub fn ToString(&this) -> String {
-        return this.expression->ToString();
+        this.expression->ToString()
     }
 }
 
@@ -2938,7 +2900,9 @@ class HIRAssemblyStatement : HIRStatement {
                 if i != 0 { result += ", "; }
                 result += this.clobbers[i];
             }
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -2955,45 +2919,19 @@ class HIRDeclaration {
 
     pub fn ToString(&this) -> String {
         match this.kind {
-            HIRDeclarationKind::Parameter => {
-                return (this as *HIRParameterDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Function => {
-                return (this as *HIRFunctionDeclaration)->ToString(0);
-            },
-            HIRDeclarationKind::Field => {
-                return (this as *HIRFieldDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Class => {
-                return (this as *HIRClassDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Structure => {
-                return (this as *HIRStructureDeclaration)->ToString();
-            },
-            HIRDeclarationKind::EnumerationMember => {
-                return (this as *HIREnumerationMember)->ToString();
-            },
-            HIRDeclarationKind::Enumeration => {
-                return (this as *HIREnumerationDeclaration)->ToString();
-            },
-            HIRDeclarationKind::VariantMember => {
-                return (this as *HIRVariantMember)->ToString();
-            },
-            HIRDeclarationKind::Variant => {
-                return (this as *HIRVariantDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Extend => {
-                return (this as *HIRExtendDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Constant => {
-                return (this as *HIRConstantDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Static => {
-                return (this as *HIRStaticDeclaration)->ToString();
-            },
-            HIRDeclarationKind::Assembly => {
-                return (this as *HIRAssemblyDeclaration)->ToString();
-            }
+            HIRDeclarationKind::Parameter => (this as *HIRParameterDeclaration)->ToString(),
+            HIRDeclarationKind::Function => (this as *HIRFunctionDeclaration)->ToString(0),
+            HIRDeclarationKind::Field => (this as *HIRFieldDeclaration)->ToString(),
+            HIRDeclarationKind::Class => (this as *HIRClassDeclaration)->ToString(),
+            HIRDeclarationKind::Structure => (this as *HIRStructureDeclaration)->ToString(),
+            HIRDeclarationKind::EnumerationMember => (this as *HIREnumerationMember)->ToString(),
+            HIRDeclarationKind::Enumeration => (this as *HIREnumerationDeclaration)->ToString(),
+            HIRDeclarationKind::VariantMember => (this as *HIRVariantMember)->ToString(),
+            HIRDeclarationKind::Variant => (this as *HIRVariantDeclaration)->ToString(),
+            HIRDeclarationKind::Extend => (this as *HIRExtendDeclaration)->ToString(),
+            HIRDeclarationKind::Constant => (this as *HIRConstantDeclaration)->ToString(),
+            HIRDeclarationKind::Static => (this as *HIRStaticDeclaration)->ToString(),
+            HIRDeclarationKind::Assembly => (this as *HIRAssemblyDeclaration)->ToString()
         }
     }
 }
@@ -3033,7 +2971,7 @@ class HIRParameterDeclaration : HIRTypedDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        return '%' + this.name + ": " + this._type->ToString();
+        '%' + this.name + ": " + this._type->ToString()
     }
 }
 
@@ -3063,7 +3001,9 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
 
         if this.body != null {
             result += ' ' + this.body->ToString(indent);
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3081,7 +3021,9 @@ class HIRFieldDeclaration : HIRTypedDeclaration {
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3130,7 +3072,9 @@ class HIRClassDeclaration : HIRTypedDeclaration {
 
         for method in this.methods {
             result += "\n    " + method->ToString(1) + '\n';
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -3174,7 +3118,9 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
 
         if this.copy_assign != null {
             result += "\n    " + this.copy_assign->ToString(1) + '\n';
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -3190,7 +3136,9 @@ class HIREnumerationMember : HIRTypedDeclaration {
 
         if this.value != null {
             result += " = " + this.value->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3209,7 +3157,9 @@ class HIREnumerationDeclaration : HIRTypedDeclaration {
                 if i != 0 { result += ",\n"; }
                 result += "    " + this.members[i]->ToString();
             } result += '\n';
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -3224,9 +3174,9 @@ class HIRVariantField {
 
     pub fn ToString(&this) -> String {
         if !this.name.Empty() {
-            return this.name + ": " + this._type->ToString();
+            this.name + ": " + this._type->ToString()
         } else {
-            return this._type->ToString();
+            this._type->ToString()
         }
     }
 }
@@ -3250,7 +3200,9 @@ class HIRVariantMember : HIRTypedDeclaration {
                 if i != 0 { result += ", "; }
                 result += this.fields[i]->ToString();
             } result += this.structure ? " }" : ")";
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3294,7 +3246,9 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
 
         if this.copy_assign != null {
             result += "\n    " + this.copy_assign->ToString(1) + '\n';
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -3308,7 +3262,9 @@ class HIRExtendDeclaration : HIRTypedDeclaration {
 
         for method in this.methods {
             result += "\n    " + method->ToString(1) + '\n';
-        } return result + '}';
+        }
+
+        result + '}'
     }
 }
 
@@ -3347,7 +3303,9 @@ class HIRExtensionRegistry {
             } else {
                 Logger::Log("Invalid arguments for method: '" + name + "'.", node, LogSeverity::Error);
             }
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3359,7 +3317,7 @@ class HIRConstantDeclaration : HIRTypedDeclaration {
     }
 
     pub fn ToString(&this) -> String {
-        return "const @" + this.name + ": " + this._type->ToString() + " = " + this.initializer->ToString();
+        "const @" + this.name + ": " + this._type->ToString() + " = " + this.initializer->ToString()
     }
 }
 
@@ -3377,7 +3335,9 @@ class HIRStaticDeclaration : HIRLinkableDeclaration {
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString();
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3416,7 +3376,9 @@ class HIRModule {
 
             result += current->ToString();
             previous = current;
-        } return result;
+        }
+
+        result
     }
 }
 
@@ -3428,47 +3390,47 @@ class HIRContext {
     HIRContext(&mut this) {}
 
     pub fn NeverType(&mut this) -> *mut HIRNeverType {
-        return this.arena.New<HIRNeverType>();
+        this.arena.New<HIRNeverType>()
     }
 
     pub fn VoidType(&mut this) -> *mut HIRVoidType {
-        return this.arena.New<HIRVoidType>();
+        this.arena.New<HIRVoidType>()
     }
 
     pub fn BooleanType(&mut this) -> *mut HIRBooleanType {
-        return this.arena.New<HIRBooleanType>();
+        this.arena.New<HIRBooleanType>()
     }
 
     pub fn CharacterType(&mut this) -> *mut HIRCharacterType {
-        return this.arena.New<HIRCharacterType>();
+        this.arena.New<HIRCharacterType>()
     }
 
     pub fn IntegerType(&mut this, width: u32, signed: bool) -> *mut HIRIntegerType {
-        return this.arena.New<HIRIntegerType>(width, signed, false, false);
+        this.arena.New<HIRIntegerType>(width, signed, false, false)
     }
 
     pub fn IntegerPointerType(&mut this, signed: bool) -> *mut HIRIntegerType {
-        return this.arena.New<HIRIntegerType>((llvm_lowerer->target->Info().pointer_size * 8) as u32, signed, false, true);
+        this.arena.New<HIRIntegerType>((llvm_lowerer->target->Info().pointer_size * 8) as u32, signed, false, true)
     }
 
     pub fn IntegerLiteralType(&mut this) -> *mut HIRIntegerType {
-        return this.arena.New<HIRIntegerType>(32u32, true, true, false);
+        this.arena.New<HIRIntegerType>(32u32, true, true, false)
     }
 
     pub fn FloatType(&mut this, width: u32) -> *mut HIRFloatType {
-        return this.arena.New<HIRFloatType>(width, false);
+        this.arena.New<HIRFloatType>(width, false)
     }
 
     pub fn FloatLiteralType(&mut this) -> *mut HIRFloatType {
-        return this.arena.New<HIRFloatType>(64u32, true);
+        this.arena.New<HIRFloatType>(64u32, true)
     }
 
     pub fn PointerType(&mut this, pointee: *HIRType, mutable: bool) -> *mut HIRPointerType {
-        return this.arena.New<HIRPointerType>(pointee, mutable);
+        this.arena.New<HIRPointerType>(pointee, mutable)
     }
 
     pub fn ReferenceType(&mut this, referent: *HIRType, mutable: bool) -> *mut HIRReferenceType {
-        return this.arena.New<HIRReferenceType>(referent, mutable);
+        this.arena.New<HIRReferenceType>(referent, mutable)
     }
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
@@ -3484,7 +3446,7 @@ class HIRContext {
 
         let _type = this.arena.New<HIRArrayType>(element, length);
         this.array_types.PushBack(_type);
-        return _type;
+        _type
     }
 
     pub fn TupleType(&mut this, elements: Vector<*HIRType>) -> *mut HIRTupleType {
@@ -3515,27 +3477,27 @@ class HIRContext {
 
         let _type = this.arena.New<HIRTupleType>(elements);
         this.tuple_types.PushBack(_type);
-        return _type;
+        _type
     }
 
     pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) -> *mut HIRFunctionType {
-        return this.arena.New<HIRFunctionType>(parameters, _return);
+        this.arena.New<HIRFunctionType>(parameters, _return)
     }
 
     pub fn ClassType(&mut this, declaration: *HIRClassDeclaration) -> *mut HIRClassType {
-        return this.arena.New<HIRClassType>(declaration);
+        this.arena.New<HIRClassType>(declaration)
     }
 
     pub fn StructureType(&mut this, declaration: *HIRStructureDeclaration) -> *mut HIRStructureType {
-        return this.arena.New<HIRStructureType>(declaration);
+        this.arena.New<HIRStructureType>(declaration)
     }
 
     pub fn EnumerationType(&mut this, declaration: *HIREnumerationDeclaration, underlying: *HIRIntegerType) -> *mut HIREnumerationType {
-        return this.arena.New<HIREnumerationType>(declaration, underlying);
+        this.arena.New<HIREnumerationType>(declaration, underlying)
     }
 
     pub fn VariantType(&mut this, declaration: *HIRVariantDeclaration) -> *mut HIRVariantType {
-        return this.arena.New<HIRVariantType>(declaration);
+        this.arena.New<HIRVariantType>(declaration)
     }
 }
 
@@ -3552,101 +3514,101 @@ class HIRBuilder {
     }
 
     pub fn WildcardPattern(&mut this) -> *mut HIRWildcardPattern {
-        return this.context->arena.New<HIRWildcardPattern>();
+        this.context->arena.New<HIRWildcardPattern>()
     }
 
     pub fn RestPattern(&mut this) -> *mut HIRRestPattern {
-        return this.context->arena.New<HIRRestPattern>();
+        this.context->arena.New<HIRRestPattern>()
     }
 
     pub fn LiteralPattern(&mut this, literal: *HIRExpression) -> *mut HIRLiteralPattern {
-        return this.context->arena.New<HIRLiteralPattern>(literal);
+        this.context->arena.New<HIRLiteralPattern>(literal)
     }
 
     pub fn RangePattern(&mut this, start: *HIRExpression, end: *HIRExpression, inclusive: bool) -> *mut HIRRangePattern {
-        return this.context->arena.New<HIRRangePattern>(start, end, inclusive);
+        this.context->arena.New<HIRRangePattern>(start, end, inclusive)
     }
 
     pub fn IdentifierPattern(&mut this, name: String, _type: *HIRType, value: *HIRExpression, mutable: bool) -> *mut HIRIdentifierPattern {
-        return this.context->arena.New<HIRIdentifierPattern>(name, _type, value, mutable);
+        this.context->arena.New<HIRIdentifierPattern>(name, _type, value, mutable)
     }
 
     pub fn TuplePattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRTupleType) -> *mut HIRTuplePattern {
-        return this.context->arena.New<HIRTuplePattern>(patterns, _type);
+        this.context->arena.New<HIRTuplePattern>(patterns, _type)
     }
 
     pub fn FieldPattern(&mut this, name: String, pattern: *HIRPattern) -> *mut HIRFieldPattern {
-        return this.context->arena.New<HIRFieldPattern>(name, pattern);
+        this.context->arena.New<HIRFieldPattern>(name, pattern)
     }
 
     pub fn StructurePattern(&mut this, declaration: *HIRStructureDeclaration, patterns: Vector<*HIRPattern>) -> *mut HIRStructurePattern {
-        return this.context->arena.New<HIRStructurePattern>(declaration, patterns);
+        this.context->arena.New<HIRStructurePattern>(declaration, patterns)
     }
 
     pub fn EnumerationPattern(&mut this, member: *HIREnumerationMember) -> *mut HIREnumerationPattern {
-        return this.context->arena.New<HIREnumerationPattern>(member);
+        this.context->arena.New<HIREnumerationPattern>(member)
     }
 
     pub fn VariantPattern(&mut this, member: *HIRVariantMember, patterns: Vector<*HIRPattern>) -> *mut HIRVariantPattern {
-        return this.context->arena.New<HIRVariantPattern>(member, patterns);
+        this.context->arena.New<HIRVariantPattern>(member, patterns)
     }
 
     pub fn OrPattern(&mut this, patterns: Vector<*HIRPattern>) -> *mut HIROrPattern {
-        return this.context->arena.New<HIROrPattern>(patterns);
+        this.context->arena.New<HIROrPattern>(patterns)
     }
 
     pub fn DereferencePattern(&mut this, binding: *HIRIdentifierPattern, pattern: *HIRPattern) -> *mut HIRDereferencePattern {
-        return this.context->arena.New<HIRDereferencePattern>(binding, pattern);
+        this.context->arena.New<HIRDereferencePattern>(binding, pattern)
     }
 
     pub fn BooleanLiteral(&mut this, value: bool, _type: *HIRType) -> *mut HIRBooleanLiteral {
-        return this.context->arena.New<HIRBooleanLiteral>(value, _type);
+        this.context->arena.New<HIRBooleanLiteral>(value, _type)
     }
 
     pub fn CharacterLiteral(&mut this, value: u32, _type: *HIRType) -> *mut HIRCharacterLiteral {
-        return this.context->arena.New<HIRCharacterLiteral>(value, _type);
+        this.context->arena.New<HIRCharacterLiteral>(value, _type)
     }
 
     pub fn IntegerLiteral(&mut this, value: u64, _type: *HIRType) -> *mut HIRIntegerLiteral {
-        return this.context->arena.New<HIRIntegerLiteral>(value, _type);
+        this.context->arena.New<HIRIntegerLiteral>(value, _type)
     }
 
     pub fn FloatLiteral(&mut this, value: f64, _type: *HIRType) -> *mut HIRFloatLiteral {
-        return this.context->arena.New<HIRFloatLiteral>(value, _type);
+        this.context->arena.New<HIRFloatLiteral>(value, _type)
     }
 
     pub fn StringLiteral(&mut this, value: String, _type: *HIRType) -> *mut HIRStringLiteral {
-        return this.context->arena.New<HIRStringLiteral>(value, _type);
+        this.context->arena.New<HIRStringLiteral>(value, _type)
     }
 
     pub fn ArrayLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRArrayLiteral {
-        return this.context->arena.New<HIRArrayLiteral>(elements, _type);
+        this.context->arena.New<HIRArrayLiteral>(elements, _type)
     }
 
     pub fn TupleLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRTupleLiteral {
-        return this.context->arena.New<HIRTupleLiteral>(elements, _type);
+        this.context->arena.New<HIRTupleLiteral>(elements, _type)
     }
 
     pub fn StructureLiteral(&mut this, fields: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRStructureLiteral {
-        return this.context->arena.New<HIRStructureLiteral>(fields, _type);
+        this.context->arena.New<HIRStructureLiteral>(fields, _type)
     }
 
     pub fn VariantLiteral(&mut this, member: *HIRVariantMember, fields: Vector<*HIRExpression>) -> *mut HIRVariantLiteral {
-        return this.context->arena.New<HIRVariantLiteral>(member, fields);
+        this.context->arena.New<HIRVariantLiteral>(member, fields)
     }
 
     pub fn NullLiteral(&mut this) -> *mut HIRNullLiteral {
         let _type = this.context->PointerType(this.context->VoidType(), false);
         _type->_null = true;
-        return this.context->arena.New<HIRNullLiteral>(_type);
+        this.context->arena.New<HIRNullLiteral>(_type)
     }
 
     pub fn ReferenceBinding(&mut this, pattern: *HIRIdentifierPattern) -> *mut HIRBindingReference {
-        return this.context->arena.New<HIRBindingReference>(pattern);
+        this.context->arena.New<HIRBindingReference>(pattern)
     }
 
     pub fn ReferenceDeclaration(&mut this, declaration: *HIRTypedDeclaration, mutable: bool) -> *mut HIRDeclarationReference {
-        return this.context->arena.New<HIRDeclarationReference>(declaration, mutable);
+        this.context->arena.New<HIRDeclarationReference>(declaration, mutable)
     }
 
     fn SetAddressable(&mut this, mut expression: *HIRExpression) {
@@ -3661,7 +3623,7 @@ class HIRBuilder {
 
     pub fn Assignment(&mut this, left: *HIRExpression, right: *HIRExpression) -> *mut HIRAssignmentExpression {
         this.SetAddressable(left);
-        return this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->VoidType());
+        this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->VoidType())
     }
 
     pub fn AddressOf(&mut this, operand: *HIRExpression, mutable: bool) -> *HIRExpression {
@@ -3669,9 +3631,9 @@ class HIRBuilder {
         if mutable || !address->_type->IsMutable() { return address; }
 
         if address->_type->IsReference() {
-            return this.Cast(address, this.context->ReferenceType(address->_type->Pointee(), false));
+            this.Cast(address, this.context->ReferenceType(address->_type->Pointee(), false))
         } else {
-            return this.Cast(address, this.context->PointerType(address->_type->Pointee(), false));
+            this.Cast(address, this.context->PointerType(address->_type->Pointee(), false))
         }
     }
 
@@ -3681,7 +3643,7 @@ class HIRBuilder {
         }
 
         this.SetAddressable(operand);
-        return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, operand->category == HIRExpressionCategory::Place ? operand->mutable : true), HIRExpressionCategory::Value, false);
+        this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, operand->category == HIRExpressionCategory::Place ? operand->mutable : true), HIRExpressionCategory::Value, false)
     }
 
     pub fn Dereference(&mut this, operand: *HIRExpression) -> *HIRExpression {
@@ -3689,45 +3651,31 @@ class HIRBuilder {
             return (operand as *HIRUnaryExpression)->operand;
         }
 
-        return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::Dereference, operand, operand->_type->Pointee(), HIRExpressionCategory::Place, operand->_type->IsMutable());
+        this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::Dereference, operand, operand->_type->Pointee(), HIRExpressionCategory::Place, operand->_type->IsMutable())
     }
 
     fn MaskToWidth(&this, value: u64, width: u32) -> u64 {
         if width >= 64 { return value; }
-        return value & ((1u64 << width) - 1);
+        value & ((1u64 << width) - 1)
     }
 
     fn FoldUnary(&mut this, kind: HIRUnaryKind, operand: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
         match kind {
             HIRUnaryKind::Negate => {
                 match operand->kind {
-                    HIRLiteralKind::Integer => {
-                        return this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width()), _type);
-                    },
-                    HIRLiteralKind::Float => {
-                        return this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type);
-                    },
-                    _ => {
-                        return null;
-                    }
+                    HIRLiteralKind::Integer => this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width()), _type),
+                    HIRLiteralKind::Float => this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type),
+                    _ => null
                 }
             },
             HIRUnaryKind::Not => {
                 match operand->kind {
-                    HIRLiteralKind::Integer => {
-                        return this.IntegerLiteral(this.MaskToWidth(!(operand as *HIRIntegerLiteral)->value, _type->Width()), _type);
-                    },
-                    HIRLiteralKind::Boolean => {
-                        return this.BooleanLiteral(!(operand as *HIRBooleanLiteral)->value, _type);
-                    },
-                    _ => {
-                        return null;
-                    }
+                    HIRLiteralKind::Integer => this.IntegerLiteral(this.MaskToWidth(!(operand as *HIRIntegerLiteral)->value, _type->Width()), _type),
+                    HIRLiteralKind::Boolean => this.BooleanLiteral(!(operand as *HIRBooleanLiteral)->value, _type),
+                    _ => null
                 }
             },
-            _ => {
-                return null;
-            }
+            _ => null
         }
     }
 
@@ -3737,7 +3685,7 @@ class HIRBuilder {
             if folded != null { return folded; }
         }
 
-        return this.context->arena.New<HIRUnaryExpression>(kind, operand, operand->_type, HIRExpressionCategory::Value, false);
+        this.context->arena.New<HIRUnaryExpression>(kind, operand, operand->_type, HIRExpressionCategory::Value, false)
     }
 
     fn SignExtend(&this, value: u64, width: u32) -> i64 {
@@ -3747,7 +3695,9 @@ class HIRBuilder {
 
         if (masked & sign_bit) != 0 {
             return (masked | !((1u64 << width) - 1)) as i64;
-        } return masked as i64;
+        }
+
+        masked as i64
     }
 
     fn FoldBinary(&mut this, kind: HIRBinaryKind, left: *HIRLiteral, right: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
@@ -3758,57 +3708,23 @@ class HIRBuilder {
                 let (signed, width) = (_type->IsSigned(), _type->Width());
 
                 match kind {
-                    HIRBinaryKind::Add => {
-                        return this.IntegerLiteral(this.MaskToWidth(left + right, width), _type);
-                    },
-                    HIRBinaryKind::Subtract => {
-                        return this.IntegerLiteral(this.MaskToWidth(left - right, width), _type);
-                    },
-                    HIRBinaryKind::Multiply => {
-                        return this.IntegerLiteral(this.MaskToWidth(left * right, width), _type);
-                    },
-                    HIRBinaryKind::Divide => {
-                        return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 : left / right, width), _type);
-                    },
-                    HIRBinaryKind::Modulo => {
-                        return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 : left % right, width), _type);
-                    },
-                    HIRBinaryKind::BitwiseAnd => {
-                        return this.IntegerLiteral(left & right, _type);
-                    },
-                    HIRBinaryKind::BitwiseOr => {
-                        return this.IntegerLiteral(left | right, _type);
-                    },
-                    HIRBinaryKind::BitwiseXor => {
-                        return this.IntegerLiteral(left ^ right, _type);
-                    },
-                    HIRBinaryKind::LeftShift => {
-                        return this.IntegerLiteral(this.MaskToWidth(left << right, width), _type);
-                    },
-                    HIRBinaryKind::RightShift => {
-                        return this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) >> right as i64) as u64 : left >> right, width), _type);
-                    },
-                    HIRBinaryKind::Equal => {
-                        return this.BooleanLiteral(left == right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::NotEqual => {
-                        return this.BooleanLiteral(left != right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::Less => {
-                        return this.BooleanLiteral(signed ? this.SignExtend(left, width) < this.SignExtend(right, width) : left < right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::LessEqual => {
-                        return this.BooleanLiteral(signed ? this.SignExtend(left, width) <= this.SignExtend(right, width) : left <= right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::Greater => {
-                        return this.BooleanLiteral(signed ? this.SignExtend(left, width) > this.SignExtend(right, width) : left > right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::GreaterEqual => {
-                        return this.BooleanLiteral(signed ? this.SignExtend(left, width) >= this.SignExtend(right, width) : left >= right, this.context->BooleanType());
-                    },
-                    _ => {
-                        return null;
-                    }
+                    HIRBinaryKind::Add => this.IntegerLiteral(this.MaskToWidth(left + right, width), _type),
+                    HIRBinaryKind::Subtract => this.IntegerLiteral(this.MaskToWidth(left - right, width), _type),
+                    HIRBinaryKind::Multiply => this.IntegerLiteral(this.MaskToWidth(left * right, width), _type),
+                    HIRBinaryKind::Divide => this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 : left / right, width), _type),
+                    HIRBinaryKind::Modulo => this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 : left % right, width), _type),
+                    HIRBinaryKind::BitwiseAnd => this.IntegerLiteral(left & right, _type),
+                    HIRBinaryKind::BitwiseOr => this.IntegerLiteral(left | right, _type),
+                    HIRBinaryKind::BitwiseXor => this.IntegerLiteral(left ^ right, _type),
+                    HIRBinaryKind::LeftShift => this.IntegerLiteral(this.MaskToWidth(left << right, width), _type),
+                    HIRBinaryKind::RightShift => this.IntegerLiteral(this.MaskToWidth(signed ? (this.SignExtend(left, width) >> right as i64) as u64 : left >> right, width), _type),
+                    HIRBinaryKind::Equal => this.BooleanLiteral(left == right, this.context->BooleanType()),
+                    HIRBinaryKind::NotEqual => this.BooleanLiteral(left != right, this.context->BooleanType()),
+                    HIRBinaryKind::Less => this.BooleanLiteral(signed ? this.SignExtend(left, width) < this.SignExtend(right, width) : left < right, this.context->BooleanType()),
+                    HIRBinaryKind::LessEqual => this.BooleanLiteral(signed ? this.SignExtend(left, width) <= this.SignExtend(right, width) : left <= right, this.context->BooleanType()),
+                    HIRBinaryKind::Greater => this.BooleanLiteral(signed ? this.SignExtend(left, width) > this.SignExtend(right, width) : left > right, this.context->BooleanType()),
+                    HIRBinaryKind::GreaterEqual => this.BooleanLiteral(signed ? this.SignExtend(left, width) >= this.SignExtend(right, width) : left >= right, this.context->BooleanType()),
+                    _ => null
                 }
             },
             HIRLiteralKind::Float if right->kind == HIRLiteralKind::Float => {
@@ -3816,39 +3732,17 @@ class HIRBuilder {
                 let right = (right as *HIRFloatLiteral)->value;
 
                 match kind {
-                    HIRBinaryKind::Add => {
-                        return this.FloatLiteral(left + right, _type);
-                    },
-                    HIRBinaryKind::Subtract => {
-                        return this.FloatLiteral(left - right, _type);
-                    },
-                    HIRBinaryKind::Multiply => {
-                        return this.FloatLiteral(left * right, _type);
-                    },
-                    HIRBinaryKind::Divide => {
-                        return this.FloatLiteral(left / right, _type);
-                    },
-                    HIRBinaryKind::Equal => {
-                        return this.BooleanLiteral(left == right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::NotEqual => {
-                        return this.BooleanLiteral(left != right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::Less => {
-                        return this.BooleanLiteral(left < right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::LessEqual => {
-                        return this.BooleanLiteral(left <= right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::Greater => {
-                        return this.BooleanLiteral(left > right, this.context->BooleanType());
-                    },
-                    HIRBinaryKind::GreaterEqual => {
-                        return this.BooleanLiteral(left >= right, this.context->BooleanType());
-                    },
-                    _ => {
-                        return null;
-                    }
+                    HIRBinaryKind::Add => this.FloatLiteral(left + right, _type),
+                    HIRBinaryKind::Subtract => this.FloatLiteral(left - right, _type),
+                    HIRBinaryKind::Multiply => this.FloatLiteral(left * right, _type),
+                    HIRBinaryKind::Divide => this.FloatLiteral(left / right, _type),
+                    HIRBinaryKind::Equal => this.BooleanLiteral(left == right, this.context->BooleanType()),
+                    HIRBinaryKind::NotEqual => this.BooleanLiteral(left != right, this.context->BooleanType()),
+                    HIRBinaryKind::Less => this.BooleanLiteral(left < right, this.context->BooleanType()),
+                    HIRBinaryKind::LessEqual => this.BooleanLiteral(left <= right, this.context->BooleanType()),
+                    HIRBinaryKind::Greater => this.BooleanLiteral(left > right, this.context->BooleanType()),
+                    HIRBinaryKind::GreaterEqual => this.BooleanLiteral(left >= right, this.context->BooleanType()),
+                    _ => null
                 }
             },
             HIRLiteralKind::Boolean if right->kind == HIRLiteralKind::Boolean => {
@@ -3856,31 +3750,19 @@ class HIRBuilder {
                 let right = (right as *HIRBooleanLiteral)->value;
 
                 match kind {
-                    HIRBinaryKind::BitwiseAnd | HIRBinaryKind::LogicalAnd => {
-                        return this.BooleanLiteral(left && right, _type);
-                    },
-                    HIRBinaryKind::BitwiseOr | HIRBinaryKind::LogicalOr => {
-                        return this.BooleanLiteral(left || right, _type);
-                    },
-                    HIRBinaryKind::BitwiseXor | HIRBinaryKind::NotEqual => {
-                        return this.BooleanLiteral(left != right, _type);
-                    },
-                    HIRBinaryKind::Equal => {
-                        return this.BooleanLiteral(left == right, _type);
-                    },
-                    _ => {
-                        return null;
-                    }
+                    HIRBinaryKind::BitwiseAnd | HIRBinaryKind::LogicalAnd => this.BooleanLiteral(left && right, _type),
+                    HIRBinaryKind::BitwiseOr | HIRBinaryKind::LogicalOr => this.BooleanLiteral(left || right, _type),
+                    HIRBinaryKind::BitwiseXor | HIRBinaryKind::NotEqual => this.BooleanLiteral(left != right, _type),
+                    HIRBinaryKind::Equal => this.BooleanLiteral(left == right, _type),
+                    _ => null
                 }
             },
-            _ => {
-                return null;
-            }
+            _ => null
         }
     }
 
     pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, _type: *HIRType) -> *HIRExpression {
-        return this.Binary(kind, left, right, Vector<*HIRExpression>(), _type);
+        this.Binary(kind, left, right, Vector<*HIRExpression>(), _type)
     }
 
     pub fn Binary(&mut this, kind: HIRBinaryKind, left: *HIRExpression, right: *HIRExpression, destructors: Vector<*HIRExpression>, _type: *HIRType) -> *HIRExpression {
@@ -3889,15 +3771,15 @@ class HIRBuilder {
             if folded != null { return folded; }
         }
 
-        return this.context->arena.New<HIRBinaryExpression>(kind, left, right, destructors, _type);
+        this.context->arena.New<HIRBinaryExpression>(kind, left, right, destructors, _type)
     }
 
     pub fn Ternary(&mut this, condition: *HIRExpression, then_value: *HIRExpression, then_destructors: Vector<*HIRExpression>, else_value: *HIRExpression, else_destructors: Vector<*HIRExpression>, _type: *HIRType, category: HIRExpressionCategory, mutable: bool) -> *mut HIRTernaryExpression {
-        return this.context->arena.New<HIRTernaryExpression>(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
+        this.context->arena.New<HIRTernaryExpression>(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable)
     }
 
     pub fn Call(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRCallExpression {
-        return this.context->arena.New<HIRCallExpression>(callee, arguments);
+        this.context->arena.New<HIRCallExpression>(callee, arguments)
     }
 
     fn FoldCast(&mut this, value: *HIRLiteral, target: *HIRType) -> *HIRExpression {
@@ -3912,7 +3794,7 @@ class HIRBuilder {
                     : (value as *HIRIntegerLiteral)->value;
 
                 if target->IsFloat() {
-                    return this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width()) as f64 : raw as f64, target);
+                    this.FloatLiteral(value->_type->IsInteger() && value->_type->IsSigned() ? this.SignExtend(raw, value->_type->Width()) as f64 : raw as f64, target)
                 } else {
                     let mut converted = raw;
 
@@ -3920,21 +3802,19 @@ class HIRBuilder {
                         converted = this.SignExtend(raw, value->_type->Width()) as u64;
                     }
 
-                    return this.IntegerLiteral(this.MaskToWidth(converted, target->Width()), target);
+                    this.IntegerLiteral(this.MaskToWidth(converted, target->Width()), target)
                 }
             },
             HIRLiteralKind::Float => {
                 let value = (value as *HIRFloatLiteral)->value;
 
                 if target->IsInteger() {
-                    return this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width()), target);
+                    this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width()), target)
                 } else {
-                    return this.FloatLiteral(value, target);
+                    this.FloatLiteral(value, target)
                 }
             },
-            _ => {
-                return null;
-            }
+            _ => null
         }
     }
 
@@ -3944,59 +3824,59 @@ class HIRBuilder {
             if folded != null { return folded; }
         }
 
-        return this.context->arena.New<HIRCastExpression>(value, _type);
+        this.context->arena.New<HIRCastExpression>(value, _type)
     }
 
     pub fn IndexAccess(&mut this, value: *HIRExpression, index: *HIRExpression) -> *mut HIRIndexAccessExpression {
         if value->_type->IsArray() {
-            return this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Element(), value->mutable);
+            this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Element(), value->mutable)
         } else {
-            return this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Pointee(), value->_type->IsMutable());
+            this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Pointee(), value->_type->IsMutable())
         }
     }
 
     pub fn TupleAccess(&mut this, instance: *HIRExpression, index: usize) -> *mut HIRTupleAccessExpression {
-        return this.context->arena.New<HIRTupleAccessExpression>(instance, index, (instance->_type as *HIRTupleType)->elements[index]);
+        this.context->arena.New<HIRTupleAccessExpression>(instance, index, (instance->_type as *HIRTupleType)->elements[index])
     }
 
     pub fn FieldAccess(&mut this, instance: *HIRExpression, field: *HIRFieldDeclaration) -> *mut HIRFieldAccessExpression {
-        return this.context->arena.New<HIRFieldAccessExpression>(instance, field);
+        this.context->arena.New<HIRFieldAccessExpression>(instance, field)
     }
 
     pub fn MemberAccess(&mut this, instance: *HIRExpression, member: *HIRVariantMember, field: *HIRVariantField) -> *mut HIRMemberAccessExpression {
-        return this.context->arena.New<HIRMemberAccessExpression>(instance, member, field);
+        this.context->arena.New<HIRMemberAccessExpression>(instance, member, field)
     }
 
     pub fn TagAccess(&mut this, instance: *HIRExpression) -> *mut HIRTagAccessExpression {
-        return this.context->arena.New<HIRTagAccessExpression>(instance, this.context->IntegerType(8, false));
+        this.context->arena.New<HIRTagAccessExpression>(instance, this.context->IntegerType(8, false))
     }
 
     pub fn New(&mut this, _type: *HIRType, size: *HIRExpression, initialized: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRNewExpression {
-        return this.context->arena.New<HIRNewExpression>(_type, size, initialized, callee, arguments, this.context->PointerType(_type, true));
+        this.context->arena.New<HIRNewExpression>(_type, size, initialized, callee, arguments, this.context->PointerType(_type, true))
     }
 
     pub fn Delete(&mut this, value: *HIRExpression, array: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRDeleteExpression {
-        return this.context->arena.New<HIRDeleteExpression>(value, array, callee, arguments, this.context->VoidType());
+        this.context->arena.New<HIRDeleteExpression>(value, array, callee, arguments, this.context->VoidType())
     }
 
     pub fn Constructor(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRConstructorExpression {
-        return this.context->arena.New<HIRConstructorExpression>(callee, arguments, _type);
+        this.context->arena.New<HIRConstructorExpression>(callee, arguments, _type)
     }
 
     pub fn Destructor(&mut this, instance: *HIRExpression, callee: *HIRExpression) -> *mut HIRDestructorExpression {
-        return this.context->arena.New<HIRDestructorExpression>(instance, callee, this.context->VoidType());
+        this.context->arena.New<HIRDestructorExpression>(instance, callee, this.context->VoidType())
     }
 
     pub fn Intrinsic(&mut this, kind: HIRIntrinsicKind, _type: *HIRType) -> *mut HIRIntrinsicExpression {
-        return this.context->arena.New<HIRIntrinsicExpression>(kind, _type, this.context->IntegerPointerType(false));
+        this.context->arena.New<HIRIntrinsicExpression>(kind, _type, this.context->IntegerPointerType(false))
     }
 
     pub fn Deferred(&mut this, expression: *ASTExpression, _type: *HIRType) -> *mut HIRDeferredExpression {
-        return this.context->arena.New<HIRDeferredExpression>(expression, _type);
+        this.context->arena.New<HIRDeferredExpression>(expression, _type)
     }
 
     pub fn Block(&mut this) -> *mut HIRBlockExpression {
-        return this.context->arena.New<HIRBlockExpression>(this.context->VoidType());
+        this.context->arena.New<HIRBlockExpression>(this.context->VoidType())
     }
 
     pub fn SetCurrentBlock(&mut this, block: *mut HIRBlockExpression) {
@@ -4004,79 +3884,79 @@ class HIRBuilder {
     }
 
     pub fn GetCurrentBlock(&this) -> *mut HIRBlockExpression {
-        return this.block;
+        this.block
     }
 
     pub fn BuildCondition(&mut this, expression: *HIRExpression) -> *mut HIRCondition {
-        return this.context->arena.New<HIRCondition>(expression);
+        this.context->arena.New<HIRCondition>(expression)
     }
 
     pub fn BuildCondition(&mut this, pattern: *HIRPattern, expression: *HIRExpression) -> *mut HIRCondition {
-        return this.context->arena.New<HIRCondition>(pattern, expression);
+        this.context->arena.New<HIRCondition>(pattern, expression)
     }
 
     pub fn If(&mut this, condition: *HIRCondition, destructors: Vector<*HIRExpression>, then_body: *HIRBlockExpression, else_body: *HIRExpression, _type: *HIRType) -> *mut HIRIfExpression {
-        return this.context->arena.New<HIRIfExpression>(condition, destructors, then_body, else_body, _type);
+        this.context->arena.New<HIRIfExpression>(condition, destructors, then_body, else_body, _type)
     }
 
     pub fn While(&mut this, condition: *HIRCondition, destructors: Vector<*HIRExpression>, while_body: *HIRBlockExpression, else_body: *HIRBlockExpression) -> *mut HIRWhileExpression {
-        return this.context->arena.New<HIRWhileExpression>(condition, destructors, while_body, else_body, this.context->VoidType());
+        this.context->arena.New<HIRWhileExpression>(condition, destructors, while_body, else_body, this.context->VoidType())
     }
 
     pub fn Loop(&mut this) -> *mut HIRLoopExpression {
-        return this.context->arena.New<HIRLoopExpression>(this.context->VoidType());
+        this.context->arena.New<HIRLoopExpression>(this.context->VoidType())
     }
 
     pub fn For(&mut this, iterator: *HIRPattern, target: *HIRPattern, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockExpression) -> *mut HIRForExpression {
-        return this.context->arena.New<HIRForExpression>(iterator, target, condition, step, destructors, body, this.context->VoidType());
+        this.context->arena.New<HIRForExpression>(iterator, target, condition, step, destructors, body, this.context->VoidType())
     }
 
     pub fn BuildMatchArm(&mut this, pattern: *HIRPattern, guard: *HIRExpression, body: *HIRBlockExpression) -> *mut HIRMatchArm {
-        return this.context->arena.New<HIRMatchArm>(pattern, guard, body);
+        this.context->arena.New<HIRMatchArm>(pattern, guard, body)
     }
 
     pub fn Match(&mut this, target: *HIRExpression, destructors: Vector<*HIRExpression>, arms: Vector<*HIRMatchArm>, _type: *HIRType) -> *mut HIRMatchExpression {
-        return this.context->arena.New<HIRMatchExpression>(target, destructors, arms, _type);
+        this.context->arena.New<HIRMatchExpression>(target, destructors, arms, _type)
     }
 
     pub fn Return(&mut this, value: *HIRExpression, destructors: Vector<*HIRExpression>) -> *mut HIRReturnExpression {
-        return this.context->arena.New<HIRReturnExpression>(value, destructors, this.context->NeverType());
+        this.context->arena.New<HIRReturnExpression>(value, destructors, this.context->NeverType())
     }
 
     pub fn Break(&mut this, value: *HIRExpression, destructors: Vector<*HIRExpression>) -> *mut HIRBreakExpression {
-        return this.context->arena.New<HIRBreakExpression>(value, destructors, this.context->NeverType());
+        this.context->arena.New<HIRBreakExpression>(value, destructors, this.context->NeverType())
     }
 
     pub fn Continue(&mut this, destructors: Vector<*HIRExpression>) -> *mut HIRContinueExpression {
-        return this.context->arena.New<HIRContinueExpression>(destructors, this.context->NeverType());
+        this.context->arena.New<HIRContinueExpression>(destructors, this.context->NeverType())
     }
 
     pub fn BuildLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression) -> *mut HIRLetStatement {
-        return this.context->arena.New<HIRLetStatement>(pattern, _type, initializer);
+        this.context->arena.New<HIRLetStatement>(pattern, _type, initializer)
     }
 
     pub fn BuildExpressionStatement(&mut this, expression: *HIRExpression) -> *mut HIRExpressionStatement {
         let statement = this.context->arena.New<HIRExpressionStatement>(expression);
         this.block->statements.PushBack(statement);
-        return statement;
+        statement
     }
 
     pub fn BuildAssemblyOperand(&mut this, name: String, expression: *HIRExpression) -> *mut HIRAssemblyOperand {
-        return this.context->arena.New<HIRAssemblyOperand>(name, expression);
+        this.context->arena.New<HIRAssemblyOperand>(name, expression)
     }
 
     pub fn BuildAssemblyStatement(&mut this, _volatile: bool, text: String, inputs: Vector<*HIRAssemblyOperand>, outputs: Vector<*HIRAssemblyOperand>, clobbers: Vector<String>) -> *mut HIRAssemblyStatement {
         let assembly = this.context->arena.New<HIRAssemblyStatement>(_volatile, text, inputs, outputs, clobbers);
         this.block->statements.PushBack(assembly);
-        return assembly;
+        assembly
     }
 
     pub fn BuildParameterDeclaration(&mut this, name: String, _type: *HIRType, mutable: bool) -> *mut HIRParameterDeclaration {
-        return this.context->arena.New<HIRParameterDeclaration>(name, _type, mutable);
+        this.context->arena.New<HIRParameterDeclaration>(name, _type, mutable)
     }
 
     pub fn BuildFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) -> *mut HIRFunctionDeclaration {
-        return this.context->arena.New<HIRFunctionDeclaration>(name, parameters, _return, _type, no_mangle, public, abi);
+        this.context->arena.New<HIRFunctionDeclaration>(name, parameters, _return, _type, no_mangle, public, abi)
     }
 
     pub fn SetCurrentFunction(&mut this, function: *mut HIRFunctionDeclaration) {
@@ -4084,71 +3964,71 @@ class HIRBuilder {
     }
 
     pub fn GetCurrentFunction(&this) -> *mut HIRFunctionDeclaration {
-        return this.function;
+        this.function
     }
 
     pub fn BuildFieldDeclaration(&mut this, name: String, _type: *HIRType, index: usize, initializer: *ASTExpression, public: bool) -> *mut HIRFieldDeclaration {
-        return this.context->arena.New<HIRFieldDeclaration>(name, _type, index, initializer, public);
+        this.context->arena.New<HIRFieldDeclaration>(name, _type, index, initializer, public)
     }
 
     pub fn BuildClassDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRClassDeclaration {
         let declaration = this.context->arena.New<HIRClassDeclaration>(name, _type);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildStructureDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRStructureDeclaration {
         let declaration = this.context->arena.New<HIRStructureDeclaration>(name, _type);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildEnumerationMember(&mut this, name: String, value: *HIRExpression, _type: *HIRType) -> *mut HIREnumerationMember {
-        return this.context->arena.New<HIREnumerationMember>(name, value, _type);
+        this.context->arena.New<HIREnumerationMember>(name, value, _type)
     }
 
     pub fn BuildEnumerationDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIREnumerationDeclaration {
         let declaration = this.context->arena.New<HIREnumerationDeclaration>(name, _type);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildVariantField(&mut this, name: String, _type: *HIRType, index: usize) -> *mut HIRVariantField {
-        return this.context->arena.New<HIRVariantField>(name, _type, index);
+        this.context->arena.New<HIRVariantField>(name, _type, index)
     }
 
     pub fn BuildVariantMember(&mut this, name: String, _type: *HIRType, index: usize) -> *mut HIRVariantMember {
-        return this.context->arena.New<HIRVariantMember>(name, _type, index);
+        this.context->arena.New<HIRVariantMember>(name, _type, index)
     }
 
     pub fn BuildVariantDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRVariantDeclaration {
         let declaration = this.context->arena.New<HIRVariantDeclaration>(name, _type);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildExtendDeclaration(&mut this, _type: *HIRType) -> *mut HIRExtendDeclaration {
         let declaration = this.context->arena.New<HIRExtendDeclaration>(_type);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildConstantDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression) -> *mut HIRConstantDeclaration {
         let declaration = this.context->arena.New<HIRConstantDeclaration>(name, _type, initializer);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildStaticDeclaration(&mut this, name: String, _type: *HIRType, initializer: *HIRExpression, alignment: *HIRExpression, mutable: bool, linkage: HIRDeclarationLinkage) -> *mut HIRStaticDeclaration {
         let declaration = this.context->arena.New<HIRStaticDeclaration>(name, _type, initializer, alignment, mutable, linkage);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 
     pub fn BuildAssemblyDeclaration(&mut this, text: String) -> *mut HIRAssemblyDeclaration {
         let declaration = this.context->arena.New<HIRAssemblyDeclaration>(text);
         this.module->declarations.PushBack(declaration);
-        return declaration;
+        declaration
     }
 }
 
