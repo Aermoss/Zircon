@@ -37,4 +37,4 @@ _start:
     movq %rsp, %rsi
     andq $-16, %rsp
     call _bootstrap
-};
+}
