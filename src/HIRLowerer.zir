@@ -26,6 +26,23 @@ enum HIRBindingMode: u8 {
     Value, Reference
 }
 
+class HIRLoweringFrame {
+    pub scope: *mut Scope = null,
+    pub function: *mut HIRFunctionDeclaration = null,
+    pub block: *mut HIRBlockStatement = null,
+    pub generic: *mut GenericDeclaration = null,
+    pub _type: *HIRType = null,
+    pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,
+    pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
+    pub _unsafe: bool = false,
+    pub temporaries: Vector<*HIRExpression>,
+    pub loop_scopes: Vector<*mut Scope>;
+
+    HIRLoweringFrame(&mut this, scope: *mut Scope, generic: *mut GenericDeclaration, _type: *HIRType) {
+        (this.scope, this.generic, this._type) = (scope, generic, _type);
+    }
+}
+
 class HIRLowerer {
     context: HIRContext,
     pub module: *mut HIRModule = null,
@@ -40,15 +57,15 @@ class HIRLowerer {
     extend_data: Map<*ASTNode, Pair<*mut HIRExtendDeclaration, *mut Scope>>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
-    pub temporaries: Vector<*HIRExpression>,
+    temporaries: Vector<*HIRExpression>,
     loop_scopes: Vector<*mut Scope>,
 
     pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,
     pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
-    pub _unsafe: bool = false,
+    _unsafe: bool = false,
 
     pub generics: Vector<*mut GenericDeclaration>,
-    pub current_generic: *mut GenericDeclaration = null,
+    current_generic: *mut GenericDeclaration = null,
     pub current_type: *HIRType = null;
 
     HIRLowerer(&mut this) {
@@ -59,6 +76,24 @@ class HIRLowerer {
 
     ~HIRLowerer(&mut this) {
         hir_lowerer = null;
+    }
+
+    pub fn SwapFrame(&mut this, frame: &mut HIRLoweringFrame) {
+        let (scope, function, block) = (this.scope_manager.current, this.builder.GetCurrentFunction(), this.builder.GetCurrentBlock());
+        let (generic, _type, _unsafe) = (this.current_generic, this.current_type, this._unsafe);
+        let (abi, linkage) = (this.abi, this.linkage);
+
+        this.scope_manager.current = frame.scope;
+        this.builder.SetCurrentFunction(frame.function);
+        this.builder.SetCurrentBlock(frame.block);
+        (this.current_generic, this.current_type, this._unsafe) = (frame.generic, frame._type, frame._unsafe);
+        (this.abi, this.linkage) = (frame.abi, frame.linkage);
+
+        (frame.scope, frame.function, frame.block) = (scope, function, block);
+        (frame.generic, frame._type, frame._unsafe) = (generic, _type, _unsafe);
+        (frame.abi, frame.linkage) = (abi, linkage);
+        this.temporaries.Swap(frame.temporaries);
+        this.loop_scopes.Swap(frame.loop_scopes);
     }
 
     pub fn Lower(&mut this, module: *ASTModule) -> *HIRModule {

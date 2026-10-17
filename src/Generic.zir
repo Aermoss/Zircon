@@ -71,17 +71,8 @@ class GenericDeclaration {
     }
 
     pub fn LowerInstance(&mut this, instance: *mut GenericInstance) {
-        let (prev_unsafe, prev_class) = (hir_lowerer->_unsafe, hir_lowerer->current_type);
-        let (prev_scope, prev_generic) = (hir_lowerer->scope_manager.current, hir_lowerer->current_generic);
-        let prev_function = hir_lowerer->builder.GetCurrentFunction();
-        let prev_block = hir_lowerer->builder.GetCurrentBlock();
-        let prev_temporaries = hir_lowerer->temporaries;
-        hir_lowerer->temporaries.Clear();
-
-        hir_lowerer->builder.SetCurrentBlock(null);
-        hir_lowerer->builder.SetCurrentFunction(null);
-        (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (this.scope, this);
-        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (false, this._type);
+        let mut frame = HIRLoweringFrame(this.scope, this, this._type);
+        hir_lowerer->SwapFrame(frame);
         hir_lowerer->scope_manager.PushScope("<generic>".ToString(), true);
 
         for i in 0..this.types.Size() {
@@ -200,11 +191,7 @@ class GenericDeclaration {
         }
 
         hir_lowerer->scope_manager.PopScope();
-        hir_lowerer->temporaries = prev_temporaries;
-        hir_lowerer->builder.SetCurrentBlock(prev_block);
-        hir_lowerer->builder.SetCurrentFunction(prev_function);
-        (hir_lowerer->scope_manager.current, hir_lowerer->current_generic) = (prev_scope, prev_generic);
-        (hir_lowerer->_unsafe, hir_lowerer->current_type) = (prev_unsafe, prev_class);
+        hir_lowerer->SwapFrame(frame);
     }
 
     pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {
