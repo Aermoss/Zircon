@@ -583,7 +583,11 @@ class Parser {
         }
 
         if this.Match(TokenType::TWO_DOT) {
-            return this.arena.New<ASTRestPattern>(token);
+            if this.Match(TokenType::ASSIGN) {
+                let end = this.ParsePatternBound();
+                if end == null { return null; }
+                return this.arena.New<ASTRangePattern>(null, end, true, token);
+            } return this.arena.New<ASTRestPattern>(token);
         }
 
         if token._type == TokenType::LPAREN {
@@ -669,9 +673,37 @@ class Parser {
             return this.arena.New<ASTPathPattern>(path, token);
         }
 
-        let literal = this.ParsePrimary();
-        if literal == null { return null; }
-        return this.arena.New<ASTLiteralPattern>(literal, token);
+        let start = this.ParsePatternBound();
+        if start == null { return null; }
+
+        if this.Match(TokenType::TWO_DOT) {
+            let inclusive = this.Match(TokenType::ASSIGN);
+            let mut end: *ASTExpression = null;
+
+            if inclusive || this.IsPatternBound() {
+                end = this.ParsePatternBound();
+                if end == null { return null; }
+            } return this.arena.New<ASTRangePattern>(start, end, inclusive, token);
+        }
+
+        return this.arena.New<ASTLiteralPattern>(start, token);
+    }
+
+    fn IsPatternBound(&this) -> bool {
+        match this.Current()._type {
+            TokenType::INTEGER | TokenType::FLOAT | TokenType::CHAR | TokenType::MINUS => { return true; },
+            _ => { return false; }
+        }
+    }
+
+    fn ParsePatternBound(&mut this) -> *ASTExpression {
+        let token = this.Current();
+
+        if this.Match(TokenType::MINUS) {
+            let operand = this.ParsePrimary();
+            if operand == null { return null; }
+            return this.arena.New<ASTUnaryExpression>(ASTUnaryKind::Negate, operand, false, token);
+        } return this.ParsePrimary();
     }
 
     fn ParsePattern(&mut this) -> *ASTPattern {

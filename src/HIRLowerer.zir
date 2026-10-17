@@ -4404,6 +4404,25 @@ class HIRLowerer {
         return this.builder.DereferencePattern(binding, referent);
     }
 
+    fn PatternType(&mut this, target_type: *HIRType, value: *HIRExpression) -> *HIRType {
+        if target_type != null { return target_type; }
+        if value == null { return null; }
+
+        if value->_type->IsReference() {
+            return value->_type->Pointee();
+        } return value->_type;
+    }
+
+    fn LowerRangeBound(&mut this, bound: *ASTExpression, _type: *HIRType) -> *HIRExpression {
+        let lowered = this.Coerce(this.LowerExpression(bound), _type);
+        if lowered == null { return null; }
+
+        if lowered->kind != HIRExpressionKind::Literal || ((lowered as *HIRLiteral)->kind != HIRLiteralKind::Integer && (lowered as *HIRLiteral)->kind != HIRLiteralKind::Character) || !lowered->_type->IsSame(_type) {
+            Logger::Log("Range pattern bounds must be integer or character literals of type '" + _type->ToString() + "'.", bound, LogSeverity::Error);
+            return null;
+        } return lowered;
+    }
+
     fn LowerPattern(&mut this, pattern: *ASTPattern, mut target_type: *HIRType, mut value: *HIRExpression, mode: HIRBindingMode) -> *HIRPattern {
         if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant || pattern->kind == ASTPatternKind::Path) {
             return this.LowerReferencePattern(pattern, value);
@@ -4417,17 +4436,51 @@ class HIRLowerer {
                 return this.builder.RestPattern();
             },
             ASTPatternKind::Literal => {
+                let expected = this.PatternType(target_type, value);
                 let mut literal = this.LowerExpression((pattern as *ASTLiteralPattern)->literal);
                 if literal == null { return null; }
 
-                if target_type != null {
-                    literal = this.Coerce(literal, target_type);
+                if expected != null {
+                    literal = this.Coerce(literal, expected);
                 } else {
                     literal = this.Coerce(literal);
                 }
 
                 if literal == null { return null; }
+
+                if expected != null && !literal->_type->IsSame(expected) {
+                    Logger::Log("Mismatched pattern type, expected '" + expected->ToString() + "' but found '" + literal->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
                 return this.builder.LiteralPattern(literal);
+            },
+            ASTPatternKind::Range => {
+                let range = pattern as *ASTRangePattern;
+                let expected = this.PatternType(target_type, value);
+
+                if expected == null || (!expected->IsInteger() && !expected->IsCharacter()) {
+                    let name = expected != null ? expected->ToString() : "unknown".ToString();
+                    Logger::Log("Range patterns can only match integers and characters, not '" + name + "'.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let start = range->start != null ? this.LowerRangeBound(range->start, expected) : null;
+                if range->start != null && start == null { return null; }
+                let end = range->end != null ? this.LowerRangeBound(range->end, expected) : null;
+                if range->end != null && end == null { return null; }
+
+                if start != null && end != null {
+                    let checker = HIRPatternChecker();
+                    let (low, high) = (checker.BoundValue(start, expected), checker.BoundValue(end, expected));
+
+                    if range->inclusive ? low > high : low >= high {
+                        Logger::Log("Lower bound of a range pattern must be " + (range->inclusive ? "less than or equal to" : "less than").ToString() + " its upper bound.", pattern, LogSeverity::Error);
+                        return null;
+                    }
+                }
+
+                return this.builder.RangePattern(start, end, range->inclusive);
             },
             ASTPatternKind::Identifier => {
                 let identifier = pattern as *ASTIdentifierPattern;

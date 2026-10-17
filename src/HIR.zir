@@ -893,7 +893,7 @@ class HIRVariantType : HIRType {
 }
 
 enum HIRPatternKind: u8 {
-    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Enumeration, Variant, Or, Dereference
+    Wildcard, Rest, Literal, Range, Identifier, Tuple, Field, Structure, Enumeration, Variant, Or, Dereference
 }
 
 class HIRPattern {
@@ -908,7 +908,7 @@ class HIRPattern {
             HIRPatternKind::Wildcard | HIRPatternKind::Rest | HIRPatternKind::Identifier => {
                 return true;
             },
-            HIRPatternKind::Literal => {
+            HIRPatternKind::Literal | HIRPatternKind::Range => {
                 return false;
             },
             HIRPatternKind::Tuple => {
@@ -957,6 +957,9 @@ class HIRPattern {
             },
             HIRPatternKind::Literal => {
                 return (this as *HIRLiteralPattern)->ToString();
+            },
+            HIRPatternKind::Range => {
+                return (this as *HIRRangePattern)->ToString();
             },
             HIRPatternKind::Identifier => {
                 return (this as *HIRIdentifierPattern)->ToString();
@@ -1011,6 +1014,24 @@ class HIRLiteralPattern : HIRPattern {
 
     pub fn ToString(&this) -> String {
         return this.literal->ToString();
+    }
+}
+
+class HIRRangePattern : HIRPattern {
+    pub start: *HIRExpression,
+    pub end: *HIRExpression,
+    pub inclusive: bool;
+
+    HIRRangePattern(&mut this, start: *HIRExpression, end: *HIRExpression, inclusive: bool) : HIRPattern(HIRPatternKind::Range) {
+        (this.start, this.end, this.inclusive) = (start, end, inclusive);
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+        if this.start != null { result += this.start->ToString(); }
+        result += this.inclusive ? "..=" : "..";
+        if this.end != null { result += this.end->ToString(); }
+        return result;
     }
 }
 
@@ -2203,6 +2224,150 @@ class HIRPatternChecker {
         }
     }
 
+    pub fn IsRange(&this, _type: *HIRType) -> bool {
+        return _type->IsCharacter() || (_type->IsInteger() && !_type->IsLiteral() && _type->Width() <= 64);
+    }
+
+    fn RangeMax(&this, _type: *HIRType) -> u64 {
+        let width = _type->Width();
+        if width >= 64 { return 0xFFFFFFFFFFFFFFFFu64; }
+        return (1u64 << width) - 1;
+    }
+
+    fn Bias(&this, value: u64, _type: *HIRType) -> u64 {
+        let masked = value & this.RangeMax(_type);
+        if !_type->IsSigned() { return masked; }
+        return masked ^ (1u64 << (_type->Width() - 1));
+    }
+
+    pub fn BoundValue(&this, bound: *HIRExpression, _type: *HIRType) -> u64 {
+        let literal = bound as *HIRLiteral;
+
+        if literal->kind == HIRLiteralKind::Character {
+            return this.Bias((literal as *HIRCharacterLiteral)->value as u64, _type);
+        } return this.Bias((literal as *HIRIntegerLiteral)->value, _type);
+    }
+
+    fn RangeOf(&this, pattern: *HIRPattern, _type: *HIRType, low: &mut u64, high: &mut u64) -> bool {
+        if pattern->kind == HIRPatternKind::Literal {
+            let literal = (pattern as *HIRLiteralPattern)->literal;
+            if literal->kind != HIRExpressionKind::Literal { return false; }
+            let kind = (literal as *HIRLiteral)->kind;
+            if kind != HIRLiteralKind::Integer && kind != HIRLiteralKind::Character { return false; }
+            let value = this.BoundValue(literal, _type);
+            (low, high) = (value, value);
+            return true;
+        } else if pattern->kind == HIRPatternKind::Range {
+            let range = pattern as *HIRRangePattern;
+            low = range->start != null ? this.BoundValue(range->start, _type) : 0;
+            high = this.RangeMax(_type);
+
+            if range->end != null {
+                high = this.BoundValue(range->end, _type);
+                if !range->inclusive { high -= 1; }
+            } return true;
+        } return false;
+    }
+
+    fn Split(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<u64> {
+        let mut points = Vector<u64>();
+        points.PushBack(low);
+
+        for row in rows {
+            let head = this.Normalize(row[0]);
+            if head == null { continue; }
+            let (mut start, mut end) = (0u64, 0u64);
+            if !this.RangeOf(head, _type, start, end) { continue; }
+            if start > low && start <= high && !points.Contains(start) { points.PushBack(start); }
+            if end < high && end + 1 > low && !points.Contains(end + 1) { points.PushBack(end + 1); }
+        }
+
+        for i in 1..points.Size() {
+            let mut j = i;
+
+            while j > 0 && points[j - 1] > points[j] {
+                let swap = points[j];
+                points[j] = points[j - 1];
+                points[j - 1] = swap;
+                j -= 1;
+            }
+        } return points;
+    }
+
+    fn SpecializeRange(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<Vector<*HIRPattern>> {
+        let mut specialized = Vector<Vector<*HIRPattern>>();
+
+        for row in rows {
+            let head = this.Normalize(row[0]);
+
+            if head != null {
+                let (mut start, mut end) = (0u64, 0u64);
+                if !this.RangeOf(head, _type, start, end) || start > low || end < high { continue; }
+            }
+
+            let mut rest = Vector<*HIRPattern>();
+
+            for i in 1..row.Size() {
+                rest.PushBack(row[i]);
+            } specialized.PushBack(rest);
+        } return specialized;
+    }
+
+    fn PieceEnd(&this, points: &Vector<u64>, index: usize, high: u64) -> u64 {
+        if index + 1 < points.Size() { return points[index + 1] - 1; }
+        return high;
+    }
+
+    fn UsefulRange(&this, rows: &Vector<Vector<*HIRPattern>>, vector: &Vector<*HIRPattern>, types: &Vector<*HIRType>, _type: *HIRType) -> bool {
+        let head = this.Normalize(vector[0]);
+        let (mut low, mut high) = (0u64, this.RangeMax(_type));
+        if head != null && !this.RangeOf(head, _type, low, high) { return true; }
+        let mut rest = Vector<*HIRPattern>();
+        for i in 1..vector.Size() { rest.PushBack(vector[i]); }
+        let points = this.Split(rows, _type, low, high);
+
+        for i in 0..points.Size() {
+            if this.Useful(this.SpecializeRange(rows, _type, points[i], this.PieceEnd(points, i, high)), rest, this.Tail(types)) {
+                return true;
+            }
+        } return false;
+    }
+
+    fn MissingRange(&this, rows: &Vector<Vector<*HIRPattern>>, types: &Vector<*HIRType>, _type: *HIRType, witness: &mut Vector<String>) -> bool {
+        let high = this.RangeMax(_type);
+        let points = this.Split(rows, _type, 0, high);
+
+        for i in 0..points.Size() {
+            let end = this.PieceEnd(points, i, high);
+            let mut inner = Vector<String>();
+
+            if this.Missing(this.SpecializeRange(rows, _type, points[i], end), this.Tail(types), inner) {
+                witness.PushBack(this.FormatRange(_type, points[i], end));
+                for value in inner { witness.PushBack(value); }
+                return true;
+            }
+        } return false;
+    }
+
+    fn FormatBound(&this, _type: *HIRType, value: u64) -> String {
+        let width = _type->Width();
+
+        if !_type->IsSigned() {
+            return String::FromInteger(value);
+        }
+
+        let unbiased = value ^ (1u64 << (width - 1));
+
+        if width < 64 && (unbiased & (1u64 << (width - 1))) != 0 {
+            return String::FromInteger((unbiased | !this.RangeMax(_type)) as i64);
+        } return String::FromInteger(unbiased as i64);
+    }
+
+    fn FormatRange(&this, _type: *HIRType, low: u64, high: u64) -> String {
+        if low == high { return this.FormatBound(_type, low); }
+        return this.FormatBound(_type, low) + "..=" + this.FormatBound(_type, high);
+    }
+
     fn Key(&this, pattern: *HIRPattern) -> String {
         match pattern->kind {
             HIRPatternKind::Literal => { return this.LiteralKey((pattern as *HIRLiteralPattern)->literal); },
@@ -2412,6 +2577,10 @@ class HIRPatternChecker {
             } return false;
         }
 
+        if this.IsRange(_type) {
+            return this.UsefulRange(expanded, vector, types, _type);
+        }
+
         if head != null {
             let key = this.Key(head);
             let mut field_types = this.FieldTypes(_type, key);
@@ -2442,6 +2611,11 @@ class HIRPatternChecker {
         if types.Empty() { return rows.Empty(); }
         let expanded = this.Expand(rows);
         let _type = this.NormalizeType(types[0]);
+
+        if this.IsRange(_type) {
+            return this.MissingRange(expanded, types, _type, witness);
+        }
+
         let heads = this.Heads(expanded);
 
         if this.IsComplete(heads, _type) {
@@ -3336,6 +3510,10 @@ class HIRBuilder {
 
     pub fn LiteralPattern(&mut this, literal: *HIRExpression) -> *mut HIRLiteralPattern {
         return this.context->arena.New<HIRLiteralPattern>(literal);
+    }
+
+    pub fn RangePattern(&mut this, start: *HIRExpression, end: *HIRExpression, inclusive: bool) -> *mut HIRRangePattern {
+        return this.context->arena.New<HIRRangePattern>(start, end, inclusive);
     }
 
     pub fn IdentifierPattern(&mut this, name: String, _type: *HIRType, value: *HIRExpression, mutable: bool) -> *mut HIRIdentifierPattern {

@@ -248,7 +248,7 @@ class ASTFunctionType : ASTType {
 }
 
 enum ASTPatternKind: u8 {
-    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Path, Or
+    Wildcard, Rest, Literal, Range, Identifier, Tuple, Field, Structure, Variant, Path, Or
 }
 
 extend ASTPatternKind {
@@ -257,6 +257,7 @@ extend ASTPatternKind {
             ASTPatternKind::Wildcard => { return "Wildcard".ToString(); },
             ASTPatternKind::Rest => { return "Rest".ToString(); },
             ASTPatternKind::Literal => { return "Literal".ToString(); },
+            ASTPatternKind::Range => { return "Range".ToString(); },
             ASTPatternKind::Identifier => { return "Identifier".ToString(); },
             ASTPatternKind::Tuple => { return "Tuple".ToString(); },
             ASTPatternKind::Field => { return "Field".ToString(); },
@@ -289,6 +290,16 @@ class ASTLiteralPattern : ASTPattern {
 
     ASTLiteralPattern(&mut this, literal: *ASTExpression, start: Token) : ASTPattern(ASTPatternKind::Literal, start) {
         this.literal = literal;
+    }
+}
+
+class ASTRangePattern : ASTPattern {
+    pub start: *ASTExpression,
+    pub end: *ASTExpression,
+    pub inclusive: bool;
+
+    ASTRangePattern(&mut this, start: *ASTExpression, end: *ASTExpression, inclusive: bool, token: Token) : ASTPattern(ASTPatternKind::Range, token) {
+        (this.start, this.end, this.inclusive) = (start, end, inclusive);
     }
 }
 

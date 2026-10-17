@@ -1911,6 +1911,9 @@ class MIRLowerer {
             HIRPatternKind::Literal => {
                 return this.TestLiteralPattern(pattern as *HIRLiteralPattern, target);
             },
+            HIRPatternKind::Range => {
+                return this.TestRangePattern(pattern as *HIRRangePattern, target);
+            },
             HIRPatternKind::Tuple => {
                 return this.TestTuplePattern(pattern as *HIRTuplePattern, target);
             },
@@ -1944,6 +1947,27 @@ class MIRLowerer {
         let value = this.builder.BuildLoad("pattern.load".ToString(), target);
         let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
         return this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1));
+    }
+
+    fn TestRangePattern(&mut this, range: *HIRRangePattern, target: *MIRValue) -> *MIRValue {
+        let bool_type = this.context.IntegerType(1);
+        let value = this.builder.BuildLoad("pattern.load".ToString(), target);
+        let signed = (range->start != null ? range->start : range->end)->_type->IsSigned();
+        let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
+
+        if range->start != null {
+            let start = this.LowerExpression(range->start);
+            if start == null { return null; }
+            condition = this.builder.BuildBinary("pattern.ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, value, start, bool_type);
+        }
+
+        if range->end != null {
+            let end = this.LowerExpression(range->end);
+            if end == null { return null; }
+            let kind = range->inclusive ? (signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle) : (signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt);
+            let compare = this.builder.BuildBinary("pattern.le".ToString(), kind, value, end, bool_type);
+            condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, compare, bool_type);
+        } return condition;
     }
 
     fn TestTuplePattern(&mut this, tuple: *HIRTuplePattern, target: *MIRValue) -> *MIRValue {
@@ -2006,7 +2030,18 @@ class MIRLowerer {
         let pointer = this.builder.BuildCast("variant.cast".ToString(), MIRCastKind::Bitcast, target, this.context.PointerType(member_type));
         let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
         let (tag, member_tag) = (this.builder.BuildLoad("variant.tag.load".ToString(), tag_pointer), this.builder.ConstantInteger(member->index as u64, tag_type));
-        let mut condition: *MIRValue = this.builder.BuildBinary("pattern.tag.eq".ToString(), MIRBinaryKind::ICmpEq, tag, member_tag, bool_type);
+        let tag_test = this.builder.BuildBinary("pattern.tag.eq".ToString(), MIRBinaryKind::ICmpEq, tag, member_tag, bool_type);
+        let mut refutable = false;
+
+        for pattern in variant->patterns {
+            if !pattern->IsIrrefutable() { refutable = true; }
+        }
+
+        if !refutable { return tag_test; }
+        let (tag_block, mut fields_block, merge_block) = (this.builder.GetCurrentBlock(), this.builder.BuildBlock("variant.fields".ToString()), this.builder.BuildBlock("variant.merge".ToString()));
+        this.builder.BuildConditionalBranch(tag_test, fields_block, merge_block);
+        this.builder.SetCurrentBlock(fields_block);
+        let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
 
         if member->structure {
             for pattern in variant->patterns {
@@ -2033,7 +2068,15 @@ class MIRLowerer {
                 if result == null { return null; }
                 condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
             }
-        } return condition;
+        }
+
+        fields_block = this.builder.GetCurrentBlock();
+        this.builder.BuildBranch(merge_block);
+        this.builder.SetCurrentBlock(merge_block);
+        let phi = this.builder.BuildPhi("variant.result".ToString(), bool_type);
+        phi->AddIncoming(this.builder.ConstantInteger(0, bool_type), tag_block);
+        phi->AddIncoming(condition, fields_block);
+        return phi;
     }
 
     fn TestOrPattern(&mut this, or: *HIROrPattern, target: *MIRValue) -> *MIRValue {
