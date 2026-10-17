@@ -422,6 +422,9 @@ class ASTExpression : ASTNode {
             ASTExpressionKind::MemberAccess => {
                 return (this as *ASTMemberAccessExpression)->ToString();
             },
+            ASTExpressionKind::TupleAccess => {
+                return (this as *ASTTupleAccessExpression)->ToString();
+            },
             ASTExpressionKind::IndexAccess => {
                 return (this as *ASTIndexAccessExpression)->ToString();
             },
@@ -442,9 +445,6 @@ class ASTExpression : ASTNode {
             },
             ASTExpressionKind::Range => {
                 return (this as *ASTRangeExpression)->ToString();
-            },
-            _ => {
-                return "<invalid expression>".ToString();
             }
         }
     }
