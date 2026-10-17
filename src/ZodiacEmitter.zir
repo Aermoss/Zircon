@@ -258,21 +258,28 @@ class ZodiacEmitter {
     fn EmitInstruction(&mut this, instruction: *LIRInstruction, next: *LIRBlock) {
         let opcode = instruction->opcode;
 
-        if opcode == LIROpcode::Ret {
-            this.EmitEpilogue();
-            return;
-        } else if opcode == LIROpcode::Asm {
-            for line in instruction->text.Split('\n') {
-                this.Line(line.Strip());
-            } return;
-        } else if opcode == LIROpcode::B {
-            let target = (instruction->uses[0] as *LIRBlockOperand)->block;
-            if target == next { return; }
-        } else if opcode == LIROpcode::Bl || opcode == LIROpcode::Blr {
-            this.Line(opcode.ToString() + " ra, " + this.Operand(instruction->uses[0]));
-            return;
-        } else if opcode == LIROpcode::Addi && instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0 && this.Operand(instruction->defines[0]) == this.Operand(instruction->uses[0]) {
-            return;
+        match opcode {
+            LIROpcode::Ret => {
+                this.EmitEpilogue();
+                return;
+            },
+            LIROpcode::Asm => {
+                for line in instruction->text.Split('\n') {
+                    this.Line(line.Strip());
+                } return;
+            },
+            LIROpcode::B => {
+                let target = (instruction->uses[0] as *LIRBlockOperand)->block;
+                if target == next { return; }
+            },
+            LIROpcode::Bl | LIROpcode::Blr => {
+                this.Line(opcode.ToString() + " ra, " + this.Operand(instruction->uses[0]));
+                return;
+            },
+            LIROpcode::Addi if instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0 && this.Operand(instruction->defines[0]) == this.Operand(instruction->uses[0]) => {
+                return;
+            },
+            _ => {}
         }
 
         let register_form = opcode == LIROpcode::Add || opcode == LIROpcode::Sub || (opcode >= LIROpcode::Mul && opcode <= LIROpcode::Remu)

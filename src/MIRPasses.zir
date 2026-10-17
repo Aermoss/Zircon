@@ -22,9 +22,11 @@ enum MIRPassKind: u8 {
 
 extend MIRPassKind {
     pub fn ToString(this) -> String {
-        if this == MIRPassKind::ReorderBlocks { return "reorder-blocks".ToString(); }
-        else if this == MIRPassKind::PromoteAllocas { return "promote-allocas".ToString(); }
-        else { return "<invalid pass>".ToString(); }
+        match this {
+            MIRPassKind::ReorderBlocks => { return "reorder-blocks".ToString(); },
+            MIRPassKind::PromoteAllocas => { return "promote-allocas".ToString(); },
+            _ => { return "<invalid pass>".ToString(); }
+        }
     }
 }
 
@@ -53,14 +55,18 @@ class MIRPassManager {
     }
 
     fn RunPass(&mut this, kind: MIRPassKind, function: *mut MIRFunctionDeclaration) -> bool {
-        if kind == MIRPassKind::ReorderBlocks {
-            let mut pass = MIRReorderBlocks();
-            return pass.Run(function);
-        } else if kind == MIRPassKind::PromoteAllocas {
-            let mut pass = MIRPromoteAllocas(this.context);
-            return pass.Run(function);
-        } else {
-            return false;
+        match kind {
+            MIRPassKind::ReorderBlocks => {
+                let mut pass = MIRReorderBlocks();
+                return pass.Run(function);
+            },
+            MIRPassKind::PromoteAllocas => {
+                let mut pass = MIRPromoteAllocas(this.context);
+                return pass.Run(function);
+            },
+            _ => {
+                return false;
+            }
         }
     }
 }
@@ -184,12 +190,18 @@ class MIRPromoteAllocas {
     fn SameType(&this, first: *MIRType, second: *MIRType) -> bool {
         if first->kind != second->kind {
             return false;
-        } else if first->kind == MIRTypeKind::Integer {
-            return (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width;
-        } else if first->kind == MIRTypeKind::Float {
-            return (first as *MIRFloatType)->width == (second as *MIRFloatType)->width;
         } else {
-            return true;
+            match first->kind {
+                MIRTypeKind::Integer => {
+                    return (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width;
+                },
+                MIRTypeKind::Float => {
+                    return (first as *MIRFloatType)->width == (second as *MIRFloatType)->width;
+                },
+                _ => {
+                    return true;
+                }
+            }
         }
     }
 
@@ -228,11 +240,15 @@ class MIRPromoteAllocas {
                     let _type = candidates[slot]->_type;
                     let mut allowed = false;
 
-                    if instruction->kind == MIRInstructionKind::Load {
-                        allowed = this.SameType((instruction as *MIRLoadInstruction)->_type, _type);
-                    } else if instruction->kind == MIRInstructionKind::Store {
-                        let store = instruction as *MIRStoreInstruction;
-                        allowed = store->pointer == operand && store->value != operand && this.SameType(store->value->_type, _type);
+                    match instruction->kind {
+                        MIRInstructionKind::Load => {
+                            allowed = this.SameType((instruction as *MIRLoadInstruction)->_type, _type);
+                        },
+                        MIRInstructionKind::Store => {
+                            let store = instruction as *MIRStoreInstruction;
+                            allowed = store->pointer == operand && store->value != operand && this.SameType(store->value->_type, _type);
+                        },
+                        _ => {}
                     }
 
                     if !allowed { promotable[slot] = false; }
@@ -320,24 +336,29 @@ class MIRPromoteAllocas {
         let mut kept = Vector<*mut MIRInstruction>();
 
         for instruction in block->instructions {
-            if instruction->kind == MIRInstructionKind::Alloca && this.Slot(instruction) != MIR_NO_BLOCK {
-                continue;
-            } else if instruction->kind == MIRInstructionKind::Load {
-                let load = instruction as *MIRLoadInstruction;
-                let slot = this.Slot(load->pointer);
-
-                if slot != MIR_NO_BLOCK {
-                    this.replacements[load] = this.current[slot];
+            match instruction->kind {
+                MIRInstructionKind::Alloca if this.Slot(instruction) != MIR_NO_BLOCK => {
                     continue;
-                }
-            } else if instruction->kind == MIRInstructionKind::Store {
-                let store = instruction as *MIRStoreInstruction;
-                let slot = this.Slot(store->pointer);
+                },
+                MIRInstructionKind::Load => {
+                    let load = instruction as *MIRLoadInstruction;
+                    let slot = this.Slot(load->pointer);
 
-                if slot != MIR_NO_BLOCK {
-                    this.Define(slot, store->value);
-                    continue;
-                }
+                    if slot != MIR_NO_BLOCK {
+                        this.replacements[load] = this.current[slot];
+                        continue;
+                    }
+                },
+                MIRInstructionKind::Store => {
+                    let store = instruction as *MIRStoreInstruction;
+                    let slot = this.Slot(store->pointer);
+
+                    if slot != MIR_NO_BLOCK {
+                        this.Define(slot, store->value);
+                        continue;
+                    }
+                },
+                _ => {}
             }
 
             kept.PushBack(instruction);
@@ -471,12 +492,16 @@ class MIRPromoteAllocas {
             MIRInstructionKind::Terminator => {
                 let terminator = instruction as *mut MIRTerminator;
 
-                if terminator->kind == MIRTerminatorKind::Return {
-                    let _return = terminator as *mut MIRReturnInstruction;
-                    _return->value = this.Resolve(_return->value);
-                } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-                    let branch = terminator as *mut MIRConditionalBranchInstruction;
-                    branch->condition = this.Resolve(branch->condition);
+                match terminator->kind {
+                    MIRTerminatorKind::Return => {
+                        let _return = terminator as *mut MIRReturnInstruction;
+                        _return->value = this.Resolve(_return->value);
+                    },
+                    MIRTerminatorKind::ConditionalBranch => {
+                        let branch = terminator as *mut MIRConditionalBranchInstruction;
+                        branch->condition = this.Resolve(branch->condition);
+                    },
+                    _ => {}
                 }
             },
             _ => {}

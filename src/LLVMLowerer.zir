@@ -115,10 +115,14 @@ class LLVMLowerer {
     }
 
     fn LowerDeclarationFirstPass(&mut this, declaration: *MIRDeclaration) {
-        if declaration->kind == MIRDeclarationKind::Type {
-            this.LowerTypeDeclarationFirstPass(declaration as *MIRTypeDeclaration);
-        } else if declaration->kind == MIRDeclarationKind::Assembly {
-            this.LowerAssemblyDeclaration(declaration as *MIRAssemblyDeclaration);
+        match declaration->kind {
+            MIRDeclarationKind::Type => {
+                this.LowerTypeDeclarationFirstPass(declaration as *MIRTypeDeclaration);
+            },
+            MIRDeclarationKind::Assembly => {
+                this.LowerAssemblyDeclaration(declaration as *MIRAssemblyDeclaration);
+            },
+            _ => {}
         }
     }
 
@@ -144,10 +148,14 @@ class LLVMLowerer {
     }
 
     fn LowerDeclarationFourthPass(&mut this, declaration: *MIRDeclaration) {
-        if declaration->kind == MIRDeclarationKind::Constant {
-            this.LowerConstantDeclarationSecondPass(declaration as *MIRConstantDeclaration);
-        } else if declaration->kind == MIRDeclarationKind::Static {
-            this.LowerStaticDeclarationSecondPass(declaration as *MIRStaticDeclaration);
+        match declaration->kind {
+            MIRDeclarationKind::Constant => {
+                this.LowerConstantDeclarationSecondPass(declaration as *MIRConstantDeclaration);
+            },
+            MIRDeclarationKind::Static => {
+                this.LowerStaticDeclarationSecondPass(declaration as *MIRStaticDeclaration);
+            },
+            _ => {}
         }
     }
 
@@ -270,9 +278,11 @@ class LLVMLowerer {
     }
 
     fn LowerLinkage(&mut this, linkage: MIRDeclarationLinkage) -> LLVMLinkage {
-        if linkage == MIRDeclarationLinkage::Private { return LLVMLinkage::LLVMPrivateLinkage; }
-        else if linkage == MIRDeclarationLinkage::Internal { return LLVMLinkage::LLVMInternalLinkage; }
-        else { return LLVMLinkage::LLVMExternalLinkage; }
+        match linkage {
+            MIRDeclarationLinkage::Private => { return LLVMLinkage::LLVMPrivateLinkage; },
+            MIRDeclarationLinkage::Internal => { return LLVMLinkage::LLVMInternalLinkage; },
+            _ => { return LLVMLinkage::LLVMExternalLinkage; }
+        }
     }
 
     fn LowerStaticDeclarationFirstPass(&mut this, _static: *MIRStaticDeclaration) {

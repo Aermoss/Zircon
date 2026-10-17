@@ -63,12 +63,16 @@ class LIRRegisterOperand : LIROperand {
     }
 
     pub fn ToString(&this) -> String {
-        if this.kind == LIRRegisterKind::Virtual {
-            return (this as *LIRVirtualRegister)->ToString();
-        } else if this.kind == LIRRegisterKind::Physical {
-            return (this as *LIRPhysicalRegister)->ToString();
-        } else {
-            return "<invalid register>".ToString();
+        match this.kind {
+            LIRRegisterKind::Virtual => {
+                return (this as *LIRVirtualRegister)->ToString();
+            },
+            LIRRegisterKind::Physical => {
+                return (this as *LIRPhysicalRegister)->ToString();
+            },
+            _ => {
+                return "<invalid register>".ToString();
+            }
         }
     }
 }

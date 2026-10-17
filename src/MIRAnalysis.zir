@@ -83,11 +83,15 @@ fn MIROperands(instruction: *MIRInstruction) -> Vector<*MIRValue> {
         MIRInstructionKind::Terminator => {
             let terminator = instruction as *MIRTerminator;
 
-            if terminator->kind == MIRTerminatorKind::Return {
-                let value = (terminator as *MIRReturnInstruction)->value;
-                if value != null { result.PushBack(value); }
-            } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-                result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
+            match terminator->kind {
+                MIRTerminatorKind::Return => {
+                    let value = (terminator as *MIRReturnInstruction)->value;
+                    if value != null { result.PushBack(value); }
+                },
+                MIRTerminatorKind::ConditionalBranch => {
+                    result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
+                },
+                _ => {}
             }
         },
         _ => {}
@@ -99,15 +103,19 @@ fn MIRSuccessors(block: *MIRBlock) -> Vector<*MIRBlock> {
     let terminator = block->terminator;
     if terminator == null { return result; }
 
-    if terminator->kind == MIRTerminatorKind::Branch {
-        result.PushBack((terminator as *MIRBranchInstruction)->target);
-    } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
-        let branch = terminator as *MIRConditionalBranchInstruction;
-        result.PushBack(branch->then_target);
+    match terminator->kind {
+        MIRTerminatorKind::Branch => {
+            result.PushBack((terminator as *MIRBranchInstruction)->target);
+        },
+        MIRTerminatorKind::ConditionalBranch => {
+            let branch = terminator as *MIRConditionalBranchInstruction;
+            result.PushBack(branch->then_target);
 
-        if branch->else_target != branch->then_target {
-            result.PushBack(branch->else_target);
-        }
+            if branch->else_target != branch->then_target {
+                result.PushBack(branch->else_target);
+            }
+        },
+        _ => {}
     } return result;
 }
 

@@ -307,91 +307,98 @@ class Parser {
         loop {
             let token = this.Current();
 
-            if token._type == TokenType::LPAREN {
-                this.Advance();
-                let call = this.arena.New<ASTCallExpression>(expression, token);
+            match token._type {
+                TokenType::LPAREN => {
+                    this.Advance();
+                    let call = this.arena.New<ASTCallExpression>(expression, token);
 
-                if !this.Match(TokenType::RPAREN) {
-                    while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
-                        let expression = this.ParseExpression();
-                        if expression == null { return null; }
-                        call->arguments.PushBack(expression);
+                    if !this.Match(TokenType::RPAREN) {
+                        while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
+                            let expression = this.ParseExpression();
+                            if expression == null { return null; }
+                            call->arguments.PushBack(expression);
 
-                        if !this.Match(TokenType::COMMA) {
-                            break;
+                            if !this.Match(TokenType::COMMA) {
+                                break;
+                            }
                         }
-                    }
 
-                    if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                } expression = call;
-            } else if token._type == TokenType::DOT || token._type == TokenType::ARROW {
-                this.Advance();
-
-                if this.Current()._type == TokenType::INTEGER {
-                    let value = this.Advance().value;
-                    expression = this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
-                    continue;
-                }
-
-                let member_access = this.arena.New<ASTMemberAccessExpression>(expression, token._type == TokenType::ARROW, token);
-
-                if this.Match(TokenType::OPERATOR) {
-                    member_access->member += "operator";
-
-                    while this.Current()._type != TokenType::LPAREN && this.Current()._type != TokenType::LESS {
-                        member_access->member += this.Current().value;
-                        this.Advance();
-                    }
-                } else {
-                    let identifier = this.Expect(TokenType::IDENTIFIER);
-                    if identifier._type == TokenType::UNKNOWN { return null; }
-                    member_access->member += identifier.value;
-                }
-
-                if this.IsTypeApplication() {
+                        if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                    } expression = call;
+                },
+                TokenType::DOT | TokenType::ARROW => {
                     this.Advance();
 
-                    while this.Current()._type != TokenType::GREATER {
-                        let _type = this.ParseType();
-                        if _type == null { return null; }
-                        member_access->types.PushBack(_type);
+                    if this.Current()._type == TokenType::INTEGER {
+                        let value = this.Advance().value;
+                        expression = this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
+                        continue;
+                    }
+
+                    let member_access = this.arena.New<ASTMemberAccessExpression>(expression, token._type == TokenType::ARROW, token);
+
+                    if this.Match(TokenType::OPERATOR) {
+                        member_access->member += "operator";
+
+                        while this.Current()._type != TokenType::LPAREN && this.Current()._type != TokenType::LESS {
+                            member_access->member += this.Current().value;
+                            this.Advance();
+                        }
+                    } else {
+                        let identifier = this.Expect(TokenType::IDENTIFIER);
+                        if identifier._type == TokenType::UNKNOWN { return null; }
+                        member_access->member += identifier.value;
+                    }
+
+                    if this.IsTypeApplication() {
+                        this.Advance();
+
+                        while this.Current()._type != TokenType::GREATER {
+                            let _type = this.ParseType();
+                            if _type == null { return null; }
+                            member_access->types.PushBack(_type);
+                            if !this.Match(TokenType::COMMA) { break; }
+                        }
+
+                        if !this.ExpectSuccess(TokenType::GREATER) { return null; }
+                    } expression = member_access;
+                },
+                TokenType::LBRACKET => {
+                    this.Advance();
+                    let _expression = this.ParseExpression();
+                    if _expression == null { return null; }
+                    expression = this.arena.New<ASTIndexAccessExpression>(expression, _expression, token);
+                    if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+                },
+                TokenType::LBRACE if this.Peek(1)._type == TokenType::IDENTIFIER && this.Peek(2)._type == TokenType::COLON => {
+                    this.Advance();
+                    let structure = this.arena.New<ASTStructureLiteral>(expression, token);
+
+                    while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
+                        if this.Current()._type == TokenType::TWO_DOT {
+                            this.Advance();
+                            break;
+                        }
+
+                        let field_identifier = this.Expect(TokenType::IDENTIFIER);
+                        if field_identifier._type == TokenType::UNKNOWN { return null; }
+                        if !this.ExpectSuccess(TokenType::COLON) { return null; }
+                        let expression = this.ParseExpression();
+                        if expression == null { return null; }
+                        structure->fields[field_identifier.value] = expression;
                         if !this.Match(TokenType::COMMA) { break; }
                     }
 
-                    if !this.ExpectSuccess(TokenType::GREATER) { return null; }
-                } expression = member_access;
-            } else if token._type == TokenType::LBRACKET {
-                this.Advance();
-                let _expression = this.ParseExpression();
-                if _expression == null { return null; }
-                expression = this.arena.New<ASTIndexAccessExpression>(expression, _expression, token);
-                if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
-            } else if token._type == TokenType::LBRACE && this.Peek(1)._type == TokenType::IDENTIFIER && this.Peek(2)._type == TokenType::COLON {
-                this.Advance();
-                let structure = this.arena.New<ASTStructureLiteral>(expression, token);
-
-                while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
-                    if this.Current()._type == TokenType::TWO_DOT {
-                        this.Advance();
-                        break;
-                    }
-
-                    let field_identifier = this.Expect(TokenType::IDENTIFIER);
-                    if field_identifier._type == TokenType::UNKNOWN { return null; }
-                    if !this.ExpectSuccess(TokenType::COLON) { return null; }
-                    let expression = this.ParseExpression();
-                    if expression == null { return null; }
-                    structure->fields[field_identifier.value] = expression;
-                    if !this.Match(TokenType::COMMA) { break; }
+                    if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
+                    expression = structure;
+                },
+                TokenType::THREE_DOT => {
+                    this.Advance();
+                    expression = this.arena.New<ASTPackSplatExpression>(expression, token);
+                },
+                _ => {
+                    break;
                 }
-
-                if !this.ExpectSuccess(TokenType::RBRACE) { return null; }
-                expression = structure;
-            } else if token._type == TokenType::THREE_DOT {
-                this.Advance();
-                expression = this.arena.New<ASTPackSplatExpression>(expression, token);
-            } else {
-                break;
             }
         } return expression;
     }
@@ -794,85 +801,98 @@ class Parser {
     fn ParseStatement(&mut this, expression: bool) -> *ASTStatement {
         let token = this.Current();
 
-        if token._type == TokenType::LET && !expression {
-            return this.ParseLetStatement();
-        } else if token._type == TokenType::IF && !expression {
-            return this.ParseIfStatement();
-        } else if token._type == TokenType::WHILE && !expression {
-            return this.ParseWhileStatement();
-        } else if token._type == TokenType::LOOP && !expression {
-            return this.ParseLoopStatement();
-        } else if token._type == TokenType::FOR && !expression {
-            return this.ParseForStatement();
-        } else if token._type == TokenType::MATCH && !expression {
-            return this.ParseMatchStatement();
-        } else if token._type == TokenType::UNSAFE && !expression {
-            return this.ParseUnsafeStatement();
-        } else if (token._type == TokenType::ASSEMBLY || token._type == TokenType::VOLATILE) && !expression {
-            return this.ParseAssemblyStatement();
-        } else if token._type == TokenType::RETURN {
-            return this.ParseReturnStatement(expression);
-        } else if token._type == TokenType::BREAK {
-            return this.ParseBreakStatement(expression);
-        } else if token._type == TokenType::CONTINUE {
-            return this.ParseContinueStatement(expression);
-        } else {
-            let index = this.index;
+        match token._type {
+            TokenType::LET if !expression => {
+                return this.ParseLetStatement();
+            },
+            TokenType::IF if !expression => {
+                return this.ParseIfStatement();
+            },
+            TokenType::WHILE if !expression => {
+                return this.ParseWhileStatement();
+            },
+            TokenType::LOOP if !expression => {
+                return this.ParseLoopStatement();
+            },
+            TokenType::FOR if !expression => {
+                return this.ParseForStatement();
+            },
+            TokenType::MATCH if !expression => {
+                return this.ParseMatchStatement();
+            },
+            TokenType::UNSAFE if !expression => {
+                return this.ParseUnsafeStatement();
+            },
+            TokenType::ASSEMBLY | TokenType::VOLATILE if !expression => {
+                return this.ParseAssemblyStatement();
+            },
+            TokenType::RETURN => {
+                return this.ParseReturnStatement(expression);
+            },
+            TokenType::BREAK => {
+                return this.ParseBreakStatement(expression);
+            },
+            TokenType::CONTINUE => {
+                return this.ParseContinueStatement(expression);
+            },
+            _ => {
+                let index = this.index;
 
-            if this.Match(TokenType::LPAREN) {
-                let mut current: *mut ASTAssignmentExpression = null;
-                let mut root: *mut ASTAssignmentExpression = null;
+                if this.Match(TokenType::LPAREN) {
+                    let mut current: *mut ASTAssignmentExpression = null;
+                    let mut root: *mut ASTAssignmentExpression = null;
 
-                while root == null || this.Match(TokenType::COMMA) {
-                    let _expression = this.ParseExpression();
-                    if _expression == null { return null; }
-                    let assignment = this.arena.New<ASTAssignmentExpression>(ASTAssignmentKind::Assign, _expression, null, token);
+                    while root == null || this.Match(TokenType::COMMA) {
+                        let _expression = this.ParseExpression();
+                        if _expression == null { return null; }
+                        let assignment = this.arena.New<ASTAssignmentExpression>(ASTAssignmentKind::Assign, _expression, null, token);
 
-                    if root != null {
-                        current->next = assignment;
-                    } else {
-                        root = assignment;
-                    } current = assignment;
-                }
-
-                if root->next != null {
-                    if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                    if !this.ExpectSuccess(TokenType::ASSIGN) { return null; }
-                    if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
-                    current = root;
-
-                    while current != null {
-                        current->right = this.ParseExpression();
-                        if current->right == null { return null; }
-
-                        if current->next != null {
-                            if !this.ExpectSuccess(TokenType::COMMA) { return null; }
-                        } current = current->next;
+                        if root != null {
+                            current->next = assignment;
+                        } else {
+                            root = assignment;
+                        } current = assignment;
                     }
 
-                    if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
-                    if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-                    return this.arena.New<ASTExpressionStatement>(root, token);
-                } else {
-                    this.index = index;
+                    if root->next != null {
+                        if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                        if !this.ExpectSuccess(TokenType::ASSIGN) { return null; }
+                        if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
+                        current = root;
+
+                        while current != null {
+                            current->right = this.ParseExpression();
+                            if current->right == null { return null; }
+
+                            if current->next != null {
+                                if !this.ExpectSuccess(TokenType::COMMA) { return null; }
+                            } current = current->next;
+                        }
+
+                        if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
+                        if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
+                        return this.arena.New<ASTExpressionStatement>(root, token);
+                    } else {
+                        this.index = index;
+                    }
                 }
-            }
 
-            let left = this.ParseExpression();
-            let _operator = this.Current();
+                let left = this.ParseExpression();
+                let _operator = this.Current();
 
-            if _operator._type == TokenType::ASSIGN || _operator._type == TokenType::PLUS_ASSIGN || _operator._type == TokenType::MINUS_ASSIGN || _operator._type == TokenType::MUL_ASSIGN || _operator._type == TokenType::DIV_ASSIGN || _operator._type == TokenType::MOD_ASSIGN
-                || _operator._type == TokenType::AND_ASSIGN || _operator._type == TokenType::OR_ASSIGN || _operator._type == TokenType::XOR_ASSIGN || _operator._type == TokenType::LSHIFT_ASSIGN || _operator._type == TokenType::RSHIFT_ASSIGN {
+                if _operator._type == TokenType::ASSIGN || _operator._type == TokenType::PLUS_ASSIGN || _operator._type == TokenType::MINUS_ASSIGN || _operator._type == TokenType::MUL_ASSIGN || _operator._type == TokenType::DIV_ASSIGN || _operator._type == TokenType::MOD_ASSIGN
+                    || _operator._type == TokenType::AND_ASSIGN || _operator._type == TokenType::OR_ASSIGN || _operator._type == TokenType::XOR_ASSIGN || _operator._type == TokenType::LSHIFT_ASSIGN || _operator._type == TokenType::RSHIFT_ASSIGN {
 
-                this.Advance();
-                let right = this.ParseExpression();
-                if right == null { return null; }
-                let assignment = this.arena.New<ASTAssignmentExpression>(this.ParseAssignmentKind(_operator._type), left, right, _operator);
-                if !expression && !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-                return this.arena.New<ASTExpressionStatement>(assignment, token);
-            } else {
-                if !expression && !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-                return this.arena.New<ASTExpressionStatement>(left, token);
+                    this.Advance();
+                    let right = this.ParseExpression();
+                    if right == null { return null; }
+                    let assignment = this.arena.New<ASTAssignmentExpression>(this.ParseAssignmentKind(_operator._type), left, right, _operator);
+                    if !expression && !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
+                    return this.arena.New<ASTExpressionStatement>(assignment, token);
+                } else {
+                    if !expression && !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
+                    return this.arena.New<ASTExpressionStatement>(left, token);
+                }
             }
         }
     }
@@ -1722,28 +1742,32 @@ class Parser {
         while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
             let attributes = this.ParseAttributes();
 
-            if this.Current()._type == TokenType::FUNCTION {
-                let function = this.ParseFunctionDeclaration(attributes, false);
+            match this.Current()._type {
+                TokenType::FUNCTION => {
+                    let function = this.ParseFunctionDeclaration(attributes, false);
 
-                if function == null {
+                    if function == null {
+                        this.SynchronizeDeclaration();
+                        continue;
+                    }
+
+                    extern_block->declarations.PushBack(function);
+                },
+                TokenType::STATIC => {
+                    let _static = this.ParseStaticDeclaration(attributes);
+
+                    if _static == null {
+                        this.SynchronizeDeclaration();
+                        continue;
+                    }
+
+                    extern_block->declarations.PushBack(_static);
+                },
+                _ => {
+                    Logger::Log("Only function and static declarations allowed in extern block.", this.Current(), LogSeverity::Error);
+                    this.Advance();
                     this.SynchronizeDeclaration();
-                    continue;
                 }
-
-                extern_block->declarations.PushBack(function);
-            } else if this.Current()._type == TokenType::STATIC {
-                let _static = this.ParseStaticDeclaration(attributes);
-
-                if _static == null {
-                    this.SynchronizeDeclaration();
-                    continue;
-                }
-
-                extern_block->declarations.PushBack(_static);
-            } else {
-                Logger::Log("Only function and static declarations allowed in extern block.", this.Current(), LogSeverity::Error);
-                this.Advance();
-                this.SynchronizeDeclaration();
             }
         }
 

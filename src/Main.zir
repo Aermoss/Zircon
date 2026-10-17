@@ -825,12 +825,17 @@ fn Main(args: &mut Vector<String>) -> i32 {
         if opt_level != LLVMCodeGenOptLevel::LLVMCodeGenLevelNone && extension == ".zir" {
             let mut passes = String();
 
-            if opt_level == LLVMCodeGenOptLevel::LLVMCodeGenLevelLess {
-                passes = "default<O1>";
-            } else if opt_level == LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault {
-                passes = "default<O2>";
-            } else if opt_level == LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive {
-                passes = "default<O3>";
+            match opt_level {
+                LLVMCodeGenOptLevel::LLVMCodeGenLevelLess => {
+                    passes = "default<O1>";
+                },
+                LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault => {
+                    passes = "default<O2>";
+                },
+                LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive => {
+                    passes = "default<O3>";
+                },
+                _ => {}
             }
 
             if passes.Size() > 1 {
