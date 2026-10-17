@@ -296,7 +296,7 @@ class HIRLowerer {
         } else if expression->_type->IsNever() && target != null && !target->IsNever() && !target->IsVoid() {
             return this.builder.Cast(expression, target);
         }
-Z
+
         match expression->kind {
             HIRExpressionKind::Deferred => {
                 return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, target), target);
