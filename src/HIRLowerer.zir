@@ -2298,20 +2298,52 @@ class HIRLowerer {
         }
 
         let statement = this.builder.BuildMatchStatement(target, destructors, arms);
+        this.CheckUnreachableArms(_match, arms, target->_type);
         let missing = statement->Uncovered();
 
-        if !missing.Empty() {
-            if target->_type->IsEnumeration() || target->_type->IsVariant() || target->_type->IsBoolean() {
-                let mut names = String();
+        if missing.Size() == 1 && missing[0] == "_" {
+            Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
+        } else if !missing.Empty() {
+            let mut names = String();
 
-                for i in 0..missing.Size() {
-                    if i != 0 { names += ", "; }
-                    names += "'" + missing[i] + "'";
+            for i in 0..missing.Size() {
+                if i != 0 { names += ", "; }
+                names += "'" + missing[i] + "'";
+            }
+
+            Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "', not covered: " + names + ".", _match, LogSeverity::Error);
+        }
+    }
+
+    fn CheckUnreachableArms(&mut this, _match: *ASTMatchStatement, arms: &Vector<*HIRMatchArm>, _type: *HIRType) {
+        let checker = HIRPatternChecker();
+        let mut rows = Vector<Vector<*HIRPattern>>();
+        let mut types = Vector<*HIRType>();
+        types.PushBack(_type);
+
+        for i in 0..arms.Size() {
+            let (arm, node) = (arms[i], _match->arms[i]);
+            let mut vector = Vector<*HIRPattern>();
+            vector.PushBack(arm->pattern);
+
+            if !checker.Useful(rows, vector, types) {
+                Logger::Log("Unreachable pattern.", node->pattern, LogSeverity::Warning);
+            } else if arm->pattern->kind == HIRPatternKind::Or && node->pattern->kind == ASTPatternKind::Or {
+                let mut previous = rows;
+                let alternatives = (arm->pattern as *HIROrPattern)->patterns;
+
+                for j in 0..alternatives.Size() {
+                    let mut alternative = Vector<*HIRPattern>();
+                    alternative.PushBack(alternatives[j]);
+
+                    if !checker.Useful(previous, alternative, types) {
+                        Logger::Log("Unreachable pattern.", (node->pattern as *ASTOrPattern)->patterns[j], LogSeverity::Warning);
+                    } previous.PushBack(alternative);
                 }
+            }
 
-                Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "', not covered: " + names + ".", _match, LogSeverity::Error);
-            } else {
-                Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
+            if arm->guard == null {
+                rows.PushBack(vector);
             }
         }
     }

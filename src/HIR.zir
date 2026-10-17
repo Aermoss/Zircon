@@ -903,83 +903,6 @@ class HIRPattern {
         this.kind = kind;
     }
 
-    pub fn CoversBoolean(&this, value: bool) -> bool {
-        if this.IsIrrefutable() {
-            return true;
-        } else if this.kind == HIRPatternKind::Literal {
-            let literal = (this as *HIRLiteralPattern)->literal;
-            return literal->kind == HIRExpressionKind::Literal && (literal as *HIRLiteral)->kind == HIRLiteralKind::Boolean && (literal as *HIRBooleanLiteral)->value == value;
-        } else if this.kind == HIRPatternKind::Or {
-            for pattern in (this as *HIROrPattern)->patterns {
-                if pattern->CoversBoolean(value) {
-                    return true;
-                }
-            }
-        } else if this.kind == HIRPatternKind::Dereference {
-            return (this as *HIRDereferencePattern)->pattern->CoversBoolean(value);
-        } return false;
-    }
-
-    pub fn CoversEnumerationMember(&this, member: *HIREnumerationMember) -> bool {
-        if this.IsIrrefutable() {
-            return true;
-        }
-
-        match this.kind {
-            HIRPatternKind::Enumeration => {
-                let other = (this as *HIREnumerationPattern)->member;
-                if other == member { return true; }
-                let (left, right) = (other->value, member->value);
-
-                return left->kind == HIRExpressionKind::Literal && right->kind == HIRExpressionKind::Literal
-                    && (left as *HIRLiteral)->kind == HIRLiteralKind::Integer && (right as *HIRLiteral)->kind == HIRLiteralKind::Integer
-                    && (left as *HIRIntegerLiteral)->value == (right as *HIRIntegerLiteral)->value;
-            },
-            HIRPatternKind::Or => {
-                for pattern in (this as *HIROrPattern)->patterns {
-                    if pattern->CoversEnumerationMember(member) {
-                        return true;
-                    }
-                } return false;
-            },
-            HIRPatternKind::Dereference => {
-                return (this as *HIRDereferencePattern)->pattern->CoversEnumerationMember(member);
-            },
-            _ => {
-                return false;
-            }
-        }
-    }
-
-    pub fn CoversVariantMember(&this, member: *HIRVariantMember) -> bool {
-        if this.IsIrrefutable() {
-            return true;
-        }
-        match this.kind {
-            HIRPatternKind::Variant => {
-                let variant = this as *HIRVariantPattern;
-                if variant->member != member { return false; }
-
-                for pattern in variant->patterns {
-                    if !pattern->IsIrrefutable() { return false; }
-                } return true;
-            },
-            HIRPatternKind::Or => {
-                for pattern in (this as *HIROrPattern)->patterns {
-                    if pattern->CoversVariantMember(member) {
-                        return true;
-                    }
-                } return false;
-            },
-            HIRPatternKind::Dereference => {
-                return (this as *HIRDereferencePattern)->pattern->CoversVariantMember(member);
-            },
-            _ => {
-                return false;
-            }
-        }
-    }
-
     pub fn IsIrrefutable(&this) -> bool {
         match this.kind {
             HIRPatternKind::Wildcard | HIRPatternKind::Rest | HIRPatternKind::Identifier => {
@@ -2237,6 +2160,395 @@ class HIRForStatement : HIRStatement {
     }
 }
 
+class HIRPatternChecker {
+    HIRPatternChecker(&mut this) {}
+
+    pub fn Normalize(&this, mut pattern: *HIRPattern) -> *HIRPattern {
+        while pattern != null {
+            match pattern->kind {
+                HIRPatternKind::Dereference => { pattern = (pattern as *HIRDereferencePattern)->pattern; },
+                HIRPatternKind::Field => { pattern = (pattern as *HIRFieldPattern)->pattern; },
+                HIRPatternKind::Wildcard | HIRPatternKind::Identifier | HIRPatternKind::Rest => { return null; },
+                _ => { return pattern; }
+            }
+        } return null;
+    }
+
+    pub fn NormalizeType(&this, _type: *HIRType) -> *HIRType {
+        if _type->IsReference() {
+            return _type->Pointee();
+        } return _type;
+    }
+
+    fn MemberKey(&this, member: *HIREnumerationMember) -> String {
+        let value = member->value;
+
+        if value->kind == HIRExpressionKind::Literal && (value as *HIRLiteral)->kind == HIRLiteralKind::Integer {
+            return "e" + String::FromInteger((value as *HIRIntegerLiteral)->value);
+        } return "m" + member->name;
+    }
+
+    fn LiteralKey(&this, literal: *HIRExpression) -> String {
+        if literal->kind != HIRExpressionKind::Literal {
+            return "?" + literal->ToString();
+        }
+
+        let value = literal as *HIRLiteral;
+
+        match value->kind {
+            HIRLiteralKind::Boolean => { return (value as *HIRBooleanLiteral)->value ? "true".ToString() : "false".ToString(); },
+            HIRLiteralKind::Integer => { return "i" + String::FromInteger((value as *HIRIntegerLiteral)->value); },
+            HIRLiteralKind::Character => { return "c" + String::FromInteger((value as *HIRCharacterLiteral)->value as u64); },
+            _ => { return "?" + literal->ToString(); }
+        }
+    }
+
+    fn Key(&this, pattern: *HIRPattern) -> String {
+        match pattern->kind {
+            HIRPatternKind::Literal => { return this.LiteralKey((pattern as *HIRLiteralPattern)->literal); },
+            HIRPatternKind::Enumeration => { return this.MemberKey((pattern as *HIREnumerationPattern)->member); },
+            HIRPatternKind::Variant => { return (pattern as *HIRVariantPattern)->member->name; },
+            _ => { return String(); }
+        }
+    }
+
+    pub fn IsFinite(&this, _type: *HIRType) -> bool {
+        return _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() || _type->IsStructure() || _type->IsTuple();
+    }
+
+    pub fn Constructors(&this, _type: *HIRType) -> Vector<String> {
+        let mut keys = Vector<String>();
+
+        if _type->IsBoolean() {
+            keys.PushBack("true".ToString());
+            keys.PushBack("false".ToString());
+        } else if _type->IsEnumeration() {
+            for member in (_type as *HIREnumerationType)->declaration->members {
+                let key = this.MemberKey(member);
+
+                if !keys.Contains(key) {
+                    keys.PushBack(key);
+                }
+            }
+        } else if _type->IsVariant() {
+            for member in (_type as *HIRVariantType)->declaration->members {
+                keys.PushBack(member->name);
+            }
+        } else if _type->IsStructure() || _type->IsTuple() {
+            keys.PushBack(String());
+        } return keys;
+    }
+
+    fn VariantMember(&this, _type: *HIRType, key: &String) -> *HIRVariantMember {
+        for member in (_type as *HIRVariantType)->declaration->members {
+            if member->name == key { return member; }
+        } return null;
+    }
+
+    pub fn FieldTypes(&this, _type: *HIRType, key: &String) -> Vector<*HIRType> {
+        let mut types = Vector<*HIRType>();
+
+        if _type->IsVariant() {
+            let member = this.VariantMember(_type, key);
+            if member == null { return types; }
+
+            for field in member->fields {
+                types.PushBack(field->_type);
+            }
+        } else if _type->IsStructure() {
+            for field in (_type as *HIRStructureType)->declaration->fields {
+                types.PushBack(field->_type);
+            }
+        } else if _type->IsTuple() {
+            for element in (_type as *HIRTupleType)->elements {
+                types.PushBack(element);
+            }
+        } return types;
+    }
+
+    fn FindField(&this, patterns: &Vector<*HIRPattern>, name: &String) -> *HIRPattern {
+        for pattern in patterns {
+            if pattern->kind == HIRPatternKind::Field && (pattern as *HIRFieldPattern)->name == name {
+                return pattern;
+            }
+        } return null;
+    }
+
+    fn Fields(&this, pattern: *HIRPattern, arity: usize) -> Vector<*HIRPattern> {
+        let mut fields = Vector<*HIRPattern>();
+
+        match pattern->kind {
+            HIRPatternKind::Variant => {
+                let variant = pattern as *HIRVariantPattern;
+
+                if variant->member->structure {
+                    for field in variant->member->fields {
+                        fields.PushBack(this.FindField(variant->patterns, field->name));
+                    }
+                } else {
+                    for field in variant->patterns {
+                        fields.PushBack(field);
+                    }
+                }
+            },
+            HIRPatternKind::Structure => {
+                let structure = pattern as *HIRStructurePattern;
+
+                for field in structure->declaration->fields {
+                    fields.PushBack(this.FindField(structure->patterns, field->name));
+                }
+            },
+            HIRPatternKind::Tuple => {
+                for element in (pattern as *HIRTuplePattern)->patterns {
+                    fields.PushBack(element);
+                }
+            },
+            _ => {}
+        }
+
+        while fields.Size() < arity {
+            fields.PushBack(null);
+        } return fields;
+    }
+
+    fn ExpandRow(&this, row: &Vector<*HIRPattern>, rows: &mut Vector<Vector<*HIRPattern>>) {
+        let head = this.Normalize(row[0]);
+
+        if head != null && head->kind == HIRPatternKind::Or {
+            for alternative in (head as *HIROrPattern)->patterns {
+                let mut expanded: Vector<*HIRPattern> = row;
+                expanded[0] = alternative;
+                this.ExpandRow(expanded, rows);
+            }
+        } else {
+            rows.PushBack(row);
+        }
+    }
+
+    pub fn Expand(&this, rows: &Vector<Vector<*HIRPattern>>) -> Vector<Vector<*HIRPattern>> {
+        let mut expanded = Vector<Vector<*HIRPattern>>();
+
+        for row in rows {
+            this.ExpandRow(row, expanded);
+        } return expanded;
+    }
+
+    pub fn Specialize(&this, rows: &Vector<Vector<*HIRPattern>>, key: &String, arity: usize) -> Vector<Vector<*HIRPattern>> {
+        let mut specialized = Vector<Vector<*HIRPattern>>();
+
+        for row in rows {
+            let head = this.Normalize(row[0]);
+            let mut fields = Vector<*HIRPattern>();
+
+            if head == null {
+                while fields.Size() < arity {
+                    fields.PushBack(null);
+                }
+            } else if this.Key(head) == key {
+                fields = this.Fields(head, arity);
+            } else {
+                continue;
+            }
+
+            for i in 1..row.Size() {
+                fields.PushBack(row[i]);
+            }
+
+            specialized.PushBack(fields);
+        } return specialized;
+    }
+
+    fn Default(&this, rows: &Vector<Vector<*HIRPattern>>) -> Vector<Vector<*HIRPattern>> {
+        let mut defaulted = Vector<Vector<*HIRPattern>>();
+
+        for row in rows {
+            if this.Normalize(row[0]) != null { continue; }
+            let mut rest = Vector<*HIRPattern>();
+
+            for i in 1..row.Size() {
+                rest.PushBack(row[i]);
+            } defaulted.PushBack(rest);
+        } return defaulted;
+    }
+
+    fn Heads(&this, rows: &Vector<Vector<*HIRPattern>>) -> Vector<String> {
+        let mut keys = Vector<String>();
+
+        for row in rows {
+            let head = this.Normalize(row[0]);
+            if head == null { continue; }
+            let key = this.Key(head);
+            if !keys.Contains(key) { keys.PushBack(key); }
+        } return keys;
+    }
+
+    fn IsComplete(&this, heads: &Vector<String>, _type: *HIRType) -> bool {
+        if !this.IsFinite(_type) { return false; }
+
+        for key in this.Constructors(_type) {
+            if !heads.Contains(key) { return false; }
+        } return true;
+    }
+
+    fn Tail(&this, types: &Vector<*HIRType>) -> Vector<*HIRType> {
+        let mut tail = Vector<*HIRType>();
+
+        for i in 1..types.Size() {
+            tail.PushBack(types[i]);
+        } return tail;
+    }
+
+    pub fn Useful(&this, rows: &Vector<Vector<*HIRPattern>>, vector: &Vector<*HIRPattern>, types: &Vector<*HIRType>) -> bool {
+        if vector.Empty() { return rows.Empty(); }
+        let expanded = this.Expand(rows);
+        let head = this.Normalize(vector[0]);
+        let _type = this.NormalizeType(types[0]);
+
+        if head != null && head->kind == HIRPatternKind::Or {
+            for alternative in (head as *HIROrPattern)->patterns {
+                let mut candidate: Vector<*HIRPattern> = vector;
+                candidate[0] = alternative;
+                if this.Useful(expanded, candidate, types) { return true; }
+            } return false;
+        }
+
+        if head != null {
+            let key = this.Key(head);
+            let mut field_types = this.FieldTypes(_type, key);
+            let mut fields = this.Fields(head, field_types.Size());
+            for i in 1..vector.Size() { fields.PushBack(vector[i]); }
+            for i in 1..types.Size() { field_types.PushBack(types[i]); }
+            return this.Useful(this.Specialize(expanded, key, this.FieldTypes(_type, key).Size()), fields, field_types);
+        }
+
+        if this.IsComplete(this.Heads(expanded), _type) {
+            for key in this.Constructors(_type) {
+                let mut field_types = this.FieldTypes(_type, key);
+                let arity = field_types.Size();
+                let mut fields = Vector<*HIRPattern>();
+                while fields.Size() < arity { fields.PushBack(null); }
+                for i in 1..vector.Size() { fields.PushBack(vector[i]); }
+                for i in 1..types.Size() { field_types.PushBack(types[i]); }
+                if this.Useful(this.Specialize(expanded, key, arity), fields, field_types) { return true; }
+            } return false;
+        }
+
+        let mut rest = Vector<*HIRPattern>();
+        for i in 1..vector.Size() { rest.PushBack(vector[i]); }
+        return this.Useful(this.Default(expanded), rest, this.Tail(types));
+    }
+
+    pub fn Missing(&this, rows: &Vector<Vector<*HIRPattern>>, types: &Vector<*HIRType>, witness: &mut Vector<String>) -> bool {
+        if types.Empty() { return rows.Empty(); }
+        let expanded = this.Expand(rows);
+        let _type = this.NormalizeType(types[0]);
+        let heads = this.Heads(expanded);
+
+        if this.IsComplete(heads, _type) {
+            for key in this.Constructors(_type) {
+                let mut field_types = this.FieldTypes(_type, key);
+                let arity = field_types.Size();
+                for i in 1..types.Size() { field_types.PushBack(types[i]); }
+                let mut inner = Vector<String>();
+
+                if this.Missing(this.Specialize(expanded, key, arity), field_types, inner) {
+                    let mut fields = Vector<String>();
+                    for i in 0..arity { fields.PushBack(inner[i]); }
+                    witness.PushBack(this.Format(_type, key, fields));
+                    for i in arity..inner.Size() { witness.PushBack(inner[i]); }
+                    return true;
+                }
+            } return false;
+        }
+
+        let mut inner = Vector<String>();
+        if !this.Missing(this.Default(expanded), this.Tail(types), inner) { return false; }
+
+        if heads.Empty() || !this.IsFinite(_type) {
+            witness.PushBack('_'.ToString());
+        } else {
+            for key in this.Constructors(_type) {
+                if heads.Contains(key) { continue; }
+                let mut fields = Vector<String>();
+
+                while fields.Size() < this.FieldTypes(_type, key).Size() {
+                    fields.PushBack('_'.ToString());
+                }
+
+                witness.PushBack(this.Format(_type, key, fields));
+                break;
+            }
+        }
+
+        for value in inner {
+            witness.PushBack(value);
+        } return true;
+    }
+
+    fn FormatFields(&this, names: &Vector<String>, fields: &Vector<String>) -> String {
+        let mut result = String();
+        let mut omitted = false;
+
+        for i in 0..fields.Size() {
+            if fields[i] == "_" {
+                omitted = true;
+                continue;
+            }
+
+            if !result.Empty() { result += ", "; }
+            result += names[i] + ": " + fields[i];
+        }
+
+        if omitted {
+            if !result.Empty() { result += ", "; }
+            result += "..";
+        } return " { " + result + " }";
+    }
+
+    pub fn Format(&this, _type: *HIRType, key: &String, fields: &Vector<String>) -> String {
+        if _type->IsBoolean() {
+            return key;
+        } else if _type->IsEnumeration() {
+            let declaration = (_type as *HIREnumerationType)->declaration;
+
+            for member in declaration->members {
+                if this.MemberKey(member) == key {
+                    return declaration->name + "::" + member->name;
+                }
+            } return '_'.ToString();
+        } else if _type->IsVariant() {
+            let member = this.VariantMember(_type, key);
+            let mut result = (_type as *HIRVariantType)->declaration->name + "::" + member->name;
+            if member->fields.Empty() { return result; }
+
+            if member->structure {
+                let mut names = Vector<String>();
+                for field in member->fields { names.PushBack(field->name); }
+                return result + this.FormatFields(names, fields);
+            }
+
+            result += "(";
+
+            for i in 0..fields.Size() {
+                if i != 0 { result += ", "; }
+                result += fields[i];
+            } return result + ")";
+        } else if _type->IsStructure() {
+            let declaration = (_type as *HIRStructureType)->declaration;
+            let mut names = Vector<String>();
+            for field in declaration->fields { names.PushBack(field->name); }
+            return declaration->name + this.FormatFields(names, fields);
+        } else if _type->IsTuple() {
+            let mut result = "(".ToString();
+
+            for i in 0..fields.Size() {
+                if i != 0 { result += ", "; }
+                result += fields[i];
+            } return result + ")";
+        } return '_'.ToString();
+    }
+}
+
 class HIRMatchArm {
     pub pattern: *HIRPattern,
     pub guard: *HIRExpression,
@@ -2263,67 +2575,38 @@ class HIRMatchStatement : HIRStatement {
     }
 
     pub fn Uncovered(&this) -> Vector<String> {
-        let mut missing = Vector<String>();
+        let checker = HIRPatternChecker();
+        let mut rows = Vector<Vector<*HIRPattern>>();
 
         for arm in this.arms {
-            if arm->guard == null && arm->pattern->IsIrrefutable() {
-                return missing;
-            }
+            if arm->guard != null { continue; }
+            let mut row = Vector<*HIRPattern>();
+            row.PushBack(arm->pattern);
+            rows.PushBack(row);
         }
 
-        let mut _type = this.target->_type;
+        let mut missing = Vector<String>();
+        let _type = checker.NormalizeType(this.target->_type);
 
-        if _type->IsReference() {
-            _type = _type->Pointee();
+        if _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() {
+            let expanded = checker.Expand(rows);
+
+            for key in checker.Constructors(_type) {
+                let field_types = checker.FieldTypes(_type, key);
+                let mut fields = Vector<String>();
+
+                if checker.Missing(checker.Specialize(expanded, key, field_types.Size()), field_types, fields) {
+                    missing.PushBack(checker.Format(_type, key, fields));
+                }
+            } return missing;
         }
 
-        if _type->IsEnumeration() {
-            for member in (_type as *HIREnumerationType)->declaration->members {
-                let mut covered = false;
+        let mut types = Vector<*HIRType>();
+        types.PushBack(this.target->_type);
+        let mut witness = Vector<String>();
 
-                for arm in this.arms {
-                    if arm->guard == null && arm->pattern->CoversEnumerationMember(member) {
-                        covered = true;
-                        break;
-                    }
-                }
-
-                if !covered {
-                    missing.PushBack(member->name);
-                }
-            }
-        } else if _type->IsVariant() {
-            for member in (_type as *HIRVariantType)->declaration->members {
-                let mut covered = false;
-
-                for arm in this.arms {
-                    if arm->guard == null && arm->pattern->CoversVariantMember(member) {
-                        covered = true;
-                        break;
-                    }
-                }
-
-                if !covered {
-                    missing.PushBack(member->name);
-                }
-            }
-        } else if _type->IsBoolean() {
-            for value in [true, false] {
-                let mut covered = false;
-
-                for arm in this.arms {
-                    if arm->guard == null && arm->pattern->CoversBoolean(value) {
-                        covered = true;
-                        break;
-                    }
-                }
-
-                if !covered {
-                    missing.PushBack((value ? "true" : "false").ToString());
-                }
-            }
-        } else {
-            missing.PushBack('_'.ToString());
+        if checker.Missing(rows, types, witness) {
+            missing.PushBack(witness[0]);
         } return missing;
     }
 
