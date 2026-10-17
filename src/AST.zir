@@ -363,7 +363,8 @@ class ASTOrPattern : ASTPattern {
 enum ASTExpressionKind: u8 {
     Literal, Path, Unary, Binary, Ternary, Call,
     PackSplat, MemberAccess, TupleAccess, IndexAccess, Cast,
-    New, Delete, Assignment, Await, Range
+    New, Delete, Assignment, Await, Range,
+    Block, If, While, Loop, For, Match, Return, Break, Continue
 }
 
 extend ASTExpressionKind {
@@ -384,7 +385,16 @@ extend ASTExpressionKind {
             ASTExpressionKind::Delete => { return "Delete".ToString(); },
             ASTExpressionKind::Assignment => { return "Assignment".ToString(); },
             ASTExpressionKind::Await => { return "Await".ToString(); },
-            ASTExpressionKind::Range => { return "Range".ToString(); }
+            ASTExpressionKind::Range => { return "Range".ToString(); },
+            ASTExpressionKind::Block => { return "Block".ToString(); },
+            ASTExpressionKind::If => { return "If".ToString(); },
+            ASTExpressionKind::While => { return "While".ToString(); },
+            ASTExpressionKind::Loop => { return "Loop".ToString(); },
+            ASTExpressionKind::For => { return "For".ToString(); },
+            ASTExpressionKind::Match => { return "Match".ToString(); },
+            ASTExpressionKind::Return => { return "Return".ToString(); },
+            ASTExpressionKind::Break => { return "Break".ToString(); },
+            ASTExpressionKind::Continue => { return "Continue".ToString(); }
         }
     }
 }
@@ -445,6 +455,33 @@ class ASTExpression : ASTNode {
             },
             ASTExpressionKind::Range => {
                 return (this as *ASTRangeExpression)->ToString();
+            },
+            ASTExpressionKind::Block => {
+                return (this as *ASTBlockExpression)->ToString();
+            },
+            ASTExpressionKind::If => {
+                return (this as *ASTIfExpression)->ToString();
+            },
+            ASTExpressionKind::While => {
+                return (this as *ASTWhileExpression)->ToString();
+            },
+            ASTExpressionKind::Loop => {
+                return (this as *ASTLoopExpression)->ToString();
+            },
+            ASTExpressionKind::For => {
+                return (this as *ASTForExpression)->ToString();
+            },
+            ASTExpressionKind::Match => {
+                return (this as *ASTMatchExpression)->ToString();
+            },
+            ASTExpressionKind::Return => {
+                return (this as *ASTReturnExpression)->ToString();
+            },
+            ASTExpressionKind::Break => {
+                return (this as *ASTBreakExpression)->ToString();
+            },
+            ASTExpressionKind::Continue => {
+                return (this as *ASTContinueExpression)->ToString();
             }
         }
     }
@@ -936,59 +973,15 @@ class ASTRangeExpression : ASTExpression {
     }
 }
 
-enum ASTStatementKind: u8 {
-    Block, Variable, Expression, If, While, Loop, For, Match, Return, Break, Continue, Unsafe, Assembly
-}
+class ASTBlockExpression : ASTExpression {
+    pub statements: Vector<*ASTStatement>,
+    pub tail: *ASTExpression = null,
+    pub _unsafe: bool = false;
 
-extend ASTStatementKind {
-    pub fn ToString(this) -> String {
-        match this {
-            ASTStatementKind::Block => { return "Block".ToString(); },
-            ASTStatementKind::Variable => { return "Variable".ToString(); },
-            ASTStatementKind::Expression => { return "Expression".ToString(); },
-            ASTStatementKind::If => { return "If".ToString(); },
-            ASTStatementKind::While => { return "While".ToString(); },
-            ASTStatementKind::Loop => { return "Loop".ToString(); },
-            ASTStatementKind::For => { return "For".ToString(); },
-            ASTStatementKind::Match => { return "Match".ToString(); },
-            ASTStatementKind::Return => { return "Return".ToString(); },
-            ASTStatementKind::Break => { return "Break".ToString(); },
-            ASTStatementKind::Continue => { return "Continue".ToString(); },
-            ASTStatementKind::Unsafe => { return "Unsafe".ToString(); },
-            ASTStatementKind::Assembly => { return "Assembly".ToString(); }
-        }
-    }
-}
+    ASTBlockExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Block, start) {}
 
-class ASTStatement : ASTNode {
-    pub kind: ASTStatementKind;
-
-    ASTStatement(&mut this, kind: ASTStatementKind, start: Token) : ASTNode(ASTNodeKind::Statement, start) {
-        this.kind = kind;
-    }
-}
-
-class ASTBlockStatement : ASTStatement {
-    pub statements: Vector<*ASTStatement>;
-
-    ASTBlockStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Block, start) {}
-}
-
-class ASTLetStatement : ASTStatement {
-    pub pattern: *ASTPattern,
-    pub _type: *ASTType,
-    pub initializer: *ASTExpression;
-
-    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Variable, start) {
-        (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
-    }
-}
-
-class ASTExpressionStatement : ASTStatement {
-    pub expression: *ASTExpression;
-
-    ASTExpressionStatement(&mut this, expression: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Expression, start) {
-        this.expression = expression;
+    pub fn ToString(&this) -> String {
+        return (this._unsafe ? "unsafe { ... }" : "{ ... }").ToString();
     }
 }
 
@@ -1003,86 +996,165 @@ class ASTCondition {
     ASTCondition(&mut this, pattern: *ASTPattern, expression: *ASTExpression) {
         (this.pattern, this.expression) = (pattern, expression);
     }
-}
 
-class ASTIfStatement : ASTStatement {
-    pub condition: *ASTCondition,
-    pub body: *ASTBlockStatement,
-    pub _else: *ASTStatement;
-
-    ASTIfStatement(&mut this, condition: *ASTCondition, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::If, start) {
-        (this.condition, this.body, this._else) = (condition, body, _else);
+    pub fn ToString(&this) -> String {
+        if this.pattern != null {
+            return "let ... = " + this.expression->ToString();
+        } return this.expression->ToString();
     }
 }
 
-class ASTWhileStatement : ASTStatement {
+class ASTIfExpression : ASTExpression {
     pub condition: *ASTCondition,
-    pub body: *ASTBlockStatement,
-    pub _else: *ASTBlockStatement;
+    pub body: *ASTBlockExpression,
+    pub _else: *ASTExpression;
 
-    ASTWhileStatement(&mut this, condition: *ASTCondition, body: *ASTBlockStatement, _else: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::While, start) {
+    ASTIfExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::If, start) {
         (this.condition, this.body, this._else) = (condition, body, _else);
+    }
+
+    pub fn ToString(&this) -> String {
+        return "if " + this.condition->ToString() + " { ... }";
     }
 }
 
-class ASTLoopStatement : ASTStatement {
-    pub body: *ASTBlockStatement;
+class ASTWhileExpression : ASTExpression {
+    pub condition: *ASTCondition,
+    pub body: *ASTBlockExpression,
+    pub _else: *ASTBlockExpression;
 
-    ASTLoopStatement(&mut this, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::Loop, start) {
+    ASTWhileExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::While, start) {
+        (this.condition, this.body, this._else) = (condition, body, _else);
+    }
+
+    pub fn ToString(&this) -> String {
+        return "while " + this.condition->ToString() + " { ... }";
+    }
+}
+
+class ASTLoopExpression : ASTExpression {
+    pub body: *ASTBlockExpression;
+
+    ASTLoopExpression(&mut this, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::Loop, start) {
         this.body = body;
     }
+
+    pub fn ToString(&this) -> String {
+        return "loop { ... }".ToString();
+    }
 }
 
-class ASTForStatement : ASTStatement {
+class ASTForExpression : ASTExpression {
     pub pattern: *ASTPattern,
     pub iterable: *ASTExpression,
-    pub body: *ASTBlockStatement;
+    pub body: *ASTBlockExpression;
 
-    ASTForStatement(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::For, start) {
+    ASTForExpression(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::For, start) {
         (this.pattern, this.iterable, this.body) = (pattern, iterable, body);
+    }
+
+    pub fn ToString(&this) -> String {
+        return "for ... in " + this.iterable->ToString() + " { ... }";
     }
 }
 
 class ASTMatchArm {
     pub pattern: *ASTPattern,
     pub guard: *ASTExpression,
-    pub body: *ASTBlockStatement;
+    pub body: *ASTBlockExpression;
 
-    ASTMatchArm(&mut this, pattern: *ASTPattern, guard: *ASTExpression, body: *ASTBlockStatement) {
+    ASTMatchArm(&mut this, pattern: *ASTPattern, guard: *ASTExpression, body: *ASTBlockExpression) {
         (this.pattern, this.guard, this.body) = (pattern, guard, body);
     }
 }
 
-class ASTMatchStatement : ASTStatement {
+class ASTMatchExpression : ASTExpression {
     pub target: *ASTExpression,
     pub arms: Vector<*ASTMatchArm>;
 
-    ASTMatchStatement(&mut this, target: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Match, start) {
+    ASTMatchExpression(&mut this, target: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Match, start) {
         this.target = target;
     }
-}
 
-class ASTReturnStatement : ASTStatement {
-    pub expression: *ASTExpression;
-
-    ASTReturnStatement(&mut this, expression: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Return, start) {
-        this.expression = expression;
+    pub fn ToString(&this) -> String {
+        return "match " + this.target->ToString() + " { ... }";
     }
 }
 
-class ASTBreakStatement : ASTStatement {
-    ASTBreakStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Break, start) {}
+class ASTReturnExpression : ASTExpression {
+    pub value: *ASTExpression;
+
+    ASTReturnExpression(&mut this, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Return, start) {
+        this.value = value;
+    }
+
+    pub fn ToString(&this) -> String {
+        if this.value != null {
+            return "return " + this.value->ToString();
+        } return "return".ToString();
+    }
 }
 
-class ASTContinueStatement : ASTStatement {
-    ASTContinueStatement(&mut this, start: Token) : ASTStatement(ASTStatementKind::Continue, start) {}
+class ASTBreakExpression : ASTExpression {
+    pub value: *ASTExpression;
+
+    ASTBreakExpression(&mut this, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Break, start) {
+        this.value = value;
+    }
+
+    pub fn ToString(&this) -> String {
+        if this.value != null {
+            return "break " + this.value->ToString();
+        } return "break".ToString();
+    }
 }
 
-class ASTUnsafeStatement : ASTStatement {
-    pub body: *ASTBlockStatement;
+class ASTContinueExpression : ASTExpression {
+    ASTContinueExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Continue, start) {}
 
-    ASTUnsafeStatement(&mut this, body: *ASTBlockStatement, start: Token) : ASTStatement(ASTStatementKind::Unsafe, start) {
-        this.body = body;
+    pub fn ToString(&this) -> String {
+        return "continue".ToString();
+    }
+}
+
+enum ASTStatementKind: u8 {
+    Variable, Expression, Assembly
+}
+
+extend ASTStatementKind {
+    pub fn ToString(this) -> String {
+        match this {
+            ASTStatementKind::Variable => { return "Variable".ToString(); },
+            ASTStatementKind::Expression => { return "Expression".ToString(); },
+            ASTStatementKind::Assembly => { return "Assembly".ToString(); }
+        }
+    }
+}
+
+class ASTStatement : ASTNode {
+    pub kind: ASTStatementKind;
+
+    ASTStatement(&mut this, kind: ASTStatementKind, start: Token) : ASTNode(ASTNodeKind::Statement, start) {
+        this.kind = kind;
+    }
+}
+
+class ASTLetStatement : ASTStatement {
+    pub pattern: *ASTPattern,
+    pub _type: *ASTType,
+    pub initializer: *ASTExpression;
+
+    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Variable, start) {
+        (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
+    }
+}
+
+class ASTExpressionStatement : ASTStatement {
+    pub expression: *ASTExpression,
+    pub semicolon: bool = true;
+
+    ASTExpressionStatement(&mut this, expression: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Expression, start) {
+        this.expression = expression;
     }
 }
 
@@ -1166,7 +1238,7 @@ class ASTFunctionDeclaration : ASTDeclaration {
     pub _async: bool = false,
     pub _return: *ASTType = null,
     pub constructors: Vector<*ASTCallExpression>,
-    pub body: *ASTBlockStatement = null,
+    pub body: *ASTBlockExpression = null,
     pub types: Vector<String>,
     pub generic: bool = false;
 

@@ -30,6 +30,7 @@ class MIRLowerer {
     runtime_functions: Map<String, *MIRFunctionDeclaration>,
     break_blocks: Vector<*mut MIRBlock>,
     continue_blocks: Vector<*mut MIRBlock>,
+    break_destinations: Vector<*MIRValue>,
     indirect_return: *MIRValue,
     current_return: *HIRType,
     module: *mut MIRModule;
@@ -281,7 +282,7 @@ class MIRLowerer {
             }
         }
 
-        this.LowerBlockStatement(function->body);
+        this.LowerBlockExpression(function->body, null);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
             if function->_return->IsVoid() {
@@ -485,38 +486,17 @@ class MIRLowerer {
 
     fn LowerStatement(&mut this, statement: *HIRStatement) {
         match statement->kind {
-            HIRStatementKind::Block => {
-                this.LowerBlockStatement(statement as *HIRBlockStatement);
-            },
             HIRStatementKind::Variable => {
                 this.LowerLetStatement(statement as *HIRLetStatement);
             },
             HIRStatementKind::Expression => {
-                this.LowerExpression((statement as *HIRExpressionStatement)->expression);
-            },
-            HIRStatementKind::If => {
-                this.LowerIfStatement(statement as *HIRIfStatement);
-            },
-            HIRStatementKind::While => {
-                this.LowerWhileStatement(statement as *HIRWhileStatement);
-            },
-            HIRStatementKind::Loop => {
-                this.LowerLoopStatement(statement as *HIRLoopStatement);
-            },
-            HIRStatementKind::For => {
-                this.LowerForStatement(statement as *HIRForStatement);
-            },
-            HIRStatementKind::Match => {
-                this.LowerMatchStatement(statement as *HIRMatchStatement);
-            },
-            HIRStatementKind::Return => {
-                this.LowerReturnStatement(statement as *HIRReturnStatement);
-            },
-            HIRStatementKind::Break => {
-                this.LowerBreakStatement(statement as *HIRBreakStatement);
-            },
-            HIRStatementKind::Continue => {
-                this.LowerContinueStatement(statement as *HIRContinueStatement);
+                let expression = (statement as *HIRExpressionStatement)->expression;
+
+                if expression->IsControl() && !expression->_type->HasSpecialMembers() {
+                    this.LowerControlExpression(expression, null);
+                } else {
+                    this.LowerExpression(expression);
+                }
             },
             HIRStatementKind::Assembly => {
                 this.LowerAssemblyStatement(statement as *HIRAssemblyStatement);
@@ -524,18 +504,92 @@ class MIRLowerer {
         }
     }
 
-    fn LowerBlockStatement(&mut this, block: *HIRBlockStatement) {
-        for statement in block->statements {
-            if this.builder.GetCurrentBlock()->HasTerminator() { break; }
-            this.LowerStatement(statement);
-        }
-    }
-
     fn LowerLetStatement(&mut this, _let: *HIRLetStatement) {
         this.BindPattern(_let->pattern);
     }
 
-    fn LowerIfStatement(&mut this, _if: *HIRIfStatement) {
+    fn LowerAssemblyStatement(&mut this, assembly: *HIRAssemblyStatement) {
+        let mut inputs = Vector<*MIRAssemblyOperand>();
+
+        for input in assembly->inputs {
+            let value = this.LowerExpression(input->expression);
+            if value == null { continue; }
+            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, value));
+        }
+
+        let mut outputs = Vector<*MIRAssemblyOperand>();
+
+        for output in assembly->outputs {
+            let value = this.LowerPlaceExpression(output->expression);
+            if value == null { continue; }
+            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, value));
+        }
+
+        this.builder.BuildAssembly(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
+    }
+
+    fn EnsureReachable(&mut this) {
+        if this.builder.GetCurrentBlock()->HasTerminator() {
+            this.builder.SetCurrentBlock(this.builder.BuildBlock("unreachable".ToString()));
+        }
+    }
+
+    fn LowerControlExpression(&mut this, expression: *HIRExpression, destination: *MIRValue) {
+        match expression->kind {
+            HIRExpressionKind::Block => {
+                this.LowerBlockExpression(expression as *HIRBlockExpression, destination);
+            },
+            HIRExpressionKind::If => {
+                this.LowerIfExpression(expression as *HIRIfExpression, destination);
+            },
+            HIRExpressionKind::While => {
+                this.LowerWhileExpression(expression as *HIRWhileExpression);
+            },
+            HIRExpressionKind::Loop => {
+                this.LowerLoopExpression(expression as *HIRLoopExpression, destination);
+            },
+            HIRExpressionKind::For => {
+                this.LowerForExpression(expression as *HIRForExpression);
+            },
+            HIRExpressionKind::Match => {
+                this.LowerMatchExpression(expression as *HIRMatchExpression, destination);
+            },
+            HIRExpressionKind::Return => {
+                this.LowerReturnExpression(expression as *HIRReturnExpression);
+            },
+            HIRExpressionKind::Break => {
+                this.LowerBreakExpression(expression as *HIRBreakExpression);
+            },
+            HIRExpressionKind::Continue => {
+                this.LowerContinueExpression(expression as *HIRContinueExpression);
+            },
+            _ => {
+                if destination != null {
+                    this.LowerExpressionTo(expression, destination);
+                } else {
+                    this.LowerExpression(expression);
+                }
+            }
+        }
+    }
+
+    fn LowerBlockExpression(&mut this, block: *HIRBlockExpression, destination: *MIRValue) {
+        for statement in block->statements {
+            if this.builder.GetCurrentBlock()->HasTerminator() { break; }
+            this.LowerStatement(statement);
+        }
+
+        if block->tail != null && !this.builder.GetCurrentBlock()->HasTerminator() {
+            this.LowerControlExpression(block->tail, destination);
+        }
+
+        for destructor in block->destructors {
+            if this.builder.GetCurrentBlock()->HasTerminator() { break; }
+            this.LowerExpression(destructor);
+        }
+    }
+
+    fn LowerIfExpression(&mut this, _if: *HIRIfExpression, destination: *MIRValue) {
         let mut condition: *MIRValue = null;
 
         if _if->condition->pattern != null {
@@ -562,7 +616,7 @@ class MIRLowerer {
             let else_block = this.builder.BuildBlock("if.else".ToString());
             this.builder.BuildConditionalBranch(condition, then_block, else_block);
             this.builder.SetCurrentBlock(else_block);
-            this.LowerBlockStatement(_if->else_body);
+            this.LowerControlExpression(_if->else_body, destination);
 
             if !this.builder.GetCurrentBlock()->HasTerminator() {
                 merge_block = this.builder.BuildBlock("if.merge".ToString());
@@ -576,7 +630,7 @@ class MIRLowerer {
             this.BindPattern(_if->condition->pattern);
         }
 
-        this.LowerBlockStatement(_if->then_body);
+        this.LowerBlockExpression(_if->then_body, destination);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
             if merge_block == null {
@@ -589,7 +643,7 @@ class MIRLowerer {
         }
     }
 
-    fn LowerWhileStatement(&mut this, _while: *HIRWhileStatement) {
+    fn LowerWhileExpression(&mut this, _while: *HIRWhileExpression) {
         let condition_block = this.builder.BuildBlock("while.cond".ToString());
         let body_block = this.builder.BuildBlock("while.body".ToString());
         let end_block = this.builder.BuildBlock("while.end".ToString());
@@ -621,7 +675,9 @@ class MIRLowerer {
 
         this.break_blocks.PushBack(end_block);
         this.continue_blocks.PushBack(condition_block);
-        this.LowerBlockStatement(_while->while_body);
+        this.break_destinations.PushBack(null);
+        this.LowerBlockExpression(_while->while_body, null);
+        this.break_destinations.PopBack();
         this.continue_blocks.PopBack();
         this.break_blocks.PopBack();
 
@@ -632,7 +688,7 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(end_block);
     }
 
-    fn LowerLoopStatement(&mut this, _loop: *HIRLoopStatement) {
+    fn LowerLoopExpression(&mut this, _loop: *HIRLoopExpression, destination: *MIRValue) {
         let body_block = this.builder.BuildBlock("loop.body".ToString());
         let end_block = this.builder.BuildBlock("loop.end".ToString());
         this.builder.BuildBranch(body_block);
@@ -640,7 +696,9 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(body_block);
         this.break_blocks.PushBack(end_block);
         this.continue_blocks.PushBack(body_block);
-        this.LowerBlockStatement(_loop->body);
+        this.break_destinations.PushBack(destination);
+        this.LowerBlockExpression(_loop->body, null);
+        this.break_destinations.PopBack();
         this.continue_blocks.PopBack();
         this.break_blocks.PopBack();
 
@@ -651,7 +709,7 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(end_block);
     }
 
-    fn LowerForStatement(&mut this, _for: *HIRForStatement) {
+    fn LowerForExpression(&mut this, _for: *HIRForExpression) {
         this.BindPattern(_for->iterator);
         this.BindPattern(_for->target);
 
@@ -669,7 +727,9 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(body_block);
         this.break_blocks.PushBack(end_block);
         this.continue_blocks.PushBack(step_block);
-        this.LowerBlockStatement(_for->body);
+        this.break_destinations.PushBack(null);
+        this.LowerBlockExpression(_for->body, null);
+        this.break_destinations.PopBack();
         this.continue_blocks.PopBack();
         this.break_blocks.PopBack();
 
@@ -691,7 +751,7 @@ class MIRLowerer {
         }
     }
 
-    fn LowerMatchStatement(&mut this, _match: *HIRMatchStatement) {
+    fn LowerMatchExpression(&mut this, _match: *HIRMatchExpression, destination: *MIRValue) {
         let target = this.LowerPlaceExpression(_match->target);
         if target == null { return; }
 
@@ -713,12 +773,17 @@ class MIRLowerer {
             if arm->guard != null {
                 let guard = this.LowerExpression(arm->guard);
                 if guard == null { return; }
+
+                for destructor in arm->destructors {
+                    this.LowerExpression(destructor);
+                }
+
                 let guard_block = this.builder.BuildBlock("match.guard".ToString());
                 this.builder.BuildConditionalBranch(guard, guard_block, next_block);
                 this.builder.SetCurrentBlock(guard_block);
             }
 
-            this.LowerBlockStatement(arm->body);
+            this.LowerBlockExpression(arm->body, destination);
 
             if !this.builder.GetCurrentBlock()->HasTerminator() {
                 this.builder.BuildBranch(merge_block);
@@ -738,16 +803,16 @@ class MIRLowerer {
         this.builder.SetCurrentBlock(merge_block);
     }
 
-    fn LowerReturnStatement(&mut this, _return: *HIRReturnStatement) {
+    fn LowerReturnExpression(&mut this, _return: *HIRReturnExpression) {
         if this.indirect_return != null {
-            this.LowerExpressionTo(_return->expression, this.indirect_return);
+            this.LowerExpressionTo(_return->value, this.indirect_return);
             for destructor in _return->destructors { this.LowerExpression(destructor); }
             this.builder.BuildReturn(null);
         } else if this.IsAggregate(this.current_return) {
             let _type = this.LowerType(this.current_return);
             if _type == null { return; }
             let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), _type);
-            this.LowerExpressionTo(_return->expression, alloca);
+            this.LowerExpressionTo(_return->value, alloca);
             let target = this.context.PointerType(this.LowerAggregateType(this.current_return));
             let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
             let load = this.builder.BuildLoad("abi.value".ToString(), pointer);
@@ -757,8 +822,8 @@ class MIRLowerer {
         } else {
             let mut value: *MIRValue = null;
 
-            if _return->expression != null {
-                value = this.LowerExpression(_return->expression);
+            if _return->value != null {
+                value = this.LowerExpression(_return->value);
                 if value == null { return; }
             }
 
@@ -768,36 +833,34 @@ class MIRLowerer {
         }
     }
 
-    fn LowerBreakStatement(&mut this, _break: *HIRBreakStatement) {
+    fn LowerBreakExpression(&mut this, _break: *HIRBreakExpression) {
+        if _break->value != null {
+            let mut destination: *MIRValue = null;
+
+            if !this.break_destinations.Empty() {
+                destination = this.break_destinations.Back();
+            }
+
+            this.LowerControlExpression(_break->value, destination);
+        }
+
+        for destructor in _break->destructors {
+            this.LowerExpression(destructor);
+        }
+
         if !this.break_blocks.Empty() {
             this.builder.BuildBranch(this.break_blocks.Back());
         }
     }
 
-    fn LowerContinueStatement(&mut this, _continue: *HIRContinueStatement) {
+    fn LowerContinueExpression(&mut this, _continue: *HIRContinueExpression) {
+        for destructor in _continue->destructors {
+            this.LowerExpression(destructor);
+        }
+
         if !this.continue_blocks.Empty() {
             this.builder.BuildBranch(this.continue_blocks.Back());
         }
-    }
-
-    fn LowerAssemblyStatement(&mut this, assembly: *HIRAssemblyStatement) {
-        let mut inputs = Vector<*MIRAssemblyOperand>();
-
-        for input in assembly->inputs {
-            let value = this.LowerExpression(input->expression);
-            if value == null { continue; }
-            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, value));
-        }
-
-        let mut outputs = Vector<*MIRAssemblyOperand>();
-
-        for output in assembly->outputs {
-            let value = this.LowerPlaceExpression(output->expression);
-            if value == null { continue; }
-            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, value));
-        }
-
-        this.builder.BuildAssembly(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
     }
 
     fn LowerConstantExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
@@ -930,6 +993,11 @@ class MIRLowerer {
                 this.LowerTernaryExpressionTo(expression as *HIRTernaryExpression, destination);
                 this.temporaries[expression] = destination;
             },
+            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => {
+                this.LowerControlExpression(expression, destination);
+                this.temporaries[expression] = destination;
+                this.EnsureReachable();
+            },
             _ => {
                 let value = this.LowerExpression(expression);
                 if value == null { return; }
@@ -980,6 +1048,11 @@ class MIRLowerer {
             },
             HIRExpressionKind::Ternary if !this.IsAggregate(expression->_type) => {
                 return this.LowerTernaryExpression(expression as *HIRTernaryExpression);
+            },
+            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsVoid() || expression->_type->IsNever() => {
+                this.LowerControlExpression(expression, null);
+                this.EnsureReachable();
+                return this.builder.ConstantUndef(this.LowerType(expression->_type));
             },
             _ => {
                 let place = this.LowerPlaceExpression(expression);

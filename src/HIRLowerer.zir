@@ -26,17 +26,24 @@ enum HIRBindingMode: u8 {
     Value, Reference
 }
 
+enum HIRBlockTail: u8 {
+    Value, Discard, Return
+}
+
 class HIRLoweringFrame {
     pub scope: *mut Scope = null,
     pub function: *mut HIRFunctionDeclaration = null,
-    pub block: *mut HIRBlockStatement = null,
+    pub block: *mut HIRBlockExpression = null,
     pub generic: *mut GenericDeclaration = null,
     pub _type: *HIRType = null,
     pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,
     pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
     pub _unsafe: bool = false,
     pub temporaries: Vector<*HIRExpression>,
-    pub loop_scopes: Vector<*mut Scope>;
+    pub temporary_stack: Vector<Vector<*HIRExpression>>,
+    pub loop_scopes: Vector<*mut Scope>,
+    pub loop_targets: Vector<*mut HIRLoopExpression>,
+    pub loop_temporaries: Vector<usize>;
 
     HIRLoweringFrame(&mut this, scope: *mut Scope, generic: *mut GenericDeclaration, _type: *HIRType) {
         (this.scope, this.generic, this._type) = (scope, generic, _type);
@@ -58,7 +65,10 @@ class HIRLowerer {
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
     temporaries: Vector<*HIRExpression>,
+    temporary_stack: Vector<Vector<*HIRExpression>>,
     loop_scopes: Vector<*mut Scope>,
+    loop_targets: Vector<*mut HIRLoopExpression>,
+    loop_temporaries: Vector<usize>,
 
     pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,
     pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
@@ -93,7 +103,10 @@ class HIRLowerer {
         (frame.generic, frame._type, frame._unsafe) = (generic, _type, _unsafe);
         (frame.abi, frame.linkage) = (abi, linkage);
         this.temporaries.Swap(frame.temporaries);
+        this.temporary_stack.Swap(frame.temporary_stack);
         this.loop_scopes.Swap(frame.loop_scopes);
+        this.loop_targets.Swap(frame.loop_targets);
+        this.loop_temporaries.Swap(frame.loop_temporaries);
     }
 
     pub fn Lower(&mut this, module: *ASTModule) -> *HIRModule {
@@ -336,6 +349,9 @@ class HIRLowerer {
             HIRExpressionKind::Deferred => {
                 return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, target), target);
             },
+            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::Match | HIRExpressionKind::Loop if expression->_type->IsLiteral() => {
+                return this.CoerceBranch(expression, target, false, null);
+            },
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Array => {
                 let array = expression as *mut HIRArrayLiteral;
 
@@ -402,6 +418,9 @@ class HIRLowerer {
                     return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, null));
                 },
                 HIRExpressionKind::Literal if ((expression as *HIRLiteral)->kind == HIRLiteralKind::Array || (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple) => {
+                    return this.Coerce(expression, this.context.VoidType());
+                },
+                HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::Match | HIRExpressionKind::Loop if expression->_type->IsLiteral() => {
                     return this.Coerce(expression, this.context.VoidType());
                 },
                 _ if expression->_type->IsLiteral() => {
@@ -707,85 +726,14 @@ class HIRLowerer {
             }
         }
 
-        declaration->body = this.LowerBlockStatement(function->body);
+        declaration->body = this.LowerBlockExpression(function->body, true, HIRBlockTail::Return);
         this.scope_manager.PopScope();
 
-        if declaration->body != null && !this.Diverges(declaration->body) {
+        if declaration->body != null && !declaration->body->_type->IsNever() {
             if declaration->_return->IsNever() {
                 Logger::Log("Function '" + function->name + "' has return type '!' but may return.", function, LogSeverity::Error);
             } else if !declaration->_return->IsVoid() {
                 Logger::Log("Function '" + function->name + "' does not return a value on all paths.", function, LogSeverity::Error);
-            }
-        }
-    }
-
-    fn ContainsBreak(&mut this, statement: *HIRStatement) -> bool {
-        if statement == null {
-            return false;
-        }
-
-        match statement->kind {
-            HIRStatementKind::Break => {
-                return true;
-            },
-            HIRStatementKind::Block => {
-                for child in (statement as *HIRBlockStatement)->statements {
-                    if this.ContainsBreak(child) { return true; }
-                } return false;
-            },
-            HIRStatementKind::If => {
-                let _if = statement as *HIRIfStatement;
-                return this.ContainsBreak(_if->then_body) || this.ContainsBreak(_if->else_body);
-            },
-            HIRStatementKind::Match => {
-                for arm in (statement as *HIRMatchStatement)->arms {
-                    if this.ContainsBreak(arm->body) { return true; }
-                } return false;
-            },
-            HIRStatementKind::While => {
-                return this.ContainsBreak((statement as *HIRWhileStatement)->else_body);
-            },
-            _ => {
-                return false;
-            }
-        }
-    }
-
-    fn Diverges(&mut this, statement: *HIRStatement) -> bool {
-        if statement == null {
-            return false;
-        }
-
-        match statement->kind {
-            HIRStatementKind::Return | HIRStatementKind::Break | HIRStatementKind::Continue => {
-                return true;
-            },
-            HIRStatementKind::Block => {
-                for child in (statement as *HIRBlockStatement)->statements {
-                    if this.Diverges(child) { return true; }
-                } return false;
-            },
-            HIRStatementKind::Expression => {
-                let expression = (statement as *HIRExpressionStatement)->expression;
-                return expression != null && expression->_type->IsNever();
-            },
-            HIRStatementKind::If => {
-                let _if = statement as *HIRIfStatement;
-                return _if->else_body != null && this.Diverges(_if->then_body) && this.Diverges(_if->else_body);
-            },
-            HIRStatementKind::Loop => {
-                return !this.ContainsBreak((statement as *HIRLoopStatement)->body);
-            },
-            HIRStatementKind::Match => {
-                let _match = statement as *HIRMatchStatement;
-                if !_match->IsExhaustive() { return false; }
-
-                for arm in _match->arms {
-                    if !this.Diverges(arm->body) { return false; }
-                } return true;
-            },
-            _ => {
-                return false;
             }
         }
     }
@@ -881,7 +829,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -909,7 +857,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -932,7 +880,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration("operator=".ToString(), _type, this.context.ReferenceType(_type, false), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -951,7 +899,7 @@ class HIRLowerer {
                 this.LowerFieldCopyAssignment(this_element, other_element, _type->element, null);
             }
 
-            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
             this.scope_manager.PopScope();
             this.module->declarations.PushBack(function);
             _type->copy_assign = function;
@@ -975,7 +923,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1002,7 +950,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1024,7 +972,7 @@ class HIRLowerer {
             let function = this.LowerImplicitDeclaration("operator=".ToString(), _type, this.context.ReferenceType(_type, false), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1042,7 +990,7 @@ class HIRLowerer {
                 this.LowerFieldCopyAssignment(this_element, other_element, _type->elements[i], null);
             }
 
-            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
             this.scope_manager.PopScope();
             this.module->declarations.PushBack(function);
             _type->copy_assign = function;
@@ -1279,7 +1227,7 @@ class HIRLowerer {
             }
         }
 
-        let block = this.builder.BuildBlockStatement();
+        let block = this.builder.Block();
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
 
@@ -1326,6 +1274,10 @@ class HIRLowerer {
             this.LowerStatement(statement);
         }
 
+        if function->body->tail != null {
+            this.LowerBlockTail(function->body->tail, HIRBlockTail::Discard, block);
+        }
+
         this.BuildDestructors(this.scope_manager.current, null);
         this.scope_manager.PopScope();
     }
@@ -1355,12 +1307,16 @@ class HIRLowerer {
             }
         }
 
-        let block = this.builder.BuildBlockStatement();
+        let block = this.builder.Block();
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
 
         for statement in function->body->statements {
             this.LowerStatement(statement);
+        }
+
+        if function->body->tail != null {
+            this.LowerBlockTail(function->body->tail, HIRBlockTail::Discard, block);
         }
 
         this.BuildDestructors(this.scope_manager.current, null);
@@ -1391,7 +1347,7 @@ class HIRLowerer {
             let function = declaration->constructors[index];
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1406,7 +1362,7 @@ class HIRLowerer {
             let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1431,7 +1387,7 @@ class HIRLowerer {
             let function = declaration->destructor;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1464,7 +1420,7 @@ class HIRLowerer {
             let function: *mut HIRFunctionDeclaration = declaration->methods.Back();
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1480,7 +1436,7 @@ class HIRLowerer {
                 this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, _class);
             }
 
-            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
             this.scope_manager.PopScope();
         }
 
@@ -1564,7 +1520,7 @@ class HIRLowerer {
             let function = declaration->copy_constructor;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1587,7 +1543,7 @@ class HIRLowerer {
             let function = declaration->destructor;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1606,7 +1562,7 @@ class HIRLowerer {
             let function = declaration->copy_assign;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1622,7 +1578,7 @@ class HIRLowerer {
                 this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
             }
 
-            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
             this.scope_manager.PopScope();
         }
 
@@ -1759,7 +1715,7 @@ class HIRLowerer {
             let function = declaration->copy_constructor;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1778,16 +1734,16 @@ class HIRLowerer {
                 let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
-                let then_block = this.builder.BuildBlockStatement();
+                let then_block = this.builder.Block();
                 this.builder.SetCurrentBlock(then_block);
 
                 for field in member->fields {
                     this.LowerFieldCopyConstructor(this.builder.MemberAccess(this_dereferenced, member, field), this.builder.MemberAccess(other_dereferenced, member, field), field->_type, variant);
                 }
 
-                this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
+                this.builder.BuildExpressionStatement(this.builder.Return(null, Vector<*HIRExpression>()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
             }
 
             this.scope_manager.PopScope();
@@ -1797,7 +1753,7 @@ class HIRLowerer {
             let function = declaration->destructor;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1810,16 +1766,16 @@ class HIRLowerer {
                 let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
-                let then_block = this.builder.BuildBlockStatement();
+                let then_block = this.builder.Block();
                 this.builder.SetCurrentBlock(then_block);
 
                 for field in member->fields {
                     this.LowerFieldDestructor(this.builder.MemberAccess(this_dereferenced, member, field), field->_type, variant);
                 }
 
-                this.builder.BuildReturnStatement(null, Vector<*HIRExpression>());
+                this.builder.BuildExpressionStatement(this.builder.Return(null, Vector<*HIRExpression>()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
             }
 
             this.scope_manager.PopScope();
@@ -1829,7 +1785,7 @@ class HIRLowerer {
             let function = declaration->copy_assign;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
-            let block = this.builder.BuildBlockStatement();
+            let block = this.builder.Block();
             this.builder.SetCurrentBlock(block);
             function->body = block;
 
@@ -1847,18 +1803,18 @@ class HIRLowerer {
                 let member_tag = this.builder.IntegerLiteral(other_member->index as u64, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, other_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
-                let then_block = this.builder.BuildBlockStatement();
+                let then_block = this.builder.Block();
                 this.builder.SetCurrentBlock(then_block);
 
                 let same_condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
-                let same_block = this.builder.BuildBlockStatement();
+                let same_block = this.builder.Block();
                 this.builder.SetCurrentBlock(same_block);
 
                 for field in other_member->fields {
                     this.LowerFieldCopyAssignment(this.builder.MemberAccess(this_dereferenced, other_member, field), this.builder.MemberAccess(other_dereferenced, other_member, field), field->_type, variant);
                 }
 
-                let different_block = this.builder.BuildBlockStatement();
+                let different_block = this.builder.Block();
                 this.builder.SetCurrentBlock(different_block);
 
                 for this_member in declaration->members {
@@ -1866,7 +1822,7 @@ class HIRLowerer {
                     let member_tag = this.builder.IntegerLiteral(this_member->index as u64, this.context.IntegerType(8, false));
                     let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                     let previous_block = this.builder.GetCurrentBlock();
-                    let then_block = this.builder.BuildBlockStatement();
+                    let then_block = this.builder.Block();
                     this.builder.SetCurrentBlock(then_block);
 
                     for field in this_member->fields {
@@ -1874,7 +1830,7 @@ class HIRLowerer {
                     }
 
                     this.builder.SetCurrentBlock(previous_block);
-                    this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+                    this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
                 }
 
                 for field in other_member->fields {
@@ -1883,12 +1839,12 @@ class HIRLowerer {
 
                 this.builder.BuildExpressionStatement(this.builder.Assignment(this_tag, member_tag));
                 this.builder.SetCurrentBlock(then_block);
-                this.builder.BuildIfStatement(same_condition, Vector<*HIRExpression>(), same_block, different_block);
+                this.builder.BuildExpressionStatement(this.builder.If(same_condition, Vector<*HIRExpression>(), same_block, different_block, this.context.VoidType()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildIfStatement(condition, Vector<*HIRExpression>(), then_block, null);
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
             }
 
-            this.builder.BuildReturnStatement(this_reference, Vector<*HIRExpression>());
+            this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
             this.scope_manager.PopScope();
         }
 
@@ -1967,9 +1923,6 @@ class HIRLowerer {
 
     fn LowerStatement(&mut this, statement: *ASTStatement) {
         match statement->kind {
-            ASTStatementKind::Block => {
-                this.LowerBlockStatement(statement as *ASTBlockStatement);
-            },
             ASTStatementKind::Variable => {
                 this.LowerLetStatement(statement as *ASTLetStatement);
             },
@@ -1984,6 +1937,8 @@ class HIRLowerer {
 
                         if expression != null {
                             this.builder.BuildExpressionStatement(expression);
+                        } else {
+                            this.MarkErroneous();
                         }
 
                         this.BuildTemporaryDestructors(null);
@@ -1994,54 +1949,15 @@ class HIRLowerer {
 
                     if expression != null {
                         this.builder.BuildExpressionStatement(expression);
+                    } else {
+                        this.MarkErroneous();
                     } this.BuildTemporaryDestructors(null);
                 }
-            },
-            ASTStatementKind::If => {
-                this.LowerIfStatement(statement as *ASTIfStatement);
-            },
-            ASTStatementKind::While => {
-                this.LowerWhileStatement(statement as *ASTWhileStatement);
-            },
-            ASTStatementKind::Loop => {
-                this.LowerLoopStatement(statement as *ASTLoopStatement);
-            },
-            ASTStatementKind::For => {
-                this.LowerForStatement(statement as *ASTForStatement);
-            },
-            ASTStatementKind::Match => {
-                this.LowerMatchStatement(statement as *ASTMatchStatement);
-            },
-            ASTStatementKind::Return => {
-                this.LowerReturnStatement(statement as *ASTReturnStatement);
-            },
-            ASTStatementKind::Break => {
-                this.LowerBreakStatement(statement as *ASTBreakStatement);
-            },
-            ASTStatementKind::Continue => {
-                this.LowerContinueStatement(statement as *ASTContinueStatement);
-            },
-            ASTStatementKind::Unsafe => {
-                this.LowerUnsafeStatement(statement as *ASTUnsafeStatement);
             },
             ASTStatementKind::Assembly => {
                 this.LowerAssemblyStatement(statement as *ASTAssemblyStatement);
             }
         }
-    }
-
-    fn LowerBlockStatement(&mut this, block: *ASTBlockStatement) -> *HIRBlockStatement {
-        let previous_block = this.builder.GetCurrentBlock();
-        let statement = this.builder.BuildBlockStatement();
-        this.builder.SetCurrentBlock(statement);
-
-        for statement in block->statements {
-            this.LowerStatement(statement);
-        }
-
-        this.BuildDestructors(this.scope_manager.current, null);
-        this.builder.SetCurrentBlock(previous_block);
-        return statement;
     }
 
     fn LowerLetStatement(&mut this, _let: *ASTLetStatement) {
@@ -2078,10 +1994,108 @@ class HIRLowerer {
         }
     }
 
-    fn LowerIfStatement(&mut this, _if: *ASTIfStatement) {
+    fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
+        let mut inputs = Vector<*HIRAssemblyOperand>();
+
+        for input in assembly->inputs {
+            let expression = this.LowerExpression(input->expression);
+            if expression == null { continue; }
+            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, expression));
+        }
+
+        let mut outputs = Vector<*HIRAssemblyOperand>();
+
+        for output in assembly->outputs {
+            if !outputs.Empty() {
+                Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
+            }
+
+            let expression = this.LowerExpression(output->expression);
+            if expression == null { continue; }
+            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, expression));
+        }
+
+        this.builder.BuildAssemblyStatement(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
+    }
+
+    fn LowerBlockExpression(&mut this, block: *ASTBlockExpression, destruct: bool, tail: HIRBlockTail) -> *mut HIRBlockExpression {
+        let previous_block = this.builder.GetCurrentBlock();
+        let result = this.builder.Block();
+        this.builder.SetCurrentBlock(result);
+        this.temporary_stack.PushBack(this.temporaries);
+        this.temporaries.Clear();
+
+        for statement in block->statements {
+            this.LowerStatement(statement);
+        }
+
+        if block->tail != null {
+            this.LowerBlockTail(block->tail, tail, result);
+        }
+
+        if destruct {
+            result->destructors += this.GetDestructors(this.scope_manager.current, null);
+        }
+
+        if result->tail == null {
+            for statement in result->statements {
+                if statement->kind == HIRStatementKind::Expression && (statement as *HIRExpressionStatement)->expression->_type->IsNever() {
+                    result->_type = this.context.NeverType();
+                    break;
+                }
+            }
+        }
+
+        this.temporaries = this.temporary_stack.PopBack();
+        this.builder.SetCurrentBlock(previous_block);
+        return result;
+    }
+
+    fn LowerBlockTail(&mut this, expression: *ASTExpression, tail: HIRBlockTail, block: *mut HIRBlockExpression) {
+        let value = this.LowerExpression(expression);
+
+        if value == null {
+            this.MarkErroneous();
+            return;
+        }
+
+        let returns = tail == HIRBlockTail::Return && !this.builder.GetCurrentFunction()->_return->IsVoid();
+
+        if value->_type->IsNever() || (value->_type->IsVoid() && !returns) {
+            this.builder.BuildExpressionStatement(value);
+            this.BuildTemporaryDestructors(null);
+        } else if returns {
+            let _return = this.LowerReturn(value, expression, expression);
+
+            if _return != null {
+                this.builder.BuildExpressionStatement(_return);
+            } else {
+                this.MarkErroneous();
+            }
+        } else if tail == HIRBlockTail::Value {
+            let moved = this.LowerCopyOrMoveValue(value);
+            if moved == null { return; }
+            (block->tail, block->_type) = (moved, moved->_type);
+            block->destructors = this.GetTemporaryDestructors(moved);
+        } else {
+            Logger::Log("Expected a value of type 'void', but found '" + value->_type->ToString() + "'; add ';' to discard it.", expression, LogSeverity::Error);
+        }
+    }
+
+    fn MarkErroneous(&mut this) {
+        this.builder.GetCurrentBlock()->_type = this.context.NeverType();
+    }
+
+    fn RegisterTemporary(&mut this, expression: *HIRExpression) -> *HIRExpression {
+        if expression != null && expression->_type->HasSpecialMembers() {
+            this.temporaries.PushBack(expression);
+        } return expression;
+    }
+
+    fn LowerIfExpression(&mut this, _if: *ASTIfExpression) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
         let expression = this.ImplicitDereference(this.LowerExpression(_if->condition->expression));
-        if expression == null { return; }
+        if expression == null { return null; }
         let destructors = this.GetTemporaryDestructors(expression);
         this.scope_manager.PushScope("<then>".ToString(), false);
 
@@ -2090,7 +2104,7 @@ class HIRLowerer {
 
             if pattern == null {
                 this.scope_manager.PopScope();
-                return;
+                return null;
             }
 
             condition = this.builder.BuildCondition(pattern, expression);
@@ -2102,33 +2116,39 @@ class HIRLowerer {
             condition = this.builder.BuildCondition(expression);
         }
 
-        let (then_body, mut else_body) = (this.LowerBlockStatement(_if->body), null as *HIRBlockStatement);
+        let then_body = this.LowerBlockExpression(_if->body, true, HIRBlockTail::Value);
         this.scope_manager.PopScope();
+        let mut else_body: *HIRExpression = null;
 
         if _if->_else != null {
             this.scope_manager.PushScope("<else>".ToString(), false);
 
-            if _if->_else->kind == ASTStatementKind::Block {
-                else_body = this.LowerBlockStatement(_if->_else as *ASTBlockStatement);
+            if _if->_else->kind == ASTExpressionKind::Block {
+                else_body = this.LowerBlockExpression(_if->_else as *ASTBlockExpression, true, HIRBlockTail::Value);
             } else {
-                let previous_block = this.builder.GetCurrentBlock();
-                let else_block = this.builder.BuildBlockStatement();
-                this.builder.SetCurrentBlock(else_block);
-                this.LowerStatement(_if->_else);
-                this.builder.SetCurrentBlock(previous_block);
-                else_body = else_block;
+                else_body = this.LowerIfExpression(_if->_else as *ASTIfExpression);
             }
 
             this.scope_manager.PopScope();
+            if else_body == null { return null; }
         }
 
-        this.builder.BuildIfStatement(condition, destructors, then_body, else_body);
+        let result = this.builder.If(condition, destructors, then_body, else_body, this.context.VoidType());
+
+        if else_body != null {
+            let _type = this.UnifyBranches(result, _if);
+            if _type == null { return null; }
+            result->_type = _type;
+        } else if !then_body->_type->IsVoid() && !then_body->_type->IsNever() {
+            Logger::Log("An 'if' without an 'else' cannot produce a value.", _if, LogSeverity::Error);
+            return null;
+        } return result;
     }
 
-    fn LowerWhileStatement(&mut this, _while: *ASTWhileStatement) {
+    fn LowerWhileExpression(&mut this, _while: *ASTWhileExpression) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
         let expression = this.ImplicitDereference(this.LowerExpression(_while->condition->expression));
-        if expression == null { return; }
+        if expression == null { return null; }
         let destructors = this.GetTemporaryDestructors(expression);
         this.scope_manager.PushScope("<while>".ToString(), false);
 
@@ -2137,7 +2157,7 @@ class HIRLowerer {
 
             if pattern == null {
                 this.scope_manager.PopScope();
-                return;
+                return null;
             }
 
             condition = this.builder.BuildCondition(pattern, expression);
@@ -2150,29 +2170,63 @@ class HIRLowerer {
         }
 
         this.loop_scopes.PushBack(this.scope_manager.current);
-        let (while_body, mut else_body) = (this.LowerBlockStatement(_while->body), null as *HIRBlockStatement);
+        this.loop_targets.PushBack(null);
+        this.loop_temporaries.PushBack(this.temporary_stack.Size());
+        let while_body = this.LowerBlockExpression(_while->body, true, HIRBlockTail::Discard);
+        this.loop_temporaries.PopBack();
+        this.loop_targets.PopBack();
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
+        let mut else_body: *HIRBlockExpression = null;
 
         if _while->_else != null {
             this.scope_manager.PushScope("<else>".ToString(), false);
-            else_body = this.LowerBlockStatement(_while->_else);
+            else_body = this.LowerBlockExpression(_while->_else, true, HIRBlockTail::Discard);
             this.scope_manager.PopScope();
         }
 
-        this.builder.BuildWhileStatement(condition, destructors, while_body, else_body);
+        return this.builder.While(condition, destructors, while_body, else_body);
     }
 
-    fn LowerLoopStatement(&mut this, _loop: *ASTLoopStatement) {
+    fn LowerLoopExpression(&mut this, _loop: *ASTLoopExpression) -> *HIRExpression {
+        let result = this.builder.Loop();
         this.scope_manager.PushScope("<loop>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
-        let body = this.LowerBlockStatement(_loop->body);
+        this.loop_targets.PushBack(result);
+        this.loop_temporaries.PushBack(this.temporary_stack.Size());
+        result->body = this.LowerBlockExpression(_loop->body, true, HIRBlockTail::Discard);
+        this.loop_temporaries.PopBack();
+        this.loop_targets.PopBack();
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
-        this.builder.BuildLoopStatement(body);
+
+        if result->breaks.Empty() {
+            result->_type = this.context.NeverType();
+            return result;
+        }
+
+        let mut values: usize = 0;
+
+        for _break in result->breaks {
+            if _break->value != null {
+                values += 1;
+            }
+        }
+
+        if values == 0 {
+            return result;
+        } else if values != result->breaks.Size() {
+            Logger::Log("Every 'break' of a 'loop' that produces a value must have a value.", _loop, LogSeverity::Error);
+            return null;
+        }
+
+        let _type = this.UnifyBranches(result, _loop);
+        if _type == null { return null; }
+        result->_type = _type;
+        return result;
     }
 
-    fn LowerForStatement(&mut this, _for: *ASTForStatement) {
+    fn LowerForExpression(&mut this, _for: *ASTForExpression) -> *HIRExpression {
         let (mut start, mut end): (*HIRExpression, *HIRExpression);
         let (mut is_range, mut inclusive) = (false, false);
         let temporary_index = this.temporaries.Size();
@@ -2182,12 +2236,12 @@ class HIRLowerer {
             (is_range, inclusive) = (true, range->inclusive);
             start = this.ImplicitDereference(this.LowerExpression(range->start));
             end = this.ImplicitDereference(this.LowerExpression(range->end));
-            if start == null || end == null { return; }
+            if start == null || end == null { return null; }
             start = this.Coerce(start, end->_type);
             end = this.Coerce(end, start->_type);
         } else {
             let iterable = this.ImplicitDereference(this.LowerExpression(_for->iterable));
-            if iterable == null { return; }
+            if iterable == null { return null; }
 
             if iterable->_type->IsArray() {
                 let index_type = this.context.IntegerPointerType(false);
@@ -2211,30 +2265,30 @@ class HIRLowerer {
 
                 if begin_function == null || end_function == null {
                     Logger::Log("For loop iterable must provide 'Begin()' and 'End()' methods.", _for, LogSeverity::Error);
-                    return;
+                    return null;
                 }
 
                 start = this.LowerResolvedCallExpression(begin_function, values, _for);
                 end = this.LowerResolvedCallExpression(end_function, values, _for);
-                if start == null || end == null { return; }
+                if start == null || end == null { return null; }
             }
         }
 
         if *start->_type != *end->_type {
             Logger::Log("Start and end expressions of a for loop must have the same type.", _for, LogSeverity::Error);
-            return;
+            return null;
         }
 
         let iterator_type = start->_type;
 
         if is_range && !iterator_type->IsInteger() && !iterator_type->IsFloat() {
             Logger::Log("For loop ranges require an integer or floating point type.", _for, LogSeverity::Error);
-            return;
+            return null;
         }
 
         if !is_range && !iterator_type->IsPointer() {
             Logger::Log("For loop 'Begin()' and 'End()' methods must return pointers.", _for, LogSeverity::Error);
-            return;
+            return null;
         }
 
         let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
@@ -2265,9 +2319,13 @@ class HIRLowerer {
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
+        this.loop_targets.PushBack(null);
+        this.loop_temporaries.PushBack(this.temporary_stack.Size());
         let previous_block = this.builder.GetCurrentBlock();
-        let body = this.builder.BuildBlockStatement();
+        let body = this.builder.Block();
         this.builder.SetCurrentBlock(body);
+        this.temporary_stack.PushBack(this.temporaries);
+        this.temporaries.Clear();
         let pattern = this.LowerPattern(_for->pattern, null, item, HIRBindingMode::Value);
 
         if pattern != null {
@@ -2283,20 +2341,27 @@ class HIRLowerer {
             this.LowerStatement(statement);
         }
 
-        this.BuildDestructors(this.scope_manager.current, null);
+        if _for->body->tail != null {
+            this.LowerBlockTail(_for->body->tail, HIRBlockTail::Discard, body);
+        }
+
+        body->destructors = this.GetDestructors(this.scope_manager.current, null);
+        this.temporaries = this.temporary_stack.PopBack();
         this.builder.SetCurrentBlock(previous_block);
+        this.loop_temporaries.PopBack();
+        this.loop_targets.PopBack();
         this.loop_scopes.PopBack();
         this.scope_manager.PopScope();
-        this.builder.BuildForStatement(iterator, target, condition, step, destructors, body);
+        return this.builder.For(iterator, target, condition, step, destructors, body);
     }
 
-    fn LowerMatchStatement(&mut this, _match: *ASTMatchStatement) {
+    fn LowerMatchExpression(&mut this, _match: *ASTMatchExpression) -> *HIRExpression {
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
-        if target == null { return; }
+        if target == null { return null; }
 
         if !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() {
             Logger::Log("Cannot match on a value of type '" + target->_type->ToString() + "'.", _match->target, LogSeverity::Error);
-            return;
+            return null;
         }
 
         let destructors = this.GetTemporaryDestructors(target);
@@ -2308,7 +2373,7 @@ class HIRLowerer {
 
             if pattern == null {
                 this.scope_manager.PopScope();
-                return;
+                return null;
             }
 
             let mut guard: *HIRExpression = null;
@@ -2318,7 +2383,7 @@ class HIRLowerer {
 
                 if guard == null {
                     this.scope_manager.PopScope();
-                    return;
+                    return null;
                 }
 
                 if !guard->_type->IsBoolean() {
@@ -2326,15 +2391,22 @@ class HIRLowerer {
                 }
             }
 
-            let body = this.LowerBlockStatement(arm->body);
+            let mut destructors = Vector<*HIRExpression>();
+
+            if guard != null {
+                destructors = this.GetTemporaryDestructors(guard);
+            }
+
+            let body = this.LowerBlockExpression(arm->body, true, HIRBlockTail::Value);
             this.scope_manager.PopScope();
-            if body == null { return; }
-            arms.PushBack(this.builder.BuildMatchArm(pattern, guard, body));
+            let match_arm = this.builder.BuildMatchArm(pattern, guard, body);
+            match_arm->destructors = destructors;
+            arms.PushBack(match_arm);
         }
 
-        let statement = this.builder.BuildMatchStatement(target, destructors, arms);
+        let expression = this.builder.Match(target, destructors, arms, this.context.VoidType());
         this.CheckUnreachableArms(_match, arms, target->_type);
-        let missing = statement->Uncovered();
+        let missing = expression->Uncovered();
 
         if missing.Size() == 1 && missing[0] == "_" {
             Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
@@ -2348,9 +2420,14 @@ class HIRLowerer {
 
             Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "', not covered: " + names + ".", _match, LogSeverity::Error);
         }
+
+        let _type = this.UnifyBranches(expression, _match);
+        if _type == null { return null; }
+        expression->_type = _type;
+        return expression;
     }
 
-    fn CheckUnreachableArms(&mut this, _match: *ASTMatchStatement, arms: &Vector<*HIRMatchArm>, _type: *HIRType) {
+    fn CheckUnreachableArms(&mut this, _match: *ASTMatchExpression, arms: &Vector<*HIRMatchArm>, _type: *HIRType) {
         let checker = HIRPatternChecker();
         let mut rows = Vector<Vector<*HIRPattern>>();
         let mut types = Vector<*HIRType>();
@@ -2383,85 +2460,244 @@ class HIRLowerer {
         }
     }
 
-    fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
+    fn LowerReturnExpression(&mut this, _return: *ASTReturnExpression) -> *HIRExpression {
         let mut value: *HIRExpression = null;
+
+        if _return->value != null {
+            value = this.LowerExpression(_return->value);
+            if value == null { return null; }
+        }
+
+        return this.LowerReturn(value, _return, _return->value);
+    }
+
+    fn LowerReturn(&mut this, mut value: *HIRExpression, node: *ASTNode, value_node: *ASTNode) -> *HIRExpression {
         let return_type = this.builder.GetCurrentFunction()->_return;
 
         if return_type->IsNever() {
-            Logger::Log("Cannot return from a function with return type '!'.", _return, LogSeverity::Error);
-            return;
+            Logger::Log("Cannot return from a function with return type '!'.", node, LogSeverity::Error);
+            return null;
         }
 
-        if _return->expression == null && !return_type->IsVoid() {
-            Logger::Log("Expected a return value of type '" + return_type->ToString() + "'.", _return, LogSeverity::Error);
-            return;
+        if value == null && !return_type->IsVoid() {
+            Logger::Log("Expected a return value of type '" + return_type->ToString() + "'.", node, LogSeverity::Error);
+            return null;
         }
 
-        if _return->expression != null {
-            value = this.Validate(this.LowerExpression(_return->expression), return_type, "Incompatible return types", _return->expression);
-            if value == null { return; }
+        if value != null {
+            value = this.Validate(value, return_type, "Incompatible return types", value_node);
+            if value == null { return null; }
             value = this.LowerCopyOrMoveValue(value);
-            if value == null { return; }
+            if value == null { return null; }
         }
 
         let mut destructors = this.GetTemporaryDestructors(value);
+        destructors += this.GetPendingTemporaryDestructors(0);
         destructors += this.GetDestructors(null, value);
-        this.builder.BuildReturnStatement(value, destructors);
+        return this.builder.Return(value, destructors);
     }
 
-    fn LowerBreakStatement(&mut this, _break: *ASTBreakStatement) {
+    fn LowerBreakExpression(&mut this, _break: *ASTBreakExpression) -> *HIRExpression {
         if this.loop_scopes.Empty() {
             Logger::Log("Break statement outside of loop.", _break, LogSeverity::Error);
-            return;
+            return null;
         }
 
-        this.BuildDestructors(this.loop_scopes.Back(), null);
-        this.builder.BuildBreakStatement();
+        let target = this.loop_targets.Back();
+        let mut value: *HIRExpression = null;
+
+        if _break->value != null {
+            if target == null {
+                Logger::Log("A 'break' with a value is only allowed inside 'loop'.", _break, LogSeverity::Error);
+                return null;
+            }
+
+            value = this.LowerExpression(_break->value);
+            if value == null { return null; }
+            value = this.LowerCopyOrMoveValue(value);
+            if value == null { return null; }
+        }
+
+        let mut destructors = this.GetTemporaryDestructors(value);
+        destructors += this.GetPendingTemporaryDestructors(this.loop_temporaries.Back() + 1);
+        destructors += this.GetDestructors(this.loop_scopes.Back(), null);
+        let result = this.builder.Break(value, destructors);
+
+        if target != null {
+            target->breaks.PushBack(result);
+        } return result;
     }
 
-    fn LowerContinueStatement(&mut this, _continue: *ASTContinueStatement) {
+    fn LowerContinueExpression(&mut this, _continue: *ASTContinueExpression) -> *HIRExpression {
         if this.loop_scopes.Empty() {
             Logger::Log("Continue statement outside of loop.", _continue, LogSeverity::Error);
-            return;
+            return null;
         }
 
-        this.BuildDestructors(this.loop_scopes.Back(), null);
-        this.builder.BuildContinueStatement();
+        let mut destructors = this.GetTemporaryDestructors(null);
+        destructors += this.GetPendingTemporaryDestructors(this.loop_temporaries.Back() + 1);
+        destructors += this.GetDestructors(this.loop_scopes.Back(), null);
+        return this.builder.Continue(destructors);
     }
 
-    fn LowerUnsafeStatement(&mut this, _unsafe: *ASTUnsafeStatement) {
+    fn LowerUnsafeBlock(&mut this, block: *ASTBlockExpression) -> *HIRExpression {
         if this._unsafe {
-            Logger::Log("Already in an unsafe statement.", _unsafe, LogSeverity::Error);
-            return;
+            Logger::Log("Already in an unsafe block.", block, LogSeverity::Error);
+            return null;
         }
 
         this._unsafe = true;
-        this.builder.GetCurrentBlock()->statements.PushBack(this.LowerBlockStatement(_unsafe->body));
+        let result = this.LowerBlockExpression(block, false, HIRBlockTail::Value);
         this._unsafe = false;
+        return result;
     }
 
-    fn LowerAssemblyStatement(&mut this, assembly: *ASTAssemblyStatement) {
-        let mut inputs = Vector<*HIRAssemblyOperand>();
+    fn Branches(&mut this, expression: *HIRExpression) -> Vector<*HIRExpression> {
+        let mut branches = Vector<*HIRExpression>();
 
-        for input in assembly->inputs {
-            let expression = this.LowerExpression(input->expression);
-            if expression == null { continue; }
-            inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, expression));
+        match expression->kind {
+            HIRExpressionKind::Block => {
+                let block = expression as *HIRBlockExpression;
+                if block->tail != null { branches.PushBack(block->tail); }
+            },
+            HIRExpressionKind::If => {
+                let _if = expression as *HIRIfExpression;
+                branches.PushBack(_if->then_body);
+                if _if->else_body != null { branches.PushBack(_if->else_body); }
+            },
+            HIRExpressionKind::Match => {
+                for arm in (expression as *HIRMatchExpression)->arms {
+                    branches.PushBack(arm->body);
+                }
+            },
+            HIRExpressionKind::Loop => {
+                for _break in (expression as *HIRLoopExpression)->breaks {
+                    if _break->value != null { branches.PushBack(_break->value); }
+                }
+            },
+            _ => {}
+        } return branches;
+    }
+
+    fn UnifyBranches(&mut this, expression: *HIRExpression, node: *ASTNode) -> *HIRType {
+        let mut concrete: *HIRType = null;
+
+        for branch in this.Branches(expression) {
+            if !branch->_type->IsNever() && !branch->_type->IsLiteral() {
+                concrete = branch->_type;
+                break;
+            }
         }
 
-        let mut outputs = Vector<*HIRAssemblyOperand>();
+        if concrete != null {
+            if concrete->IsInteger() || concrete->IsFloat() {
+                if this.CoerceBranch(expression, concrete, false, node) == null { return null; }
+            } else {
+                if this.CoerceBranch(expression, this.context.VoidType(), false, node) == null { return null; }
+            }
+        }
 
-        for output in assembly->outputs {
-            if !outputs.Empty() {
-                Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
+        let mut _type: *HIRType = null;
+
+        for branch in this.Branches(expression) {
+            if branch->_type->IsNever() { continue; }
+
+            if _type == null {
+                _type = branch->_type;
+                continue;
             }
 
-            let expression = this.LowerExpression(output->expression);
-            if expression == null { continue; }
-            outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, expression));
+            let mut common: *HIRType = null;
+
+            if concrete != null {
+                common = this.CommonType(_type, branch->_type);
+            } else if branch->_type->IsSame(_type) {
+                common = _type;
+            }
+
+            if common == null {
+                Logger::Log("Incompatible branch types ('" + _type->ToString() + "' != '" + branch->_type->ToString() + "').", node, LogSeverity::Error);
+                return null;
+            } _type = common;
         }
 
-        this.builder.BuildAssemblyStatement(assembly->_volatile, assembly->text, inputs, outputs, assembly->clobbers);
+        if _type == null {
+            return this.context.NeverType();
+        }
+
+        if concrete != null && this.CoerceBranch(expression, _type, true, node) == null {
+            return null;
+        } return _type;
+    }
+
+    fn CoerceBranch(&mut this, expression: *HIRExpression, target: *HIRType, validate: bool, node: *ASTNode) -> *HIRExpression {
+        if expression->_type->IsNever() { return expression; }
+
+        unsafe {
+            let branch = expression as *mut HIRExpression;
+        }
+
+        match expression->kind {
+            HIRExpressionKind::Block => {
+                let block = branch as *mut HIRBlockExpression;
+                if block->tail == null { return expression; }
+                let value = this.CoerceBranch(block->tail, target, validate, node);
+                if value == null { return null; }
+                block->tail = value;
+            },
+            HIRExpressionKind::If => {
+                let _if = branch as *mut HIRIfExpression;
+                if this.CoerceBranch(_if->then_body, target, validate, node) == null { return null; }
+
+                if _if->else_body != null {
+                    let else_body = this.CoerceBranch(_if->else_body, target, validate, node);
+                    if else_body == null { return null; }
+                    _if->else_body = else_body;
+                }
+            },
+            HIRExpressionKind::Match => {
+                for arm in (branch as *HIRMatchExpression)->arms {
+                    if this.CoerceBranch(arm->body, target, validate, node) == null { return null; }
+                }
+            },
+            HIRExpressionKind::Loop => {
+                for _break in (branch as *HIRLoopExpression)->breaks {
+                    if _break->value != null {
+                        let value = this.CoerceBranch(_break->value, target, validate, node);
+                        if value == null { return null; }
+                        _break->value = value;
+                    }
+                }
+            },
+            _ => {
+                if validate {
+                    return this.Validate(expression, target, "Incompatible branch types", node);
+                } return this.Coerce(expression, target);
+            }
+        }
+
+        for value in this.Branches(expression) {
+            if !value->_type->IsNever() {
+                branch->_type = value->_type;
+                break;
+            }
+        } return expression;
+    }
+
+    fn GetPendingTemporaryDestructors(&mut this, from: usize) -> Vector<*HIRExpression> {
+        let mut destructors = Vector<*HIRExpression>();
+        let mut i = this.temporary_stack.Size();
+
+        while i > from {
+            i -= 1;
+
+            for instance in this.temporary_stack[i].Reverse() {
+                let function = this.GetDestructor(instance->_type);
+                if function == null { continue; }
+                let callee = this.builder.ReferenceDeclaration(function, false);
+                destructors.PushBack(this.builder.Destructor(this.builder.AddressOf(instance), callee));
+            }
+        } return destructors;
     }
 
     fn GetTemporaryDestructorsSince(&mut this, index: usize, exception: *HIRExpression) -> Vector<*HIRExpression> {
@@ -2714,6 +2950,38 @@ class HIRLowerer {
             },
             ASTExpressionKind::Ternary => {
                 return this.LowerTernaryExpression(expression as *ASTTernaryExpression, target);
+            },
+            ASTExpressionKind::Block => {
+                let block = expression as *ASTBlockExpression;
+                if block->_unsafe { return this.RegisterTemporary(this.LowerUnsafeBlock(block)); }
+                this.scope_manager.PushScope("<block>".ToString(), false);
+                let result = this.LowerBlockExpression(block, true, HIRBlockTail::Value);
+                this.scope_manager.PopScope();
+                return this.RegisterTemporary(result);
+            },
+            ASTExpressionKind::If => {
+                return this.RegisterTemporary(this.LowerIfExpression(expression as *ASTIfExpression));
+            },
+            ASTExpressionKind::While => {
+                return this.LowerWhileExpression(expression as *ASTWhileExpression);
+            },
+            ASTExpressionKind::Loop => {
+                return this.RegisterTemporary(this.LowerLoopExpression(expression as *ASTLoopExpression));
+            },
+            ASTExpressionKind::For => {
+                return this.LowerForExpression(expression as *ASTForExpression);
+            },
+            ASTExpressionKind::Match => {
+                return this.RegisterTemporary(this.LowerMatchExpression(expression as *ASTMatchExpression));
+            },
+            ASTExpressionKind::Return => {
+                return this.LowerReturnExpression(expression as *ASTReturnExpression);
+            },
+            ASTExpressionKind::Break => {
+                return this.LowerBreakExpression(expression as *ASTBreakExpression);
+            },
+            ASTExpressionKind::Continue => {
+                return this.LowerContinueExpression(expression as *ASTContinueExpression);
             },
             _ => {
                 Logger::Log("Unknown expression '" + expression->kind.ToString() + "'.", expression, LogSeverity::Error);
