@@ -240,7 +240,7 @@ class ASTFunctionType : ASTType {
 }
 
 enum ASTPatternKind: u8 {
-    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Or
+    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Path, Or
 }
 
 extend ASTPatternKind {
@@ -253,6 +253,7 @@ extend ASTPatternKind {
         else if this == ASTPatternKind::Field { return "Field".ToString(); }
         else if this == ASTPatternKind::Structure { return "Structure".ToString(); }
         else if this == ASTPatternKind::Variant { return "Variant".ToString(); }
+        else if this == ASTPatternKind::Path { return "Path".ToString(); }
         else if this == ASTPatternKind::Or { return "Or".ToString(); }
         else { return "Unknown".ToString(); }
     }
@@ -321,6 +322,14 @@ class ASTVariantPattern : ASTPattern {
     pub patterns: Vector<*ASTPattern>;
 
     ASTVariantPattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Variant, start) {
+        this.path = path;
+    }
+}
+
+class ASTPathPattern : ASTPattern {
+    pub path: *ASTPath;
+
+    ASTPathPattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Path, start) {
         this.path = path;
     }
 }

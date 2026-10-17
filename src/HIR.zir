@@ -879,7 +879,7 @@ class HIRVariantType : HIRType {
 }
 
 enum HIRPatternKind: u8 {
-    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Variant, Or, Dereference
+    Wildcard, Rest, Literal, Identifier, Tuple, Field, Structure, Enumeration, Variant, Or, Dereference
 }
 
 class HIRPattern {
@@ -889,7 +889,29 @@ class HIRPattern {
         this.kind = kind;
     }
 
-    pub fn CoversMember(&this, member: *HIRVariantMember) -> bool {
+    pub fn CoversEnumerationMember(&this, member: *HIREnumerationMember) -> bool {
+        if this.IsIrrefutable() {
+            return true;
+        } else if this.kind == HIRPatternKind::Enumeration {
+            let other = (this as *HIREnumerationPattern)->member;
+            if other == member { return true; }
+            let (left, right) = (other->value, member->value);
+
+            return left->kind == HIRExpressionKind::Literal && right->kind == HIRExpressionKind::Literal
+                && (left as *HIRLiteral)->kind == HIRLiteralKind::Integer && (right as *HIRLiteral)->kind == HIRLiteralKind::Integer
+                && (left as *HIRIntegerLiteral)->value == (right as *HIRIntegerLiteral)->value;
+        } else if this.kind == HIRPatternKind::Or {
+            for pattern in (this as *HIROrPattern)->patterns {
+                if pattern->CoversEnumerationMember(member) {
+                    return true;
+                }
+            }
+        } else if this.kind == HIRPatternKind::Dereference {
+            return (this as *HIRDereferencePattern)->pattern->CoversEnumerationMember(member);
+        } return false;
+    }
+
+    pub fn CoversVariantMember(&this, member: *HIRVariantMember) -> bool {
         if this.IsIrrefutable() {
             return true;
         } else if this.kind == HIRPatternKind::Variant {
@@ -901,12 +923,12 @@ class HIRPattern {
             } return true;
         } else if this.kind == HIRPatternKind::Or {
             for pattern in (this as *HIROrPattern)->patterns {
-                if pattern->CoversMember(member) {
+                if pattern->CoversVariantMember(member) {
                     return true;
                 }
             }
         } else if this.kind == HIRPatternKind::Dereference {
-            return (this as *HIRDereferencePattern)->pattern->CoversMember(member);
+            return (this as *HIRDereferencePattern)->pattern->CoversVariantMember(member);
         } return false;
     }
 
@@ -959,6 +981,8 @@ class HIRPattern {
             return (this as *HIRFieldPattern)->ToString();
         } else if this.kind == HIRPatternKind::Structure {
             return (this as *HIRStructurePattern)->ToString();
+        } else if this.kind == HIRPatternKind::Enumeration {
+            return (this as *HIREnumerationPattern)->ToString();
         } else if this.kind == HIRPatternKind::Variant {
             return (this as *HIRVariantPattern)->ToString();
         } else if this.kind == HIRPatternKind::Or {
@@ -1062,6 +1086,18 @@ class HIRStructurePattern : HIRPattern {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
         } return result + " }";
+    }
+}
+
+class HIREnumerationPattern : HIRPattern {
+    pub member: *HIREnumerationMember;
+
+    HIREnumerationPattern(&mut this, member: *HIREnumerationMember) : HIRPattern(HIRPatternKind::Enumeration) {
+        this.member = member;
+    }
+
+    pub fn ToString(&this) -> String {
+        return this.member->name;
     }
 }
 
@@ -2103,23 +2139,44 @@ class HIRMatchStatement : HIRStatement {
         }
 
         let mut _type = this.target->_type;
-        if _type->IsReference() { _type = _type->Pointee(); }
-        if !_type->IsVariant() { return false; }
 
-        for member in (_type as *HIRVariantType)->declaration->members {
-            let mut covered = false;
+        if _type->IsReference() {
+            _type = _type->Pointee();
+        }
 
-            for arm in this.arms {
-                if arm->guard == null && arm->pattern->CoversMember(member) {
-                    covered = true;
-                    break;
+        if _type->IsEnumeration() {
+            for member in (_type as *HIREnumerationType)->declaration->members {
+                let mut covered = false;
+
+                for arm in this.arms {
+                    if arm->guard == null && arm->pattern->CoversEnumerationMember(member) {
+                        covered = true;
+                        break;
+                    }
                 }
-            }
 
-            if !covered {
-                return false;
-            }
-        } return true;
+                if !covered {
+                    return false;
+                }
+            } return true;
+        } else if _type->IsVariant() {
+            for member in (_type as *HIRVariantType)->declaration->members {
+                let mut covered = false;
+
+                for arm in this.arms {
+                    if arm->guard == null && arm->pattern->CoversVariantMember(member) {
+                        covered = true;
+                        break;
+                    }
+                }
+
+                if !covered {
+                    return false;
+                }
+            } return true;
+        } else {
+            return false;
+        }
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2848,6 +2905,10 @@ class HIRBuilder {
 
     pub fn StructurePattern(&mut this, declaration: *HIRStructureDeclaration, patterns: Vector<*HIRPattern>) -> *mut HIRStructurePattern {
         return this.context->arena.New<HIRStructurePattern>(declaration, patterns);
+    }
+
+    pub fn EnumerationPattern(&mut this, member: *HIREnumerationMember) -> *mut HIREnumerationPattern {
+        return this.context->arena.New<HIREnumerationPattern>(member);
     }
 
     pub fn VariantPattern(&mut this, member: *HIRVariantMember, patterns: Vector<*HIRPattern>) -> *mut HIRVariantPattern {

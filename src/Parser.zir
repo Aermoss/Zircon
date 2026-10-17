@@ -632,7 +632,7 @@ class Parser {
                 return variant;
             }
 
-            return this.arena.New<ASTVariantPattern>(path, token);
+            return this.arena.New<ASTPathPattern>(path, token);
         }
 
         let literal = this.ParsePrimary();

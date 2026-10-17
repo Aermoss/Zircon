@@ -4158,7 +4158,7 @@ class HIRLowerer {
     }
 
     fn LowerPattern(&mut this, pattern: *ASTPattern, mut target_type: *HIRType, mut value: *HIRExpression, mode: HIRBindingMode) -> *HIRPattern {
-        if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant) {
+        if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant || pattern->kind == ASTPatternKind::Path) {
             return this.LowerReferencePattern(pattern, value);
         }
 
@@ -4416,14 +4416,22 @@ class HIRLowerer {
             Logger::Log("Symbol '" + structure->path->ToString() + "' is not a structure.", pattern, LogSeverity::Error);
             return null;
         } else if pattern->kind == ASTPatternKind::Variant {
-            let variant = pattern as *ASTVariantPattern;
             let mut patterns = Vector<*HIRPattern>();
-
+            let variant = pattern as *ASTVariantPattern;
             let symbols = this.scope_manager.Resolve(variant->path, false);
             if symbols.Empty() { return null; }
 
             for symbol in symbols {
-                if symbol->kind != SymbolKind::Declaration || symbol->declaration->kind != HIRDeclarationKind::VariantMember {
+                if symbol->kind != SymbolKind::Declaration {
+                    continue;
+                }
+
+                if symbol->declaration->kind == HIRDeclarationKind::EnumerationMember {
+                    Logger::Log("Enumeration member '" + variant->path->ToString() + "' has no fields.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                if symbol->declaration->kind != HIRDeclarationKind::VariantMember {
                     continue;
                 }
 
@@ -4461,6 +4469,44 @@ class HIRLowerer {
             }
 
             Logger::Log("Symbol '" + variant->path->ToString() + "' is not a variant member.", pattern, LogSeverity::Error);
+            return null;
+        } else if pattern->kind == ASTPatternKind::Path {
+            let path = (pattern as *ASTPathPattern)->path;
+            let symbols = this.scope_manager.Resolve(path, false);
+            if symbols.Empty() { return null; }
+
+            for symbol in symbols {
+                if symbol->kind != SymbolKind::Declaration {
+                    continue;
+                }
+
+                if symbol->declaration->kind == HIRDeclarationKind::EnumerationMember {
+                    let member = symbol->declaration as *HIREnumerationMember;
+
+                    if value != null && !value->_type->IsSame(member->_type) {
+                        Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.builder.EnumerationPattern(member);
+                } else if symbol->declaration->kind == HIRDeclarationKind::VariantMember {
+                    let member = symbol->declaration as *HIRVariantMember;
+
+                    if !member->fields.Empty() {
+                        Logger::Log("Variant member '" + path->ToString() + "' has fields; use '" + path->ToString() + (member->structure ? " { ... }" : "(...)") + "' to match it.", pattern, LogSeverity::Error);
+                        return null;
+                    }
+
+                    if value != null && !value->_type->IsSame(member->_type) {
+                        Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.builder.VariantPattern(member, Vector<*HIRPattern>());
+                }
+            }
+
+            Logger::Log("Symbol '" + path->ToString() + "' is not an enumeration or variant member.", pattern, LogSeverity::Error);
             return null;
         } else if pattern->kind == ASTPatternKind::Or {
             let mut patterns = Vector<*HIRPattern>();

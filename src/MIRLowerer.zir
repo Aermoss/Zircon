@@ -1739,6 +1739,8 @@ class MIRLowerer {
             return this.TestPattern((pattern as *HIRFieldPattern)->pattern, target);
         } else if pattern->kind == HIRPatternKind::Structure {
             return this.TestStructurePattern(pattern as *HIRStructurePattern, target);
+        } else if pattern->kind == HIRPatternKind::Enumeration {
+            return this.TestEnumerationPattern(pattern as *HIREnumerationPattern, target);
         } else if pattern->kind == HIRPatternKind::Variant {
             return this.TestVariantPattern(pattern as *HIRVariantPattern, target);
         } else if pattern->kind == HIRPatternKind::Or {
@@ -1795,6 +1797,12 @@ class MIRLowerer {
             if result == null { return null; }
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
         } return condition;
+    }
+
+    fn TestEnumerationPattern(&mut this, enumeration: *HIREnumerationPattern, target: *MIRValue) -> *MIRValue {
+        let value = this.LowerExpression(enumeration->member->value);
+        if value == null { return null; }
+        return this.builder.BuildBinary("pattern.eq".ToString(), MIRBinaryKind::ICmpEq, this.builder.BuildLoad("pattern.load".ToString(), target), value, this.context.IntegerType(1));
     }
 
     fn TestVariantPattern(&mut this, variant: *HIRVariantPattern, target: *MIRValue) -> *MIRValue {
