@@ -24,8 +24,7 @@ extend MIRPassKind {
     pub fn ToString(this) -> String {
         match this {
             MIRPassKind::ReorderBlocks => { return "reorder-blocks".ToString(); },
-            MIRPassKind::PromoteAllocas => { return "promote-allocas".ToString(); },
-            _ => { return "<invalid pass>".ToString(); }
+            MIRPassKind::PromoteAllocas => { return "promote-allocas".ToString(); }
         }
     }
 }
@@ -63,9 +62,6 @@ class MIRPassManager {
             MIRPassKind::PromoteAllocas => {
                 let mut pass = MIRPromoteAllocas(this.context);
                 return pass.Run(function);
-            },
-            _ => {
-                return false;
             }
         }
     }

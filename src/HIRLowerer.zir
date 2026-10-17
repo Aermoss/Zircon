@@ -1991,9 +1991,6 @@ class HIRLowerer {
             },
             ASTStatementKind::Assembly => {
                 this.LowerAssemblyStatement(statement as *ASTAssemblyStatement);
-            },
-            _ => {
-                Logger::Log("Unknown statement '" + statement->kind.ToString() + "'.", statement, LogSeverity::Error);
             }
         }
     }
@@ -2300,7 +2297,23 @@ class HIRLowerer {
             arms.PushBack(this.builder.BuildMatchArm(pattern, guard, body));
         }
 
-        this.builder.BuildMatchStatement(target, destructors, arms);
+        let statement = this.builder.BuildMatchStatement(target, destructors, arms);
+        let missing = statement->Uncovered();
+
+        if !missing.Empty() {
+            if target->_type->IsEnumeration() || target->_type->IsVariant() || target->_type->IsBoolean() {
+                let mut names = String();
+
+                for i in 0..missing.Size() {
+                    if i != 0 { names += ", "; }
+                    names += "'" + missing[i] + "'";
+                }
+
+                Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "', not covered: " + names + ".", _match, LogSeverity::Error);
+            } else {
+                Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
+            }
+        }
     }
 
     fn LowerReturnStatement(&mut this, _return: *ASTReturnStatement) {
@@ -2871,10 +2884,6 @@ class HIRLowerer {
             },
             ASTLiteralKind::Null => {
                 return this.builder.NullLiteral();
-            },
-            _ => {
-                Logger::Log("Unknown literal '" + literal->kind.ToString() + "'.", literal, LogSeverity::Error);
-                return null;
             }
         }
     }
@@ -4738,10 +4747,6 @@ class HIRLowerer {
                 }
 
                 return this.builder.OrPattern(patterns);
-            },
-            _ => {
-                Logger::Log("Unknown pattern '" + pattern->kind.ToString() + "'.", pattern, LogSeverity::Error);
-                return null;
             }
         }
     }
@@ -4907,10 +4912,6 @@ class HIRLowerer {
                 let _return = this.LowerType(function->_return);
                 if _return == null { return null; }
                 return this.context.FunctionType(parameters, _return);
-            },
-            _ => {
-                Logger::Log("Unknown type '" + _type->kind.ToString() + "'.", _type, LogSeverity::Error);
-                return null;
             }
         }
     }

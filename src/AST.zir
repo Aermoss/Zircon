@@ -28,8 +28,7 @@ extend ASTNodeKind {
             ASTNodeKind::Statement => { return "Statement".ToString(); },
             ASTNodeKind::Expression => { return "Expression".ToString(); },
             ASTNodeKind::Pattern => { return "Pattern".ToString(); },
-            ASTNodeKind::Type => { return "Type".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTNodeKind::Type => { return "Type".ToString(); }
         }
     }
 }
@@ -108,8 +107,7 @@ extend ASTTypeKind {
             ASTTypeKind::Reference => { return "Reference".ToString(); },
             ASTTypeKind::Array => { return "Array".ToString(); },
             ASTTypeKind::Tuple => { return "Tuple".ToString(); },
-            ASTTypeKind::Function => { return "Function".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTTypeKind::Function => { return "Function".ToString(); }
         }
     }
 }
@@ -143,9 +141,6 @@ class ASTType : ASTNode {
             },
             ASTTypeKind::Function => {
                 return (this as *ASTFunctionType)->ToString();
-            },
-            _ => {
-                return "<invalid type>".ToString();
             }
         }
     }
@@ -268,8 +263,7 @@ extend ASTPatternKind {
             ASTPatternKind::Structure => { return "Structure".ToString(); },
             ASTPatternKind::Variant => { return "Variant".ToString(); },
             ASTPatternKind::Path => { return "Path".ToString(); },
-            ASTPatternKind::Or => { return "Or".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTPatternKind::Or => { return "Or".ToString(); }
         }
     }
 }
@@ -379,8 +373,7 @@ extend ASTExpressionKind {
             ASTExpressionKind::Delete => { return "Delete".ToString(); },
             ASTExpressionKind::Assignment => { return "Assignment".ToString(); },
             ASTExpressionKind::Await => { return "Await".ToString(); },
-            ASTExpressionKind::Range => { return "Range".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTExpressionKind::Range => { return "Range".ToString(); }
         }
     }
 }
@@ -461,8 +454,7 @@ extend ASTLiteralKind {
             ASTLiteralKind::Array => { return "Array".ToString(); },
             ASTLiteralKind::Tuple => { return "Tuple".ToString(); },
             ASTLiteralKind::Structure => { return "Structure".ToString(); },
-            ASTLiteralKind::Null => { return "Null".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTLiteralKind::Null => { return "Null".ToString(); }
         }
     }
 }
@@ -502,9 +494,6 @@ class ASTLiteral : ASTExpression {
             },
             ASTLiteralKind::Null => {
                 return (this as *ASTNullLiteral)->ToString();
-            },
-            _ => {
-                return "<invalid literal>".ToString();
             }
         }
     }
@@ -651,8 +640,7 @@ extend ASTUnaryKind {
             ASTUnaryKind::AddressOf => { return '&'.ToString(); },
             ASTUnaryKind::Dereference => { return '*'.ToString(); },
             ASTUnaryKind::Negate => { return '-'.ToString(); },
-            ASTUnaryKind::Not => { return '!'.ToString(); },
-            _ => { return "<invalid unary>".ToString(); }
+            ASTUnaryKind::Not => { return '!'.ToString(); }
         }
     }
 }
@@ -698,8 +686,7 @@ extend ASTBinaryKind {
             ASTBinaryKind::BitwiseOr => { return '|'.ToString(); },
             ASTBinaryKind::BitwiseXor => { return '^'.ToString(); },
             ASTBinaryKind::LeftShift => { return "<<".ToString(); },
-            ASTBinaryKind::RightShift => { return ">>".ToString(); },
-            _ => { return "<invalid binary>".ToString(); }
+            ASTBinaryKind::RightShift => { return ">>".ToString(); }
         }
     }
 }
@@ -873,8 +860,7 @@ extend ASTAssignmentKind {
             ASTAssignmentKind::RightShiftAssign => { return ">>=".ToString(); },
             ASTAssignmentKind::AndAssign => { return "&=".ToString(); },
             ASTAssignmentKind::OrAssign => { return "|=".ToString(); },
-            ASTAssignmentKind::XorAssign => { return "^=".ToString(); },
-            _ => { return "<invalid assignment>".ToString(); }
+            ASTAssignmentKind::XorAssign => { return "^=".ToString(); }
         }
     }
 }
@@ -958,8 +944,7 @@ extend ASTStatementKind {
             ASTStatementKind::Break => { return "Break".ToString(); },
             ASTStatementKind::Continue => { return "Continue".ToString(); },
             ASTStatementKind::Unsafe => { return "Unsafe".ToString(); },
-            ASTStatementKind::Assembly => { return "Assembly".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTStatementKind::Assembly => { return "Assembly".ToString(); }
         }
     }
 }
@@ -1132,8 +1117,7 @@ extend ASTDeclarationKind {
             ASTDeclarationKind::Extend => { return "Extend".ToString(); },
             ASTDeclarationKind::Type => { return "Type".ToString(); },
             ASTDeclarationKind::Extern => { return "Extern".ToString(); },
-            ASTDeclarationKind::Assembly => { return "Assembly".ToString(); },
-            _ => { return "Unknown".ToString(); }
+            ASTDeclarationKind::Assembly => { return "Assembly".ToString(); }
         }
     }
 }

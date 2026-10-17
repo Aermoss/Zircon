@@ -49,9 +49,6 @@ class MIRType {
             },
             MIRTypeKind::Function => {
                 return (this as *MIRFunctionType)->ToString();
-            },
-            _ => {
-                return "<invalid type>".ToString();
             }
         }
     }
@@ -199,9 +196,6 @@ class MIRValue {
             },
             MIRValueKind::Parameter => {
                 return _type->ToString() + ' ' + (this as *MIRParameter)->ToString();
-            },
-            _ => {
-                return "<invalid value>".ToString();
             }
         }
     }
@@ -243,9 +237,6 @@ class MIRConstant : MIRValue {
             },
             MIRConstantKind::Undef => {
                 return (this as *MIRConstantUndef)->ToString();
-            },
-            _ => {
-                return "<invalid constant>".ToString();
             }
         }
     }
@@ -366,9 +357,6 @@ class MIRConstantExpression : MIRConstant {
             },
             MIRConstantExpressionKind::StructGEP => {
                 return (this as *MIRStructGEPExpression)->ToString();
-            },
-            _ => {
-                return "<invalid expression>".ToString();
             }
         }
     }
@@ -383,8 +371,7 @@ extend MIRUnaryKind {
         match this {
             MIRUnaryKind::Neg => { return "neg".ToString(); },
             MIRUnaryKind::FNeg => { return "fneg".ToString(); },
-            MIRUnaryKind::Not => { return "not".ToString(); },
-            _ => { return "<invalid unary>".ToString(); }
+            MIRUnaryKind::Not => { return "not".ToString(); }
         }
     }
 }
@@ -446,8 +433,7 @@ extend MIRBinaryKind {
             MIRBinaryKind::FCmpLt => { return "fcmp lt".ToString(); },
             MIRBinaryKind::FCmpGt => { return "fcmp gt".ToString(); },
             MIRBinaryKind::FCmpLe => { return "fcmp le".ToString(); },
-            MIRBinaryKind::FCmpGe => { return "fcmp ge".ToString(); },
-            _ => { return "<invalid binary>".ToString(); }
+            MIRBinaryKind::FCmpGe => { return "fcmp ge".ToString(); }
         }
     }
 }
@@ -486,8 +472,7 @@ extend MIRCastKind {
             MIRCastKind::UIToFP => { return "uitofp".ToString(); },
             MIRCastKind::PtrToInt => { return "ptrtoint".ToString(); },
             MIRCastKind::IntToPtr => { return "inttoptr".ToString(); },
-            MIRCastKind::Bitcast => { return "bitcast".ToString(); },
-            _ => { return "<invalid cast>".ToString(); }
+            MIRCastKind::Bitcast => { return "bitcast".ToString(); }
         }
     }
 }
@@ -597,9 +582,6 @@ class MIRInstruction : MIRValue {
             },
             MIRInstructionKind::Terminator => {
                 result += (this as *MIRTerminator)->ToString();
-            },
-            _ => {
-                result += "<invalid instruction>";
             }
         } return result;
     }
@@ -860,9 +842,6 @@ class MIRTerminator : MIRInstruction {
             },
             MIRTerminatorKind::Unreachable => {
                 return (this as *MIRUnreachableInstruction)->ToString();
-            },
-            _ => {
-                return "<invalid terminator>".ToString();
             }
         }
     }
@@ -1037,9 +1016,6 @@ class MIRDeclaration {
             },
             MIRDeclarationKind::Assembly => {
                 return (this as *MIRAssemblyDeclaration)->ToString();
-            },
-            _ => {
-                return "<invalid declaration>".ToString();
             }
         }
     }

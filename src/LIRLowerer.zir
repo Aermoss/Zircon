@@ -305,9 +305,6 @@ class LIRLowerer {
                     _ => { return LIRConstant(); }
                 }
                 return left;
-            },
-            _ => {
-                return LIRConstant();
             }
         }
     }
@@ -657,9 +654,6 @@ class LIRLowerer {
             },
             MIRValueKind::DeclarationReference => {
                 return this.builder.SymbolOperand((value as *MIRDeclarationReference)->declaration->name);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -740,9 +734,6 @@ class LIRLowerer {
             },
             MIRInstructionKind::Terminator => {
                 this.LowerTerminator(instruction as *MIRTerminator);
-                return null;
-            },
-            _ => {
                 return null;
             }
         }

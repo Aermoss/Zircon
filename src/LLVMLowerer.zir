@@ -315,9 +315,6 @@ class LLVMLowerer {
             },
             MIRValueKind::DeclarationReference => {
                 return this.declarations.Get((value as *MIRDeclarationReference)->declaration, null);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -369,9 +366,6 @@ class LLVMLowerer {
             },
             MIRConstantKind::Expression => {
                 return this.LowerConstantExpression(constant as *MIRConstantExpression);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -392,9 +386,6 @@ class LLVMLowerer {
             },
             MIRConstantExpressionKind::StructGEP => {
                 return this.LowerStructGEPExpression(expression as *MIRStructGEPExpression);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -479,9 +470,6 @@ class LLVMLowerer {
             },
             MIRInstructionKind::Terminator => {
                 return this.LowerTerminator(instruction as *MIRTerminator);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -540,8 +528,7 @@ class LLVMLowerer {
         match kind {
             MIRUnaryKind::Neg => { return LLVMBuildNeg(this.builder, operand, name); },
             MIRUnaryKind::FNeg => { return LLVMBuildFNeg(this.builder, operand, name); },
-            MIRUnaryKind::Not => { return LLVMBuildNot(this.builder, operand, name); },
-            _ => { return null; }
+            MIRUnaryKind::Not => { return LLVMBuildNot(this.builder, operand, name); }
         }
     }
 
@@ -588,8 +575,7 @@ class LLVMLowerer {
             MIRBinaryKind::FCmpLt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLT, left, right, name); },
             MIRBinaryKind::FCmpGt => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGT, left, right, name); },
             MIRBinaryKind::FCmpLe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOLE, left, right, name); },
-            MIRBinaryKind::FCmpGe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGE, left, right, name); },
-            _ => { return null; }
+            MIRBinaryKind::FCmpGe => { return LLVMBuildFCmp(this.builder, LLVMRealPredicate::LLVMRealOGE, left, right, name); }
         }
     }
 
@@ -630,8 +616,7 @@ class LLVMLowerer {
             MIRCastKind::UIToFP => { return LLVMBuildUIToFP(this.builder, value, target, name); },
             MIRCastKind::PtrToInt => { return LLVMBuildPtrToInt(this.builder, value, target, name); },
             MIRCastKind::IntToPtr => { return LLVMBuildIntToPtr(this.builder, value, target, name); },
-            MIRCastKind::Bitcast => { return LLVMBuildBitCast(this.builder, value, target, name); },
-            _ => { return null; }
+            MIRCastKind::Bitcast => { return LLVMBuildBitCast(this.builder, value, target, name); }
         }
     }
 
@@ -707,9 +692,6 @@ class LLVMLowerer {
             },
             MIRTerminatorKind::Unreachable => {
                 return this.LowerUnreachableInstruction(terminator as *MIRUnreachableInstruction);
-            },
-            _ => {
-                return null;
             }
         }
     }
@@ -802,9 +784,6 @@ class LLVMLowerer {
             },
             MIRTypeKind::Function => {
                 return LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0);
-            },
-            _ => {
-                return null;
             }
         }
     }

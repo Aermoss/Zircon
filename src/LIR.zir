@@ -43,9 +43,6 @@ class LIROperand {
             },
             LIROperandKind::Symbol => {
                 return (this as *LIRSymbolOperand)->ToString();
-            },
-            _ => {
-                return "<invalid operand>".ToString();
             }
         }
     }
@@ -69,9 +66,6 @@ class LIRRegisterOperand : LIROperand {
             },
             LIRRegisterKind::Physical => {
                 return (this as *LIRPhysicalRegister)->ToString();
-            },
-            _ => {
-                return "<invalid register>".ToString();
             }
         }
     }
@@ -272,8 +266,7 @@ extend LIROpcode {
             LIROpcode::Li => { return "li".ToString(); },
             LIROpcode::La => { return "la".ToString(); },
             LIROpcode::Ret => { return "ret".ToString(); },
-            LIROpcode::Asm => { return "asm".ToString(); },
-            _ => { return "<invalid instruction>".ToString(); }
+            LIROpcode::Asm => { return "asm".ToString(); }
         }
     }
 }
