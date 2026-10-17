@@ -3858,6 +3858,18 @@ class HIRLowerer {
                 return null;
             }
 
+            let mut constant: u64 = 0;
+
+            if (kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo) && this.IntegerLiteralValue(right, &mut constant) && constant == 0 {
+                Logger::Log(kind == ASTBinaryKind::Divide ? "Division by zero." : "Remainder with a divisor of zero.", node, LogSeverity::Error);
+                return null;
+            }
+
+            if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as u64 {
+                Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                return null;
+            }
+
             if kind == ASTBinaryKind::Add || kind == ASTBinaryKind::Subtract || kind == ASTBinaryKind::Multiply || kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo {
                 return this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type);
             } else if kind == ASTBinaryKind::Equal || kind == ASTBinaryKind::NotEqual || kind == ASTBinaryKind::Greater || kind == ASTBinaryKind::GreaterEqual || kind == ASTBinaryKind::Less || kind == ASTBinaryKind::LessEqual {
@@ -3871,18 +3883,6 @@ class HIRLowerer {
         } else if left->_type->IsFloat() && right->_type->IsFloat() {
             if *left->_type != *right->_type {
                 Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
-                return null;
-            }
-
-            let mut constant: u64 = 0;
-
-            if (kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo) && this.IntegerLiteralValue(right, &mut constant) && constant == 0 {
-                Logger::Log(kind == ASTBinaryKind::Divide ? "Division by zero." : "Remainder with a divisor of zero.", node, LogSeverity::Error);
-                return null;
-            }
-
-            if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as u64 {
-                Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
                 return null;
             }
 
