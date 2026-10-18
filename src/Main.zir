@@ -116,7 +116,7 @@ class _NullEnv {
 }
 
 extern "C" {
-    fn clock_gettime(clk_id: i32, tp: *mut _TimeSpec) -> i32 #[if DARWIN] ; #[else] {
+    fn clock_gettime(clk_id: i32, tp: *mut _TimeSpec) -> i32 #[if LIBC] ; #[else] {
         let mut result: i64 = 0;
 
         volatile asm : rax(228), rdi(clk_id as i64), rsi(tp) -> {
@@ -126,7 +126,7 @@ extern "C" {
         return result as i32;
     } #[endif]
 
-    fn fork() -> i32 #[if DARWIN] ; #[else] {
+    fn fork() -> i32 #[if LIBC] ; #[else] {
         let mut result: i64 = 0;
 
         volatile asm : rax(57) -> {
@@ -136,7 +136,7 @@ extern "C" {
         return result as i32;
     } #[endif]
 
-    fn execve(path: *i8, argv: **i8, envp: **i8) -> i32 #[if DARWIN] ; #[else] {
+    fn execve(path: *i8, argv: **i8, envp: **i8) -> i32 #[if LIBC] ; #[else] {
         let mut result: i64 = 0;
 
         volatile asm : rax(59), rdi(path), rsi(argv), rdx(envp) -> {
@@ -146,7 +146,7 @@ extern "C" {
         return result as i32;
     } #[endif]
 
-    fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32 #[if DARWIN] ; #[else] {
+    fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32 #[if LIBC] ; #[else] {
         let mut result: i64 = 0;
 
         volatile asm : rax(61), rdi(pid as i64), rsi(status), rdx(options as i64) -> {
@@ -163,7 +163,7 @@ class Timer {
     pub fn Get(&this) -> f64 {
         let mut ts: _TimeSpec;
         (ts.sec, ts.nsec) = (0, 0);
-        clock_gettime(0, &ts);
+        clock_gettime(0, &mut ts);
         (ts.sec as f64) + (ts.nsec as f64) / 1000000000.0
     }
 }
@@ -184,7 +184,7 @@ fn Execute(command: *i8) -> u32 {
     }
 
     let mut status: i32 = 0;
-    waitpid(pid, &status, 0);
+    waitpid(pid, &mut status, 0);
     ((status >> 8) & 0xFF) as u32
 }
 #[endif]
@@ -417,12 +417,17 @@ fn Main(args: &mut Vector<String>) -> i32 {
     LLVMEnablePrettyStackTrace();
     LLVMInstallFatalErrorHandler(FatalErrorHandler);
 
-    LLVMInitializeAllTargetInfos();
-    LLVMInitializeAllTargets();
-    LLVMInitializeAllTargetMCs();
-    LLVMInitializeAllAsmPrinters();
-    LLVMInitializeAllAsmParsers();
-    LLVMInitializeAllDisassemblers();
+    LLVMInitializeX86TargetInfo();
+    LLVMInitializeX86Target();
+    LLVMInitializeX86TargetMC();
+    LLVMInitializeX86AsmPrinter();
+    LLVMInitializeX86AsmParser();
+
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmPrinter();
+    LLVMInitializeAArch64AsmParser();
 
     let (mut input_files, mut output_file) = (Vector<String>(), String());
     let (mut include_paths, mut lib_paths) = (Vector<String>(), Vector<String>());
@@ -611,25 +616,29 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     if triple.Contains("windows") {
-        defines.PushBack(String("WINDOWS"));
+        defines.PushBack("WINDOWS".ToString());
     } else if triple.Contains("darwin") || triple.Contains("apple") {
-        defines.PushBack(String("DARWIN"));
+        defines.PushBack("DARWIN".ToString());
     } else if triple.Contains("linux") {
-        defines.PushBack(String("LINUX"));
+        defines.PushBack("LINUX".ToString());
     }
 
     if triple.Contains("x86_64") {
-        defines.PushBack(String("AMD64"));
+        defines.PushBack("AMD64".ToString());
     } else if triple.Contains("aarch64") || triple.Contains("arm64") {
-        defines.PushBack(String("ARM64"));
+        defines.PushBack("ARM64".ToString());
     } else if triple.StartsWith("zodiac") {
-        defines.PushBack(String("ZODIAC"));
+        defines.PushBack("ZODIAC".ToString());
         freestanding = true;
 
         if !emit_asm && !check {
             Logger::Log("The Zodiac target can only generate assembly, use '-S' and assemble with 'zas'.", LogSeverity::Error);
             return 1;
         }
+    }
+
+    if triple.Contains("darwin") || triple.Contains("apple") || (triple.Contains("linux") && !freestanding) {
+        defines.PushBack("LIBC".ToString());
     }
 
     let mut timer = Timer();
@@ -925,11 +934,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let lld_link_exe = "lld-link".ToString();
 #[endif]
     let mut command = String();
+    let arm64 = triple.Contains("aarch64") || triple.Contains("arm64");
 
     if triple.Contains("windows") {
 #[if WINDOWS]
         let (sdk_path, msvc_path) = (GetWindowsSDKPath(), GetMSVCPath());
-        command = "\"" + msvc_path + "\\bin\\Hostx64\\x64\\link.exe\" /NOLOGO /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:_start";
+        let machine = arm64 ? "arm64" : "x64";
+        command = "\"" + msvc_path + "\\bin\\Hostx64\\x64\\link.exe\" /NOLOGO /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:_start /MACHINE:" + machine;
         if debug { command += " /DEBUG"; }
         command += " /OUT:" + output_file;
 
@@ -938,9 +949,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         }
 
         if !freestanding {
-            command += " \"/LIBPATH:" + msvc_path + "\\lib\\x64\"";
-            command += " \"/LIBPATH:" + sdk_path + "\\um\\x64\"";
-            command += " \"/LIBPATH:" + sdk_path + "\\ucrt\\x64\"";
+            command += " \"/LIBPATH:" + msvc_path + "\\lib\\" + machine + "\"";
+            command += " \"/LIBPATH:" + sdk_path + "\\um\\" + machine + "\"";
+            command += " \"/LIBPATH:" + sdk_path + "\\ucrt\\" + machine + "\"";
 
             for lib_path in lib_paths {
                 command += " \"/LIBPATH:" + lib_path + "\"";
@@ -957,11 +968,31 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
 #[endif]
     } else if triple.Contains("darwin") || triple.Contains("apple") {
-        Logger::Log("Cannot link to darwin.", LogSeverity::Error);
+#[if DARWIN]
+        command = "cc -arch ".ToString() + (arm64 ? "arm64" : "x86_64") + " -o " + output_file;
+
+        for object in objects {
+            command += " " + object;
+        }
+
+        for lib_path in lib_paths {
+            command += " -L" + lib_path + " -Wl,-rpath," + lib_path;
+        }
+
+        for lib in libs {
+            command += " -l" + lib;
+        }
+#[else]
+        Logger::Log("Cannot link to darwin from another platform.", LogSeverity::Error);
         return 1;
+#[endif]
     } else if triple.Contains("linux") {
         command = lld_exe + " --nostdlib --entry _start";
-        if !freestanding { command += " --dynamic-linker /lib64/ld-linux-x86-64.so.2"; }
+
+        if !freestanding {
+            command += arm64 ? " --dynamic-linker /lib/ld-linux-aarch64.so.1" : " --dynamic-linker /lib64/ld-linux-x86-64.so.2";
+        }
+
         command += " -o " + output_file;
 
         for object in objects {
@@ -972,8 +1003,22 @@ fn Main(args: &mut Vector<String>) -> i32 {
             command += " -L" + lib_path;
         }
 
+#[if !WINDOWS]
+        if arm64 {
+            command += " -L/usr/lib/aarch64-linux-gnu -L/lib/aarch64-linux-gnu";
+        } else if triple.Contains("x86_64") {
+            command += " -L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu";
+        }
+
+        command += " -L/usr/lib64 -L/lib64 -L/usr/lib -L/lib";
+#[endif]
+
         for lib in libs {
             command += " -l" + lib;
+        }
+
+        if !freestanding {
+            command += " -l:libc.so.6";
         }
     } else {
         Logger::Log("Invalid target: '" + triple + "'.", LogSeverity::Error);
@@ -1002,7 +1047,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     if run {
 #[if !WINDOWS]
-        if SplitPath(output_file).left.Empty() { output_file = JoinPath(String("."), output_file); }
+        if SplitPath(output_file).0.Empty() { output_file = JoinPath(String("."), output_file); }
 #[endif]
         WriteLine("Program finished with exit code: " + String::FromInteger(Execute(output_file.Data()) as u64) + ".");
     }

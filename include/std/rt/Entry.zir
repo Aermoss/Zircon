@@ -18,6 +18,8 @@
 #[include "std/rt/windows" : *]
 #[elif LINUX]
 #[include "std/rt/linux" : *]
+#[elif DARWIN]
+#[include "std/rt/darwin" : *]
 #[else]
 #[error "Unsupported platform!"]
 #[endif]

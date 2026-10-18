@@ -27,11 +27,11 @@ extern "C" {
     fn RtlFillMemory(Destination: *mut void, Length: usize, Fill: u8);
 #[endif]
 
-    fn malloc(size: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn malloc(size: usize) -> *mut void #[if LIBC] ; #[else] {
 #[if WINDOWS]
         return HeapAlloc(GetProcessHeap(), 0, size);
 #[else]
-        let address = 0;
+        let mut address: i64 = 0;
 
         volatile asm : rax(9), rdi(0), rsi((size + 8) as i64), rdx(3), r10(0x22), r8(-1), r9(0) -> {
             syscall
@@ -44,7 +44,7 @@ extern "C" {
 #[endif]
     } #[endif]
 
-    fn free(ptr: *mut void) #[if DARWIN] ; #[else] {
+    fn free(ptr: *mut void) #[if LIBC] ; #[else] {
         if ptr == null { return; }
 #[if WINDOWS]
         HeapFree(GetProcessHeap(), 0, ptr);
@@ -59,7 +59,7 @@ extern "C" {
 #[endif]
     } #[endif]
 
-    fn memcpy(dst: *mut void, src: *void, size: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn memcpy(dst: *mut void, src: *void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if size == 0 || dst == null || src == null { return dst; }
 #[if WINDOWS]
         RtlCopyMemory(dst, src, size);
@@ -71,7 +71,7 @@ extern "C" {
         return dst;
     } #[endif]
 
-    fn memmove(dst: *mut void, src: *void, size: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn memmove(dst: *mut void, src: *void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if size == 0 || dst == null || src == null { return dst; }
 #[if WINDOWS]
         RtlMoveMemory(dst, src, size);
@@ -91,7 +91,7 @@ extern "C" {
         return dst;
     } #[endif]
 
-    fn memset(ptr: *mut void, value: i32, num: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn memset(ptr: *mut void, value: i32, num: usize) -> *mut void #[if LIBC] ; #[else] {
         if num == 0 || ptr == null { return ptr; }
 #[if WINDOWS]
         RtlFillMemory(ptr, num, value as u8);
@@ -103,7 +103,7 @@ extern "C" {
         return ptr;
     } #[endif]
 
-    fn calloc(nmemb: usize, size: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn calloc(nmemb: usize, size: usize) -> *mut void #[if LIBC] ; #[else] {
         let total = nmemb * size;
         let ptr = malloc(total);
         if ptr == null { return null; }
@@ -111,7 +111,7 @@ extern "C" {
         return ptr;
     } #[endif]
 
-    fn realloc(ptr: *mut void, size: usize) -> *mut void #[if DARWIN] ; #[else] {
+    fn realloc(ptr: *mut void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if ptr == null { return malloc(size); }
         if size == 0 { free(ptr); return null; }
 #[if WINDOWS]

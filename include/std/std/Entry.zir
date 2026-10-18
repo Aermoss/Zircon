@@ -18,7 +18,7 @@ extern "C" {
 #[if WINDOWS]
     fn ExitProcess(uExitCode: u32) -> !;
 #[else]
-    fn exit(status: i32) -> ! #[if DARWIN] ; #[else] {
+    fn exit(status: i32) -> ! #[if LIBC] ; #[else] {
         let _status: i64 = status as i64;
 
         volatile asm : rax(60), rdi(_status) -> {

@@ -2,11 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build-windows:
+  windows:
     runs-on: windows-latest
+
+    outputs:
+      llvm-major: ${{ steps.llvm.outputs.major }}
 
     steps:
       - name: Checkout source.
@@ -15,11 +18,179 @@ jobs:
       - name: Install LLVM.
         run: choco install llvm -y
 
-      - name: Build compiler.
-        run: .\bin\zirconc.exe src/Main.zir -o zirconc.exe -L"C:\Program Files\LLVM\lib" -lLLVM-C -lDbgHelp -g -v
+      - name: Detect LLVM version.
+        id: llvm
+        run: |
+          $version = ((& "C:\Program Files\LLVM\bin\clang.exe" --version)[0] -split ' ')[2]
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "major=$($version.Split('.')[0])" >> $env:GITHUB_OUTPUT
 
-      - name: Upload artifact.
+      - name: Build compiler.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force dist\windows-amd64, dist\windows-arm64, dist\objects | Out-Null
+          .\bin\zirconc.exe src/Main.zir -o dist\windows-amd64\zirconc.exe -L"C:\Program Files\LLVM\lib" -lLLVM-C -lDbgHelp -g -v
+          .\dist\windows-amd64\zirconc.exe --version
+
+      - name: Build compiler for Windows ARM64.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $version = "${{ steps.llvm.outputs.version }}"
+          Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-woa64.exe" -OutFile llvm-woa64.exe
+          7z e llvm-woa64.exe -ollvm-arm64 LLVM-C.lib -r -y
+
+          $stubs = foreach ($target in 'BPF', 'WebAssembly', 'RISCV', 'NVPTX') {
+            foreach ($part in 'TargetInfo', 'Target', 'TargetMC', 'AsmPrinter', 'AsmParser', 'Disassembler') {
+              if ($target -ne 'NVPTX' -or $part -notin 'AsmParser', 'Disassembler') { "void LLVMInitialize$target$part(void) {}" }
+            }
+          }
+
+          $stubs | Set-Content llvm-arm64\stubs.c
+          & "C:\Program Files\LLVM\bin\clang.exe" --target=aarch64-pc-windows-msvc -c llvm-arm64\stubs.c -o llvm-arm64\stubs.obj
+          & "C:\Program Files\LLVM\bin\llvm-lib.exe" llvm-arm64\stubs.obj /out:llvm-arm64\LLVMStubs.lib
+          .\bin\zirconc.exe src/Main.zir -o dist\windows-arm64\zirconc.exe -target aarch64-pc-windows-msvc -L"$PWD\llvm-arm64" -lLLVM-C -lLLVMStubs -lDbgHelp -g -v
+
+      - name: Compile objects for Linux and macOS.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $targets = @{
+            'linux-amd64' = 'x86_64-unknown-linux-gnu'
+            'linux-arm64' = 'aarch64-unknown-linux-gnu'
+            'darwin-amd64' = 'x86_64-apple-macosx11.0'
+            'darwin-arm64' = 'arm64-apple-macosx11.0'
+          }
+
+          foreach ($name in $targets.Keys) {
+            .\bin\zirconc.exe src/Main.zir -o "dist\objects\zirconc-$name.o" -c -target $targets[$name] -v
+          }
+
+      - name: Upload Windows AMD64 compiler.
         uses: actions/upload-artifact@v4
         with:
           name: zirconc-windows-amd64
-          path: zirconc.exe
+          path: dist/windows-amd64/zirconc.exe
+
+      - name: Upload Windows ARM64 compiler.
+        uses: actions/upload-artifact@v4
+        with:
+          name: zirconc-windows-arm64
+          path: dist/windows-arm64/zirconc.exe
+
+      - name: Upload objects.
+        uses: actions/upload-artifact@v4
+        with:
+          name: objects
+          path: dist/objects
+
+  linux:
+    needs: windows
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            multiarch: x86_64-linux-gnu
+            loader: /lib64/ld-linux-x86-64.so.2
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            multiarch: aarch64-linux-gnu
+            loader: /lib/ld-linux-aarch64.so.1
+
+    runs-on: ${{ matrix.runner }}
+
+    env:
+      LLVM_MAJOR: ${{ needs.windows.outputs.llvm-major }}
+
+    steps:
+      - name: Checkout source.
+        uses: actions/checkout@v4
+
+      - name: Download objects.
+        uses: actions/download-artifact@v4
+        with:
+          name: objects
+          path: objects
+
+      - name: Install LLVM.
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          sudo bash llvm.sh "$LLVM_MAJOR"
+          sudo ln -sf "/usr/bin/ld.lld-$LLVM_MAJOR" /usr/local/bin/ld.lld
+
+      - name: Link compiler.
+        run: |
+          ld.lld --nostdlib --entry _start --dynamic-linker ${{ matrix.loader }} -o zirconc objects/zirconc-linux-${{ matrix.arch }}.o \
+            -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -L/usr/lib/${{ matrix.multiarch }} -l:libc.so.6
+          ./zirconc --version
+
+      - name: Rebuild compiler natively.
+        run: |
+          ./zirconc src/Main.zir -o zirconc2 -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -v
+          ./zirconc2 src/Main.zir -o zirconc3 -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM
+          cmp zirconc2 zirconc3
+
+      - name: Upload compiler.
+        uses: actions/upload-artifact@v4
+        with:
+          name: zirconc-linux-${{ matrix.arch }}
+          path: zirconc2
+
+  darwin:
+    needs: windows
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: macos-15-intel
+            cc-arch: x86_64
+          - arch: arm64
+            runner: macos-latest
+            cc-arch: arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    env:
+      LLVM_MAJOR: ${{ needs.windows.outputs.llvm-major }}
+
+    steps:
+      - name: Checkout source.
+        uses: actions/checkout@v4
+
+      - name: Download objects.
+        uses: actions/download-artifact@v4
+        with:
+          name: objects
+          path: objects
+
+      - name: Install LLVM.
+        run: |
+          if brew install "llvm@$LLVM_MAJOR"; then
+            echo "LLVM_LIB=$(brew --prefix "llvm@$LLVM_MAJOR")/lib" >> "$GITHUB_ENV"
+          else
+            brew install llvm
+            echo "LLVM_LIB=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+          fi
+
+      - name: Link compiler.
+        run: |
+          cc -arch ${{ matrix.cc-arch }} objects/zirconc-darwin-${{ matrix.arch }}.o -o zirconc -L"$LLVM_LIB" -lLLVM -Wl,-rpath,"$LLVM_LIB"
+          ./zirconc --version
+
+      - name: Rebuild compiler natively.
+        run: |
+          ./zirconc src/Main.zir -o zirconc2 -L"$LLVM_LIB" -lLLVM -v
+          ./zirconc2 src/Main.zir -o zirconc3 -L"$LLVM_LIB" -lLLVM
+          ./zirconc3 --version
+
+      - name: Upload compiler.
+        uses: actions/upload-artifact@v4
+        with:
+          name: zirconc-darwin-${{ matrix.arch }}
+          path: zirconc2

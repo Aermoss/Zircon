@@ -17,7 +17,7 @@
 #[include "std/mem", "std/vec" : *]
 
 extern "C" {
-    fn strlen(str: *i8) -> usize {
+    fn strlen(str: *i8) -> usize #[if LIBC] ; #[else] {
         let mut i: usize = 0;
 
         loop {
@@ -29,9 +29,9 @@ extern "C" {
         }
 
         0
-    }
+    } #[endif]
 
-    fn strcmp(s1: *i8, s2: *i8) -> i32 {
+    fn strcmp(s1: *i8, s2: *i8) -> i32 #[if LIBC] ; #[else] {
         let mut i: usize = 0;
 
         while s1[i] == s2[i] {
@@ -41,9 +41,9 @@ extern "C" {
         }
 
         (s1[i] as i32) - (s2[i] as i32)
-    }
+    } #[endif]
 
-    fn strncmp(s1: *i8, s2: *i8, n: usize) -> i32 {
+    fn strncmp(s1: *i8, s2: *i8, n: usize) -> i32 #[if LIBC] ; #[else] {
         for i in 0..n {
             if s1[i] != s2[i] {
                 return (s1[i] as i32) - (s2[i] as i32);
@@ -55,7 +55,7 @@ extern "C" {
         }
 
         0
-    }
+    } #[endif]
 }
 
 class String {

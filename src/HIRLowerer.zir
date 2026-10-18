@@ -2032,7 +2032,7 @@ class HIRLowerer {
         let mut inputs = Vector<*HIRAssemblyOperand>();
 
         for input in assembly->inputs {
-            let expression = this.LowerExpression(input->expression);
+            let expression = this.Coerce(this.LowerExpression(input->expression));
             if expression == null { continue; }
             inputs.PushBack(this.builder.BuildAssemblyOperand(input->name, expression));
         }
@@ -2044,7 +2044,7 @@ class HIRLowerer {
                 Logger::Log("Multiple outputs are not supported.", assembly, LogSeverity::Error);
             }
 
-            let expression = this.LowerExpression(output->expression);
+            let expression = this.Coerce(this.LowerExpression(output->expression));
             if expression == null { continue; }
             outputs.PushBack(this.builder.BuildAssemblyOperand(output->name, expression));
         }
