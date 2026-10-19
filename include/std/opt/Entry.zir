@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/std", "std/io" : *]
+#[include "std/panic" : *]
 
 enum Option<T> {
     Some(T), None;
@@ -36,10 +36,7 @@ enum Option<T> {
     pub fn Unwrap(&this) -> T {
         match this {
             Option<T>::Some(value) => value,
-            Option<T>::None => {
-                WriteLine("Panicked: called Unwrap() on a None value.");
-                Exit(1);
-            }
+            Option<T>::None => Panic("called 'Unwrap' on a 'None' value.")
         }
     }
 

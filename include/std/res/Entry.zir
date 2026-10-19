@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/std", "std/io" : *]
+#[include "std/panic" : *]
 
 enum Result<T, E> {
     Ok(T), Err(E);
@@ -36,10 +36,7 @@ enum Result<T, E> {
     pub fn Unwrap(&this) -> T {
         match this {
             Result<T, E>::Ok(value) => value,
-            Result<T, E>::Err(_) => {
-                WriteLine("Panicked: called Unwrap() on an Err value.");
-                Exit(1);
-            }
+            Result<T, E>::Err(_) => Panic("called 'Unwrap' on an 'Err' value.")
         }
     }
 
@@ -52,10 +49,7 @@ enum Result<T, E> {
 
     pub fn UnwrapErr(&this) -> E {
         match this {
-            Result<T, E>::Ok(_) => {
-                WriteLine("Panicked: called UnwrapErr() on an Ok value.");
-                Exit(1);
-            },
+            Result<T, E>::Ok(_) => Panic("called 'UnwrapErr' on an 'Ok' value."),
             Result<T, E>::Err(err) => err
         }
     }

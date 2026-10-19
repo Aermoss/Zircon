@@ -268,16 +268,6 @@ extern "C" {
         return result as i32;
     } #[endif]
 
-    fn read(fd: i32, buf: *mut i8, count: usize) -> isize #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(0), rdi(fd as i64), rsi(buf), rdx(count as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as isize;
-    } #[endif]
-
     fn close(fd: i32) #[if LIBC] ; #[else] {
         volatile asm : rax(3), rdi(fd as i64) -> {
             syscall

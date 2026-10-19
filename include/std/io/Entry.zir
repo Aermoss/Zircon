@@ -23,6 +23,16 @@ extern "C" {
 
     fn GetStdHandle(nStdHandle: u32) -> *mut void;
 #[else]
+    fn read(fd: i32, buf: *mut i8, count: usize) -> isize #[if LIBC] ; #[else] {
+        let mut result: i64 = 0;
+
+        volatile asm : rax(0), rdi(fd as i64), rsi(buf), rdx(count as i64) -> {
+            syscall
+        } -> rax(result) : memory, rcx, r11;
+
+        return result as isize;
+    } #[endif]
+
     fn write(fd: i32, buf: *i8, len: usize) #[if LIBC] ; #[else] {
         volatile asm : rax(1), rdi(fd), rsi(buf), rdx(len) -> {
             syscall
@@ -40,6 +50,24 @@ const STDIN_FILENO: i32 = 0;
 const STDOUT_FILENO: i32 = 1;
 const STDERR_FILENO: i32 = 2;
 #[endif]
+
+fn ReadLine() -> String {
+    let mut line = String();
+    let mut character: i8 = 0;
+
+    loop {
+#[if WINDOWS]
+        let mut count: u32 = 0;
+        ReadFile(GetStdHandle(STD_INPUT_HANDLE), &mut character, 1, &mut count, null);
+#[else]
+        let count = read(STDIN_FILENO, &mut character, 1);
+#[endif]
+        if count != 1 || character == '\n' || character == '\r' { break; }
+        line += character;
+    }
+
+    line
+}
 
 fn Write(text: &String) {
 #[if WINDOWS]
@@ -72,6 +100,40 @@ fn WriteLine(text: *i8) {
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
     write(STDOUT_FILENO, "\n", 1);
+#[endif]
+}
+
+fn WriteError(text: &String) {
+#[if WINDOWS]
+    WriteFile(GetStdHandle(STD_ERROR_HANDLE), text.Data(), text.Length() as u32, null, null);
+#[else]
+    write(STDERR_FILENO, text.Data(), text.Length());
+#[endif]
+}
+
+fn WriteError(text: *i8) {
+#[if WINDOWS]
+    WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, strlen(text) as u32, null, null);
+#[else]
+    write(STDERR_FILENO, text, strlen(text));
+#[endif]
+}
+
+fn WriteErrorLine(text: &String) {
+    WriteError(text);
+#[if WINDOWS]
+    WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
+#[else]
+    write(STDERR_FILENO, "\n", 1);
+#[endif]
+}
+
+fn WriteErrorLine(text: *i8) {
+    WriteError(text);
+#[if WINDOWS]
+    WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
+#[else]
+    write(STDERR_FILENO, "\n", 1);
 #[endif]
 }
 
