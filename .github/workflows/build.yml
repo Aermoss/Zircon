@@ -250,7 +250,7 @@ jobs:
           notes="Built with LLVM $LLVM_MAJOR. Windows packages include LLVM-C.dll; on Linux and macOS install LLVM $LLVM_MAJOR (libLLVM)."
 
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            gh release create "$GITHUB_REF_NAME" packages/* --title "Zircon $GITHUB_REF_NAME" --notes "$notes"
+            gh release create "$GITHUB_REF_NAME" packages/* --title "$(head -n 1 README.md | sed 's/^# //; s/\r$//')" --notes "$notes" --generate-notes
           else
             gh release delete nightly --cleanup-tag --yes || true
             gh release create nightly packages/* --prerelease --target "$GITHUB_SHA" --title "Nightly" --notes "Built from $GITHUB_SHA. $notes"
