@@ -14,7 +14,21 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/std", "std/str", "std/pair" : *]
+#[include "std/io", "std/std", "std/str", "std/pair", "std/res" : *]
+
+enum IOError {
+    NotFound, PermissionDenied, AlreadyExists, InvalidInput, Other(i32);
+
+    pub fn ToString(&this) -> String {
+        match this {
+            IOError::NotFound => "entity not found".ToString(),
+            IOError::PermissionDenied => "permission denied".ToString(),
+            IOError::AlreadyExists => "entity already exists".ToString(),
+            IOError::InvalidInput => "invalid input".ToString(),
+            IOError::Other(code) => "os error " + String::FromInteger(code as i64)
+        }
+    }
+}
 
 #[if WINDOWS]
 const PATH_SEPERATOR: i8 = '\\';
@@ -61,6 +75,8 @@ extern "C" {
 
     fn GetFileSize(hFile: *mut void, lpFileSizeHigh: *mut u32) -> u32;
     fn CloseHandle(hObject: *mut void) -> i32;
+
+    fn GetLastError() -> u32;
 }
 
 const GENERIC_READ: u32 = 0x80000000;
@@ -75,80 +91,85 @@ const FILE_ATTRIBUTE_NORMAL: u32 = 0x00000080;
 const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x00000010;
 const INVALID_FILE_ATTRIBUTES: u32 = 0xFFFFFFFF;
 
-const INVALID_HANDLE_VALUE: *mut void = -1 as *mut void;
+const INVALID_HANDLE_VALUE: *mut void = -1isize as *mut void;
+const INVALID_FILE_SIZE: u32 = 0xFFFFFFFF;
 
-fn _ReadFile(path: &String) -> String {
-    let mut content = String();
-    let handle = CreateFileA(path.Data(), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
-
-    if handle == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to open file for reading: '" + path + "'.\x1b[0m");
-        return content;
+fn _LastError() -> IOError {
+    match GetLastError() {
+        2 | 3 => IOError::NotFound,
+        5 => IOError::PermissionDenied,
+        80 | 183 => IOError::AlreadyExists,
+        87 | 123 => IOError::InvalidInput,
+        code => IOError::Other(code as i32)
     }
+}
 
+fn _ReadFile(path: &String) -> Result<String, IOError> {
+    let handle = CreateFileA(path.Data(), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
+    if handle == INVALID_HANDLE_VALUE { return Result<String, IOError>::Err(_LastError()); }
     let size = GetFileSize(handle, null);
 
-    if size > 0 {
-        let string = new i8[size as usize + 1];
-        let mut bytesRead: u32 = 0;
-
-        if ReadFile(handle, string, size, &mut bytesRead, null) != 0 {
-            string[size as usize] = 0;
-            content += string;
-        }
+    if size == INVALID_FILE_SIZE {
+        let error = _LastError();
+        CloseHandle(handle);
+        return Result<String, IOError>::Err(error);
     }
 
+    let buffer = new i8[size as usize + 1];
+    let mut count: u32 = 0;
+
+    if size != 0 && ReadFile(handle, buffer, size, &mut count, null) == 0 {
+        let error = _LastError();
+        delete[] buffer;
+        CloseHandle(handle);
+        return Result<String, IOError>::Err(error);
+    }
+
+    buffer[count as usize] = 0;
+    let content = String(buffer);
+    delete[] buffer;
     CloseHandle(handle);
-    content
+    Result<String, IOError>::Ok(content)
 }
 
-fn _WriteFile(path: &String, content: &String) -> bool {
+fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
     let handle = CreateFileA(path.Data(), GENERIC_WRITE, FILE_SHARE_NONE, null, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, null);
-
-    if handle == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to open file for writing: '" + path + "'.\x1b[0m");
-        return false;
-    }
-
+    if handle == INVALID_HANDLE_VALUE { return Result<(), IOError>::Err(_LastError()); }
     let mut written: u32 = 0;
-    let success = WriteFile(handle, content.Data(), content.Length() as u32, &mut written, null);
-    CloseHandle(handle);
-    success != 0
-}
 
-fn GetTemporaryPath() -> String {
-    let mut buffer: [i8; MAX_PATH];
-    let length = GetTempPathA(sizeof(buffer) as u32, &mut buffer[0]);
-
-    if length > 0 && length < sizeof(buffer) as u32 {
-        String(&buffer[0] as *i8, 0, length as usize)
-    } else {
-        WriteLine("\x1b[31mFailed to get temporary path.\x1b[0m");
-        String()
+    if WriteFile(handle, content.Data(), content.Length() as u32, &mut written, null) == 0 {
+        let error = _LastError();
+        CloseHandle(handle);
+        return Result<(), IOError>::Err(error);
     }
+
+    CloseHandle(handle);
+    Result<(), IOError>::Ok(())
 }
 
-fn AbsolutePath(path: &String) -> String {
+fn GetTemporaryPath() -> Result<String, IOError> {
+    let mut buffer: [i8; MAX_PATH];
+    let length = GetTempPathA(MAX_PATH as u32, &mut buffer[0]);
+    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
+}
+
+fn AbsolutePath(path: &String) -> Result<String, IOError> {
     let mut buffer: [i8; MAX_PATH];
     let mut filePart: *mut i8 = null;
     let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, &mut buffer[0], &mut filePart);
-
-    if length > 0 && length < MAX_PATH as u32 {
-        return String(&buffer[0] as *i8, 0, length as usize);
-    }
-
-    path
+    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 }
 
-fn ExecutablePath() -> String {
+fn ExecutablePath() -> Result<String, IOError> {
     let mut buffer: [i8; MAX_PATH];
     let length = GetModuleFileNameA(null, &mut buffer[0], MAX_PATH as u32);
-
-    if length > 0 && length < MAX_PATH as u32 {
-        return String(&buffer[0] as *i8, 0, length as usize);
-    }
-
-    String()
+    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 }
 
 fn PathExists(path: &String) -> bool {
@@ -175,8 +196,12 @@ fn FolderExists(path: &String) -> bool {
     }
 }
 
-fn RemoveFile(path: &String) -> bool {
-    DeleteFileA(path.Data()) != 0
+fn RemoveFile(path: &String) -> Result<(), IOError> {
+    if DeleteFileA(path.Data()) == 0 {
+        return Result<(), IOError>::Err(_LastError());
+    }
+
+    Result<(), IOError>::Ok(())
 }
 #[else]
 const PATH_SEPERATOR: i8 = '/';
@@ -316,10 +341,13 @@ extern "C" {
 
     fn realpath(path: *i8, resolved_path: *mut i8) -> *mut i8;
 #[if DARWIN]
+    fn __error() -> *mut i32;
     fn opendir(name: *i8) -> *mut void;
     fn closedir(directory: *mut void) -> i32;
     fn _NSGetExecutablePath(buffer: *mut i8, size: *mut u32) -> i32;
 #[else]
+    fn __errno_location() -> *mut i32;
+
     fn readlink(pathname: *i8, buffer: *mut i8, size: usize) -> isize #[if LIBC] ; #[else] {
         let mut result = 0i64;
 
@@ -332,73 +360,103 @@ extern "C" {
 #[endif]
 }
 
-fn _ReadFile(path: &String) -> String {
-    let mut content = String();
-    let fd = open(path.Data(), O_RDONLY, 0);
+fn _LastError(result: i64) -> IOError {
+#[if !LIBC]
+    let code = -result as i32;
+#[elif DARWIN]
+    let code = *__error();
+#[else]
+    let code = *__errno_location();
+#[endif]
 
-    if fd < 0 {
-        WriteLine("\x1b[31mFailed to open file for reading: '" + path + "'.\x1b[0m");
-        return content;
+    match code {
+        2 | 20 => IOError::NotFound,
+        1 | 13 => IOError::PermissionDenied,
+        17 => IOError::AlreadyExists,
+        22 => IOError::InvalidInput,
+        _ => IOError::Other(code)
     }
+}
 
+fn _ReadFile(path: &String) -> Result<String, IOError> {
+    let fd = open(path.Data(), O_RDONLY, 0);
+    if fd < 0 { return Result<String, IOError>::Err(_LastError(fd as i64)); }
     let size = lseek(fd, 0, SEEK_END);
 
-    if size > 0 {
-        lseek(fd, 0, SEEK_SET);
-        let buffer = new i8[size as usize + 1];
-        let bytes_read = read(fd, buffer, size as usize);
+    if size < 0 {
+        let error = _LastError(size);
+        close(fd);
+        return Result<String, IOError>::Err(error);
+    }
 
-        if bytes_read > 0 {
-            buffer[bytes_read as usize] = 0;
-            content = buffer;
+    lseek(fd, 0, SEEK_SET);
+    let buffer = new i8[size as usize + 1];
+    let mut length: usize = 0;
+
+    while length < size as usize {
+        let count = read(fd, buffer + length, size as usize - length);
+
+        if count < 0 {
+            let error = _LastError(count as i64);
+            delete[] buffer;
+            close(fd);
+            return Result<String, IOError>::Err(error);
         }
 
-        delete[] buffer;
+        if count == 0 { break; }
+        length += count as usize;
     }
 
+    buffer[length] = 0;
+    let content = String(buffer);
+    delete[] buffer;
     close(fd);
-    content
+    Result<String, IOError>::Ok(content)
 }
 
-fn _WriteFile(path: &String, content: &String) -> bool {
+fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
     let mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
     let fd = open(path.Data(), O_WRONLY | O_CREAT | O_TRUNC, mode);
+    if fd < 0 { return Result<(), IOError>::Err(_LastError(fd as i64)); }
+    let mut written: usize = 0;
 
-    if fd < 0 {
-        WriteLine("\x1b[31mFailed to open file for writing: '" + path + "'.\x1b[0m");
-        return false;
+    while written < content.Length() {
+        let count = write(fd, content.Data() + written, content.Length() - written);
+
+        if count <= 0 {
+            let error = _LastError(count as i64);
+            close(fd);
+            return Result<(), IOError>::Err(error);
+        }
+
+        written += count as usize;
     }
 
-    write(fd, content.Data(), content.Length());
     close(fd);
-    true
+    Result<(), IOError>::Ok(())
 }
 
-fn GetTemporaryPath() -> String {
-    String("/tmp/")
+fn GetTemporaryPath() -> Result<String, IOError> {
+    Result<String, IOError>::Ok("/tmp/".ToString());
 }
 
-fn AbsolutePath(path: &String) -> String {
+fn AbsolutePath(path: &String) -> Result<String, IOError> {
     let mut buffer: [i8; PATH_MAX];
-    let result = realpath(path.Data(), &mut buffer[0]);
-
-    if result != null {
-        return String(&buffer[0] as *i8);
-    }
-
-    path
+    if realpath(path.Data(), &mut buffer[0]) == null { return Result<String, IOError>::Err(_LastError(0)); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8))
 }
 
-fn ExecutablePath() -> String {
+fn ExecutablePath() -> Result<String, IOError> {
     let mut buffer: [i8; PATH_MAX];
 #[if DARWIN]
     let mut size = PATH_MAX as u32;
-    if _NSGetExecutablePath(&mut buffer[0], &mut size) != 0 { return String(); }
+    if _NSGetExecutablePath(&mut buffer[0], &mut size) != 0 { return Result<String, IOError>::Err(IOError::InvalidInput); }
     AbsolutePath(String(&buffer[0] as *i8))
 #[else]
     let length = readlink("/proc/self/exe", &mut buffer[0], PATH_MAX);
-    if length <= 0 || length as usize >= PATH_MAX { return String(); }
-    String(&buffer[0] as *i8, 0, length as usize)
+    if length < 0 { return Result<String, IOError>::Err(_LastError(length as i64)); }
+    if length as usize >= PATH_MAX { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 #[endif]
 }
 
@@ -439,8 +497,10 @@ fn FolderExists(path: &String) -> bool {
 }
 #[endif]
 
-fn RemoveFile(path: &String) -> bool {
-    unlink(path.Data()) == 0
+fn RemoveFile(path: &String) -> Result<(), IOError> {
+    let result = unlink(path.Data());
+    if result != 0 { return Result<(), IOError>::Err(_LastError(result as i64)); }
+    Result<(), IOError>::Ok(())
 }
 #[endif]
 

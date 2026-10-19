@@ -2109,7 +2109,7 @@ class HIRLowerer {
             }
         }
 
-        this.temporaries = this.temporary_stack.PopBack();
+        this.temporaries = this.temporary_stack.PopBack().Unwrap();
         this.builder.SetCurrentBlock(previous_block);
         result
     }
@@ -2424,7 +2424,7 @@ class HIRLowerer {
         }
 
         body->destructors = this.GetDestructors(this.scope_manager.current, null);
-        this.temporaries = this.temporary_stack.PopBack();
+        this.temporaries = this.temporary_stack.PopBack().Unwrap();
         this.builder.SetCurrentBlock(previous_block);
         this.loop_temporaries.PopBack();
         this.loop_targets.PopBack();
@@ -3060,7 +3060,7 @@ class HIRLowerer {
                     if suffix == "size" {
                         _type = this.context.IntegerPointerType(signed);
                     } else {
-                        let width = suffix.ToInteger() as u32;
+                        let width = suffix.ToUnsignedInteger().Unwrap() as u32;
 
                         if width == 128 || width == 64 || width == 32 || width == 16 || width == 8 {
                             _type = this.context.IntegerType(width, signed);
@@ -3078,7 +3078,7 @@ class HIRLowerer {
                 let mut _type = this.context.FloatLiteralType();
 
                 if !float->suffix.Empty() {
-                    let width = float->suffix.SubString(1).ToInteger() as u32;
+                    let width = float->suffix.SubString(1).ToUnsignedInteger().Unwrap() as u32;
 
                     if width == 64 || width == 32 {
                         _type = this.context.FloatType(width);
@@ -3570,7 +3570,9 @@ class HIRLowerer {
                             let mut value = this.ImplicitDereference(values[0]);
                             value = this.Validate(value, target_type, "Incompatible primitive type initialization types", call);
                             if value == null { return null; }
-                            this.builder.BuildExpressionStatement(this.builder.Assignment(target, value));
+                            value = this.LowerCopyOrMoveValue(value);
+                            if value == null { return null; }
+                            this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.Dereference(target), value));
                         }
                     } return target;
                 } else if path->segments[0].name == "destruct" {
@@ -3939,6 +3941,8 @@ class HIRLowerer {
                 }
 
                 values[0] = this.Validate(values[0], _type, "Incompatible primitive type initialization types", _new);
+                if values[0] == null { return null; }
+                values[0] = this.LowerCopyOrMoveValue(values[0]);
                 if values[0] == null { return null; }
                 this.builder.New(_type, null, true, null, values)
             }
@@ -5226,7 +5230,7 @@ class HIRLowerer {
                 if specifier == "size" {
                     return this.context.IntegerPointerType(signed);
                 } else {
-                    let width = specifier.ToUnsignedInteger() as u32;
+                    let width = specifier.ToUnsignedInteger().Unwrap() as u32;
 
                     if width != 8 && width != 16 && width != 32 && width != 64 && width != 128 {
                         Logger::Log("Invalid integer type '" + name + "'.", path, LogSeverity::Error);
@@ -5236,7 +5240,7 @@ class HIRLowerer {
                     return this.context.IntegerType(width, signed);
                 }
             } else if name.StartsWith('f') {
-                let width = name.SubString(1).ToUnsignedInteger() as u32;
+                let width = name.SubString(1).ToUnsignedInteger().Unwrap() as u32;
 
                 if width != 32 && width != 64 {
                     Logger::Log("Invalid float type '" + name + "'.", path, LogSeverity::Error);

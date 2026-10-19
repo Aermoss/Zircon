@@ -910,7 +910,7 @@ extern "C" {
         }
 
         let parts = version.ToString().Split('.');
-        let (major, minor) = (parts[0].ToInteger() as i32, parts[1].ToInteger() as i32);
+        let (major, minor) = (parts[0].ToInteger().Unwrap() as i32, parts[1].ToInteger().Unwrap() as i32);
         (max_loaded_major, max_loaded_minor) = (major, minor);
         (GLVersion.major, GLVersion.minor) = (major, minor);
 

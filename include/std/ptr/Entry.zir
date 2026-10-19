@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/atom" : *]
+#[include "std/atom", "std/opt" : *]
 
 class SharedControlBlock<T> {
     pub ptr: *mut T = null,
@@ -191,26 +191,24 @@ class Weak<T> {
         AtomicLoad64(&this.control->strong) == 0
     }
 
-    pub fn Lock(&this) -> Shared<T> {
-        let mut result = Shared<T>();
-        if this.control == null { return result; }
+    pub fn Lock(&this) -> Option<Shared<T>> {
+        if this.control == null { return Option<Shared<T>>::None; }
         let mut count = AtomicLoad64(&this.control->strong);
 
         loop {
             if count == 0 {
-                return result;
+                return Option<Shared<T>>::None;
             }
 
             if AtomicCompareExchangeBool64(&mut this.control->strong, count, count + 1) {
+                let mut result = Shared<T>();
                 result.control = this.control;
-                break;
+                return Option<Shared<T>>::Some(result);
             }
 
             count = AtomicLoad64(&this.control->strong);
             AtomicPause();
         }
-
-        result
     }
 
     pub fn StrongCount(&this) -> u64 {

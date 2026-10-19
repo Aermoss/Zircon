@@ -1305,6 +1305,8 @@ class MIRLowerer {
                 types.RemoveAt(0);
                 arguments += this.LowerCallArguments(_new->arguments, types);
                 this.builder.BuildCall("new.constructor".ToString(), callee, arguments);
+            } else if _new->initialized {
+                this.LowerExpressionTo(_new->arguments[0], pointer);
             }
         }
 
@@ -1429,6 +1431,19 @@ class MIRLowerer {
             }
 
             if target_type->IsPointer() {
+                let pointer_width = this.target_info.pointer_size as u32 * 8;
+                let size_type = this.context.IntegerType(pointer_width);
+
+                if value_type->Width() < pointer_width {
+                    if value_type->IsSigned() {
+                        value = this.builder.BuildCast("cast.extend".ToString(), MIRCastKind::SExt, value, size_type);
+                    } else {
+                        value = this.builder.BuildCast("cast.extend".ToString(), MIRCastKind::ZExt, value, size_type);
+                    }
+                } else if value_type->Width() > pointer_width {
+                    value = this.builder.BuildCast("cast.truncate".ToString(), MIRCastKind::Trunc, value, size_type);
+                }
+
                 return this.builder.BuildCast("cast".ToString(), MIRCastKind::IntToPtr, value, this.LowerType(target_type));
             }
         } else if value_type->IsFloat() {

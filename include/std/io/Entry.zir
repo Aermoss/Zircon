@@ -30,13 +30,17 @@ extern "C" {
             syscall
         } -> rax(result) : memory, rcx, r11;
 
-        return result as isize;
+        result as isize
     } #[endif]
 
-    fn write(fd: i32, buf: *i8, len: usize) #[if LIBC] ; #[else] {
+    fn write(fd: i32, buf: *i8, len: usize) -> isize #[if LIBC] ; #[else] {
+        let mut result: i64 = 0;
+
         volatile asm : rax(1), rdi(fd), rsi(buf), rdx(len) -> {
             syscall
-        } : memory, rcx, r11, rax;
+        } -> rax(result) : memory, rcx, r11;
+
+        result as isize
     } #[endif]
 #[endif]
 }
@@ -51,7 +55,7 @@ const STDOUT_FILENO: i32 = 1;
 const STDERR_FILENO: i32 = 2;
 #[endif]
 
-fn ReadLine() -> String {
+fn ReadLine() -> Option<String> {
     let mut line = String();
     let mut character: i8 = 0;
 
@@ -62,11 +66,12 @@ fn ReadLine() -> String {
 #[else]
         let count = read(STDIN_FILENO, &mut character, 1);
 #[endif]
+        if count != 1 && line.Empty() { return Option<String>::None; }
         if count != 1 || character == '\n' || character == '\r' { break; }
         line += character;
     }
 
-    line
+    Option<String>::Some(line)
 }
 
 fn Write(text: &String) {

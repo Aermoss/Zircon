@@ -59,7 +59,6 @@ extern "C" {
     fn CreateProcessA(lpApplicationName: *i8, lpCommandLine: */* mut */ i8, lpProcessAttributes: *mut void, lpThreadAttributes: *mut void, bInheritHandles: i32, dwCreationFlags: u32, lpEnvironment: *mut void, lpCurrentDirectory: *i8, lpStartupInfo: LPSTARTUPINFOA, lpProcessInformation: LPPROCESS_INFORMATION) -> i32;
     fn WaitForSingleObject(hHandle: *mut void, dwMilliseconds: u32) -> u32;
     fn GetExitCodeProcess(hProcess: *mut void, lpExitCode: *mut u32) -> i32;
-    fn GetLastError() -> u32;
 }
 
 class Timer {
@@ -213,7 +212,7 @@ fn GetWindowsSDKPath() -> String {
                 let (mut parsed_v1, mut parsed_v2, mut parsed_v3, mut parsed_v4) = (0u64, 0u64, 0u64, 0u64);
 
                 if parts.Size() == 4 {
-                    (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToUnsignedInteger(), parts[1].ToUnsignedInteger(), parts[2].ToUnsignedInteger(), parts[3].ToUnsignedInteger());
+                    (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap(), parts[3].ToUnsignedInteger().Unwrap());
                 } else {
                     WriteLine("\x1b[31mFailed to parse Windows SDK version.\x1b[0m");
                     Exit(1);
@@ -261,7 +260,7 @@ fn GetMSVCPath() -> String {
             let file_name = String(&find_data.cFileName[0] as *i8);
 
             if file_name != "." && file_name != ".." {
-                let mut parsed_version = file_name.ToInteger();
+                let mut parsed_version = file_name.ToInteger().Unwrap();
 
                 if parsed_version == 2017 { parsed_version = 15; }
                 else if parsed_version == 2019 { parsed_version = 16; }
@@ -333,7 +332,7 @@ fn GetMSVCPath() -> String {
                 let (mut parsed_v1, mut parsed_v2, mut parsed_v3) = (0u64, 0u64, 0u64);
 
                 if parts.Size() == 3 {
-                    (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToUnsignedInteger(), parts[1].ToUnsignedInteger(), parts[2].ToUnsignedInteger());
+                    (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap());
                 } else {
                     WriteLine("\x1b[31mFailed to parse MSVC version.\x1b[0m");
                     Exit(1);
@@ -362,6 +361,12 @@ fn GetMSVCPath() -> String {
     path
 }
 #[endif]
+
+fn WriteOutput(path: &String, content: &String) {
+    if let Result<(), IOError>::Err(error) = _WriteFile(path, content) {
+        Logger::Log(path, "Failed to write file: " + error.ToString() + ".", LogSeverity::Error);
+    }
+}
 
 fn PrintVersion() {
     WriteLine("Zircon 8.0 \"Octane\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
@@ -435,7 +440,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     include_paths.PushBack(".".ToString());
     include_paths.PushBack("include".ToString());
-    let root = SplitPath(SplitPath(ExecutablePath()).0).0;
+    let root = SplitPath(SplitPath(ExecutablePath().Unwrap()).0).0;
 
     if !root.Empty() {
         include_paths.PushBack(JoinPath(root, "include".ToString()));
@@ -650,8 +655,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let start = timer.Get();
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
-    let temp_path = GetTemporaryPath();
-    if temp_path.Empty() { return 1; }
+    let temp_path = match GetTemporaryPath() {
+        Result<String, IOError>::Ok(path) => path,
+        Result<String, IOError>::Err(error) => {
+            Logger::Log("Failed to get temporary path: " + error.ToString() + ".", LogSeverity::Error);
+            return 1;
+        }
+    };
     let mut entry_included = false;
     let mut failed = false;
 
@@ -680,7 +690,15 @@ fn Main(args: &mut Vector<String>) -> i32 {
             preprocessor.include_paths = include_paths;
             preprocessor.defines = defines;
 
-            let mut source = _ReadFile(input_file);
+            let mut source = match _ReadFile(input_file) {
+                Result<String, IOError>::Ok(source) => source,
+                Result<String, IOError>::Err(error) => {
+                    failed = true;
+                    Logger::Log(input_file, "Failed to read file: " + error.ToString() + ".", LogSeverity::Error);
+                    Logger::Clear();
+                    continue;
+                }
+            };
 
             if !entry_included && !check && !freestanding {
                 source += "\n#[include \"std/rt\" : *]\n";
@@ -704,7 +722,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if !check && !Logger::HasError() && hir_module != null {
                 WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
-                if emit_hir { _WriteFile(name + ".hir", hir_module->ToString()); }
+                if emit_hir { WriteOutput(name + ".hir", hir_module->ToString()); }
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
                 let mir_start = timer.Get();
@@ -720,27 +738,27 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     WriteLine("MIR passes ran in " + String::FromFloat(timer.Get() - passes_start) + " seconds.");
                 }
 
-                if emit_mir { _WriteFile(name + ".mir", mir_module->ToString()); }
+                if emit_mir { WriteOutput(name + ".mir", mir_module->ToString()); }
 
                 if target.backend == TargetBackend::Zodiac {
                     let mut lir_lowerer = LIRLowerer();
                     let lir_start = timer.Get();
                     let lir_module = lir_lowerer.Lower(mir_module);
                     WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
-                    if emit_lir { _WriteFile(name + ".virtual.lir", lir_module->ToString()); }
+                    if emit_lir { WriteOutput(name + ".virtual.lir", lir_module->ToString()); }
 
                     let mut allocator = LIRAllocator(&mut lir_lowerer.context);
                     let allocator_start = timer.Get();
                     allocator.Allocate(lir_module);
                     WriteLine("LIR module allocated in " + String::FromFloat(timer.Get() - allocator_start) + " seconds.");
-                    if emit_lir { _WriteFile(name + ".physical.lir", lir_module->ToString()); }
+                    if emit_lir { WriteOutput(name + ".physical.lir", lir_module->ToString()); }
 
                     if emit_asm {
                         let mut asm_name = name + ".s";
                         if !output_file.Empty() { asm_name = output_file; }
                         let mut emitter = ZodiacEmitter();
                         let assembly = emitter.Emit(lir_module);
-                        _WriteFile(asm_name, assembly);
+                        WriteOutput(asm_name, assembly);
                     }
                 } else {
                     let llvm_start = timer.Get();
@@ -811,7 +829,19 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if verbose {
                 Logger::Log("Assembling: '" + input_file + "'.", LogSeverity::Info);
-            } module = assembler.Assemble(_ReadFile(input_file));
+            }
+
+            match _ReadFile(input_file) {
+                Result<String, IOError>::Ok(source) => {
+                    module = assembler.Assemble(source);
+                },
+                Result<String, IOError>::Err(error) => {
+                    failed = true;
+                    Logger::Log(input_file, "Failed to read file: " + error.ToString() + ".", LogSeverity::Error);
+                    Logger::Clear();
+                    continue;
+                }
+            }
         } else if extension == ".obj" || extension == ".o" {
             if emit_object {
                 Logger::Log("Skipping input: '" + input_file + "'.", LogSeverity::Warning);

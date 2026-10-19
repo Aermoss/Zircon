@@ -963,7 +963,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let output_path = JoinPath(output_directory, file_state->relative_path + ".zir");
         EnsureDirectory(SplitPath(output_path).0);
 
-        if _WriteFile(output_path, content.SubString(0, end)) {
+        if _WriteFile(output_path, content.SubString(0, end)).IsOk() {
             WriteLine(executable + ": \x1b[32mInfo:\x1b[0m Generated '" + output_path + "'.");
         }
     }

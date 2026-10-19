@@ -213,40 +213,51 @@ class Parser {
                 let (mut value, mut suffix, mut base) = (String(), String(), 10u64);
                 let mut index = token.value.Find('u');
 
-                if index == -1 {
+                if index.IsNone() {
                     index = token.value.Find('i');
                 }
 
-                if index != -1 {
-                    value = token.value.SubString(0, index as usize);
-                    suffix = token.value.SubString(index as usize);
+                if let Option<usize>::Some(index) = index {
+                    value = token.value.SubString(0, index);
+                    suffix = token.value.SubString(index);
                 } else {
                     value = token.value;
                 }
 
-                if value.StartsWith("0x") {
+                if value.StartsWith("0x") || value.StartsWith("0X") {
                     (value, base) = (value.SubString(2), 16);
-                } else if value.StartsWith("0o") {
+                } else if value.StartsWith("0o") || value.StartsWith("0O") {
                     (value, base) = (value.SubString(2), 8);
-                } else if value.StartsWith("0b") {
+                } else if value.StartsWith("0b") || value.StartsWith("0B") {
                     (value, base) = (value.SubString(2), 2);
                 }
 
-                this.arena.New<ASTIntegerLiteral>(value.ToUnsignedInteger(base), suffix, token)
+                match value.ToUnsignedInteger(base) {
+                    Option<u64>::Some(value) => this.arena.New<ASTIntegerLiteral>(value, suffix, token),
+                    Option<u64>::None => {
+                        Logger::Log("Invalid integer literal '" + token.value + "'.", token, LogSeverity::Error);
+                        null
+                    }
+                }
             },
             TokenType::FLOAT => {
                 this.Advance();
                 let (mut value, mut suffix) = (String(), String());
-                let mut index = token.value.Find('f');
 
-                if index != -1 {
-                    value = token.value.SubString(0, index as usize);
-                    suffix = token.value.SubString(index as usize);
+                if let Option<usize>::Some(index) = token.value.Find('f') {
+                    value = token.value.SubString(0, index);
+                    suffix = token.value.SubString(index);
                 } else {
                     value = token.value;
                 }
 
-                this.arena.New<ASTFloatLiteral>(value.ToFloat(), suffix, token)
+                match value.ToFloat() {
+                    Option<f64>::Some(value) => this.arena.New<ASTFloatLiteral>(value, suffix, token),
+                    Option<f64>::None => {
+                        Logger::Log("Invalid float literal '" + token.value + "'.", token, LogSeverity::Error);
+                        null
+                    }
+                }
             },
             TokenType::STRING => {
                 this.Advance();
@@ -279,6 +290,11 @@ class Parser {
             },
             TokenType::LPAREN => {
                 this.Advance();
+
+                if this.Match(TokenType::RPAREN) {
+                    return this.arena.New<ASTTupleLiteral>(token);
+                }
+
                 let mut expression = this.ParseExpression();
                 if expression == null { return null; }
 
@@ -369,7 +385,17 @@ class Parser {
 
                     if this.Current()._type == TokenType::INTEGER {
                         let value = this.Advance().value;
-                        expression = this.arena.New<ASTTupleAccessExpression>(expression, value.ToUnsignedInteger() as usize, token._type == TokenType::ARROW, token);
+
+                        match value.ToUnsignedInteger() {
+                            Option<u64>::Some(index) => {
+                                expression = this.arena.New<ASTTupleAccessExpression>(expression, index as usize, token._type == TokenType::ARROW, token);
+                            },
+                            Option<u64>::None => {
+                                Logger::Log("Invalid tuple index '" + value + "'.", token, LogSeverity::Error);
+                                return null;
+                            }
+                        }
+
                         continue;
                     }
 
@@ -840,8 +866,8 @@ class Parser {
             this.arena.New<ASTPathType>(this.ParsePath(), token)
         };
 
-        while !pointers.Empty() {
-            node = this.arena.New<ASTPointerType>(node, pointers.PopBack(), token);
+        while let Option<bool>::Some(mutable) = pointers.PopBack() {
+            node = this.arena.New<ASTPointerType>(node, mutable, token);
         }
 
         if !references.Empty() {

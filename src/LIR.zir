@@ -112,7 +112,11 @@ fn LIRRegisterIndex(name: &String) -> i32 {
             }
         }
 
-        let index = rest.ToInteger(10) as i32;
+        let index = match rest.ToUnsignedInteger(10) {
+            Option<u64>::Some(index) if index <= 31 => index as i32,
+            _ => return -1
+        };
+
         if name.StartsWith('x') && index <= 31 { index }
         else if name.StartsWith('s') && index <= 11 { index + 5 }
         else if name.StartsWith('t') && index <= 6 { index + 17 }

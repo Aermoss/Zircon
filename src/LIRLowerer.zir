@@ -431,8 +431,12 @@ class LIRLowerer {
                 (definer, inverted) = (definers[inner as usize], true);
             }
 
-            let position = block->instructions.Index(definer);
-            if position < 0 || definer->uses.Size() != 2 { continue; }
+            let position = match block->instructions.Index(definer) {
+                Option<usize>::Some(position) => position,
+                Option<usize>::None => continue
+            };
+
+            if definer->uses.Size() != 2 { continue; }
             let mut left = definer->uses[0];
             let mut right = definer->uses[1];
             let mut stable = true;
@@ -443,7 +447,7 @@ class LIRLowerer {
                 if index < 0 || index as usize >= count { stable = false; continue; }
                 if defines[index as usize] == 1 { continue; }
 
-                for k in (position as usize + 1)..(size - 2) {
+                for k in (position + 1)..(size - 2) {
                     for other in block->instructions[k]->defines {
                         if this.VirtualIndex(other) == index { stable = false; }
                     }

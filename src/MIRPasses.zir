@@ -285,9 +285,7 @@ class MIRPromoteAllocas {
                 worklist.PushBack(store_blocks[i]);
             }
 
-            while !worklist.Empty() {
-                let block = worklist.PopBack();
-
+            while let Option<usize>::Some(block) = worklist.PopBack() {
                 for k in this.control_flow.frontier_offsets[block]..this.control_flow.frontier_offsets[block + 1] {
                     let target = this.control_flow.frontier[k];
                     if has_phi[target] { continue; }
@@ -371,8 +369,8 @@ class MIRPromoteAllocas {
         }
 
         while this.undo_slots.Size() > saved {
-            let slot = this.undo_slots.PopBack();
-            this.current[slot] = this.undo_values.PopBack();
+            let slot = this.undo_slots.PopBack().Unwrap();
+            this.current[slot] = this.undo_values.PopBack().Unwrap();
         }
     }
 
@@ -545,8 +543,8 @@ class MIRPromoteAllocas {
             }
         }
 
-        while !worklist.Empty() {
-            let phi = this.phis[worklist.PopBack()];
+        while let Option<usize>::Some(index) = worklist.PopBack() {
+            let phi = this.phis[index];
 
             for incoming in phi->incomings {
                 let index = indices.Get(incoming.value, MIR_NO_BLOCK);

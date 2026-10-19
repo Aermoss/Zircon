@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/mem", "std/vec" : *]
+#[include "std/mem", "std/vec", "std/opt" : *]
 
 extern "C" {
     fn strlen(str: *i8) -> usize #[if LIBC] ; #[else] {
@@ -281,22 +281,16 @@ class String {
         String::FromFloat(value, 6)
     }
 
-    fn ParseUnsigned(&this, base: u64, negative: &mut bool) -> u64 {
-        if this.length == 0 { return 0; }
-        if base < 2 || base > 36 { return 0; }
-        let mut result: u64 = 0;
-        let mut i: usize = 0;
-
-        if this.data[0] == '-' {
-            negative = true;
-            i = 1;
-        } else if this.data[0] == '+' {
-            negative = false;
-            i = 1;
+    fn ParseUnsigned(&this, start: usize, base: u64) -> Option<u64> {
+        if base < 2 || base > 36 || start >= this.length {
+            return Option<u64>::None;
         }
 
-        while i < this.length {
+        let mut result: u64 = 0;
+
+        for i in start..this.length {
             let c = this.data[i];
+
             let value: u64 = if c >= '0' && c <= '9' {
                 (c - '0') as u64
             } else if c >= 'A' && c <= 'Z' {
@@ -304,81 +298,74 @@ class String {
             } else if c >= 'a' && c <= 'z' {
                 (c - 'a' + 10) as u64
             } else {
-                break;
+                return Option<u64>::None;
             };
 
-            if value >= base { break; }
+            if value >= base || result > (0xFFFFFFFFFFFFFFFF - value) / base {
+                return Option<u64>::None;
+            }
+
             result = result * base + value;
-            i += 1;
         }
 
-        result
+        Option<u64>::Some(result)
     }
 
-    pub fn ToUnsignedInteger(&this, base: u64) -> u64 {
-        let mut negative = false;
-        let value = this.ParseUnsigned(base, negative);
-
-        if negative {
-            return !value + 1;
-        }
-
-        value
+    pub fn ToUnsignedInteger(&this, base: u64) -> Option<u64> {
+        this.ParseUnsigned(if this.StartsWith('+') { 1 } else { 0 }, base)
     }
 
-    pub fn ToUnsignedInteger(&this) -> u64 {
+    pub fn ToUnsignedInteger(&this) -> Option<u64> {
         this.ToUnsignedInteger(10)
     }
 
-    pub fn ToInteger(&this, base: i64) -> i64 {
-        let mut negative = false;
-        let value = this.ParseUnsigned(base as u64, negative);
+    pub fn ToInteger(&this, base: i64) -> Option<i64> {
+        let negative = this.StartsWith('-');
 
-        if negative {
-            return -(value as i64);
+        match this.ParseUnsigned(if negative || this.StartsWith('+') { 1 } else { 0 }, base as u64) {
+            Option<u64>::Some(value) if negative && value <= 0x8000000000000000 => Option<i64>::Some((!value + 1) as i64),
+            Option<u64>::Some(value) if !negative && value <= 0x7FFFFFFFFFFFFFFF => Option<i64>::Some(value as i64),
+            _ => Option<i64>::None
         }
-
-        value as i64
     }
 
-    pub fn ToInteger(&this) -> i64 {
+    pub fn ToInteger(&this) -> Option<i64> {
         this.ToInteger(10)
     }
 
-    pub fn ToFloat(&this) -> f64 {
-        if this.length == 0 { return 0.0; }
-        if this == "nan" { return 0.0 / 0.0; }
-        if this == "inf" || this == "+inf" { return 1.0 / 0.0; }
-        if this == "-inf" { return -1.0 / 0.0; }
-        let (mut value, mut negative) = (0.0, false);
+    pub fn ToFloat(&this) -> Option<f64> {
+        if this == "nan" { return Option<f64>::Some(0.0 / 0.0); }
+        if this == "inf" || this == "+inf" { return Option<f64>::Some(1.0 / 0.0); }
+        if this == "-inf" { return Option<f64>::Some(-1.0 / 0.0); }
+        let (mut value, mut negative, mut digits) = (0.0, false, 0);
         let mut i: usize = 0;
 
-        if this.data[0] == '-' {
+        if this.StartsWith('-') {
             negative = true;
             i = 1;
-        } else if this.data[0] == '+' {
+        } else if this.StartsWith('+') {
             i = 1;
         }
 
-        while i < this.length {
-            let c = this.data[i];
-            if c < '0' || c > '9' { break; }
+        while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
             value *= 10.0;
-            value += (c - '0') as f64;
-            i += 1;
+            value += (this.data[i] - '0') as f64;
+            (i, digits) = (i + 1, digits + 1);
         }
 
         if i < this.length && this.data[i] == '.' {
             i += 1;
             let mut divisor = 10.0;
 
-            while i < this.length {
-                let c = this.data[i];
-                if c < '0' || c > '9' { break; }
-                value += (c - '0') as f64 / divisor;
+            while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
+                value += (this.data[i] - '0') as f64 / divisor;
                 divisor *= 10.0;
-                i += 1;
+                (i, digits) = (i + 1, digits + 1);
             }
+        }
+
+        if digits == 0 {
+            return Option<f64>::None;
         }
 
         if i < this.length && (this.data[i] == 'e' || this.data[i] == 'E') {
@@ -394,14 +381,16 @@ class String {
                 }
             }
 
-            let mut exponent: i64 = 0;
+            let (mut exponent, mut exponent_digits) = (0i64, 0);
 
-            while i < this.length {
-                let c = this.data[i];
-                if c < '0' || c > '9' { break; }
+            while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
                 exponent *= 10;
-                exponent += (c - '0') as i64;
-                i += 1;
+                exponent += (this.data[i] - '0') as i64;
+                (i, exponent_digits) = (i + 1, exponent_digits + 1);
+            }
+
+            if exponent_digits == 0 {
+                return Option<f64>::None;
             }
 
             while exponent > 0 {
@@ -413,11 +402,8 @@ class String {
             }
         }
 
-        if negative {
-            return -value;
-        }
-
-        value
+        if i != this.length { return Option<f64>::None; }
+        Option<f64>::Some(if negative { -value } else { value })
     }
 
     pub fn ToLower(&this) -> String {
@@ -565,11 +551,11 @@ class String {
     }
 
     fn Contains(&this, substring: *i8, length: usize) -> bool {
-        this.Find(substring, length) != -1
+        this.Find(substring, length).IsSome()
     }
 
     pub fn Contains(&this, character: i8) -> bool {
-        this.Find(character) != -1
+        this.Find(character).IsSome()
     }
 
     pub fn StartsWith(&this, prefix: &String) -> bool {
@@ -749,18 +735,17 @@ class String {
         count
     }
 
-    pub fn Find(&this, substring: &String) -> isize {
+    pub fn Find(&this, substring: &String) -> Option<usize> {
         this.Find(substring.data, substring.length)
     }
 
-    pub fn Find(&this, substring: *i8) -> isize {
+    pub fn Find(&this, substring: *i8) -> Option<usize> {
         this.Find(substring, strlen(substring))
     }
 
-    fn Find(&this, substring: *i8, length: usize) -> isize {
-        if substring == null { return -1; }
-        if length == 0 { return 0; }
-        if length > this.length { return -1; }
+    fn Find(&this, substring: *i8, length: usize) -> Option<usize> {
+        if substring == null || length > this.length { return Option<usize>::None; }
+        if length == 0 { return Option<usize>::Some(0); }
 
         for i in 0..=(this.length - length) {
             let mut found = true;
@@ -773,21 +758,21 @@ class String {
             }
 
             if found {
-                return i as isize;
+                return Option<usize>::Some(i);
             }
         }
 
-        -1
+        Option<usize>::None
     }
 
-    pub fn Find(&this, character: i8) -> isize {
+    pub fn Find(&this, character: i8) -> Option<usize> {
         for i in 0..this.length {
             if this.data[i] == character {
-                return i as isize;
+                return Option<usize>::Some(i);
             }
         }
 
-        -1
+        Option<usize>::None
     }
 
     pub fn Strip(&this) -> String {

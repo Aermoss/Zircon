@@ -728,7 +728,13 @@ class Shader {
 
     fn FromPath(&mut this, vertex_path: &String, fragment_path: &String) {
         let (vertex_source, fragment_source) = (_ReadFile(vertex_path), _ReadFile(fragment_path));
-        this.FromSource(vertex_source.Data(), fragment_source.Data());
+
+        if vertex_source.IsErr() || fragment_source.IsErr() {
+            Logger::Error("Failed to read shader sources '" + vertex_path + "' and '" + fragment_path + "'.");
+            return;
+        }
+
+        this.FromSource(vertex_source.Unwrap().Data(), fragment_source.Unwrap().Data());
     }
 
     pub fn Reload(&mut this) {
@@ -941,7 +947,7 @@ class Subchunk {
     }
 
     pub fn GetLight(&this, number: u8, index: usize, position: &Vector3, direction: &Vector3) -> Vector<f32> {
-        let chunk = this.parent.Lock();
+        let chunk = this.parent.Lock().Unwrap();
 
         if !chunk.Valid() {
             Logger::Error("Failed to lock parent chunk.");
@@ -978,7 +984,7 @@ class Subchunk {
     }
 
     pub fn GetSkylight(&this, number: u8, index: usize, position: &Vector3, direction: &Vector3) -> Vector<f32> {
-        let chunk = this.parent.Lock();
+        let chunk = this.parent.Lock().Unwrap();
 
         if !chunk.Valid() {
             Logger::Error("Failed to lock parent chunk.");
@@ -1015,7 +1021,7 @@ class Subchunk {
     }
 
     pub fn GetShading(&this, number: u8, index: usize, direction: &Vector3) -> Vector<f32> {
-        let chunk = this.parent.Lock();
+        let chunk = this.parent.Lock().Unwrap();
 
         if !chunk.Valid() {
             Logger::Error("Failed to lock parent chunk.");
@@ -1080,16 +1086,16 @@ class Subchunk {
             return 0;
         }
 
-        let mut chunk = this.parent.Lock();
+        let mut chunk = this.parent.Lock().Unwrap();
 
         if !chunk.Valid() {
             Logger::Error("Failed to lock parent chunk.");
         }
 
         if x < (chunk->world_position.x as i32) {
-            chunk = chunk->west_neighbor.Lock();
+            chunk = chunk->west_neighbor.Lock().Unwrap();
         } else if x >= (chunk->world_position.x as i32) + (SUBCHUNK_WIDTH as i32) {
-            chunk = chunk->east_neighbor.Lock();
+            chunk = chunk->east_neighbor.Lock().Unwrap();
         }
 
         if !chunk.Valid() {
@@ -1097,9 +1103,9 @@ class Subchunk {
         }
 
         if z < (chunk->world_position.z as i32) {
-            chunk = chunk->north_neighbor.Lock();
+            chunk = chunk->north_neighbor.Lock().Unwrap();
         } else if z >= (chunk->world_position.z as i32) + (SUBCHUNK_DEPTH as i32) {
-            chunk = chunk->south_neighbor.Lock();
+            chunk = chunk->south_neighbor.Lock().Unwrap();
         }
 
         if !chunk.Valid() {
@@ -1110,7 +1116,7 @@ class Subchunk {
     }
 
     pub fn Update(&mut this) {
-        let chunk = this.parent.Lock();
+        let chunk = this.parent.Lock().Unwrap();
 
         if !chunk.Valid() {
             Logger::Error("Failed to lock parent chunk.");
@@ -1613,25 +1619,25 @@ class World {
 
                         if dist_sq > UNLOAD_DISTANCE_SQ as f32 {
                             let mut ready = chunk->state == ChunkState::Ready;
-                            let east_neighbor = chunk->east_neighbor.Lock();
+                            let east_neighbor = chunk->east_neighbor.Lock().Unwrap();
 
                             if east_neighbor.Valid() {
                                 ready |= east_neighbor->state == ChunkState::Ready;
                             }
 
-                            let west_neighbor = chunk->west_neighbor.Lock();
+                            let west_neighbor = chunk->west_neighbor.Lock().Unwrap();
 
                             if west_neighbor.Valid() {
                                 ready |= west_neighbor->state == ChunkState::Ready;
                             }
 
-                            let north_neighbor = chunk->north_neighbor.Lock();
+                            let north_neighbor = chunk->north_neighbor.Lock().Unwrap();
 
                             if north_neighbor.Valid() {
                                 ready |= north_neighbor->state == ChunkState::Ready;
                             }
 
-                            let south_neighbor = chunk->south_neighbor.Lock();
+                            let south_neighbor = chunk->south_neighbor.Lock().Unwrap();
 
                             if south_neighbor.Valid() {
                                 ready |= south_neighbor->state == ChunkState::Ready;
@@ -2096,14 +2102,14 @@ class World {
             this.QueueChunkUpload(chunk);
 
             if local_position.x == (SUBCHUNK_WIDTH as f32) - 1.0 {
-                let east_neighbor = chunk->east_neighbor.Lock();
+                let east_neighbor = chunk->east_neighbor.Lock().Unwrap();
 
                 if east_neighbor.Valid() {
                     east_neighbor->subchunks[subchunk_position.y as usize]->Update();
                     this.QueueChunkUpload(east_neighbor);
                 }
             } else if local_position.x == 0.0 {
-                let west_neighbor = chunk->west_neighbor.Lock();
+                let west_neighbor = chunk->west_neighbor.Lock().Unwrap();
 
                 if west_neighbor.Valid() {
                     west_neighbor->subchunks[subchunk_position.y as usize]->Update();
@@ -2120,14 +2126,14 @@ class World {
             }
 
             if local_position.z == (SUBCHUNK_DEPTH as f32) - 1.0 {
-                let south_neighbor = chunk->south_neighbor.Lock();
+                let south_neighbor = chunk->south_neighbor.Lock().Unwrap();
 
                 if south_neighbor.Valid() {
                     south_neighbor->subchunks[subchunk_position.y as usize]->Update();
                     this.QueueChunkUpload(south_neighbor);
                 }
             } else if local_position.z == 0.0 {
-                let north_neighbor = chunk->north_neighbor.Lock();
+                let north_neighbor = chunk->north_neighbor.Lock().Unwrap();
 
                 if north_neighbor.Valid() {
                     north_neighbor->subchunks[subchunk_position.y as usize]->Update();

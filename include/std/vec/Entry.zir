@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/mem" : *]
+#[include "std/opt" : *]
 
 class Vector<T> {
     data: *mut T = null,
@@ -119,9 +119,10 @@ class Vector<T> {
         this.size += 1;
     }
 
-    pub fn PopBack(&mut this) -> T {
+    pub fn PopBack(&mut this) -> Option<T> {
+        if this.size == 0 { return Option<T>::None; }
         this.size -= 1;
-        this.data[this.size]
+        Option<T>::Some(this.data[this.size])
     }
 
     pub fn Insert(&mut this, index: usize, value: T) {
@@ -171,14 +172,14 @@ class Vector<T> {
         false
     }
 
-    pub fn Index(&this, value: T) -> isize {
+    pub fn Index(&this, value: T) -> Option<usize> {
         for i in 0..this.size {
             if this.data[i] == value {
-                return i as isize;
+                return Option<usize>::Some(i);
             }
         }
 
-        -1
+        Option<usize>::None
     }
 
     pub fn operator+(&this, other: &Vector<T>) -> Vector<T> {
