@@ -2007,6 +2007,16 @@ class HIRLowerer {
         if _let->initializer != null {
             initializer = this.LowerExpectedExpression(_let->initializer, _type);
             if initializer == null { return; }
+
+            if _type != null {
+                let original_type = initializer->_type;
+                initializer = this.Coerce(initializer, _type);
+                if initializer == null { return; }
+
+                if _type->IsSame(initializer->_type) && !this.LiteralNeedsExplicitType(original_type, _type) && !initializer->IsBlockLike() {
+                    Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", _let->_type, LogSeverity::Warning);
+                }
+            }
         } else if _type == null {
             Logger::Log("A type annotation is required for a 'let' statement without an initializer.", _let, LogSeverity::Error);
             return;
@@ -4821,13 +4831,8 @@ class HIRLowerer {
 
                 if value != null {
                     if target_type != null {
-                        let original_type = value->_type;
                         value = this.Coerce(value, target_type);
                         if value == null { return null; }
-
-                        if target_type->IsSame(value->_type) && !this.LiteralNeedsExplicitType(original_type, target_type) && !value->IsBlockLike() {
-                            Logger::Log("Unnecessary type annotation, type can be inferred from initializer.", pattern, LogSeverity::Warning);
-                        }
 
                         if target_type->IsReference() && !value->_type->IsReference() && this.IsTemporary(value) {
                             Logger::Log("Cannot bind a reference to a temporary value.", pattern, LogSeverity::Error);
