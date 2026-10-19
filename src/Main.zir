@@ -768,7 +768,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if buffer != null {
                 if extension == ".ll" {
-                    if LLVMParseIRInContext(LLVMGetGlobalContext(), buffer, &mut module, &mut message) != 0 {
+                    if LLVMParseIRInContext2(llvm_lowerer.context, buffer, &mut module, &mut message) != 0 {
                         let final_message = message != null ? message : "Unknown reason.";
                         Logger::Log(input_file, "Failed to parse LLVM IR: " + final_message.ToString(), LogSeverity::Error);
                     }
@@ -783,6 +783,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     LLVMDisposeMessage(message);
                     message = null;
                 }
+
+                LLVMDisposeMemoryBuffer(buffer);
             }
 
             if module != null {

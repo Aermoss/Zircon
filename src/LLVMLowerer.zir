@@ -20,7 +20,7 @@
 class LLVMLowerer {
     module: LLVMModuleRef = null,
     builder: LLVMBuilderRef = null,
-    context: LLVMContextRef,
+    pub context: LLVMContextRef,
     pub target: *Target,
 
     types: Map<*MIRType, LLVMTypeRef>,
@@ -695,12 +695,7 @@ class LLVMLowerer {
                     LLVMFloatTypeInContext(this.context)
                 }
             },
-            MIRTypeKind::Pointer => {
-                let pointer = _type as *MIRPointerType;
-                let pointee = this.LowerType(pointer->pointee);
-                if pointee == null { return null; }
-                LLVMPointerType(pointee, 0)
-            },
+            MIRTypeKind::Pointer => LLVMPointerTypeInContext(this.context, 0),
             MIRTypeKind::Array => {
                 let array = _type as *MIRArrayType;
                 let element = this.LowerType(array->element);
@@ -722,7 +717,7 @@ class LLVMLowerer {
                     LLVMStructTypeInContext(this.context, fields.Data(), fields.Size() as u32, 0)
                 }
             },
-            MIRTypeKind::Function => LLVMPointerType(this.LowerFunctionType(_type as *MIRFunctionType), 0)
+            MIRTypeKind::Function => LLVMPointerTypeInContext(this.context, 0)
         }
     }
 }
