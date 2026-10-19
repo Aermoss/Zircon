@@ -48,7 +48,7 @@ class Assembler {
         let mut message: *mut i8 = null;
 
         if LLVMVerifyModule(this.module, LLVMVerifierFailureAction::LLVMReturnStatusAction, &mut message) != 0 {
-            let final_message = message != null ? message : "Unknown reason.";
+            let final_message = if message != null { message } else { "Unknown reason." };
             Logger::Log("Module verification failed: " + final_message.ToString(), LogSeverity::Error);
 
             if message != null {

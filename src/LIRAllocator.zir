@@ -324,15 +324,15 @@ class LIRAllocator {
 
             for instruction in this.function->blocks[i]->instructions {
                 for k in 0..(instruction->uses.Size() + instruction->implicit_uses.Size()) {
-                    let operand = k < instruction->uses.Size() ? instruction->uses[k] : instruction->implicit_uses[k - instruction->uses.Size()];
+                    let operand = if k < instruction->uses.Size() { instruction->uses[k] } else { instruction->implicit_uses[k - instruction->uses.Size()] };
                     let index = this.PhysicalIndex(this.UsedRegister(operand));
                     if index < 0 || !this.IsAllocatable(index as u8) { continue; }
-                    let start = open[index as usize] != LIR_NO_POSITION ? open[index as usize] : block_starts[i];
+                    let start = if open[index as usize] != LIR_NO_POSITION { open[index as usize] } else { block_starts[i] };
                     ranges.PushBack(LIRFixedRange(index as u8, start, use_position));
                 }
 
                 for k in 0..(instruction->defines.Size() + instruction->implicit_defines.Size()) {
-                    let operand = k < instruction->defines.Size() ? instruction->defines[k] : instruction->implicit_defines[k - instruction->defines.Size()];
+                    let operand = if k < instruction->defines.Size() { instruction->defines[k] } else { instruction->implicit_defines[k - instruction->defines.Size()] };
                     let index = this.PhysicalIndex(operand);
                     if index < 0 || !this.IsAllocatable(index as u8) { continue; }
                     open[index as usize] = use_position + 1;

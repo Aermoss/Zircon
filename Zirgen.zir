@@ -155,7 +155,7 @@ fn TypeToString(_type: CXType) -> String {
             return FuncTypeToString(pointee);
         }
 
-        String(clang_isConstQualifiedType(pointee) != 0 ? "*" : "*mut ") + TypeToString(pointee)
+        String(if clang_isConstQualifiedType(pointee) != 0 { "*" } else { "*mut " }) + TypeToString(pointee)
     } else if _type.kind == CXTypeKind::CXType_Record || _type.kind == CXTypeKind::CXType_Enum || _type.kind == CXTypeKind::CXType_Typedef {
         let spelling = clang_getTypeSpelling(_type);
         let mut string = clang_getCString(spelling).ToString();
@@ -263,7 +263,7 @@ fn EmitEnum(state: *mut GlobalState, file_state: *mut FileState, cursor: CXCurso
     let is_definition = clang_isCursorDefinition(cursor) != 0;
     let transpile_state = state->transpile_states.Get(name, TranspileState::None);
     if transpile_state == TranspileState::Defined || (transpile_state == TranspileState::Declared && !is_definition) { return; }
-    state->transpile_states[name] = is_definition ? TranspileState::Defined : TranspileState::Declared;
+    state->transpile_states[name] = if is_definition { TranspileState::Defined } else { TranspileState::Declared };
     let type_name: String = if !type_override.Empty() {
         type_override
     } else {
@@ -296,7 +296,7 @@ fn EmitStruct(state: *mut GlobalState, file_state: *mut FileState, cursor: CXCur
     let is_definition = clang_isCursorDefinition(cursor) != 0;
     let transpile_state = state->transpile_states.Get(name, TranspileState::None);
     if transpile_state == TranspileState::Defined || (transpile_state == TranspileState::Declared && !is_definition) { return; }
-    state->transpile_states[name] = is_definition ? TranspileState::Defined : TranspileState::Declared;
+    state->transpile_states[name] = if is_definition { TranspileState::Defined } else { TranspileState::Declared };
 
     file_state->count = 0;
     let length_before = file_state->declarations.Length();
@@ -733,7 +733,7 @@ extern "C" {
 
                 if _type.kind == CXTypeKind::CXType_ConstantArray {
                     let element_type = clang_getArrayElementType(_type);
-                    let prefix = clang_isConstQualifiedType(element_type) != 0 ? "*" : "*mut ";
+                    let prefix = if clang_isConstQualifiedType(element_type) != 0 { "*" } else { "*mut " };
                     arguments += argument_name + ": " + prefix + TypeToString(element_type);
                 } else {
                     arguments += argument_name + ": " + TypeToString(_type);

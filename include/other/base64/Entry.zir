@@ -25,8 +25,8 @@ class Base64 {
 
         while i < length {
             let b0: u64 = (string[i] as u64) & 0xFF;
-            let b1: u64 = (i + 1 < length) ? ((string[i + 1] as u64) & 0xFF) : 0;
-            let b2: u64 = (i + 2 < length) ? ((string[i + 2] as u64) & 0xFF) : 0;
+            let b1: u64 = if i + 1 < length { (string[i + 1] as u64) & 0xFF } else { 0 };
+            let b2: u64 = if i + 2 < length { (string[i + 2] as u64) & 0xFF } else { 0 };
             let triple: u64 = (b0 << 16) | (b1 << 8) | b2;
             result += table[(triple >> 18) & 0x3F];
             result += table[(triple >> 12) & 0x3F];
@@ -63,9 +63,9 @@ class Base64 {
 
         while i < length {
             let n0: u64 = Base64::GetValue(string[i]);
-            let n1: u64 = (i + 1 < length) ? Base64::GetValue(string[i + 1]) : 0;
-            let n2: u64 = (i + 2 < length) ? Base64::GetValue(string[i + 2]) : 0;
-            let n3: u64 = (i + 3 < length) ? Base64::GetValue(string[i + 3]) : 0;
+            let n1: u64 = if i + 1 < length { Base64::GetValue(string[i + 1]) } else { 0 };
+            let n2: u64 = if i + 2 < length { Base64::GetValue(string[i + 2]) } else { 0 };
+            let n3: u64 = if i + 3 < length { Base64::GetValue(string[i + 3]) } else { 0 };
             let triple: u64 = (n0 << 18) | (n1 << 12) | (n2 << 6) | n3;
             result += ((triple >> 16) & 0xFF) as i8;
 

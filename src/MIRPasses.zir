@@ -564,7 +564,7 @@ class MIRPromoteAllocas {
             let mut kept = Vector<*mut MIRInstruction>();
 
             for instruction in block->instructions {
-                let index = instruction->kind == MIRInstructionKind::Phi ? indices.Get(instruction, MIR_NO_BLOCK) : MIR_NO_BLOCK;
+                let index = if instruction->kind == MIRInstructionKind::Phi { indices.Get(instruction, MIR_NO_BLOCK) } else { MIR_NO_BLOCK };
                 if index == MIR_NO_BLOCK || !dead[index] { kept.PushBack(instruction); }
             }
 

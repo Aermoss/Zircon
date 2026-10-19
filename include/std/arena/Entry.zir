@@ -164,7 +164,7 @@ class Arena {
     }
 
     fn GrowChain(&mut this, min_bytes: usize) -> bool {
-        let chunk = new ArenaChunk(min_bytes > ARENA_DEFAULT_CHUNK_SIZE ? min_bytes : ARENA_DEFAULT_CHUNK_SIZE);
+        let chunk = new ArenaChunk(if min_bytes > ARENA_DEFAULT_CHUNK_SIZE { min_bytes } else { ARENA_DEFAULT_CHUNK_SIZE });
 
         if chunk == null {
             return false;

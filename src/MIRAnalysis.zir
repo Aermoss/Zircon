@@ -210,7 +210,7 @@ class MIRControlFlow {
                 for k in this.predecessor_offsets[b]..this.predecessor_offsets[b + 1] {
                     let predecessor = this.predecessors[k];
                     if this.idom[predecessor] == MIR_NO_BLOCK { continue; }
-                    candidate = candidate == MIR_NO_BLOCK ? predecessor : this.Intersect(predecessor, candidate);
+                    candidate = if candidate == MIR_NO_BLOCK { predecessor } else { this.Intersect(predecessor, candidate) };
                 }
 
                 if candidate != this.idom[b] {

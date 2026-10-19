@@ -234,7 +234,7 @@ class ScopeManager {
 
                     if !function->pack_name.Empty() {
                         let fixed = function->parameters.Size();
-                        let start = fixed < values.Size() ? fixed : values.Size();
+                        let start = if fixed < values.Size() { fixed } else { values.Size() };
 
                         for i in start..values.Size() {
                             types.PushBack(values[i]->_type);

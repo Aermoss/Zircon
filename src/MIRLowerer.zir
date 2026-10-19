@@ -263,7 +263,7 @@ class MIRLowerer {
 
         for i in 0..function->parameters.Size() {
             let parameter = function->parameters[i];
-            let lowered = this.builder.GetCurrentFunction()->parameters[(indirect_return ? 1 : 0) + i];
+            let lowered = this.builder.GetCurrentFunction()->parameters[(if indirect_return { 1 } else { 0 }) + i];
 
             if this.IsIndirectAggregate(parameter->_type) {
                 this.parameters[parameter] = lowered;
@@ -941,7 +941,6 @@ class MIRLowerer {
             HIRExpressionKind::MemberAccess => this.LowerMemberAccessExpression(expression as *HIRMemberAccessExpression),
             HIRExpressionKind::TagAccess => this.LowerTagAccessExpression(expression as *HIRTagAccessExpression),
             HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
-            HIRExpressionKind::Ternary if expression->category == HIRExpressionCategory::Place => this.LowerTernaryPlaceExpression(expression as *HIRTernaryExpression),
             _ => {
                 let alloca = this.builder.BuildAlloca("temporary".ToString(), this.LowerType(expression->_type));
                 this.LowerExpressionTo(expression, alloca);
@@ -977,10 +976,6 @@ class MIRLowerer {
                 this.LowerConstructorExpression(expression as *HIRConstructorExpression, destination);
                 this.temporaries[expression] = destination;
             },
-            HIRExpressionKind::Ternary if expression->category == HIRExpressionCategory::Value && this.IsAggregate(expression->_type) => {
-                this.LowerTernaryExpressionTo(expression as *HIRTernaryExpression, destination);
-                this.temporaries[expression] = destination;
-            },
             HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => {
                 this.LowerControlExpression(expression, destination);
                 this.temporaries[expression] = destination;
@@ -1014,7 +1009,6 @@ class MIRLowerer {
             HIRExpressionKind::Cast => this.LowerCastExpression(expression as *HIRCastExpression),
             HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
             HIRExpressionKind::Binary => this.LowerBinaryExpression(expression as *HIRBinaryExpression),
-            HIRExpressionKind::Ternary if !this.IsAggregate(expression->_type) => this.LowerTernaryExpression(expression as *HIRTernaryExpression),
             HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsVoid() || expression->_type->IsNever() => {
                 this.LowerControlExpression(expression, null);
                 this.EnsureReachable();
@@ -1033,7 +1027,7 @@ class MIRLowerer {
         let _type = this.LowerType(literal->_type);
 
         match literal->kind {
-            HIRLiteralKind::Boolean => this.builder.ConstantInteger((literal as *HIRBooleanLiteral)->value ? 1 : 0, _type),
+            HIRLiteralKind::Boolean => this.builder.ConstantInteger(if (literal as *HIRBooleanLiteral)->value { 1 } else { 0 }, _type),
             HIRLiteralKind::Character => this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as u64, _type),
             HIRLiteralKind::Integer => this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type),
             HIRLiteralKind::Float => this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type),
@@ -1109,7 +1103,7 @@ class MIRLowerer {
     }
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
-        let value = intrinsic->kind == HIRIntrinsicKind::SizeOf ? intrinsic->_type->Size() : intrinsic->_type->Alignment();
+        let value = if intrinsic->kind == HIRIntrinsicKind::SizeOf { intrinsic->_type->Size() } else { intrinsic->_type->Alignment() };
         this.builder.ConstantInteger(value as u64, this.LowerType((intrinsic as *HIRExpression)->_type))
     }
 
@@ -1228,7 +1222,7 @@ class MIRLowerer {
 
     fn ArrayCookieSize(&mut this, element: *HIRType) -> u64 {
         let (pointer_size, alignment) = (this.target_info.pointer_size as u64, element->Alignment() as u64);
-        alignment > pointer_size ? alignment : pointer_size
+        if alignment > pointer_size { alignment } else { pointer_size }
     }
 
     fn LowerNewExpression(&mut this, _new: *HIRNewExpression) -> *MIRValue {
@@ -1607,7 +1601,7 @@ class MIRLowerer {
 
         if (binary->kind == HIRBinaryKind::LeftShift || binary->kind == HIRBinaryKind::RightShift) && right_type->Width() != left_type->Width() {
             if right_type->Width() < left_type->Width() {
-                right = this.builder.BuildCast("shift.cast".ToString(), right_type->IsSigned() ? MIRCastKind::SExt : MIRCastKind::ZExt, right, result_type);
+                right = this.builder.BuildCast("shift.cast".ToString(), if right_type->IsSigned() { MIRCastKind::SExt } else { MIRCastKind::ZExt }, right, result_type);
             } else {
                 right = this.builder.BuildCast("shift.cast".ToString(), MIRCastKind::Trunc, right, result_type);
             }
@@ -1639,19 +1633,19 @@ class MIRLowerer {
                 HIRBinaryKind::Add => this.builder.BuildBinary("add".ToString(), MIRBinaryKind::Add, left, right, result_type),
                 HIRBinaryKind::Subtract => this.builder.BuildBinary("sub".ToString(), MIRBinaryKind::Sub, left, right, result_type),
                 HIRBinaryKind::Multiply => this.builder.BuildBinary("mul".ToString(), MIRBinaryKind::Mul, left, right, result_type),
-                HIRBinaryKind::Divide => this.builder.BuildBinary("div".ToString(), signed ? MIRBinaryKind::SDiv : MIRBinaryKind::UDiv, left, right, result_type),
-                HIRBinaryKind::Modulo => this.builder.BuildBinary("rem".ToString(), signed ? MIRBinaryKind::SRem : MIRBinaryKind::URem, left, right, result_type),
+                HIRBinaryKind::Divide => this.builder.BuildBinary("div".ToString(), if signed { MIRBinaryKind::SDiv } else { MIRBinaryKind::UDiv }, left, right, result_type),
+                HIRBinaryKind::Modulo => this.builder.BuildBinary("rem".ToString(), if signed { MIRBinaryKind::SRem } else { MIRBinaryKind::URem }, left, right, result_type),
                 HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
                 HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
-                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type),
-                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type),
-                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type),
-                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), if signed { MIRBinaryKind::ICmpSlt } else { MIRBinaryKind::ICmpUlt }, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), if signed { MIRBinaryKind::ICmpSle } else { MIRBinaryKind::ICmpUle }, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), if signed { MIRBinaryKind::ICmpSgt } else { MIRBinaryKind::ICmpUgt }, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), if signed { MIRBinaryKind::ICmpSge } else { MIRBinaryKind::ICmpUge }, left, right, result_type),
                 HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
                 HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
                 HIRBinaryKind::BitwiseXor => this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type),
                 HIRBinaryKind::LeftShift => this.builder.BuildBinary("shl".ToString(), MIRBinaryKind::Shl, left, right, result_type),
-                HIRBinaryKind::RightShift => this.builder.BuildBinary("shr".ToString(), signed ? MIRBinaryKind::AShr : MIRBinaryKind::LShr, left, right, result_type),
+                HIRBinaryKind::RightShift => this.builder.BuildBinary("shr".ToString(), if signed { MIRBinaryKind::AShr } else { MIRBinaryKind::LShr }, left, right, result_type),
                 _ => null
             }
         } else if left_type->IsFloat() && right_type->IsFloat() {
@@ -1672,7 +1666,7 @@ class MIRLowerer {
         } else if left_type->IsPointer() && right_type->IsPointer() {
             match binary->kind {
                 HIRBinaryKind::Subtract => {
-                    let element_type = left_type->IsNullPointer() ? right_type->Pointee() : left_type->Pointee();
+                    let element_type = if left_type->IsNullPointer() { right_type->Pointee() } else { left_type->Pointee() };
                     let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
                     let left = this.builder.BuildCast("ptr.diff.left".ToString(), MIRCastKind::PtrToInt, left, size_type);
                     let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, right, size_type);
@@ -1689,8 +1683,8 @@ class MIRLowerer {
                 _ => null
             }
         } else if (left_type->IsPointer() && right_type->IsInteger()) || (left_type->IsInteger() && right_type->IsPointer()) {
-            let mut pointer = left_type->IsPointer() ? left : right;
-            let mut index = left_type->IsPointer() ? right : left;
+            let mut pointer = if left_type->IsPointer() { left } else { right };
+            let mut index = if left_type->IsPointer() { right } else { left };
 
             match binary->kind {
                 HIRBinaryKind::Add => this.builder.BuildArrayGEP("ptr.add".ToString(), pointer, index),
@@ -1709,120 +1703,16 @@ class MIRLowerer {
             match binary->kind {
                 HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
                 HIRBinaryKind::NotEqual => this.builder.BuildBinary("ne".ToString(), MIRBinaryKind::ICmpNe, left, right, result_type),
-                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt, left, right, result_type),
-                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle, left, right, result_type),
-                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), signed ? MIRBinaryKind::ICmpSgt : MIRBinaryKind::ICmpUgt, left, right, result_type),
-                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, left, right, result_type),
+                HIRBinaryKind::Less => this.builder.BuildBinary("lt".ToString(), if signed { MIRBinaryKind::ICmpSlt } else { MIRBinaryKind::ICmpUlt }, left, right, result_type),
+                HIRBinaryKind::LessEqual => this.builder.BuildBinary("le".ToString(), if signed { MIRBinaryKind::ICmpSle } else { MIRBinaryKind::ICmpUle }, left, right, result_type),
+                HIRBinaryKind::Greater => this.builder.BuildBinary("gt".ToString(), if signed { MIRBinaryKind::ICmpSgt } else { MIRBinaryKind::ICmpUgt }, left, right, result_type),
+                HIRBinaryKind::GreaterEqual => this.builder.BuildBinary("ge".ToString(), if signed { MIRBinaryKind::ICmpSge } else { MIRBinaryKind::ICmpUge }, left, right, result_type),
                 HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
                 HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
                 HIRBinaryKind::BitwiseXor => this.builder.BuildBinary("xor".ToString(), MIRBinaryKind::Xor, left, right, result_type),
                 _ => null
             }
         } else { null }
-    }
-
-    fn LowerTernaryPlaceExpression(&mut this, ternary: *HIRTernaryExpression) -> *MIRValue {
-        let condition = this.LowerExpression(ternary->condition);
-        if condition == null { return null; }
-
-        let mut then_block = this.builder.BuildBlock("ternary.then".ToString());
-        let mut else_block = this.builder.BuildBlock("ternary.else".ToString());
-        let merge_block = this.builder.BuildBlock("ternary.merge".ToString());
-        this.builder.BuildConditionalBranch(condition, then_block, else_block);
-
-        this.builder.SetCurrentBlock(then_block);
-        let then_place = this.LowerPlaceExpression(ternary->then_value);
-        if then_place == null { return null; }
-
-        for destructor in ternary->then_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        then_block = this.builder.GetCurrentBlock();
-        this.builder.BuildBranch(merge_block);
-
-        this.builder.SetCurrentBlock(else_block);
-        let else_place = this.LowerPlaceExpression(ternary->else_value);
-        if else_place == null { return null; }
-
-        for destructor in ternary->else_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        else_block = this.builder.GetCurrentBlock();
-        this.builder.BuildBranch(merge_block);
-
-        this.builder.SetCurrentBlock(merge_block);
-        let phi = this.builder.BuildPhi("ternary.place".ToString(), then_place->_type);
-        phi->AddIncoming(then_place, then_block);
-        phi->AddIncoming(else_place, else_block);
-        phi
-    }
-
-    fn LowerTernaryExpressionTo(&mut this, ternary: *HIRTernaryExpression, destination: *MIRValue) {
-        let condition = this.LowerExpression(ternary->condition);
-        if condition == null { return; }
-
-        let then_block = this.builder.BuildBlock("ternary.then".ToString());
-        let else_block = this.builder.BuildBlock("ternary.else".ToString());
-        let merge_block = this.builder.BuildBlock("ternary.merge".ToString());
-        this.builder.BuildConditionalBranch(condition, then_block, else_block);
-
-        this.builder.SetCurrentBlock(then_block);
-        this.LowerExpressionTo(ternary->then_value, destination);
-
-        for destructor in ternary->then_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        this.builder.BuildBranch(merge_block);
-        this.builder.SetCurrentBlock(else_block);
-        this.LowerExpressionTo(ternary->else_value, destination);
-
-        for destructor in ternary->else_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        this.builder.BuildBranch(merge_block);
-        this.builder.SetCurrentBlock(merge_block);
-    }
-
-    fn LowerTernaryExpression(&mut this, ternary: *HIRTernaryExpression) -> *MIRValue {
-        let condition = this.LowerExpression(ternary->condition);
-        if condition == null { return null; }
-
-        let mut then_block = this.builder.BuildBlock("ternary.then".ToString());
-        let mut else_block = this.builder.BuildBlock("ternary.else".ToString());
-        let merge_block = this.builder.BuildBlock("ternary.merge".ToString());
-        this.builder.BuildConditionalBranch(condition, then_block, else_block);
-
-        this.builder.SetCurrentBlock(then_block);
-        let then_value = this.LowerExpression(ternary->then_value);
-        if then_value == null { return null; }
-
-        for destructor in ternary->then_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        then_block = this.builder.GetCurrentBlock();
-        this.builder.BuildBranch(merge_block);
-
-        this.builder.SetCurrentBlock(else_block);
-        let else_value = this.LowerExpression(ternary->else_value);
-        if else_value == null { return null; }
-
-        for destructor in ternary->else_destructors {
-            this.LowerExpression(destructor);
-        }
-
-        else_block = this.builder.GetCurrentBlock();
-        this.builder.BuildBranch(merge_block);
-
-        this.builder.SetCurrentBlock(merge_block);
-        let phi = this.builder.BuildPhi("ternary".ToString(), then_value->_type);
-        phi->AddIncoming(then_value, then_block);
-        phi->AddIncoming(else_value, else_block);
-        phi
     }
 
     fn TestPattern(&mut this, pattern: *HIRPattern, target: *MIRValue) -> *MIRValue {
@@ -1844,26 +1734,26 @@ class MIRLowerer {
         let literal = this.LowerExpression(pattern->literal);
         if literal == null { return null; }
         let value = this.builder.BuildLoad("pattern.load".ToString(), target);
-        let kind = pattern->literal->_type->IsFloat() ? MIRBinaryKind::FCmpEq : MIRBinaryKind::ICmpEq;
+        let kind = if pattern->literal->_type->IsFloat() { MIRBinaryKind::FCmpEq } else { MIRBinaryKind::ICmpEq };
         this.builder.BuildBinary("pattern.eq".ToString(), kind, value, literal, this.context.IntegerType(1))
     }
 
     fn TestRangePattern(&mut this, range: *HIRRangePattern, target: *MIRValue) -> *MIRValue {
         let bool_type = this.context.IntegerType(1);
         let value = this.builder.BuildLoad("pattern.load".ToString(), target);
-        let signed = (range->start != null ? range->start : range->end)->_type->IsSigned();
+        let signed = (if range->start != null { range->start } else { range->end })->_type->IsSigned();
         let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
 
         if range->start != null {
             let start = this.LowerExpression(range->start);
             if start == null { return null; }
-            condition = this.builder.BuildBinary("pattern.ge".ToString(), signed ? MIRBinaryKind::ICmpSge : MIRBinaryKind::ICmpUge, value, start, bool_type);
+            condition = this.builder.BuildBinary("pattern.ge".ToString(), if signed { MIRBinaryKind::ICmpSge } else { MIRBinaryKind::ICmpUge }, value, start, bool_type);
         }
 
         if range->end != null {
             let end = this.LowerExpression(range->end);
             if end == null { return null; }
-            let kind = range->inclusive ? (signed ? MIRBinaryKind::ICmpSle : MIRBinaryKind::ICmpUle) : (signed ? MIRBinaryKind::ICmpSlt : MIRBinaryKind::ICmpUlt);
+            let kind = if range->inclusive { if signed { MIRBinaryKind::ICmpSle } else { MIRBinaryKind::ICmpUle } } else if signed { MIRBinaryKind::ICmpSlt } else { MIRBinaryKind::ICmpUlt };
             let compare = this.builder.BuildBinary("pattern.le".ToString(), kind, value, end, bool_type);
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, compare, bool_type);
         }
@@ -2064,7 +1954,7 @@ class MIRLowerer {
             this.context.StructureType(elements)
         } else if _type->IsClass() || _type->IsStructure() || _type->IsVariant() {
             let declaration = this.types.Get(_type, null);
-            declaration != null ? declaration->_type : null
+            if declaration != null { declaration->_type } else { null }
         } else if _type->IsFunction() {
             let mut parameters = Vector<*MIRType>();
             let mut _return = this.LowerAggregateType(_type->Return());

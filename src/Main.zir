@@ -757,7 +757,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut message: *mut i8 = null;
 
             if LLVMCreateMemoryBufferWithContentsOfFile(input_file.Data(), &mut buffer, &mut message) != 0 {
-                let final_message = message != null ? message : "Unknown reason.";
+                let final_message = if message != null { message } else { "Unknown reason." };
                 Logger::Log(input_file, "Failed to read file: " + final_message.ToString(), LogSeverity::Error);
             }
 
@@ -769,12 +769,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if buffer != null {
                 if extension == ".ll" {
                     if LLVMParseIRInContext2(llvm_lowerer.context, buffer, &mut module, &mut message) != 0 {
-                        let final_message = message != null ? message : "Unknown reason.";
+                        let final_message = if message != null { message } else { "Unknown reason." };
                         Logger::Log(input_file, "Failed to parse LLVM IR: " + final_message.ToString(), LogSeverity::Error);
                     }
                 } else {
                     if LLVMParseBitcodeInContext(LLVMGetGlobalContext(), buffer, &mut module, &mut message) != 0 {
-                        let final_message = message != null ? message : "Unknown reason.";
+                        let final_message = if message != null { message } else { "Unknown reason." };
                         Logger::Log(input_file, "Failed to parse bitcode: " + final_message.ToString(), LogSeverity::Error);
                     }
                 }
@@ -793,7 +793,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 LLVMSetTarget(module, target.triple.Data());
 
                 if LLVMVerifyModule(module, LLVMVerifierFailureAction::LLVMReturnStatusAction, &mut message) != 0 {
-                    let final_message = message != null ? message : "Unknown reason.";
+                    let final_message = if message != null { message } else { "Unknown reason." };
                     Logger::Log(input_file, "Module verification failed: " + final_message.ToString(), LogSeverity::Error);
                     LLVMDisposeModule(module);
                     module = null;
@@ -872,7 +872,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut message: *mut i8 = null;
 
             if LLVMPrintModuleToFile(module, (name + ".ll").Data(), &mut message) != 0 {
-                let final_message = message != null ? message : "Unknown reason.";
+                let final_message = if message != null { message } else { "Unknown reason." };
                 Logger::Log(input_file, "Failed to emit LLVM IR: " + final_message.ToString(), LogSeverity::Error);
             }
 
@@ -898,7 +898,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             } continue;
         }
 
-        let mut object_name = name + (triple.Contains("windows") ? ".obj" : ".o");
+        let mut object_name = name + (if triple.Contains("windows") { ".obj" } else { ".o" });
 
         if !emit_object {
             object_name = JoinPath(temp_path, SplitPath(object_name).1);
@@ -923,7 +923,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if check || failed || emit_object || emit_asm {
         for temp_file in temp_files {
             RemoveFile(temp_file);
-        } return failed ? 1 : 0;
+        } return if failed { 1 } else { 0 };
     }
 
     if output_file.Empty() {
@@ -946,7 +946,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if triple.Contains("windows") {
 #[if WINDOWS]
         let (sdk_path, msvc_path) = (GetWindowsSDKPath(), GetMSVCPath());
-        let machine = arm64 ? "arm64" : "x64";
+        let machine = if arm64 { "arm64" } else { "x64" };
         command = "\"" + msvc_path + "\\bin\\Hostx64\\x64\\link.exe\" /NOLOGO /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:_start /MACHINE:" + machine;
         if debug { command += " /DEBUG"; }
         command += " /OUT:" + output_file;
@@ -976,7 +976,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 #[endif]
     } else if triple.Contains("darwin") || triple.Contains("apple") {
 #[if DARWIN]
-        command = "cc -arch ".ToString() + (arm64 ? "arm64" : "x86_64") + " -o " + output_file;
+        command = "cc -arch ".ToString() + (if arm64 { "arm64" } else { "x86_64" }) + " -o " + output_file;
 
         for object in objects {
             command += " " + object;
@@ -997,7 +997,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         command = lld_exe + " --nostdlib --entry _start";
 
         if !freestanding {
-            command += arm64 ? " --dynamic-linker /lib/ld-linux-aarch64.so.1" : " --dynamic-linker /lib64/ld-linux-x86-64.so.2";
+            command += if arm64 { " --dynamic-linker /lib/ld-linux-aarch64.so.1" } else { " --dynamic-linker /lib64/ld-linux-x86-64.so.2" };
         }
 
         command += " -o " + output_file;

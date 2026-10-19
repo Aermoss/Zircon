@@ -370,7 +370,11 @@ class HIRLowerer {
                 }
 
                 for i in 0..array->elements.Size() {
-                    array->elements[i] = target->IsArray() ? this.Coerce(array->elements[i], target->Element()) : this.Coerce(array->elements[i]);
+                    array->elements[i] = if target->IsArray() {
+                        this.Coerce(array->elements[i], target->Element())
+                    } else {
+                        this.Coerce(array->elements[i])
+                    };
                 }
 
                 expression->_type = this.context.ArrayType(array->elements[0]->_type, array->elements.Size());
@@ -381,11 +385,13 @@ class HIRLowerer {
                 let mut types = Vector<*HIRType>();
 
                 for i in 0..tuple->elements.Size() {
-                    if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
-                        tuple->elements[i] = this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i]);
+                    tuple->elements[i] = if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
+                        this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i])
                     } else {
-                        tuple->elements[i] = this.Coerce(tuple->elements[i]);
-                    } types.PushBack(tuple->elements[i]->_type);
+                        this.Coerce(tuple->elements[i])
+                    };
+
+                    types.PushBack(tuple->elements[i]->_type);
                 }
 
                 expression->_type = this.context.TupleType(types);
@@ -1377,7 +1383,7 @@ class HIRLowerer {
         }
 
         if _class->constructors.Empty() {
-            let index = declaration->constructors.Size() - (has_copy_constructor ? 1 : 2);
+            let index = declaration->constructors.Size() - (if has_copy_constructor { 1 } else { 2 });
             let function = declaration->constructors[index];
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
@@ -2097,7 +2103,7 @@ class HIRLowerer {
 
     fn LowerBlockTail(&mut this, expression: *ASTExpression, tail: HIRBlockTail, block: *mut HIRBlockExpression, expected: *HIRType) {
         let returns = tail == HIRBlockTail::Return && !this.builder.GetCurrentFunction()->_return->IsVoid();
-        let mut value = this.LowerExpectedExpression(expression, returns ? this.builder.GetCurrentFunction()->_return : expected);
+        let mut value = this.LowerExpectedExpression(expression, if returns { this.builder.GetCurrentFunction()->_return } else { expected });
 
         if value != null && tail == HIRBlockTail::Value && expected != null && !value->_type->IsNever() && !value->_type->IsVoid() {
             value = this.Validate(value, expected, "Incompatible types", expression);
@@ -2151,9 +2157,10 @@ class HIRLowerer {
 
     fn LowerIfExpression(&mut this, _if: *ASTIfExpression, expected: *HIRType) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
+        let temporary_index = this.temporaries.Size();
         let expression = this.ImplicitDereference(this.LowerExpression(_if->condition->expression));
         if expression == null { return null; }
-        let destructors = this.GetTemporaryDestructors(expression);
+        let destructors = this.GetTemporaryDestructorsSince(temporary_index, expression);
         this.scope_manager.PushScope("<then>".ToString(), false);
 
         if _if->condition->pattern != null {
@@ -2206,9 +2213,10 @@ class HIRLowerer {
 
     fn LowerWhileExpression(&mut this, _while: *ASTWhileExpression) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
+        let temporary_index = this.temporaries.Size();
         let expression = this.ImplicitDereference(this.LowerExpression(_while->condition->expression));
         if expression == null { return null; }
-        let destructors = this.GetTemporaryDestructors(expression);
+        let destructors = this.GetTemporaryDestructorsSince(temporary_index, expression);
         this.scope_manager.PushScope("<while>".ToString(), false);
 
         if _while->condition->pattern != null {
@@ -2364,7 +2372,7 @@ class HIRLowerer {
             };
 
             item = iterator_reference;
-            condition = this.builder.Binary(inclusive ? HIRBinaryKind::LessEqual : HIRBinaryKind::Less, iterator_reference, target_reference, this.context.BooleanType());
+            condition = this.builder.Binary(if inclusive { HIRBinaryKind::LessEqual } else { HIRBinaryKind::Less }, iterator_reference, target_reference, this.context.BooleanType());
             step = this.builder.Assignment(iterator_reference, this.builder.Binary(HIRBinaryKind::Add, iterator_reference, one, iterator_type));
         } else {
             let one: *HIRExpression = this.builder.IntegerLiteral(1, this.context.IntegerPointerType(false));
@@ -2413,6 +2421,7 @@ class HIRLowerer {
     }
 
     fn LowerMatchExpression(&mut this, _match: *ASTMatchExpression, expected: *HIRType) -> *HIRExpression {
+        let temporary_index = this.temporaries.Size();
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
         if target == null { return null; }
 
@@ -2421,7 +2430,7 @@ class HIRLowerer {
             return null;
         }
 
-        let destructors = this.GetTemporaryDestructors(target);
+        let destructors = this.GetTemporaryDestructorsSince(temporary_index, target);
         let mut arms = Vector<*HIRMatchArm>();
 
         for arm in _match->arms {
@@ -2434,6 +2443,7 @@ class HIRLowerer {
             }
 
             let mut guard: *HIRExpression = null;
+            let guard_index = this.temporaries.Size();
 
             if arm->guard != null {
                 guard = this.ImplicitDereference(this.LowerExpression(arm->guard));
@@ -2451,7 +2461,7 @@ class HIRLowerer {
             let mut destructors = Vector<*HIRExpression>();
 
             if guard != null {
-                destructors = this.GetTemporaryDestructors(guard);
+                destructors = this.GetTemporaryDestructorsSince(guard_index, guard);
             }
 
             let body = this.LowerBlockExpression(arm->body, true, HIRBlockTail::Value, expected);
@@ -2522,7 +2532,7 @@ class HIRLowerer {
 
         if _return->value != null {
             let return_type = this.builder.GetCurrentFunction()->_return;
-            value = this.LowerExpectedExpression(_return->value, return_type->IsVoid() || return_type->IsNever() ? null : return_type);
+            value = this.LowerExpectedExpression(_return->value, if return_type->IsVoid() || return_type->IsNever() { null } else { return_type });
             if value == null { return null; }
         }
 
@@ -2863,11 +2873,17 @@ class HIRLowerer {
                     _ => null
                 }
             },
-            ASTExpressionKind::Ternary => {
-                let ternary = expression as *ASTTernaryExpression;
-                let then_type = this.IsDeferrableExpression(ternary->then);
+            ASTExpressionKind::Block => {
+                let block = expression as *ASTBlockExpression;
+                if block->_unsafe || !block->statements.Empty() || block->tail == null { return null; }
+                this.IsDeferrableExpression(block->tail)
+            },
+            ASTExpressionKind::If => {
+                let _if = expression as *ASTIfExpression;
+                if _if->condition->pattern != null || _if->_else == null { return null; }
+                let then_type = this.IsDeferrableExpression(_if->body);
                 if then_type == null { return null; }
-                let else_type = this.IsDeferrableExpression(ternary->_else);
+                let else_type = this.IsDeferrableExpression(_if->_else);
                 if else_type == null { return null; }
 
                 if *then_type == *else_type {
@@ -2908,7 +2924,7 @@ class HIRLowerer {
     }
 
     fn LowerExpression(&mut this, expression: *ASTExpression) -> *HIRExpression {
-        if expression->kind == ASTExpressionKind::Unary || expression->kind == ASTExpressionKind::Binary || expression->kind == ASTExpressionKind::Ternary {
+        if expression->kind == ASTExpressionKind::Unary || expression->kind == ASTExpressionKind::Binary || expression->kind == ASTExpressionKind::If {
             let _type = this.IsDeferrableExpression(expression);
 
             if _type != null {
@@ -2988,7 +3004,6 @@ class HIRLowerer {
             ASTExpressionKind::MemberAccess => this.LowerMemberAccessExpression(expression as *ASTMemberAccessExpression),
             ASTExpressionKind::Unary => this.LowerUnaryExpression(expression as *ASTUnaryExpression, target),
             ASTExpressionKind::Binary => this.LowerBinaryExpression(expression as *ASTBinaryExpression, target),
-            ASTExpressionKind::Ternary => this.LowerTernaryExpression(expression as *ASTTernaryExpression, target),
             ASTExpressionKind::Block => {
                 let block = expression as *ASTBlockExpression;
                 if block->_unsafe { return this.RegisterTemporary(this.LowerUnsafeBlock(block)); }
@@ -3481,7 +3496,7 @@ class HIRLowerer {
                         return null;
                     }
 
-                    return this.builder.Intrinsic(path->segments[0].name == "sizeof" ? HIRIntrinsicKind::SizeOf : HIRIntrinsicKind::AlignOf, _type);
+                    return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
                 } else if path->segments[0].name == "construct" {
                     if call->arguments.Size() == 0 {
                         Logger::Log("Invalid number of arguments for 'construct'.", call, LogSeverity::Error);
@@ -4331,8 +4346,8 @@ class HIRLowerer {
         if function != null {
             return this.LowerResolvedCallExpression(function, values, node);
         } else if left->_type->HasFields() || right->_type->HasFields() {
-            let reciever = left->_type->HasFields() ? left : right;
-            let argument = left->_type->HasFields() ? right : left;
+            let reciever = if left->_type->HasFields() { left } else { right };
+            let argument = if left->_type->HasFields() { right } else { left };
 
             let mut values = Vector<*HIRExpression>();
             values.PushBack(reciever);
@@ -4395,7 +4410,7 @@ class HIRLowerer {
             let mut constant: u64 = 0;
 
             if (kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo) && this.IntegerLiteralValue(right, &mut constant) && constant == 0 {
-                Logger::Log(kind == ASTBinaryKind::Divide ? "Division by zero." : "Remainder with a divisor of zero.", node, LogSeverity::Error);
+                Logger::Log(if kind == ASTBinaryKind::Divide { "Division by zero." } else { "Remainder with a divisor of zero." }, node, LogSeverity::Error);
                 return null;
             }
 
@@ -4442,8 +4457,8 @@ class HIRLowerer {
                 }
             }
         } else if (left->_type->IsPointer() && right->_type->IsInteger()) || (left->_type->IsInteger() && right->_type->IsPointer()) {
-            let pointer = left->_type->IsPointer() ? left : right;
-            let index = left->_type->IsPointer() ? right : left;
+            let pointer = if left->_type->IsPointer() { left } else { right };
+            let index = if left->_type->IsPointer() { right } else { left };
 
             if !index->_type->IsIntegerPointer() {
                 Logger::Log("Pointer arithmetic requires an operand of pointer-sized type.", node, LogSeverity::Error);
@@ -4500,48 +4515,6 @@ class HIRLowerer {
             Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + kind.ToString() + "'.", node, LogSeverity::Error);
             null
         }
-    }
-
-    fn LowerTernaryExpression(&mut this, ternary: *ASTTernaryExpression, target: *HIRType) -> *HIRExpression {
-        let condition = this.ImplicitDereference(this.LowerExpression(ternary->condition));
-
-        if condition != null && !condition->_type->IsBoolean() {
-            Logger::Log("Invalid condition type '" + condition->_type->ToString() + "'.", ternary->condition, LogSeverity::Error);
-        }
-
-        let then_index = this.temporaries.Size();
-        let mut then_value = this.LowerExpression(ternary->then);
-        let then_destructors = this.GetTemporaryDestructorsSince(then_index, then_value);
-        if then_value == null { return null; }
-
-        let else_index = this.temporaries.Size();
-        let mut else_value = this.LowerExpression(ternary->_else);
-        let else_destructors = this.GetTemporaryDestructorsSince(else_index, else_value);
-        if else_value == null { return null; }
-
-        then_value = this.Coerce(then_value, target != null ? target : else_value->_type);
-        else_value = this.Coerce(else_value, target != null ? target : then_value->_type);
-        let _type = this.CommonType(then_value->_type, else_value->_type);
-
-        if _type == null {
-            Logger::Log("Incompatible ternary branch types ('" + then_value->_type->ToString() + "' != '" + else_value->_type->ToString() + "').", ternary, LogSeverity::Error);
-            return null;
-        }
-
-        let mutable = then_value->mutable && else_value->mutable ? true : false;
-        let category = (then_value->category == HIRExpressionCategory::Place && else_value->category == HIRExpressionCategory::Place) ? HIRExpressionCategory::Place : HIRExpressionCategory::Value;
-        let temporary = category == HIRExpressionCategory::Value && _type->HasSpecialMembers();
-
-        if temporary {
-            then_value = this.LowerCopyOrMoveValue(then_value);
-            if then_value == null { return null; }
-            else_value = this.LowerCopyOrMoveValue(else_value);
-            if else_value == null { return null; }
-        }
-
-        let result = this.builder.Ternary(condition, then_value, then_destructors, else_value, else_destructors, _type, category, mutable);
-        if temporary { this.temporaries.PushBack(result); }
-        result
     }
 
     fn CommonType(&mut this, left: *HIRType, right: *HIRType) -> *HIRType {
@@ -4644,7 +4617,7 @@ class HIRLowerer {
             rest = i as isize;
         }
 
-        let explicit = rest == -1 ? patterns.Size() : patterns.Size() - 1;
+        let explicit = if rest == -1 { patterns.Size() } else { patterns.Size() - 1 };
 
         if (rest == -1 && explicit != count) || explicit > count {
             Logger::Log(description + " has " + String::FromInteger(count as u64) + " field(s), but the pattern has " + String::FromInteger(explicit as u64) + '.', node, LogSeverity::Error);
@@ -4771,22 +4744,22 @@ class HIRLowerer {
                 let expected = this.PatternType(target_type, value);
 
                 if expected == null || (!expected->IsInteger() && !expected->IsCharacter()) {
-                    let name = expected != null ? expected->ToString() : "unknown".ToString();
+                    let name = if expected != null { expected->ToString() } else { "unknown".ToString() };
                     Logger::Log("Range patterns can only match integers and characters, not '" + name + "'.", pattern, LogSeverity::Error);
                     return null;
                 }
 
-                let start = range->start != null ? this.LowerRangeBound(range->start, expected) : null;
+                let start = if range->start != null { this.LowerRangeBound(range->start, expected) } else { null };
                 if range->start != null && start == null { return null; }
-                let end = range->end != null ? this.LowerRangeBound(range->end, expected) : null;
+                let end = if range->end != null { this.LowerRangeBound(range->end, expected) } else { null };
                 if range->end != null && end == null { return null; }
 
                 if start != null && end != null {
                     let checker = HIRPatternChecker();
                     let (low, high) = (checker.BoundValue(start, expected), checker.BoundValue(end, expected));
 
-                    if range->inclusive ? low > high : low >= high {
-                        Logger::Log("Lower bound of a range pattern must be " + (range->inclusive ? "less than or equal to" : "less than").ToString() + " its upper bound.", pattern, LogSeverity::Error);
+                    if low > high || (!range->inclusive && low == high) {
+                        Logger::Log("Lower bound of a range pattern must be " + (if range->inclusive { "less than or equal to" } else { "less than" }).ToString() + " its upper bound.", pattern, LogSeverity::Error);
                         return null;
                     }
                 }
@@ -4932,7 +4905,7 @@ class HIRLowerer {
 
                     let mut element_type: *HIRType = null;
                     if target_type != null { element_type = tuple_type->elements[i]; }
-                    let element = value != null ? this.builder.TupleAccess(value, i) : null;
+                    let element = if value != null { this.builder.TupleAccess(value, i) } else { null };
                     let lowered_pattern = this.LowerPattern(expanded[i], element_type, element, mode);
                     if lowered_pattern == null { return null; }
                     patterns.PushBack(lowered_pattern);
@@ -4979,7 +4952,7 @@ class HIRLowerer {
                             return null;
                         }
 
-                        let field = value != null ? this.builder.FieldAccess(value, declaration_field) : null;
+                        let field = if value != null { this.builder.FieldAccess(value, declaration_field) } else { null };
                         let lowered_pattern = this.LowerPattern(field_pattern, null, field, mode);
                         if lowered_pattern == null { return null; }
                         patterns.PushBack(lowered_pattern);
@@ -5019,7 +4992,7 @@ class HIRLowerer {
                         if field_pattern->kind == ASTPatternKind::Rest { continue; }
                         let member_field = member->fields[indices[position]];
                         position += 1;
-                        let field = value != null ? this.builder.MemberAccess(value, member, member_field) : null;
+                        let field = if value != null { this.builder.MemberAccess(value, member, member_field) } else { null };
                         let lowered_pattern = this.LowerPattern(field_pattern, null, field, mode);
                         if lowered_pattern == null { return null; }
                         patterns.PushBack(lowered_pattern);
@@ -5075,7 +5048,7 @@ class HIRLowerer {
                             continue;
                         }
 
-                        let field = value != null ? this.builder.MemberAccess(value, member, member->fields[i]) : null;
+                        let field = if value != null { this.builder.MemberAccess(value, member, member->fields[i]) } else { null };
                         let lowered_pattern = this.LowerPattern(expanded[i], null, field, mode);
                         if lowered_pattern == null { return null; }
                         patterns.PushBack(lowered_pattern);
@@ -5112,7 +5085,7 @@ class HIRLowerer {
                             let member = symbol->declaration as *HIRVariantMember;
 
                             if !member->fields.Empty() {
-                                Logger::Log("Variant member '" + path->ToString() + "' has fields; use '" + path->ToString() + (member->structure ? " { ... }" : "(...)") + "' to match it.", pattern, LogSeverity::Error);
+                                Logger::Log("Variant member '" + path->ToString() + "' has fields; use '" + path->ToString() + (if member->structure { " { ... }" } else { "(...)" }) + "' to match it.", pattern, LogSeverity::Error);
                                 return null;
                             }
 

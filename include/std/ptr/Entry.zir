@@ -88,7 +88,7 @@ class Shared<T> {
     pub fn WeakCount(&this) -> u64 {
         if this.control == null { return 0; }
         let weak = AtomicLoad64(&this.control->weak);
-        weak > 0 ? weak - 1 : 0
+        if weak > 0 { weak - 1 } else { 0 }
     }
 
     pub fn Valid(&this) -> bool {
@@ -221,7 +221,7 @@ class Weak<T> {
     pub fn WeakCount(&this) -> u64 {
         if this.control == null { return 0; }
         let weak = AtomicLoad64(&this.control->weak);
-        weak > 0 ? weak - 1 : 0
+        if weak > 0 { weak - 1 } else { 0 }
     }
 
     pub fn operator=(&mut this, shared: &Shared<T>) -> &mut Weak<T> {

@@ -112,7 +112,7 @@ class Vector<T> {
 
     pub fn PushBack(&mut this, value: T) {
         if this.capacity < this.size + 1 {
-            this.Reserve(this.capacity != 0 ? this.capacity * 2 : 1);
+            this.Reserve(if this.capacity != 0 { this.capacity * 2 } else { 1 });
         }
 
         this.data[this.size] = value;
@@ -126,7 +126,7 @@ class Vector<T> {
 
     pub fn Insert(&mut this, index: usize, value: T) {
         if this.capacity < this.size + 1 {
-            this.Reserve(this.capacity != 0 ? this.capacity * 2 : 1);
+            this.Reserve(if this.capacity != 0 { this.capacity * 2 } else { 1 });
         }
 
         for offset in 0..(this.size - index) {

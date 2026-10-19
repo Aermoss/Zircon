@@ -123,7 +123,7 @@ class String {
     }
 
     String(&mut this, string: *i8, start: usize, mut length: usize) {
-        let other_length = string != null ? strlen(string) : 0;
+        let other_length = if string != null { strlen(string) } else { 0 };
 
         if string == null || start >= other_length || length == 0 {
             this.Allocate(0);

@@ -107,7 +107,7 @@ class Lexer {
         let mut token: Token;
         (token.row, token.column, token.file) = (this.row, this.column, this.file);
         let quote_char = this.CurrentChar();
-        token._type = quote_char != '"' ? TokenType::CHAR : TokenType::STRING;
+        token._type = if quote_char != '"' { TokenType::CHAR } else { TokenType::STRING };
         this.Advance(1);
 
         while this.CurrentChar() != quote_char && this.CurrentChar() != '\n' && this.CurrentChar() != '\0' {
@@ -308,7 +308,13 @@ class Lexer {
                     }
                 }
             } else {
-                if token.value.Size() > 1 ? this.IsAlphaNum(byte as i8) : this.IsAlpha(byte as i8) {
+                let accepted = if token.value.Size() > 1 {
+                    this.IsAlphaNum(byte as i8)
+                } else {
+                    this.IsAlpha(byte as i8)
+                };
+
+                if accepted {
                     token.value += byte as i8;
                     this.Advance(1);
                 } else {

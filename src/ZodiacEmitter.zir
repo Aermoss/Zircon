@@ -221,7 +221,7 @@ class ZodiacEmitter {
 
         for i in 0..function->blocks.Size() {
             let block = function->blocks[i];
-            let next = i + 1 < function->blocks.Size() ? function->blocks[i + 1] : null;
+            let next = if i + 1 < function->blocks.Size() { function->blocks[i + 1] } else { null };
             this.output += this.Label(block) + ":\n";
             let size = block->instructions.Size();
 
@@ -295,12 +295,12 @@ class ZodiacEmitter {
         let mut first = true;
 
         for operand in instruction->defines {
-            text += (first ? " " : ", ") + this.Operand(operand);
+            text += (if first { " " } else { ", " }) + this.Operand(operand);
             first = false;
         }
 
         for operand in instruction->uses {
-            text += (first ? " " : ", ") + this.Operand(operand);
+            text += (if first { " " } else { ", " }) + this.Operand(operand);
             first = false;
         }
 

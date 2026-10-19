@@ -163,7 +163,7 @@ class ASTPointerType : ASTType {
     }
 
     pub fn ToString(&this) -> String {
-        (this.mutable ? "*mut " : "*") + this.pointee->ToString()
+        (if this.mutable { "*mut " } else { "*" }) + this.pointee->ToString()
     }
 }
 
@@ -176,7 +176,7 @@ class ASTReferenceType : ASTType {
     }
 
     pub fn ToString(&this) -> String {
-        (this.mutable ? "&mut " : "&") + this.pointee->ToString()
+        (if this.mutable { "&mut " } else { "&" }) + this.pointee->ToString()
     }
 }
 
@@ -353,7 +353,7 @@ class ASTOrPattern : ASTPattern {
 }
 
 enum ASTExpressionKind: u8 {
-    Literal, Path, Unary, Binary, Ternary, Call,
+    Literal, Path, Unary, Binary, Call,
     PackSplat, MemberAccess, TupleAccess, IndexAccess, Cast,
     New, Delete, Assignment, Await, Range,
     Block, If, While, Loop, For, Match, Return, Break, Continue
@@ -366,7 +366,6 @@ extend ASTExpressionKind {
             ASTExpressionKind::Path => "Path",
             ASTExpressionKind::Unary => "Unary",
             ASTExpressionKind::Binary => "Binary",
-            ASTExpressionKind::Ternary => "Ternary",
             ASTExpressionKind::Call => "Call",
             ASTExpressionKind::PackSplat => "PackSplat",
             ASTExpressionKind::MemberAccess => "MemberAccess",
@@ -404,7 +403,6 @@ class ASTExpression : ASTNode {
             ASTExpressionKind::Path => (this as *ASTPathExpression)->ToString(),
             ASTExpressionKind::Unary => (this as *ASTUnaryExpression)->ToString(),
             ASTExpressionKind::Binary => (this as *ASTBinaryExpression)->ToString(),
-            ASTExpressionKind::Ternary => (this as *ASTTernaryExpression)->ToString(),
             ASTExpressionKind::Call => (this as *ASTCallExpression)->ToString(),
             ASTExpressionKind::PackSplat => (this as *ASTPackSplatExpression)->ToString(),
             ASTExpressionKind::MemberAccess => (this as *ASTMemberAccessExpression)->ToString(),
@@ -479,7 +477,7 @@ class ASTBooleanLiteral : ASTLiteral {
     }
 
     pub fn ToString(&this) -> String {
-        (this.value ? "true" : "false").ToString()
+        (if this.value { "true" } else { "false" }).ToString()
     }
 }
 
@@ -683,20 +681,6 @@ class ASTBinaryExpression : ASTExpression {
     }
 }
 
-class ASTTernaryExpression : ASTExpression {
-    pub condition: *ASTExpression,
-    pub then: *ASTExpression,
-    pub _else: *ASTExpression;
-
-    ASTTernaryExpression(&mut this, condition: *ASTExpression, then: *ASTExpression, _else: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Ternary, start) {
-        (this.condition, this.then, this._else) = (condition, then, _else);
-    }
-
-    pub fn ToString(&this) -> String {
-        this.condition->ToString() + " ? " + this.then->ToString() + " : " + this._else->ToString()
-    }
-}
-
 class ASTCallExpression : ASTExpression {
     pub expression: *ASTExpression,
     pub arguments: Vector<*ASTExpression>;
@@ -740,7 +724,7 @@ class ASTMemberAccessExpression : ASTExpression {
     }
 
     pub fn ToString(&this) -> String {
-        this.expression->ToString() + (this.arrow ? "->" : ".") + this.member
+        this.expression->ToString() + (if this.arrow { "->" } else { "." }) + this.member
     }
 }
 
@@ -754,7 +738,7 @@ class ASTTupleAccessExpression : ASTExpression {
     }
 
     pub fn ToString(&this) -> String {
-        this.expression->ToString() + (this.arrow ? "->" : ".") + String::FromInteger(this.index as u64)
+        this.expression->ToString() + (if this.arrow { "->" } else { "." }) + String::FromInteger(this.index as u64)
     }
 }
 
@@ -819,7 +803,7 @@ class ASTDeleteExpression : ASTExpression {
     ASTDeleteExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Delete, start) {}
 
     pub fn ToString(&this) -> String {
-        (this.array ? "delete[] " : "delete ") + this.expression->ToString()
+        (if this.array { "delete[] " } else { "delete " }) + this.expression->ToString()
     }
 }
 
@@ -905,7 +889,7 @@ class ASTRangeExpression : ASTExpression {
     }
 
     pub fn ToString(&this) -> String {
-        this.start->ToString() + (this.inclusive ? "..=" : "..") + this.end->ToString()
+        this.start->ToString() + (if this.inclusive { "..=" } else { ".." }) + this.end->ToString()
     }
 }
 
@@ -917,7 +901,7 @@ class ASTBlockExpression : ASTExpression {
     ASTBlockExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Block, start) {}
 
     pub fn ToString(&this) -> String {
-        (this._unsafe ? "unsafe { ... }" : "{ ... }").ToString()
+        (if this._unsafe { "unsafe { ... }" } else { "{ ... }" }).ToString()
     }
 }
 

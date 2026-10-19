@@ -219,7 +219,7 @@ class MIRConstantInteger : MIRConstant {
 
     pub fn ToString(&this) -> String {
         if (this._type as *MIRIntegerType)->width == 1 {
-            return (this.value != 0 ? "true" : "false").ToString();
+            return (if this.value != 0 { "true" } else { "false" }).ToString();
         }
 
         String::FromInteger(this.value as i64)
@@ -757,7 +757,7 @@ class MIRAssemblyInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = (this._volatile ? "volatile asm " : "asm ").ToString();
+        let mut result = (if this._volatile { "volatile asm " } else { "asm " }).ToString();
 
         if !this.inputs.Empty() {
             result += ": ";

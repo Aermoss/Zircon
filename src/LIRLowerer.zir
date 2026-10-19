@@ -89,7 +89,7 @@ class LIRLowerer {
 
     fn Unsupported(&mut this, feature: *i8) -> *LIROperand {
         let function = this.builder.GetCurrentFunction();
-        let location = function != null ? " (in '" + function->name + "')" : String();
+        let location = if function != null { " (in '" + function->name + "')" } else { String() };
         Logger::Log(feature.ToString() + " is not supported by the Zodiac backend" + location + '.', LogSeverity::Error);
         null
     }
@@ -455,16 +455,16 @@ class LIRLowerer {
 
             match definer->opcode {
                 LIROpcode::Sltiu if this.IsImmediateValue(right, 1) => {
-                    (opcode, right) = (inverted ? LIROpcode::Bne : LIROpcode::Beq, this.Zero());
+                    (opcode, right) = (if inverted { LIROpcode::Bne } else { LIROpcode::Beq }, this.Zero());
                 },
                 LIROpcode::Sltu if this.IsZero(left) => {
-                    (opcode, left, right) = (inverted ? LIROpcode::Beq : LIROpcode::Bne, right, this.Zero());
+                    (opcode, left, right) = (if inverted { LIROpcode::Beq } else { LIROpcode::Bne }, right, this.Zero());
                 },
                 LIROpcode::Slt | LIROpcode::Slti => {
-                    opcode = inverted ? LIROpcode::Bge : LIROpcode::Blt;
+                    opcode = if inverted { LIROpcode::Bge } else { LIROpcode::Blt };
                 },
                 LIROpcode::Sltu | LIROpcode::Sltiu => {
-                    opcode = inverted ? LIROpcode::Bgeu : LIROpcode::Bltu;
+                    opcode = if inverted { LIROpcode::Bgeu } else { LIROpcode::Bltu };
                 },
                 _ => {
                     continue;
@@ -747,11 +747,11 @@ class LIRLowerer {
         match _type->kind {
             MIRTypeKind::Integer => {
                 let width = (_type as *MIRIntegerType)->width;
-                width <= 8 ? 1 : width / 8
+                if width <= 8 { 1 } else { width / 8 }
             },
             MIRTypeKind::Float => {
                 let width = (_type as *MIRFloatType)->width;
-                width <= 8 ? 1 : width / 8
+                if width <= 8 { 1 } else { width / 8 }
             },
             MIRTypeKind::Pointer => 4,
             MIRTypeKind::Array => this.AlignOf((_type as *MIRArrayType)->element),
@@ -776,11 +776,11 @@ class LIRLowerer {
         match _type->kind {
             MIRTypeKind::Integer => {
                 let width = (_type as *MIRIntegerType)->width;
-                width <= 8 ? 1 : width / 8
+                if width <= 8 { 1 } else { width / 8 }
             },
             MIRTypeKind::Float => {
                 let width = (_type as *MIRFloatType)->width;
-                width <= 8 ? 1 : width / 8
+                if width <= 8 { 1 } else { width / 8 }
             },
             MIRTypeKind::Pointer => 4,
             MIRTypeKind::Array => {
@@ -837,7 +837,7 @@ class LIRLowerer {
     }
 
     fn SignExtendValue(&this, value: i64, width: u32) -> i64 {
-        let bits = (width == 0 || width > 32) ? 32 : width;
+        let bits = if width == 0 || width > 32 { 32 } else { width };
         let shift = (64 - bits) as i64;
         (value << shift) >> shift
     }
@@ -974,14 +974,14 @@ class LIRLowerer {
 
     fn AllocateStack(&mut this, size: u32, alignment: u32) -> *LIRMemoryOperand {
         let function = this.builder.GetCurrentFunction();
-        function->frame_size = this.AlignUp(function->frame_size + size, alignment > 4 ? 4 : alignment);
+        function->frame_size = this.AlignUp(function->frame_size + size, if alignment > 4 { 4 } else { alignment });
         this.builder.MemoryOperand(this.Physical(LIR_FP), -(function->frame_size as i32))
     }
 
     fn CopyMemory(&mut this, destination: *LIRMemoryOperand, source: *LIRMemoryOperand, size: u32, alignment: u32) {
-        let unit: u32 = (alignment >= 4 && size % 4 == 0) ? 4 : ((alignment >= 2 && size % 2 == 0) ? 2 : 1);
-        let load = unit == 4 ? LIROpcode::Lw : (unit == 2 ? LIROpcode::Lhu : LIROpcode::Lbu);
-        let store = unit == 4 ? LIROpcode::Sw : (unit == 2 ? LIROpcode::Sh : LIROpcode::Sb);
+        let unit: u32 = if alignment >= 4 && size % 4 == 0 { 4 } else if alignment >= 2 && size % 2 == 0 { 2 } else { 1 };
+        let load = if unit == 4 { LIROpcode::Lw } else if unit == 2 { LIROpcode::Lhu } else { LIROpcode::Lbu };
+        let store = if unit == 4 { LIROpcode::Sw } else if unit == 2 { LIROpcode::Sh } else { LIROpcode::Sb };
         let legal_source = this.LegalMemory(source, size);
         let legal_destination = this.LegalMemory(destination, size);
         let mut offset: u32 = 0;
@@ -994,11 +994,11 @@ class LIRLowerer {
     }
 
     fn LoadOpcode(&this, size: u32) -> LIROpcode {
-        size == 1 ? LIROpcode::Lbu : (size == 2 ? LIROpcode::Lhu : LIROpcode::Lw)
+        if size == 1 { LIROpcode::Lbu } else if size == 2 { LIROpcode::Lhu } else { LIROpcode::Lw }
     }
 
     fn StoreOpcode(&this, size: u32) -> LIROpcode {
-        size == 1 ? LIROpcode::Sb : (size == 2 ? LIROpcode::Sh : LIROpcode::Sw)
+        if size == 1 { LIROpcode::Sb } else if size == 2 { LIROpcode::Sh } else { LIROpcode::Sw }
     }
 
     fn IsScalar(&this, _type: *MIRType) -> bool {
@@ -1020,7 +1020,7 @@ class LIRLowerer {
             this.CopyMemory(temporary, this.EnsureMemory(pointer), size, alignment);
             return temporary;
         } else if !this.IsScalar(load->_type) {
-            return this.Unsupported(load->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+            return this.Unsupported(if load->_type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
         }
 
         this.EmitValue(this.LoadOpcode(size), this.LegalMemory(this.EnsureMemory(pointer), size), null)
@@ -1037,7 +1037,7 @@ class LIRLowerer {
             this.CopyMemory(this.EnsureMemory(pointer), this.EnsureMemory(value), size, alignment);
             return null;
         } else if !this.IsScalar(_type) {
-            return this.Unsupported(_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+            return this.Unsupported(if _type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
         }
 
         let source = this.EnsureRegister(value);
@@ -1080,7 +1080,7 @@ class LIRLowerer {
 
     fn LowerUnary(&mut this, kind: MIRUnaryKind, operand_value: *MIRValue, _type: *MIRType) -> *LIROperand {
         if kind == MIRUnaryKind::FNeg || !this.IsScalar(_type) {
-            return this.Unsupported(kind == MIRUnaryKind::FNeg ? "Floating point" : "64-bit integer arithmetic");
+            return this.Unsupported(if kind == MIRUnaryKind::FNeg { "Floating point" } else { "64-bit integer arithmetic" });
         }
 
         let operand = this.LowerValue(operand_value);
@@ -1126,7 +1126,7 @@ class LIRLowerer {
         }
 
         let immediate = this.IsImmediate(right);
-        let value = immediate ? this.ImmediateValue(right) : 0;
+        let value = if immediate { this.ImmediateValue(right) } else { 0 };
 
         match kind {
             MIRBinaryKind::Add => {
@@ -1138,21 +1138,21 @@ class LIRLowerer {
                 this.EmitValue(LIROpcode::Sub, this.EnsureRegister(left), this.EnsureRegister(right))
             },
             MIRBinaryKind::Mul => {
-                let shift = immediate ? this.Log2(value) : -1;
+                let shift = if immediate { this.Log2(value) } else { -1 };
                 if shift >= 0 { return this.EmitValue(LIROpcode::Slli, this.EnsureRegister(left), this.Immediate(shift)); }
                 this.EmitValue(LIROpcode::Mul, this.EnsureRegister(left), this.EnsureRegister(right))
             },
             MIRBinaryKind::SDiv | MIRBinaryKind::SRem => {
-                let opcode = kind == MIRBinaryKind::SDiv ? LIROpcode::Div : LIROpcode::Rem;
+                let opcode = if kind == MIRBinaryKind::SDiv { LIROpcode::Div } else { LIROpcode::Rem };
                 this.EmitValue(opcode, this.EnsureRegister(this.SignExtend(left, width)), this.EnsureRegister(this.SignExtend(right, width)))
             },
             MIRBinaryKind::UDiv | MIRBinaryKind::URem => {
-                let opcode = kind == MIRBinaryKind::UDiv ? LIROpcode::Divu : LIROpcode::Remu;
+                let opcode = if kind == MIRBinaryKind::UDiv { LIROpcode::Divu } else { LIROpcode::Remu };
                 this.EmitValue(opcode, this.EnsureRegister(this.ZeroExtend(left, width)), this.EnsureRegister(this.ZeroExtend(right, width)))
             },
             MIRBinaryKind::And | MIRBinaryKind::Or | MIRBinaryKind::Xor => {
-                let register_opcode = kind == MIRBinaryKind::And ? LIROpcode::And : (kind == MIRBinaryKind::Or ? LIROpcode::Or : LIROpcode::Xor);
-                let immediate_opcode = kind == MIRBinaryKind::And ? LIROpcode::Andi : (kind == MIRBinaryKind::Or ? LIROpcode::Ori : LIROpcode::Xori);
+                let register_opcode = if kind == MIRBinaryKind::And { LIROpcode::And } else if kind == MIRBinaryKind::Or { LIROpcode::Or } else { LIROpcode::Xor };
+                let immediate_opcode = if kind == MIRBinaryKind::And { LIROpcode::Andi } else if kind == MIRBinaryKind::Or { LIROpcode::Ori } else { LIROpcode::Xori };
                 if immediate && this.FitsUnsigned16(value) { return this.EmitValue(immediate_opcode, this.EnsureRegister(left), right); }
                 this.EmitValue(register_opcode, this.EnsureRegister(left), this.EnsureRegister(right))
             },
@@ -1177,10 +1177,10 @@ class LIRLowerer {
 
     fn LowerComparison(&mut this, kind: MIRBinaryKind, left_operand: *LIROperand, right_operand: *LIROperand, width: u32) -> *LIROperand {
         let signed = kind == MIRBinaryKind::ICmpSlt || kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpSle || kind == MIRBinaryKind::ICmpSge;
-        let left = signed ? this.SignExtend(left_operand, width) : this.ZeroExtend(left_operand, width);
-        let right = signed ? this.SignExtend(right_operand, width) : this.ZeroExtend(right_operand, width);
+        let left = if signed { this.SignExtend(left_operand, width) } else { this.ZeroExtend(left_operand, width) };
+        let right = if signed { this.SignExtend(right_operand, width) } else { this.ZeroExtend(right_operand, width) };
         let immediate = this.IsImmediate(right);
-        let value = immediate ? this.ImmediateValue(right) : 0;
+        let value = if immediate { this.ImmediateValue(right) } else { 0 };
 
         match kind {
             MIRBinaryKind::ICmpEq | MIRBinaryKind::ICmpNe => {
@@ -1198,20 +1198,18 @@ class LIRLowerer {
                 this.EmitValue(LIROpcode::Sltu, this.Zero(), difference)
             },
             MIRBinaryKind::ICmpSlt | MIRBinaryKind::ICmpSge => {
-                let result = (immediate && this.FitsSigned16(value)) ? this.EmitValue(LIROpcode::Slti, this.EnsureRegister(left), right)
-                    : this.EmitValue(LIROpcode::Slt, this.EnsureRegister(left), this.EnsureRegister(right));
-                kind == MIRBinaryKind::ICmpSlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1))
+                let result = if immediate && this.FitsSigned16(value) { this.EmitValue(LIROpcode::Slti, this.EnsureRegister(left), right) } else { this.EmitValue(LIROpcode::Slt, this.EnsureRegister(left), this.EnsureRegister(right)) };
+                if kind == MIRBinaryKind::ICmpSlt { result } else { this.EmitValue(LIROpcode::Xori, result, this.Immediate(1)) }
             },
             MIRBinaryKind::ICmpUlt | MIRBinaryKind::ICmpUge => {
-                let result = (immediate && this.FitsUnsigned16(value)) ? this.EmitValue(LIROpcode::Sltiu, this.EnsureRegister(left), right)
-                    : this.EmitValue(LIROpcode::Sltu, this.EnsureRegister(left), this.EnsureRegister(right));
-                kind == MIRBinaryKind::ICmpUlt ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1))
+                let result = if immediate && this.FitsUnsigned16(value) { this.EmitValue(LIROpcode::Sltiu, this.EnsureRegister(left), right) } else { this.EmitValue(LIROpcode::Sltu, this.EnsureRegister(left), this.EnsureRegister(right)) };
+                if kind == MIRBinaryKind::ICmpUlt { result } else { this.EmitValue(LIROpcode::Xori, result, this.Immediate(1)) }
             },
             _ => {
-                let opcode = signed ? LIROpcode::Slt : LIROpcode::Sltu;
+                let opcode = if signed { LIROpcode::Slt } else { LIROpcode::Sltu };
                 let result = this.EmitValue(opcode, this.EnsureRegister(right), this.EnsureRegister(left));
                 let strict = kind == MIRBinaryKind::ICmpSgt || kind == MIRBinaryKind::ICmpUgt;
-                strict ? result : this.EmitValue(LIROpcode::Xori, result, this.Immediate(1))
+                if strict { result } else { this.EmitValue(LIROpcode::Xori, result, this.Immediate(1)) }
             }
         }
     }
@@ -1237,7 +1235,7 @@ class LIRLowerer {
             let argument = call->arguments[i];
 
             if !this.IsScalar(argument->_type) && !this.IsAggregate(argument->_type) {
-                return this.Unsupported(argument->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+                return this.Unsupported(if argument->_type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
             }
 
             let source = this.EnsureRegister(this.LowerValue(argument));
@@ -1282,7 +1280,7 @@ class LIRLowerer {
         if call->_type == null || call->_type->kind == MIRTypeKind::Void {
             return null;
         } else if !this.IsScalar(call->_type) {
-            return this.Unsupported(call->_type->kind == MIRTypeKind::Float ? "Floating point" : "Returning this type by value");
+            return this.Unsupported(if call->_type->kind == MIRTypeKind::Float { "Floating point" } else { "Returning this type by value" });
         }
 
         let result = this.builder.VirtualRegister();
@@ -1318,7 +1316,7 @@ class LIRLowerer {
         if condition == null || then_value == null || else_value == null { return null; }
 
         if this.IsImmediate(condition) {
-            return this.ImmediateValue(condition) != 0 ? then_value : else_value;
+            return if this.ImmediateValue(condition) != 0 { then_value } else { else_value };
         }
 
         let else_register = this.EnsureRegister(else_value);
@@ -1329,7 +1327,7 @@ class LIRLowerer {
 
     fn LowerPhiInstruction(&mut this, phi: *MIRPhiInstruction) -> *LIROperand {
         if !this.IsScalar(phi->_type) && !this.IsAggregate(phi->_type) {
-            return this.Unsupported(phi->_type->kind == MIRTypeKind::Float ? "Floating point" : "64-bit integer arithmetic");
+            return this.Unsupported(if phi->_type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
         }
 
         this.builder.VirtualRegister()
@@ -1411,7 +1409,7 @@ class LIRLowerer {
 
         if _return->value != null {
             if !this.IsScalar(_return->value->_type) {
-                this.Unsupported(_return->value->_type->kind == MIRTypeKind::Float ? "Floating point" : "Returning this type by value");
+                this.Unsupported(if _return->value->_type->kind == MIRTypeKind::Float { "Floating point" } else { "Returning this type by value" });
             } else {
                 let value = this.EnsureRegister(this.LowerValue(_return->value));
                 let register = this.Physical(LIR_A0);
@@ -1429,7 +1427,7 @@ class LIRLowerer {
         if condition == null { return; }
 
         if this.IsImmediate(condition) {
-            this.EmitBranch(this.EdgeTarget(this.ImmediateValue(condition) != 0 ? branch->then_target : branch->else_target, false));
+            this.EmitBranch(this.EdgeTarget(if this.ImmediateValue(condition) != 0 { branch->then_target } else { branch->else_target }, false));
             return;
         }
 

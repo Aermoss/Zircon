@@ -79,7 +79,7 @@ class LLVMLowerer {
         let mut message: *mut i8 = null;
 
         if LLVMVerifyModule(this.module, LLVMVerifierFailureAction::LLVMReturnStatusAction, &mut message) != 0 {
-            let final_message = message != null ? message : "Unknown reason.";
+            let final_message = if message != null { message } else { "Unknown reason." };
             Logger::Log("Module verification failed: " + final_message.ToString(), LogSeverity::Error);
 
             if message != null {
@@ -292,7 +292,7 @@ class LLVMLowerer {
         if _type == null { return; }
         let global = LLVMAddGlobal(this.module, _type, _static->name.Data());
         LLVMSetLinkage(global, this.LowerLinkage(_static->linkage));
-        LLVMSetGlobalConstant(global, !_static->mutable ? 1 : 0);
+        LLVMSetGlobalConstant(global, if !_static->mutable { 1 } else { 0 });
         this.declarations[_static] = global;
     }
 
@@ -620,9 +620,9 @@ class LLVMLowerer {
             constraints += "~{" + clobber + '}';
         }
 
-        let _type = LLVMFunctionType(_return, parameters.Empty() ? null : parameters.Data(), parameters.Size() as u32, 0);
+        let _type = LLVMFunctionType(_return, if parameters.Empty() { null } else { parameters.Data() }, parameters.Size() as u32, 0);
         let inline = LLVMGetInlineAsm(_type, assembly->text.Data(), assembly->text.Length(), constraints.Data(), constraints.Length(), assembly->_volatile as i32, 0, LLVMInlineAsmDialect::LLVMInlineAsmDialectATT, 0);
-        let result = LLVMBuildCall2(this.builder, _type, inline, inputs.Empty() ? null : inputs.Data(), inputs.Size() as u32, "");
+        let result = LLVMBuildCall2(this.builder, _type, inline, if inputs.Empty() { null } else { inputs.Data() }, inputs.Size() as u32, "");
 
         if output != null {
             LLVMBuildStore(this.builder, result, output);

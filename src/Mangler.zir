@@ -37,11 +37,11 @@ class Mangler {
         } else if _type->IsCharacter() {
             result += 'c';
         } else if _type->IsInteger() {
-            result += (_type->IsSigned() ? 'i' : 'u') + String::FromInteger(_type->Width() as u64);
+            result += (if _type->IsSigned() { 'i' } else { 'u' }) + String::FromInteger(_type->Width() as u64);
         } else if _type->IsFloat() {
             result += 'f' + String::FromInteger(_type->Width() as u64);
         } else if _type->IsPointer() {
-            result += (_type->IsReference() ? 'R' : 'P') + Mangler::MangleType(_type->Pointee());
+            result += (if _type->IsReference() { 'R' } else { 'P' }) + Mangler::MangleType(_type->Pointee());
         } else if _type->IsArray() {
             let array = _type as *HIRArrayType;
             result += 'A' + String::FromInteger(array->length as u64) + '_' + Mangler::MangleType(array->element);

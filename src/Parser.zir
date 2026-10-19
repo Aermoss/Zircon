@@ -164,7 +164,7 @@ class Parser {
 
                 path->segments.PushBack(ASTPathSegment(_identifier));
             } else {
-                let _identifier = this.Expect(this.Current()._type != TokenType::THIS ? TokenType::IDENTIFIER : TokenType::THIS);
+                let _identifier = this.Expect(if this.Current()._type != TokenType::THIS { TokenType::IDENTIFIER } else { TokenType::THIS });
                 if _identifier._type == TokenType::UNKNOWN { return null; }
                 let mut segment = ASTPathSegment(_identifier.value);
 
@@ -602,20 +602,7 @@ class Parser {
     }
 
     fn ParseExpression(&mut this) -> *ASTExpression {
-        let mut expression = this.ParseBinaryExpression(0);
-        if expression == null { return null; }
-        let token = this.Current();
-
-        if token._type == TokenType::QUESTION_MARK {
-            this.Advance();
-            let then = this.ParseExpression();
-            if then == null || !this.ExpectSuccess(TokenType::COLON) { return null; }
-            let _else = this.ParseExpression();
-            if _else == null { return null; }
-            expression = this.arena.New<ASTTernaryExpression>(expression, then, _else, token);
-        }
-
-        expression
+        this.ParseBinaryExpression(0)
     }
 
     fn ParsePrimaryPattern(&mut this) -> *ASTPattern {
@@ -1394,7 +1381,7 @@ class Parser {
             if this.Match(TokenType::BITWISE_AND) {
                 let mutable = this.Match(TokenType::MUT);
                 if !this.ExpectSuccess(TokenType::THIS) { return null; }
-                function->instance_kind = mutable ? ASTInstanceKind::MutRef : ASTInstanceKind::ConstRef;
+                function->instance_kind = if mutable { ASTInstanceKind::MutRef } else { ASTInstanceKind::ConstRef };
             } else if this.Match(TokenType::THIS) {
                 function->instance_kind = ASTInstanceKind::Copy;
             } else {

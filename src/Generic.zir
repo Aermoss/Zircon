@@ -201,7 +201,13 @@ class GenericDeclaration {
             pack = !(this.declaration as *ASTFunctionDeclaration)->pack_name.Empty();
         }
 
-        if pack ? types.Size() < this.types.Size() : types.Size() != this.types.Size() {
+        let mismatch = if pack {
+            types.Size() < this.types.Size()
+        } else {
+            types.Size() != this.types.Size()
+        };
+
+        if mismatch {
             let mut expected = String::FromInteger(this.types.Size() as u64);
             if pack { expected = "at least " + expected; }
             Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);

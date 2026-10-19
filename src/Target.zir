@@ -57,7 +57,7 @@ class Target {
         let mut message: *mut i8 = null;
 
         if LLVMGetTargetFromTriple(this.triple.Data(), &mut this.target, &mut message) != 0 {
-            let final_message = message != null ? message : "Unknown reason.";
+            let final_message = if message != null { message } else { "Unknown reason." };
             WriteLine("\x1b[31mFailed to get target from triple: " + final_message.ToString() + ".\x1b[0m");
             if message != null { LLVMDisposeMessage(message); }
             Exit(1);
