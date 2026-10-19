@@ -37,34 +37,24 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          New-Item -ItemType Directory -Force dist\windows-amd64, dist\windows-arm64, dist\objects | Out-Null
+          New-Item -ItemType Directory -Force dist\windows-amd64 | Out-Null
           .\bin\zirconc.exe src/Main.zir -o dist\windows-amd64\zirconc.exe -L"C:\Program Files\LLVM\lib" -lLLVM-C -lDbgHelp -g -v
           Copy-Item "C:\Program Files\LLVM\bin\LLVM-C.dll" dist\windows-amd64\
-          .\dist\windows-amd64\zirconc.exe --version
 
       - name: Build compiler for Windows ARM64.
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force dist\windows-arm64 | Out-Null
+          .\bin\zirconc.exe src/Main.zir -o dist\windows-arm64\zirconc.exe -target aarch64-pc-windows-msvc -L"$PWD\llvm-aarch64" -lLLVM-C -lDbgHelp -g -v
           Copy-Item llvm-aarch64\LLVM-C.dll dist\windows-arm64\
-          New-Item -ItemType Directory -Force stubs | Out-Null
-
-          $objects = foreach ($target in 'BPF', 'WebAssembly', 'RISCV', 'NVPTX') {
-            foreach ($part in 'TargetInfo', 'Target', 'TargetMC', 'AsmPrinter', 'AsmParser', 'Disassembler') {
-              $name = "LLVMInitialize$target$part"
-              "void $name(void) {}" | Set-Content "stubs\$name.c"
-              clang --target=aarch64-pc-windows-msvc -c "stubs\$name.c" -o "stubs\$name.obj"
-              "stubs\$name.obj"
-            }
-          }
-
-          llvm-lib $objects /out:llvm-aarch64\LLVMStubs.lib
-          .\bin\zirconc.exe src/Main.zir -o dist\windows-arm64\zirconc.exe -target aarch64-pc-windows-msvc -L"$PWD\llvm-aarch64" -lLLVM-C -lLLVMStubs -lDbgHelp -g -v
 
       - name: Compile objects for Linux and macOS.
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force dist\objects | Out-Null
+
           $targets = @{
             'linux-amd64' = 'x86_64-unknown-linux-gnu'
             'linux-arm64' = 'aarch64-unknown-linux-gnu'
@@ -252,8 +242,6 @@ jobs:
               tar -czf "packages/$name.tar.gz" -C staging "$name"
             fi
           done
-
-          (cd packages && sha256sum * > SHA256SUMS)
 
       - name: Publish release.
         env:
