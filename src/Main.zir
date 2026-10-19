@@ -433,8 +433,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (mut include_paths, mut lib_paths) = (Vector<String>(), Vector<String>());
     let (mut defines, mut libs) = (Vector<String>(), Vector<String>());
 
-    include_paths.PushBack(String("."));
-    include_paths.PushBack(String("include"));
+    include_paths.PushBack(".".ToString());
+    include_paths.PushBack("include".ToString());
+    let root = SplitPath(SplitPath(ExecutablePath()).0).0;
+
+    if !root.Empty() {
+        include_paths.PushBack(JoinPath(root, "include".ToString()));
+    }
 
     let mut features = String();
     let mut triple = LLVMGetDefaultTargetTriple().ToString();
@@ -447,7 +452,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut i: usize = 1;
 
     while i < args.Size() {
-        let arg = args[i];
+        let &arg = args[i];
 
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);

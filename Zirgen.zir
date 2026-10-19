@@ -572,12 +572,7 @@ extern "C" {
         let child_expression = TranslateExpression(cursor);
 
         if !child_expression.Empty() {
-            if cursor.kind == CXCursorKind::CXCursor_BinaryOperator {
-                expressions->PushBack("(" + child_expression + ")");
-            } else {
-                expressions->PushBack(child_expression);
-            }
-
+            expressions->PushBack(child_expression);
             return CXChildVisitResult::CXChildVisit_Continue;
         }
 
@@ -790,7 +785,7 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
     if handle == INVALID_HANDLE_VALUE { return; }
 
     loop {
-        let name = String(find_data.cFileName[0] as *i8);
+        let name = String(&find_data.cFileName[0] as *i8);
 
         if name != "." && name != ".." {
             let path = directory + "\\" + name;
@@ -828,7 +823,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut i: usize = 2;
 
     while i < args.Size() {
-        let arg = args[i];
+        let &arg = args[i];
 
         if arg == "-o" {
             i += 1;

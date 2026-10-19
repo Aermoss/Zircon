@@ -54,6 +54,7 @@ extern "C" {
 
     fn GetTempPathA(nBufferLength: u32, lpBuffer: *mut i8) -> u32;
     fn GetFullPathNameA(lpFileName: *i8, nBufferLength: u32, lpBuffer: *mut i8, lpFilePart: *mut *mut i8) -> u32;
+    fn GetModuleFileNameA(hModule: *mut void, lpFilename: *mut i8, nSize: u32) -> u32;
 
     fn CreateFileA(lpFileName: *i8, dwDesiredAccess: u32, dwShareMode: u32, lpSecurityAttributes: *mut void, dwCreationDisposition: u32, dwFlagsAndAttributes: u32, hTemplateFile: *mut void) -> *mut void;
     fn DeleteFileA(lpFileName: *i8) -> i32;
@@ -137,6 +138,17 @@ fn AbsolutePath(path: &String) -> String {
     }
 
     path
+}
+
+fn ExecutablePath() -> String {
+    let mut buffer: [i8; MAX_PATH];
+    let length = GetModuleFileNameA(null, &mut buffer[0], MAX_PATH as u32);
+
+    if length > 0 && length < MAX_PATH as u32 {
+        return String(&buffer[0] as *i8, 0, length as usize);
+    }
+
+    String()
 }
 
 fn PathExists(path: &String) -> bool {
@@ -316,6 +328,17 @@ extern "C" {
 #[if DARWIN]
     fn opendir(name: *i8) -> *mut void;
     fn closedir(directory: *mut void) -> i32;
+    fn _NSGetExecutablePath(buffer: *mut i8, size: *mut u32) -> i32;
+#[else]
+    fn readlink(pathname: *i8, buffer: *mut i8, size: usize) -> isize #[if LIBC] ; #[else] {
+        let mut result = 0i64;
+
+        volatile asm : rax(89), rdi(pathname), rsi(buffer), rdx(size as i64) -> {
+            syscall
+        } -> rax(result) : memory, rcx, r11;
+
+        return result as isize;
+    } #[endif]
 #[endif]
 }
 
@@ -374,6 +397,19 @@ fn AbsolutePath(path: &String) -> String {
     }
 
     path
+}
+
+fn ExecutablePath() -> String {
+    let mut buffer: [i8; PATH_MAX];
+#[if DARWIN]
+    let mut size = PATH_MAX as u32;
+    if _NSGetExecutablePath(&mut buffer[0], &mut size) != 0 { return String(); }
+    AbsolutePath(String(&buffer[0] as *i8))
+#[else]
+    let length = readlink("/proc/self/exe", &mut buffer[0], PATH_MAX);
+    if length <= 0 || length as usize >= PATH_MAX { return String(); }
+    String(&buffer[0] as *i8, 0, length as usize)
+#[endif]
 }
 
 fn PathExists(path: &String) -> bool {

@@ -372,6 +372,7 @@ enum CXCursorKind: i32 {
     CXCursor_OMPAssumeDirective = 309,
     CXCursor_OMPStripeDirective = 310,
     CXCursor_OMPFuseDirective = 311,
+    CXCursor_OMPSplitDirective = 312,
     CXCursor_OpenACCComputeConstruct = 320,
     CXCursor_OpenACCLoopConstruct = 321,
     CXCursor_OpenACCCombinedConstruct = 322,
@@ -625,7 +626,8 @@ enum CXTypeKind: i32 {
     CXType_BTFTagAttributed = 178,
     CXType_HLSLResource = 179,
     CXType_HLSLAttributedResource = 180,
-    CXType_HLSLInlineSpirv = 181
+    CXType_HLSLInlineSpirv = 181,
+    CXType_PredefinedSugar = 182
 }
 
 enum CXCallingConv: i32 {
@@ -1247,7 +1249,8 @@ enum CXUnaryOperatorKind: i32 {
     CXUnaryOperator_Real,
     CXUnaryOperator_Imag,
     CXUnaryOperator_Extension,
-    CXUnaryOperator_Coawait
+    CXUnaryOperator_Coawait,
+    CXUnaryOperator_Last = CXUnaryOperator_Coawait
 }
 
 type CXRemapping = *mut void;
