@@ -225,27 +225,33 @@ class MIRLowerer {
             name = Mangler::MangleFunction(name, function->_type, types, this.namespaces);
         }
 
-        let mut parameters = Vector<*MIRParameter>();
+        let mut _parameters = Vector<*MIRParameter>();
         let mut _return = this.LowerAggregateType(function->_return);
         if _return == null { return; }
 
         if this.IsIndirectAggregate(function->_return) {
             let lowered_parameter = this.builder.BuildParameter("sret".ToString(), 0, _return);
             (_return, lowered_parameter->sret) = (this.context.VoidType(), this.LowerType(function->_return));
-            parameters.PushBack(lowered_parameter);
+            _parameters.PushBack(lowered_parameter);
         }
 
-        for parameter in function->parameters {
+        let mut parameters = Vector<*HIRParameterDeclaration>(function->parameters);
+
+        if function->caller_location != null {
+            parameters.PushBack(function->caller_location);
+        }
+
+        for parameter in parameters {
             let lowered_type = this.LowerAggregateType(parameter->_type);
-            let lowered_parameter = this.builder.BuildParameter(parameter->name, parameters.Size() as u32, lowered_type);
-            parameters.PushBack(lowered_parameter);
+            let lowered_parameter = this.builder.BuildParameter(parameter->name, _parameters.Size() as u32, lowered_type);
+            _parameters.PushBack(lowered_parameter);
 
             if this.IsAggregate(parameter->_type) && lowered_type->kind == MIRTypeKind::Pointer && function->abi == HIRDeclarationABI::C {
                 lowered_parameter->byval = this.LowerType(parameter->_type);
             }
         }
 
-        this.declarations[function] = this.builder.BuildFunction(name, parameters, _return, this.LowerLinkage(function->linkage));
+        this.declarations[function] = this.builder.BuildFunction(name, _parameters, _return, this.LowerLinkage(function->linkage));
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
@@ -261,8 +267,14 @@ class MIRLowerer {
             this.indirect_return = null;
         }
 
-        for i in 0..function->parameters.Size() {
-            let parameter = function->parameters[i];
+        let mut parameters = Vector<*HIRParameterDeclaration>(function->parameters);
+
+        if function->caller_location != null {
+            parameters.PushBack(function->caller_location);
+        }
+
+        for i in 0..parameters.Size() {
+            let parameter = parameters[i];
             let lowered = this.builder.GetCurrentFunction()->parameters[(if indirect_return { 1 } else { 0 }) + i];
 
             if this.IsIndirectAggregate(parameter->_type) {
@@ -1155,6 +1167,14 @@ class MIRLowerer {
         let mut arguments = Vector<*MIRValue>();
         if this.IsIndirectAggregate(_return) { arguments.PushBack(destination); }
         arguments += this.LowerCallArguments(call->arguments, parameters);
+
+        if call->location != null {
+            let (mut locations, mut types) = (Vector<*HIRExpression>(), Vector<*HIRType>());
+            locations.PushBack(call->location);
+            types.PushBack(call->location->_type);
+            arguments += this.LowerCallArguments(locations, types);
+        }
+
         let result = this.builder.BuildCall("call".ToString(), callee, arguments);
 
         if _return.IsNever() {

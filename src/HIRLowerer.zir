@@ -742,6 +742,15 @@ class HIRLowerer {
         if _return == null { return null; }
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
 
+        if function->track_caller {
+            if this.abi != HIRDeclarationABI::Native {
+                Logger::Log("Attribute 'track_caller' cannot be used on external functions.", function, LogSeverity::Error);
+                return null;
+            }
+
+            declaration->caller_location = this.builder.BuildParameterDeclaration("caller.location".ToString(), this.CallerLocationType(), false);
+        }
+
         if instance == null {
             this.scope_manager.current->Set(function->name, declaration, this.abi == HIRDeclarationABI::Native && !function->no_mangle, function);
         }
@@ -760,6 +769,10 @@ class HIRLowerer {
             if parameter->_type->HasSpecialMembers() {
                 this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(parameter, false));
             }
+        }
+
+        if declaration->caller_location != null {
+            this.scope_manager.current->instances.PushBack(this.builder.ReferenceDeclaration(declaration->caller_location, false));
         }
 
         declaration->body = this.LowerBlockExpression(function->body, true, HIRBlockTail::Return, null);
@@ -2960,6 +2973,11 @@ class HIRLowerer {
                                     return this.builder.ReferenceDeclaration(parameter, parameter->mutable);
                                 },
                                 HIRDeclarationKind::Function => {
+                                    if (declaration as *HIRFunctionDeclaration)->caller_location != null {
+                                        Logger::Log("Cannot take the address of 'track_caller' function '" + path->ToString() + "'.", expression, LogSeverity::Error);
+                                        return null;
+                                    }
+
                                     return this.builder.ReferenceDeclaration(declaration as *HIRFunctionDeclaration, false);
                                 },
                                 HIRDeclarationKind::EnumerationMember => {
@@ -3497,6 +3515,13 @@ class HIRLowerer {
                     }
 
                     return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
+                } else if path->segments[0].name == "caller_location" {
+                    if call->arguments.Size() != 0 {
+                        Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.LowerCallerLocation(call);
                 } else if path->segments[0].name == "construct" {
                     if call->arguments.Size() == 0 {
                         Logger::Log("Invalid number of arguments for 'construct'.", call, LogSeverity::Error);
@@ -3798,11 +3823,54 @@ class HIRLowerer {
 
         let call = this.builder.Call(callee, values);
 
+        if callee->kind == HIRExpressionKind::DeclarationReference {
+            let declaration = (callee as *HIRDeclarationReference)->declaration;
+
+            if declaration->kind == HIRDeclarationKind::Function && (declaration as *HIRFunctionDeclaration)->caller_location != null {
+                call->location = this.LowerCopyOrMoveValue(this.LowerCallerLocation(node));
+                if call->location == null { return null; }
+            }
+        }
+
         if (callee->_type as *HIRFunctionType)->_return->HasSpecialMembers() {
             this.temporaries.PushBack(call);
         }
 
         call
+    }
+
+    fn CallerLocationType(&mut this) -> *HIRTupleType {
+        let mut types = Vector<*HIRType>();
+        types.PushBack(this.context.PointerType(this.context.IntegerType(8, true), false));
+        types.PushBack(this.context.IntegerType(32, false));
+        types.PushBack(this.context.IntegerType(32, false));
+        this.context.TupleType(types)
+    }
+
+    fn LowerCallerLocation(&mut this, node: *ASTNode) -> *HIRExpression {
+        let function = this.builder.GetCurrentFunction();
+
+        if function != null && function->caller_location != null {
+            return this.builder.ReferenceDeclaration(function->caller_location, false);
+        }
+
+        let mut token = node->start;
+
+        if node->kind == ASTNodeKind::Expression && (node as *ASTExpression)->kind == ASTExpressionKind::Call {
+            let callee = (node as *ASTCallExpression)->expression;
+            token = callee->start;
+
+            if callee->kind == ASTExpressionKind::MemberAccess {
+                token.column += token.value.Length() as u32;
+            }
+        }
+
+        let _type = this.CallerLocationType();
+        let mut elements = Vector<*HIRExpression>();
+        elements.PushBack(this.builder.StringLiteral(token.file, _type->elements[0]));
+        elements.PushBack(this.builder.IntegerLiteral(token.row as u64, _type->elements[1]));
+        elements.PushBack(this.builder.IntegerLiteral(token.column as u64, _type->elements[2]));
+        this.builder.TupleLiteral(elements, _type)
     }
 
     fn LowerNewExpression(&mut this, _new: *ASTNewExpression) -> *HIRExpression {

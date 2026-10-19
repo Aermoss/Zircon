@@ -33,10 +33,11 @@ enum Option<T> {
         }
     }
 
+    @track_caller
     pub fn Unwrap(&this) -> T {
         match this {
             Option<T>::Some(value) => value,
-            Option<T>::None => Panic("called 'Unwrap' on a 'None' value.")
+            Option<T>::None => Panic("Called 'Unwrap' on a 'None' value.")
         }
     }
 

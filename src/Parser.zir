@@ -1298,24 +1298,28 @@ class Parser {
 
     fn ParseFunctionDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>, _class: bool) -> *ASTFunctionDeclaration {
         let token = this.Current();
-        let mut no_mangle = false;
+        let (mut no_mangle, mut track_caller) = (false, false);
 
         for attribute in attributes {
-            if attribute.left == "nomangle" {
-                if attribute.right.Size() != 0 {
-                    Logger::Log("Invalid number of arguments for attribute '" + attribute.left + "'.", token, LogSeverity::Error);
-                    return null;
-                }
-
-                if no_mangle {
-                    Logger::Log("Attribute '" + attribute.left + "' already set.", token, LogSeverity::Error);
-                    return null;
-                }
-
-                no_mangle = true;
-            } else {
+            if attribute.left != "nomangle" && attribute.left != "track_caller" {
                 Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
                 return null;
+            }
+
+            if attribute.right.Size() != 0 {
+                Logger::Log("Invalid number of arguments for attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+                return null;
+            }
+
+            if (attribute.left == "nomangle" && no_mangle) || (attribute.left == "track_caller" && track_caller) {
+                Logger::Log("Attribute '" + attribute.left + "' already set.", token, LogSeverity::Error);
+                return null;
+            }
+
+            if attribute.left == "nomangle" {
+                no_mangle = true;
+            } else {
+                track_caller = true;
             }
         }
 
@@ -1352,9 +1356,12 @@ class Parser {
                 if identifier._type == TokenType::UNKNOWN { return null; }
                 name += identifier.value;
             }
+        } else if track_caller {
+            Logger::Log("Attribute 'track_caller' cannot be used on constructors or destructors.", token, LogSeverity::Error);
+            return null;
         }
 
-        let function = this.arena.New<ASTFunctionDeclaration>(name, public, no_mangle, token);
+        let function = this.arena.New<ASTFunctionDeclaration>(name, public, no_mangle, track_caller, token);
 
         if this.Match(TokenType::LESS) {
             function->generic = true;

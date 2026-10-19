@@ -1603,7 +1603,8 @@ class HIRBinaryExpression : HIRExpression {
 
 class HIRCallExpression : HIRExpression {
     pub callee: *HIRExpression,
-    pub arguments: Vector<*HIRExpression>;
+    pub arguments: Vector<*HIRExpression>,
+    pub location: *HIRExpression = null;
 
     HIRCallExpression(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>) : HIRExpression(HIRExpressionKind::Call, callee->_type->Return()) {
         (this.callee, this.arguments) = (callee, arguments);
@@ -2939,7 +2940,8 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub parameters: Vector<*HIRParameterDeclaration>,
     pub _return: *HIRType,
     pub body: *HIRBlockExpression = null,
-    pub instance: *GenericInstance = null;
+    pub instance: *GenericInstance = null,
+    pub caller_location: *HIRParameterDeclaration = null;
 
     HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRLinkableDeclaration(HIRDeclarationKind::Function, name, _type, abi, HIRDeclarationLinkage::External) {
         (this.parameters, this._return, this.no_mangle, this.public) = (parameters, _return, no_mangle, public);

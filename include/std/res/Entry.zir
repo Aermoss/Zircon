@@ -33,10 +33,11 @@ enum Result<T, E> {
         }
     }
 
+    @track_caller
     pub fn Unwrap(&this) -> T {
         match this {
             Result<T, E>::Ok(value) => value,
-            Result<T, E>::Err(_) => Panic("called 'Unwrap' on an 'Err' value.")
+            Result<T, E>::Err(_) => Panic("Called 'Unwrap' on an 'Err' value.")
         }
     }
 
@@ -47,9 +48,10 @@ enum Result<T, E> {
         }
     }
 
+    @track_caller
     pub fn UnwrapErr(&this) -> E {
         match this {
-            Result<T, E>::Ok(_) => Panic("called 'UnwrapErr' on an 'Ok' value."),
+            Result<T, E>::Ok(_) => Panic("Called 'UnwrapErr' on an 'Ok' value."),
             Result<T, E>::Err(err) => err
         }
     }

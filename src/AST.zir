@@ -1155,6 +1155,7 @@ enum ASTInstanceKind: i32 {
 
 class ASTFunctionDeclaration : ASTDeclaration {
     pub no_mangle: bool,
+    pub track_caller: bool,
     pub public: bool,
     pub name: String,
     pub instance_kind: ASTInstanceKind = ::ASTInstanceKind::None,
@@ -1168,8 +1169,8 @@ class ASTFunctionDeclaration : ASTDeclaration {
     pub types: Vector<String>,
     pub generic: bool = false;
 
-    ASTFunctionDeclaration(&mut this, name: String, public: bool, no_mangle: bool, start: Token) : ASTDeclaration(ASTDeclarationKind::Function, start) {
-        (this.name, this.public, this.no_mangle) = (name, public, no_mangle);
+    ASTFunctionDeclaration(&mut this, name: String, public: bool, no_mangle: bool, track_caller: bool, start: Token) : ASTDeclaration(ASTDeclarationKind::Function, start) {
+        (this.name, this.public, this.no_mangle, this.track_caller) = (name, public, no_mangle, track_caller);
     }
 }
 

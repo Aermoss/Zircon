@@ -16,14 +16,18 @@
 
 #[include "std/std", "std/io" : *]
 
+@track_caller
 fn Panic(message: &String) -> ! {
-    WriteError("Panicked: ");
-    WriteErrorLine(message);
-    Exit(1);
+    Panic(message.Data())
 }
 
+@track_caller
 fn Panic(message: *i8) -> ! {
-    WriteError("Panicked: ");
-    WriteErrorLine(message);
+    let (file, line, column) = caller_location();
+    WriteError("\x1b[31mPanicked at ");
+    WriteError(file);
+    WriteError(":" + String::FromInteger(line as u64) + ":" + String::FromInteger(column as u64) + ": ");
+    WriteError(message);
+    WriteErrorLine("\x1b[0m");
     Exit(1);
 }
