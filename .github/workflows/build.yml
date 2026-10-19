@@ -16,12 +16,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install LLVM.
-        run: choco install llvm -y
-
-      - name: Detect LLVM version.
         id: llvm
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          choco upgrade llvm -y
           $version = ((& "C:\Program Files\LLVM\bin\clang.exe" --version)[0] -split ' ')[2]
+
+          gh release download "llvmorg-$version" --repo llvm/llvm-project --pattern "clang+llvm-$version-aarch64-pc-windows-msvc.tar.xz" --output llvm-aarch64.tar.xz
+          7z x llvm-aarch64.tar.xz -y | Out-Null
+          7z e llvm-aarch64.tar -ollvm-aarch64 LLVM-C.dll LLVM-C.lib -r -y | Out-Null
+
+          "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
           "version=$version" >> $env:GITHUB_OUTPUT
           "major=$($version.Split('.')[0])" >> $env:GITHUB_OUTPUT
 
@@ -31,26 +39,27 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory -Force dist\windows-amd64, dist\windows-arm64, dist\objects | Out-Null
           .\bin\zirconc.exe src/Main.zir -o dist\windows-amd64\zirconc.exe -L"C:\Program Files\LLVM\lib" -lLLVM-C -lDbgHelp -g -v
+          Copy-Item "C:\Program Files\LLVM\bin\LLVM-C.dll" dist\windows-amd64\
           .\dist\windows-amd64\zirconc.exe --version
 
       - name: Build compiler for Windows ARM64.
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $version = "${{ steps.llvm.outputs.version }}"
-          Invoke-WebRequest "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-woa64.exe" -OutFile llvm-woa64.exe
-          7z e llvm-woa64.exe -ollvm-arm64 LLVM-C.lib -r -y
+          Copy-Item llvm-aarch64\LLVM-C.dll dist\windows-arm64\
+          New-Item -ItemType Directory -Force stubs | Out-Null
 
-          $stubs = foreach ($target in 'BPF', 'WebAssembly', 'RISCV', 'NVPTX') {
+          $objects = foreach ($target in 'BPF', 'WebAssembly', 'RISCV', 'NVPTX') {
             foreach ($part in 'TargetInfo', 'Target', 'TargetMC', 'AsmPrinter', 'AsmParser', 'Disassembler') {
-              if ($target -ne 'NVPTX' -or $part -notin 'AsmParser', 'Disassembler') { "void LLVMInitialize$target$part(void) {}" }
+              $name = "LLVMInitialize$target$part"
+              "void $name(void) {}" | Set-Content "stubs\$name.c"
+              clang --target=aarch64-pc-windows-msvc -c "stubs\$name.c" -o "stubs\$name.obj"
+              "stubs\$name.obj"
             }
           }
 
-          $stubs | Set-Content llvm-arm64\stubs.c
-          & "C:\Program Files\LLVM\bin\clang.exe" --target=aarch64-pc-windows-msvc -c llvm-arm64\stubs.c -o llvm-arm64\stubs.obj
-          & "C:\Program Files\LLVM\bin\llvm-lib.exe" llvm-arm64\stubs.obj /out:llvm-arm64\LLVMStubs.lib
-          .\bin\zirconc.exe src/Main.zir -o dist\windows-arm64\zirconc.exe -target aarch64-pc-windows-msvc -L"$PWD\llvm-arm64" -lLLVM-C -lLLVMStubs -lDbgHelp -g -v
+          llvm-lib $objects /out:llvm-aarch64\LLVMStubs.lib
+          .\bin\zirconc.exe src/Main.zir -o dist\windows-arm64\zirconc.exe -target aarch64-pc-windows-msvc -L"$PWD\llvm-aarch64" -lLLVM-C -lLLVMStubs -lDbgHelp -g -v
 
       - name: Compile objects for Linux and macOS.
         run: |
@@ -71,13 +80,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zirconc-windows-amd64
-          path: dist/windows-amd64/zirconc.exe
+          path: |
+            dist/windows-amd64/zirconc.exe
+            dist/windows-amd64/LLVM-C.dll
 
       - name: Upload Windows ARM64 compiler.
         uses: actions/upload-artifact@v4
         with:
           name: zirconc-windows-arm64
-          path: dist/windows-arm64/zirconc.exe
+          path: |
+            dist/windows-arm64/zirconc.exe
+            dist/windows-arm64/LLVM-C.dll
 
       - name: Upload objects.
         uses: actions/upload-artifact@v4
@@ -133,12 +146,13 @@ jobs:
           ./zirconc src/Main.zir -o zirconc2 -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -v
           ./zirconc2 src/Main.zir -o zirconc3 -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM
           cmp zirconc2 zirconc3
+          mv zirconc2 zirconc
 
       - name: Upload compiler.
         uses: actions/upload-artifact@v4
         with:
           name: zirconc-linux-${{ matrix.arch }}
-          path: zirconc2
+          path: zirconc
 
   darwin:
     needs: windows
@@ -188,9 +202,68 @@ jobs:
           ./zirconc src/Main.zir -o zirconc2 -L"$LLVM_LIB" -lLLVM -v
           ./zirconc2 src/Main.zir -o zirconc3 -L"$LLVM_LIB" -lLLVM
           ./zirconc3 --version
+          mv zirconc2 zirconc
 
       - name: Upload compiler.
         uses: actions/upload-artifact@v4
         with:
           name: zirconc-darwin-${{ matrix.arch }}
-          path: zirconc2
+          path: zirconc
+
+  release:
+    needs: [windows, linux, darwin]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: write
+
+    env:
+      LLVM_MAJOR: ${{ needs.windows.outputs.llvm-major }}
+
+    steps:
+      - name: Checkout source.
+        uses: actions/checkout@v4
+
+      - name: Download compilers.
+        uses: actions/download-artifact@v4
+        with:
+          pattern: zirconc-*
+          path: compilers
+
+      - name: Package compilers.
+        run: |
+          mkdir packages
+
+          for directory in compilers/zirconc-*; do
+            name=$(basename "$directory")
+            mkdir -p "staging/$name/bin"
+            cp -r include README.md LICENSE "staging/$name/"
+
+            if [[ $name == *windows* ]]; then
+              cp "$directory/zirconc.exe" "$directory/LLVM-C.dll" "staging/$name/bin/"
+              (cd staging && zip -qr "../packages/$name.zip" "$name")
+            else
+              install -m 755 "$directory/zirconc" "staging/$name/bin/zirconc"
+              tar -czf "packages/$name.tar.gz" -C staging "$name"
+            fi
+          done
+
+          (cd packages && sha256sum * > SHA256SUMS)
+
+      - name: Publish release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Built with LLVM $LLVM_MAJOR. Windows packages include LLVM-C.dll; on Linux and macOS install LLVM $LLVM_MAJOR (libLLVM)."
+
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            gh release create "$GITHUB_REF_NAME" packages/* --title "Zircon $GITHUB_REF_NAME" --notes "$notes"
+          else
+            gh release delete nightly --cleanup-tag --yes || true
+            gh release create nightly packages/* --prerelease --target "$GITHUB_SHA" --title "Nightly" --notes "Built from $GITHUB_SHA. $notes"
+          fi
