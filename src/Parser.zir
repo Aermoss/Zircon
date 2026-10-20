@@ -1033,8 +1033,7 @@ class Parser {
             TokenType::LOOP => this.ParseLoopExpression(),
             TokenType::FOR => this.ParseForExpression(),
             TokenType::MATCH => this.ParseMatchExpression(),
-            TokenType::UNSAFE => this.ParseUnsafeBlock(),
-            _ => this.ParseBlock()
+            _ => this.ParseBlockExpression()
         }
     }
 
@@ -1158,12 +1157,11 @@ class Parser {
         _match
     }
 
-    fn ParseUnsafeBlock(&mut this) -> *ASTBlockExpression {
-        let token = this.Expect(TokenType::UNSAFE);
-        if token._type == TokenType::UNKNOWN { return null; }
+    fn ParseBlockExpression(&mut this) -> *ASTBlockExpression {
+        let _unsafe = this.Match(TokenType::UNSAFE);
         let block = this.ParseBlock();
         if block == null { return null; }
-        block->_unsafe = true;
+        block->_unsafe = _unsafe;
         block
     }
 
