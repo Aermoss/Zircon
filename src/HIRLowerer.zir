@@ -18,7 +18,7 @@ enum HIRLoweringPass: u8 {
     None, First, Second, Third, Fourth
 }
 
-#[include "std/str", "std/vec", "std/map", "std/pair", "std/arena",
+#[include "std/str", "std/vec", "std/map", "std/arena",
     "src/ScopeManager.zir", "src/Scope.zir", "src/Symbol.zir", "src/Generic.zir",
         "src/Token.zir", "src/AST.zir", "src/HIR.zir", "src/Logger.zir" : *]
 
@@ -70,10 +70,10 @@ class HIRLowerer {
     pub scope_manager: ScopeManager,
 
     pub current_pass: HIRLoweringPass = HIRLoweringPass::None,
-    class_data: Map<*ASTNode, Pair<*mut HIRClassDeclaration, *mut Scope>>,
-    structure_data: Map<*ASTNode, Pair<*mut HIRStructureDeclaration, *mut Scope>>,
-    variant_data: Map<*ASTNode, Pair<*mut HIRVariantDeclaration, *mut Scope>>,
-    extend_data: Map<*ASTNode, Pair<*mut HIRExtendDeclaration, *mut Scope>>,
+    class_data: Map<*ASTNode, (*mut HIRClassDeclaration, *mut Scope)>,
+    structure_data: Map<*ASTNode, (*mut HIRStructureDeclaration, *mut Scope)>,
+    variant_data: Map<*ASTNode, (*mut HIRVariantDeclaration, *mut Scope)>,
+    extend_data: Map<*ASTNode, (*mut HIRExtendDeclaration, *mut Scope)>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
 
     temporaries: Vector<*HIRExpression>,
@@ -174,7 +174,7 @@ class HIRLowerer {
                 let _class = declaration as *ASTClassDeclaration;
                 let pair = this.LowerClassDeclarationFirstPass(_class, null);
 
-                if !_class->generic && pair.left != null && pair.right != null {
+                if !_class->generic && pair.0 != null && pair.1 != null {
                     this.class_data[declaration] = pair;
                 }
             },
@@ -182,7 +182,7 @@ class HIRLowerer {
                 let structure = declaration as *ASTStructureDeclaration;
                 let pair = this.LowerStructureDeclarationFirstPass(structure, null);
 
-                if !structure->generic && pair.left != null && pair.right != null {
+                if !structure->generic && pair.0 != null && pair.1 != null {
                     this.structure_data[declaration] = pair;
                 }
             },
@@ -190,7 +190,7 @@ class HIRLowerer {
                 let variant = declaration as *ASTVariantDeclaration;
                 let pair = this.LowerVariantDeclarationFirstPass(variant, null);
 
-                if !variant->generic && pair.left != null && pair.right != null {
+                if !variant->generic && pair.0 != null && pair.1 != null {
                     this.variant_data[declaration] = pair;
                 }
             },
@@ -215,7 +215,7 @@ class HIRLowerer {
 
                 if !_class->generic {
                     let cache = this.class_data[declaration];
-                    this.LowerClassDeclarationSecondPass(cache.left, _class, cache.right);
+                    this.LowerClassDeclarationSecondPass(cache.0, _class, cache.1);
                 }
             },
             ASTDeclarationKind::Structure => {
@@ -223,7 +223,7 @@ class HIRLowerer {
 
                 if !structure->generic {
                     let cache = this.structure_data[declaration];
-                    this.LowerStructureDeclarationSecondPass(cache.left, structure, cache.right);
+                    this.LowerStructureDeclarationSecondPass(cache.0, structure, cache.1);
                 }
             },
             ASTDeclarationKind::Enumeration => {
@@ -234,7 +234,7 @@ class HIRLowerer {
 
                 if !variant->generic {
                     let cache = this.variant_data[declaration];
-                    this.LowerVariantDeclarationSecondPass(cache.left, variant, cache.right);
+                    this.LowerVariantDeclarationSecondPass(cache.0, variant, cache.1);
                 }
             },
             ASTDeclarationKind::Type => {
@@ -271,7 +271,7 @@ class HIRLowerer {
 
                 if !_class->generic {
                     let cache = this.class_data[declaration];
-                    this.LowerClassDeclarationThirdPass(cache.left, _class, cache.right);
+                    this.LowerClassDeclarationThirdPass(cache.0, _class, cache.1);
                 }
             },
             ASTDeclarationKind::Structure => {
@@ -279,7 +279,7 @@ class HIRLowerer {
 
                 if !structure->generic {
                     let cache = this.structure_data[declaration];
-                    this.LowerStructureDeclarationThirdPass(cache.left, structure, cache.right);
+                    this.LowerStructureDeclarationThirdPass(cache.0, structure, cache.1);
                 }
             },
             ASTDeclarationKind::Variant => {
@@ -287,13 +287,13 @@ class HIRLowerer {
 
                 if !variant->generic {
                     let cache = this.variant_data[declaration];
-                    this.LowerVariantDeclarationThirdPass(cache.left, variant, cache.right);
+                    this.LowerVariantDeclarationThirdPass(cache.0, variant, cache.1);
                 }
             },
             ASTDeclarationKind::Extend => {
                 let pair = this.LowerExtendDeclarationFirstPass(declaration as *ASTExtendDeclaration);
 
-                if pair.left != null && pair.right != null {
+                if pair.0 != null && pair.1 != null {
                     this.extend_data[declaration] = pair;
                 }
             },
@@ -322,7 +322,7 @@ class HIRLowerer {
 
                 if !_class->generic {
                     let cache = this.class_data[declaration];
-                    this.LowerClassDeclarationFourthPass(cache.left, _class, cache.right);
+                    this.LowerClassDeclarationFourthPass(cache.0, _class, cache.1);
                 }
             },
             ASTDeclarationKind::Structure => {
@@ -330,7 +330,7 @@ class HIRLowerer {
 
                 if !structure->generic {
                     let cache = this.structure_data[declaration];
-                    this.LowerStructureDeclarationFourthPass(cache.left, structure, cache.right);
+                    this.LowerStructureDeclarationFourthPass(cache.0, structure, cache.1);
                 }
             },
             ASTDeclarationKind::Variant => {
@@ -338,12 +338,12 @@ class HIRLowerer {
 
                 if !variant->generic {
                     let cache = this.variant_data[declaration];
-                    this.LowerVariantDeclarationFourthPass(cache.left, variant, cache.right);
+                    this.LowerVariantDeclarationFourthPass(cache.0, variant, cache.1);
                 }
             },
             ASTDeclarationKind::Extend => {
                 let cache = this.extend_data[declaration];
-                this.LowerExtendDeclarationSecondPass(cache.left, declaration as *ASTExtendDeclaration, cache.right);
+                this.LowerExtendDeclarationSecondPass(cache.0, declaration as *ASTExtendDeclaration, cache.1);
             },
             ASTDeclarationKind::Extern => {
                 this.LowerExternDeclarationSecondPass(declaration as *ASTExternDeclaration);
@@ -413,7 +413,14 @@ class HIRLowerer {
 
                 for i in 0..tuple->elements.Size() {
                     tuple->elements[i] = if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
-                        this.CoerceNull(this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i]), (target as *HIRTupleType)->elements[i])
+                        let element_target = (target as *HIRTupleType)->elements[i];
+                        let mut element = tuple->elements[i];
+
+                        if element != null && element->_type->IsReference() && !element_target->IsReference() {
+                            element = this.LowerCopyOrMoveValue(this.ImplicitDereference(element));
+                        }
+
+                        this.CoerceNull(this.Coerce(element, element_target), element_target)
                     } else {
                         this.Coerce(tuple->elements[i])
                     };
@@ -874,12 +881,12 @@ class HIRLowerer {
         }
     }
 
-    pub fn LowerClassDeclarationFirstPass(&mut this, _class: *ASTClassDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRClassDeclaration, *mut Scope> {
+    pub fn LowerClassDeclarationFirstPass(&mut this, _class: *ASTClassDeclaration, instance: *mut GenericInstance) -> (*mut HIRClassDeclaration, *mut Scope) {
         if _class->generic && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(_class);
             this.scope_manager.current->Set(_class->name, generic, _class);
             this.generics.PushBack(generic);
-            return Pair<*mut HIRClassDeclaration, *mut Scope>(null, null);
+            return (null, null);
         }
 
         let mut scope: *mut Scope = null;
@@ -894,7 +901,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        Pair<*mut HIRClassDeclaration, *mut Scope>(declaration, scope)
+        (declaration, scope)
     }
 
     pub fn LowerClassDeclarationSecondPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
@@ -1328,6 +1335,58 @@ class HIRLowerer {
         }
     }
 
+    fn LowerDefaultConstruction(&mut this, target: *HIRExpression, _type: *HIRType, node: *ASTNode) -> bool {
+        if _type->IsUnit() {
+            return true;
+        } else if _type->IsClass() {
+            let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+            for candidate in (_type as *HIRClassType)->declaration->constructors {
+                candidates.PushBack(candidate);
+            }
+
+            let mut values = Vector<*HIRExpression>();
+            values.PushBack(target);
+            let function = this.ResolveOverload(candidates, values, node, false);
+            if function == null { return false; }
+            let call = this.LowerResolvedCallExpression(function, values, node);
+            if call == null { return false; }
+            this.builder.BuildExpressionStatement(call);
+        } else if _type->IsVariant() {
+            Logger::Log("Type '" + _type->ToString() + "' has no default value.", node, LogSeverity::Error);
+            return false;
+        } else if _type->IsStructure() {
+            for field in (_type as *HIRStructureType)->declaration->fields {
+                let element = this.builder.FieldAccess(target, field);
+
+                if field->initializer != null {
+                    let mut value = this.Validate(this.LowerExpression(field->initializer), field->_type, "Incompatible field initializer types", field->initializer);
+                    if value == null { return false; }
+                    value = this.LowerCopyOrMoveValue(value);
+                    if value == null { return false; }
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(element, value));
+                } else if !this.LowerDefaultConstruction(element, field->_type, node) {
+                    return false;
+                }
+            }
+        } else if _type->IsTrivial() {
+            this.builder.BuildExpressionStatement(this.builder.Assignment(target, this.builder.NullLiteral(_type)));
+        } else if _type->IsTuple() {
+            let &elements = (_type as *HIRTupleType)->elements;
+
+            for i in 0..elements.Size() {
+                if !this.LowerDefaultConstruction(this.builder.TupleAccess(target, i), elements[i], node) { return false; }
+            }
+        } else if _type->IsArray() {
+            for i in 0.._type->Length() as u64 {
+                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                if !this.LowerDefaultConstruction(this.builder.IndexAccess(target, index), _type->Element(), node) { return false; }
+            }
+        }
+
+        true
+    }
+
     fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
         if !_type->HasSpecialMembers() { return; }
         let function = this.GetDestructor(_type);
@@ -1585,12 +1644,12 @@ class HIRLowerer {
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
-    pub fn LowerStructureDeclarationFirstPass(&mut this, structure: *ASTStructureDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRStructureDeclaration, *mut Scope> {
+    pub fn LowerStructureDeclarationFirstPass(&mut this, structure: *ASTStructureDeclaration, instance: *mut GenericInstance) -> (*mut HIRStructureDeclaration, *mut Scope) {
         if structure->generic && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(structure);
             this.scope_manager.current->Set(structure->name, generic, structure);
             this.generics.PushBack(generic);
-            return Pair<*mut HIRStructureDeclaration, *mut Scope>(null, null);
+            return (null, null);
         }
 
         let mut scope: *mut Scope = null;
@@ -1605,7 +1664,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        Pair<*mut HIRStructureDeclaration, *mut Scope>(declaration, scope)
+        (declaration, scope)
     }
 
     pub fn LowerStructureDeclarationSecondPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
@@ -1768,12 +1827,12 @@ class HIRLowerer {
         this.scope_manager.PopScope();
     }
 
-    pub fn LowerVariantDeclarationFirstPass(&mut this, variant: *ASTVariantDeclaration, instance: *mut GenericInstance) -> Pair<*mut HIRVariantDeclaration, *mut Scope> {
+    pub fn LowerVariantDeclarationFirstPass(&mut this, variant: *ASTVariantDeclaration, instance: *mut GenericInstance) -> (*mut HIRVariantDeclaration, *mut Scope) {
         if variant->generic && instance == null {
             let generic = this.context.arena.New<GenericDeclaration>(variant);
             this.scope_manager.current->Set(variant->name, generic, variant);
             this.generics.PushBack(generic);
-            return Pair<*mut HIRVariantDeclaration, *mut Scope>(null, null);
+            return (null, null);
         }
 
         let mut scope: *mut Scope = null;
@@ -1788,7 +1847,7 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        Pair<*mut HIRVariantDeclaration, *mut Scope>(declaration, scope)
+        (declaration, scope)
     }
 
     pub fn LowerVariantDeclarationSecondPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
@@ -1993,7 +2052,7 @@ class HIRLowerer {
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
 
-    fn LowerExtendDeclarationFirstPass(&mut this, _extend: *ASTExtendDeclaration) -> Pair<*mut HIRExtendDeclaration, *mut Scope> {
+    fn LowerExtendDeclarationFirstPass(&mut this, _extend: *ASTExtendDeclaration) -> (*mut HIRExtendDeclaration, *mut Scope) {
         let _type = this.LowerType(_extend->_type);
         let declaration = this.builder.BuildExtendDeclaration(_type);
         this.extension_registry.Register(declaration);
@@ -2012,7 +2071,7 @@ class HIRLowerer {
 
         this.current_type = previous_type;
         this.scope_manager.PopScope();
-        Pair<*mut HIRExtendDeclaration, *mut Scope>(declaration, scope)
+        (declaration, scope)
     }
 
     fn LowerExtendDeclarationSecondPass(&mut this, declaration: *mut HIRExtendDeclaration, _extend: *ASTExtendDeclaration, scope: *mut Scope) {
@@ -2784,27 +2843,27 @@ class HIRLowerer {
                     }
 
                     for field in structure->fields {
-                        let index = _type->Index(field.left);
+                        let index = _type->Index(field.0);
 
                         if index == -1 {
-                            Logger::Log("Structure '" + path->ToString() + "' doesn't contain any field named '" + field.left + "'.", literal, LogSeverity::Error);
+                            Logger::Log("Structure '" + path->ToString() + "' doesn't contain any field named '" + field.0 + "'.", literal, LogSeverity::Error);
                             return null;
                         }
 
                         let declaration = fields[index as usize];
 
                         if !declaration->public && (this.current_type == null || *this.current_type != *_type) {
-                            Logger::Log("Field '" + field.left + "' of structure '" + path->ToString() + "' is private.", field.right, LogSeverity::Error);
+                            Logger::Log("Field '" + field.0 + "' of structure '" + path->ToString() + "' is private.", field.1, LogSeverity::Error);
                             return null;
                         }
 
-                        let mut value = this.Validate(this.LowerExpression(field.right), declaration->_type, "Incompatible structure field types", field.right);
+                        let mut value = this.Validate(this.LowerExpression(field.1), declaration->_type, "Incompatible structure field types", field.1);
                         if value == null { return null; }
                         value = this.LowerCopyOrMoveValue(value);
                         if value == null { return null; }
 
                         if initialized_fields.Contains(index as usize) {
-                            Logger::Log("Structure '" + path->ToString() + "' field '" + field.left + "' was initialized more than once.", literal, LogSeverity::Error);
+                            Logger::Log("Structure '" + path->ToString() + "' field '" + field.0 + "' was initialized more than once.", literal, LogSeverity::Error);
                             return null;
                         }
 
@@ -2845,25 +2904,25 @@ class HIRLowerer {
                         let mut index: isize = -1;
 
                         for i in 0..member->fields.Size() {
-                            if member->fields[i]->name == field.left {
+                            if member->fields[i]->name == field.0 {
                                 index = i as isize;
                                 break;
                             }
                         }
 
                         if index == -1 {
-                            Logger::Log("Variant member '" + path->ToString() + "' doesn't contain any field named '" + field.left + "'.", literal, LogSeverity::Error);
+                            Logger::Log("Variant member '" + path->ToString() + "' doesn't contain any field named '" + field.0 + "'.", literal, LogSeverity::Error);
                             return null;
                         }
 
                         let declaration = member->fields[index as usize];
-                        let mut value = this.Validate(this.LowerExpression(field.right), declaration->_type, "Incompatible variant member field types", field.right);
+                        let mut value = this.Validate(this.LowerExpression(field.1), declaration->_type, "Incompatible variant member field types", field.1);
                         if value == null { return null; }
                         value = this.LowerCopyOrMoveValue(value);
                         if value == null { return null; }
 
                         if initialized_fields.Contains(index as usize) {
-                            Logger::Log("Variant member '" + path->ToString() + "' field '" + field.left + "' was initialized more than once.", literal, LogSeverity::Error);
+                            Logger::Log("Variant member '" + path->ToString() + "' field '" + field.0 + "' was initialized more than once.", literal, LogSeverity::Error);
                             return null;
                         }
 
@@ -3188,6 +3247,8 @@ class HIRLowerer {
                             value = this.LowerCopyOrMoveValue(value);
                             if value == null { return null; }
                             this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.Dereference(target), value));
+                        } else if !this.LowerDefaultConstruction(this.builder.Dereference(target), target_type, call) {
+                            return null;
                         }
                     } return target;
                 } else if path->segments[0].name == "destruct" {
@@ -3214,8 +3275,8 @@ class HIRLowerer {
 
                     let target_type: *HIRType = target->_type->Pointee();
 
-                    if target_type->IsClass() {
-                        let function = (target_type as *HIRClassType)->declaration->destructor;
+                    if target_type->HasSpecialMembers() {
+                        let function = this.GetDestructor(target_type);
                         if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function, false);
                         this.builder.BuildExpressionStatement(this.builder.Destructor(target, callee));
@@ -3588,7 +3649,7 @@ class HIRLowerer {
     }
 
     fn LiteralNeedsExplicitType(&mut this, _type: *HIRType, target: *HIRType) -> bool {
-        if _type->IsNever() || _type->IsNullPointer() {
+        if _type->IsNever() || _type->IsNullPointer() || (_type->IsReference() && !target->IsPointer()) {
             true
         } else if _type->IsArray() && target->IsArray() {
             this.LiteralNeedsExplicitType(_type->Element(), target->Element())

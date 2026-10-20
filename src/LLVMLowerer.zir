@@ -252,9 +252,7 @@ class LLVMLowerer {
             }
         }
 
-        for pair in this.phis {
-            let (phi, lowered) = (pair.left, pair.right);
-
+        for (phi, lowered) in this.phis {
             for incoming in phi->incomings {
                 let mut value = this.LowerValue(incoming.value);
                 if value == null { continue; }

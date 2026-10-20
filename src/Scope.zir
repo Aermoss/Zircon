@@ -29,7 +29,7 @@ class Scope {
 
     ~Scope(&this) {
         for pair in this.symbols {
-            for symbol in pair.right {
+            for symbol in pair.1 {
                 delete symbol;
             }
         }

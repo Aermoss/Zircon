@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/std", "std/str", "std/pair", "std/res" : *]
+#[include "std/io", "std/std", "std/str", "std/res" : *]
 
 enum IOError {
     NotFound, PermissionDenied, AlreadyExists, InvalidInput, Other(i32);

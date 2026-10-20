@@ -105,9 +105,9 @@ class Mangler {
         for i in 0..substitution_table.Size() {
             let pair = substitution_table[i];
 
-            if *_type == *pair.left {
+            if *_type == *pair.0 {
                 let mut left = _type;
-                let mut right = pair.left;
+                let mut right = pair.0;
                 let mut equal = true;
 
                 while left->IsPointer() {

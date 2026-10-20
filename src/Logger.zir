@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/str", "std/vec", "std/pair", "std/mem", "std/std", "src/Token.zir", "src/AST.zir" : *]
+#[include "std/io", "std/str", "std/vec", "std/mem", "std/std", "src/Token.zir", "src/AST.zir" : *]
 
 #[if WINDOWS]
 class SYMBOL_INFO {
@@ -111,8 +111,8 @@ enum LogSeverity: i32 {
 
 class Log {
     pub file: String,
-    pub start: Pair<u32, u32>,
-    pub end: Pair<u32, u32>,
+    pub start: (u32, u32),
+    pub end: (u32, u32),
     pub message: String,
     pub severity: LogSeverity
 }
@@ -132,8 +132,8 @@ class Logger {
 
     pub fn Log(file: *i8, start_row: u32, start_column: u32, end_row: u32, end_column: u32, message: *i8, severity: LogSeverity) {
         let mut log: Log;
-        (log.start.left, log.start.right) = (start_row, start_column);
-        (log.end.left, log.end.right) = (end_row, end_column);
+        log.start = (start_row, start_column);
+        log.end = (end_row, end_column);
         (log.file, log.severity) = (file, severity);
         log.message += file;
         log.message += ":";

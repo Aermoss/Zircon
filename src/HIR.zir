@@ -283,6 +283,18 @@ class HIRType {
             return this.ScorePointer(other, 100);
         }
 
+        if this.IsTuple() && other.IsTuple() {
+            let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
+            if left->elements.Size() != right->elements.Size() { return 0; }
+            let mut score: u64 = 100;
+
+            for i in 0..left->elements.Size() {
+                let element_score = left->elements[i]->ScoreParameter(*right->elements[i]);
+                if element_score == 0 { return 0; }
+                if element_score < score { score = element_score; }
+            } return score;
+        }
+
         if this.IsReference() {
             let score = this.Pointee().ScoreParameter(other);
             if score != 0 { return score - 3; }
@@ -3576,6 +3588,10 @@ class HIRBuilder {
     pub fn NullLiteral(&mut this) -> *mut HIRNullLiteral {
         let _type = this.context->PointerType(this.context->VoidType(), false);
         _type->_null = true;
+        this.context->arena.New<HIRNullLiteral>(_type)
+    }
+
+    pub fn NullLiteral(&mut this, _type: *HIRType) -> *mut HIRNullLiteral {
         this.context->arena.New<HIRNullLiteral>(_type)
     }
 

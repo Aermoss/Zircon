@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/map", "std/pair", "std/arena",
+#[include "std/str", "std/vec", "std/map", "std/arena",
     "src/Logger.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/AST.zir" : *]
 
 class Parser {
@@ -1271,21 +1271,21 @@ class Parser {
         }
     }
 
-    fn ParseAttributes(&mut this) -> Vector<Pair<String, Vector<*ASTNode>>> {
-        let mut attributes = Vector<Pair<String, Vector<*ASTNode>>>();
+    fn ParseAttributes(&mut this) -> Vector<(String, Vector<*ASTNode>)> {
+        let mut attributes = Vector<(String, Vector<*ASTNode>)>();
 
         while this.Match(TokenType::AT) {
-            let mut pair = Pair<String, Vector<*ASTNode>>();
+            let mut pair = (String(), Vector<*ASTNode>());
             let identifier = this.Expect(TokenType::IDENTIFIER);
             if identifier._type == TokenType::UNKNOWN { return attributes; }
-            pair.left = identifier.value;
+            pair.0 = identifier.value;
 
             if this.Match(TokenType::LPAREN) {
                 if !this.Match(TokenType::RPAREN) {
                     while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
                         let expression = this.ParseExpression();
                         if expression == null { return attributes; }
-                        pair.right.PushBack(expression);
+                        pair.1.PushBack(expression);
 
                         if !this.Match(TokenType::COMMA) {
                             break;
@@ -1331,27 +1331,27 @@ class Parser {
         }
     }
 
-    fn ParseFunctionDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>, _class: bool) -> *ASTFunctionDeclaration {
+    fn ParseFunctionDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>, _class: bool) -> *ASTFunctionDeclaration {
         let token = this.Current();
         let (mut no_mangle, mut track_caller) = (false, false);
 
         for attribute in attributes {
-            if attribute.left != "nomangle" && attribute.left != "track_caller" {
-                Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            if attribute.0 != "nomangle" && attribute.0 != "track_caller" {
+                Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                 return null;
             }
 
-            if attribute.right.Size() != 0 {
-                Logger::Log("Invalid number of arguments for attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            if attribute.1.Size() != 0 {
+                Logger::Log("Invalid number of arguments for attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                 return null;
             }
 
-            if (attribute.left == "nomangle" && no_mangle) || (attribute.left == "track_caller" && track_caller) {
-                Logger::Log("Attribute '" + attribute.left + "' already set.", token, LogSeverity::Error);
+            if (attribute.0 == "nomangle" && no_mangle) || (attribute.0 == "track_caller" && track_caller) {
+                Logger::Log("Attribute '" + attribute.0 + "' already set.", token, LogSeverity::Error);
                 return null;
             }
 
-            if attribute.left == "nomangle" {
+            if attribute.0 == "nomangle" {
                 no_mangle = true;
             } else {
                 track_caller = true;
@@ -1504,12 +1504,12 @@ class Parser {
         this.arena.New<ASTParameterDeclaration>(token.value, _type, mutable, token)
     }
 
-    fn ParseClassDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTClassDeclaration {
+    fn ParseClassDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTClassDeclaration {
         let token = this.Expect(TokenType::CLASS);
         if token._type == TokenType::UNKNOWN { return null; }
 
         for attribute in attributes {
-            Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
             return null;
         }
 
@@ -1596,12 +1596,12 @@ class Parser {
         _class
     }
 
-    fn ParseStructureDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTStructureDeclaration {
+    fn ParseStructureDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTStructureDeclaration {
         let token = this.Expect(TokenType::STRUCTURE);
         if token._type == TokenType::UNKNOWN { return null; }
 
         for attribute in attributes {
-            Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
             return null;
         }
 
@@ -1680,12 +1680,12 @@ class Parser {
         this.arena.New<ASTFieldDeclaration>(token.value, _type, initializer, public, token)
     }
 
-    fn ParseEnumerationDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTEnumerationDeclaration {
+    fn ParseEnumerationDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTEnumerationDeclaration {
         let token = this.Expect(TokenType::ENUMERATION);
         if token._type == TokenType::UNKNOWN { return null; }
 
         for attribute in attributes {
-            Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
             return null;
         }
 
@@ -1718,12 +1718,12 @@ class Parser {
         enumeration
     }
 
-    fn ParseVariantDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTVariantDeclaration {
+    fn ParseVariantDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTVariantDeclaration {
         let token = this.Expect(TokenType::ENUMERATION);
         if token._type == TokenType::UNKNOWN { return null; }
 
         for attribute in attributes {
-            Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
             return null;
         }
 
@@ -1877,26 +1877,26 @@ class Parser {
         this.arena.New<ASTConstantDeclaration>(identifier.value, _type, initializer, token)
     }
 
-    fn ParseStaticDeclaration(&mut this, attributes: &Vector<Pair<String, Vector<*ASTNode>>>) -> *ASTStaticDeclaration {
+    fn ParseStaticDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTStaticDeclaration {
         let token = this.Expect(TokenType::STATIC);
         if token._type == TokenType::UNKNOWN { return null; }
         let mut alignment = null;
 
         for attribute in attributes {
-            if attribute.left == "align" {
-                if attribute.right.Size() != 1 {
-                    Logger::Log("Invalid number of arguments for attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+            if attribute.0 == "align" {
+                if attribute.1.Size() != 1 {
+                    Logger::Log("Invalid number of arguments for attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                     return null;
                 }
 
                 if alignment != null {
-                    Logger::Log("Attribute '" + attribute.left + "' already set.", token, LogSeverity::Error);
+                    Logger::Log("Attribute '" + attribute.0 + "' already set.", token, LogSeverity::Error);
                     return null;
                 }
 
-                alignment = attribute.right[0];
+                alignment = attribute.1[0];
             } else {
-                Logger::Log("Invalid attribute '" + attribute.left + "'.", token, LogSeverity::Error);
+                Logger::Log("Invalid attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                 return null;
             }
         }

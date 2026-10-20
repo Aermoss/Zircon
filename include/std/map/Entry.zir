@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#[include "std/vec", "std/pair", "std/opt" : *]
+#[include "std/vec", "std/opt" : *]
 
 class Map<K, V> {
-    vector: Vector<Pair<K, V>>;
+    vector: Vector<(K, V)>;
 
     Map(&mut this) {}
 
@@ -27,8 +27,8 @@ class Map<K, V> {
 
     ~Map(&mut this) {}
 
-    pub fn Data(&this) -> *Pair<K, V> { this.vector.Data() }
-    pub fn Data(&mut this) -> *mut Pair<K, V> { this.vector.Data() }
+    pub fn Data(&this) -> *(K, V) { this.vector.Data() }
+    pub fn Data(&mut this) -> *mut (K, V) { this.vector.Data() }
 
     pub fn Empty(&this) -> bool { this.vector.Empty() }
     pub fn Size(&this) -> usize { this.vector.Size() }
@@ -45,7 +45,7 @@ class Map<K, V> {
         let mut keys = Vector<K>();
 
         for pair in this.vector {
-            keys.PushBack(pair.left);
+            keys.PushBack(pair.0);
         }
 
         keys
@@ -55,7 +55,7 @@ class Map<K, V> {
         let mut values = Vector<V>();
 
         for pair in this.vector {
-            values.PushBack(pair.right);
+            values.PushBack(pair.1);
         }
 
         values
@@ -63,7 +63,7 @@ class Map<K, V> {
 
     pub fn Has(&this, key: K) -> bool {
         for pair in this.vector {
-            if pair.left == key {
+            if pair.0 == key {
                 return true;
             }
         }
@@ -73,8 +73,8 @@ class Map<K, V> {
 
     pub fn Get(&this, key: K) -> Option<V> {
         for pair in this.vector {
-            if pair.left == key {
-                return Option<V>::Some(pair.right);
+            if pair.0 == key {
+                return Option<V>::Some(pair.1);
             }
         }
 
@@ -83,8 +83,8 @@ class Map<K, V> {
 
     pub fn Get(&this, key: K, default: V) -> V {
         for pair in this.vector {
-            if pair.left == key {
-                return pair.right;
+            if pair.0 == key {
+                return pair.1;
             }
         }
 
@@ -93,7 +93,7 @@ class Map<K, V> {
 
     pub fn Remove(&mut this, key: K) {
         for i in 0..this.vector.Size() {
-            if this.vector[i].left == key {
+            if this.vector[i].0 == key {
                 this.vector.RemoveAt(i);
                 return;
             }
@@ -102,7 +102,7 @@ class Map<K, V> {
 
     pub fn Index(&this, key: K) -> Option<usize> {
         for i in 0..this.vector.Size() {
-            if this.vector[i].left == key {
+            if this.vector[i].0 == key {
                 return Option<usize>::Some(i);
             }
         }
@@ -117,36 +117,38 @@ class Map<K, V> {
 
     pub fn operator[](&mut this, key: K) -> &mut V {
         for pair in this.vector {
-            if pair.left == key {
-                return pair.right;
+            if pair.0 == key {
+                return pair.1;
             }
         }
 
-        this.vector.PushBack(Pair<K, V>(key));
-        this.vector[this.vector.Size() - 1].right
+        let index = this.vector.Size();
+        this.vector.Resize(index + 1);
+        this.vector[index].0 = key;
+        this.vector[index].1
     }
 
-    pub fn operator[](&this, index: usize) -> &Pair<K, V> {
+    pub fn operator[](&this, index: usize) -> &(K, V) {
         this.vector[index]
     }
 
-    pub fn operator[](&mut this, index: usize) -> &mut Pair<K, V> {
+    pub fn operator[](&mut this, index: usize) -> &mut (K, V) {
         this.vector[index]
     }
 
-    pub fn Begin(&this) -> *Pair<K, V> {
+    pub fn Begin(&this) -> *(K, V) {
         this.vector.Begin()
     }
 
-    pub fn End(&this) -> *Pair<K, V> {
+    pub fn End(&this) -> *(K, V) {
         this.vector.End()
     }
 
-    pub fn Begin(&mut this) -> *mut Pair<K, V> {
+    pub fn Begin(&mut this) -> *mut (K, V) {
         this.vector.Begin()
     }
 
-    pub fn End(&mut this) -> *mut Pair<K, V> {
+    pub fn End(&mut this) -> *mut (K, V) {
         this.vector.End()
     }
 }

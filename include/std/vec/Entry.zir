@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/opt" : *]
+#[include "std/opt", "std/mem" : *]
 
 class Vector<T> {
     data: *mut T = null,
@@ -24,11 +24,11 @@ class Vector<T> {
     Vector(&mut this) {}
 
     Vector(&mut this, other: &Vector<T>) {
-        if other.data == null { return; }
-        this.Allocate(other.capacity);
+        if other.size == 0 { return; }
+        this.Reserve(other.size);
 
         for i in 0..other.size {
-            this.data[i] = other.data[i];
+            construct(this.data + i, other.data[i]);
         } this.size = other.size;
     }
 
@@ -47,13 +47,32 @@ class Vector<T> {
     pub fn Empty(&this) -> bool { this.size == 0 }
     pub fn Size(&this) -> usize { this.size }
 
-    fn Allocate(&mut this, capacity: usize) {
-        (this.data, this.capacity) = (new T[capacity], capacity);
+    fn Release(&mut this) {
+        if this.data == null { return; }
+
+        for i in 0..this.size {
+            destruct(this.data + i);
+        }
+
+        free(this.data);
+        (this.data, this.capacity, this.size) = (null, 0, 0);
     }
 
-    fn Release(&mut this) {
-        if this.data != null { delete[] this.data; }
-        (this.data, this.capacity, this.size) = (null, 0, 0);
+    fn Relocate(&mut this, capacity: usize) {
+        let data = malloc(capacity * sizeof(T)) as *mut T;
+
+        if this.data != null {
+            memcpy(data, this.data, this.size * sizeof(T));
+            free(this.data);
+        }
+
+        (this.data, this.capacity) = (data, capacity);
+    }
+
+    fn Grow(&mut this, size: usize) {
+        if size <= this.capacity { return; }
+        let doubled = this.capacity * 2;
+        this.Relocate(if doubled > size { doubled } else { size });
     }
 
     pub fn Clear(&mut this) {
@@ -62,34 +81,31 @@ class Vector<T> {
 
     pub fn Reserve(&mut this, capacity: usize) {
         if capacity > this.capacity {
-            let temp = this.data;
-            this.Allocate(capacity);
-
-            if temp != null {
-                for i in 0..this.size {
-                    this.data[i] = temp[i];
-                } delete[] temp;
-            }
+            this.Relocate(capacity);
         }
     }
 
     pub fn Resize(&mut this, size: usize) {
         if size > this.size {
-            this.Reserve(size);
+            this.Grow(size);
+
+            for i in this.size..size {
+                construct(this.data + i);
+            }
+        } else {
+            for i in size..this.size {
+                destruct(this.data + i);
+            }
         } this.size = size;
     }
 
     pub fn Shrink(&mut this) {
-        if this.size < this.capacity {
-            let temp = this.data;
-            let size = this.size;
-            this.Allocate(size);
+        if this.size == this.capacity { return; }
 
-            if temp != null {
-                for i in 0..size {
-                    this.data[i] = temp[i];
-                } delete[] temp;
-            } this.size = size;
+        if this.size == 0 {
+            this.Release();
+        } else {
+            this.Relocate(this.size);
         }
     }
 
@@ -101,53 +117,43 @@ class Vector<T> {
 
     pub fn Reverse(&this) -> Vector<T> {
         let mut result = Vector<T>();
-        result.Resize(this.size);
+        result.Reserve(this.size);
 
         for i in 0..this.size {
-            result.data[i] = this.data[this.size - 1 - i];
+            construct(result.data + i, this.data[this.size - 1 - i]);
         }
 
+        result.size = this.size;
         result
     }
 
     pub fn PushBack(&mut this, value: T) {
-        if this.capacity < this.size + 1 {
-            this.Reserve(if this.capacity != 0 { this.capacity * 2 } else { 1 });
-        }
-
-        this.data[this.size] = value;
+        this.Grow(this.size + 1);
+        construct(this.data + this.size, value);
         this.size += 1;
     }
 
     pub fn PopBack(&mut this) -> Option<T> {
         if this.size == 0 { return Option<T>::None; }
         this.size -= 1;
-        Option<T>::Some(this.data[this.size])
+        let result = Option<T>::Some(this.data[this.size]);
+        destruct(this.data + this.size);
+        result
     }
 
     pub fn Insert(&mut this, index: usize, value: T) {
-        if this.capacity < this.size + 1 {
-            this.Reserve(if this.capacity != 0 { this.capacity * 2 } else { 1 });
-        }
-
-        for offset in 0..(this.size - index) {
-            let i = this.size - offset;
-            this.data[i] = this.data[i - 1];
-        }
-
-        this.data[index] = value;
+        this.Grow(this.size + 1);
+        memmove(this.data + index + 1, this.data + index, (this.size - index) * sizeof(T));
+        construct(this.data + index, value);
         this.size += 1;
     }
 
     pub fn RemoveAt(&mut this, index: usize) -> T {
-        let temp = this.data[index];
-
-        for i in (index + 1)..this.size {
-            this.data[i - 1] = this.data[i];
-        }
-
+        let result = this.data[index];
+        destruct(this.data + index);
+        memmove(this.data + index, this.data + index + 1, (this.size - index - 1) * sizeof(T));
         this.size -= 1;
-        temp
+        result
     }
 
     pub fn Remove(&mut this, value: T) {
@@ -156,8 +162,10 @@ class Vector<T> {
         for read_index in 0..this.size {
             if this.data[read_index] != value {
                 if read_index != write_index {
-                    this.data[write_index] = this.data[read_index];
+                    memcpy(this.data + write_index, this.data + read_index, sizeof(T));
                 } write_index += 1;
+            } else {
+                destruct(this.data + read_index);
             }
         } this.size = write_index;
     }
@@ -184,38 +192,40 @@ class Vector<T> {
 
     pub fn operator+(&this, other: &Vector<T>) -> Vector<T> {
         let mut result = Vector<T>();
-        result.Resize(this.size + other.size);
+        result.Reserve(this.size + other.size);
 
         for i in 0..this.size {
-            result.data[i] = this.data[i];
+            construct(result.data + i, this.data[i]);
         }
 
         for i in 0..other.size {
-            result.data[this.size + i] = other.data[i];
+            construct(result.data + this.size + i, other.data[i]);
         }
 
+        result.size = this.size + other.size;
         result
     }
 
     pub fn operator+=(&mut this, other: &Vector<T>) -> &mut Vector<T> {
-        let old_size = this.size;
-        this.Resize(this.size + other.size);
+        let count = other.size;
+        this.Grow(this.size + count);
 
-        for i in 0..other.size {
-            this.data[old_size + i] = other.data[i];
+        for i in 0..count {
+            construct(this.data + this.size + i, other.data[i]);
         }
 
+        this.size += count;
         this
     }
 
     pub fn operator=(&mut this, other: &Vector<T>) -> &mut Vector<T> {
         if this.data == other.data { return this; }
         this.Release();
-        if other.data == null { return this; }
-        this.Allocate(other.capacity);
+        if other.size == 0 { return this; }
+        this.Reserve(other.size);
 
         for i in 0..other.size {
-            this.data[i] = other.data[i];
+            construct(this.data + i, other.data[i]);
         }
 
         this.size = other.size;
