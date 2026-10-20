@@ -540,7 +540,13 @@ class LLVMLowerer {
             arguments.PushBack(lowered_argument);
         }
 
-        LLVMBuildCall2(this.builder, _type, callee, arguments.Data(), arguments.Size() as u32, call->name.Data())
+        let result = LLVMBuildCall2(this.builder, _type, callee, arguments.Data(), arguments.Size() as u32, call->name.Data());
+
+        if call->sret != null {
+            LLVMAddCallSiteAttribute(result, 1 as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(call->sret)));
+        }
+
+        result
     }
 
     fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> LLVMValueRef {

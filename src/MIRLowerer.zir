@@ -1368,6 +1368,7 @@ class MIRLowerer {
         } else if _return.IsUnit() {
             return this.UnitConstant();
         } else if this.IsIndirectAggregate(_return) {
+            result->sret = this.LowerType(_return);
             return destination;
         } else if this.IsAggregate(_return) {
             let target = this.context.PointerType(this.LowerAggregateType(_return));

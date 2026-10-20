@@ -632,7 +632,8 @@ class MIRBinaryInstruction : MIRInstruction {
 
 class MIRCallInstruction : MIRInstruction {
     pub callee: *MIRValue,
-    pub arguments: Vector<*MIRValue>;
+    pub arguments: Vector<*MIRValue>,
+    pub sret: *MIRType = null;
 
     MIRCallInstruction(&mut this, name: String, callee: *MIRValue, arguments: Vector<*MIRValue>, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Call, name, _type) {
         (this.callee, this.arguments) = (callee, arguments);
