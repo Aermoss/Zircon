@@ -427,6 +427,10 @@ class Parser {
                         if !this.ExpectSuccess(TokenType::GREATER) { return null; }
                     } expression = member_access;
                 },
+                TokenType::QUESTION_MARK => {
+                    this.Advance();
+                    expression = this.arena.New<ASTTryExpression>(expression, token);
+                },
                 TokenType::LBRACKET => {
                     this.Advance();
                     let _expression = this.ParseExpression();

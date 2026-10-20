@@ -2623,6 +2623,11 @@ class HIRLowerer {
         this.builder.Continue(destructors)
     }
 
+    fn LowerTryExpression(&mut this, _try: *ASTTryExpression) -> *HIRExpression {
+        Logger::Log("The '?' operator is not implemented yet.", _try, LogSeverity::Error);
+        null
+    }
+
     fn LowerUnsafeBlock(&mut this, block: *ASTBlockExpression) -> *HIRExpression {
         if this._unsafe {
             Logger::Log("Already in an unsafe block.", block, LogSeverity::Error);
@@ -3038,6 +3043,7 @@ class HIRLowerer {
             ASTExpressionKind::Return => this.LowerReturnExpression(expression as *ASTReturnExpression),
             ASTExpressionKind::Break => this.LowerBreakExpression(expression as *ASTBreakExpression),
             ASTExpressionKind::Continue => this.LowerContinueExpression(expression as *ASTContinueExpression),
+            ASTExpressionKind::Try => this.LowerTryExpression(expression as *ASTTryExpression),
             _ => {
                 Logger::Log("Unknown expression '" + expression->kind.ToString() + "'.", expression, LogSeverity::Error);
                 null

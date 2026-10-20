@@ -356,7 +356,7 @@ enum ASTExpressionKind: u8 {
     Literal, Path, Unary, Binary, Call,
     PackSplat, MemberAccess, TupleAccess, IndexAccess, Cast,
     New, Delete, Assignment, Await, Range,
-    Block, If, While, Loop, For, Match, Return, Break, Continue
+    Block, If, While, Loop, For, Match, Return, Break, Continue, Try
 }
 
 extend ASTExpressionKind {
@@ -385,7 +385,8 @@ extend ASTExpressionKind {
             ASTExpressionKind::Match => "Match",
             ASTExpressionKind::Return => "Return",
             ASTExpressionKind::Break => "Break",
-            ASTExpressionKind::Continue => "Continue"
+            ASTExpressionKind::Continue => "Continue",
+            ASTExpressionKind::Try => "Try"
         }.ToString()
     }
 }
@@ -422,7 +423,8 @@ class ASTExpression : ASTNode {
             ASTExpressionKind::Match => (this as *ASTMatchExpression)->ToString(),
             ASTExpressionKind::Return => (this as *ASTReturnExpression)->ToString(),
             ASTExpressionKind::Break => (this as *ASTBreakExpression)->ToString(),
-            ASTExpressionKind::Continue => (this as *ASTContinueExpression)->ToString()
+            ASTExpressionKind::Continue => (this as *ASTContinueExpression)->ToString(),
+            ASTExpressionKind::Try => (this as *ASTTryExpression)->ToString()
         }
     }
 }
@@ -1040,6 +1042,18 @@ class ASTContinueExpression : ASTExpression {
 
     pub fn ToString(&this) -> String {
         "continue".ToString()
+    }
+}
+
+class ASTTryExpression : ASTExpression {
+    pub expression: *ASTExpression;
+
+    ASTTryExpression(&mut this, expression: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Try, start) {
+        this.expression = expression;
+    }
+
+    pub fn ToString(&this) -> String {
+        this.expression->ToString() + "?"
     }
 }
 
