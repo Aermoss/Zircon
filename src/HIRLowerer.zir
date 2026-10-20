@@ -235,7 +235,7 @@ class HIRLowerer {
     }
 
     fn LowerTypeDeclaration(&mut this, type_definition: *ASTTypeDeclaration) {
-        this.scope_manager.current->Set(type_definition->name, this.LowerType(type_definition->_type), type_definition);
+        this.scope_manager.current->Set(type_definition->name, this.LowerTypeOrVoid(type_definition->_type), type_definition);
     }
 
     fn LowerDeclarationThirdPass(&mut this, declaration: *ASTDeclaration) -> bool {
@@ -5181,12 +5181,6 @@ class HIRLowerer {
         }
     }
 
-    fn IsVoidTypeName(&mut this, _type: *ASTType) -> bool {
-        if _type->kind != ASTTypeKind::Path { return false; }
-        let path = (_type as *ASTPathType)->path;
-        !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() && path->segments[0].name == "void"
-    }
-
     fn IsPrimitiveTypeName(&mut this, path: *ASTPath) -> bool {
         if path->absolute || path->segments.Size() != 1 || !path->segments[0].types.Empty() {
             return false;
@@ -5216,8 +5210,7 @@ class HIRLowerer {
             let name = path->segments[0].name;
 
             if name == "void" {
-                Logger::Log("Type 'void' can only be used behind a pointer; use '()' for no value.", path, LogSeverity::Error);
-                return null;
+                return this.context.VoidType();
             } else if name == "bool" {
                 return this.context.BooleanType();
             } else if name == "char" {
@@ -5276,6 +5269,17 @@ class HIRLowerer {
     }
 
     pub fn LowerType(&mut this, _type: *ASTType) -> *HIRType {
+        let lowered = this.LowerTypeOrVoid(_type);
+
+        if lowered != null && lowered->IsVoid() {
+            Logger::Log("Type 'void' can only be used behind a pointer; use '()' for no value.", _type, LogSeverity::Error);
+            return null;
+        }
+
+        lowered
+    }
+
+    fn LowerTypeOrVoid(&mut this, _type: *ASTType) -> *HIRType {
         if _type == null {
             return this.context.UnitType();
         }
@@ -5285,7 +5289,7 @@ class HIRLowerer {
             ASTTypeKind::Path => this.LowerType((_type as *ASTPathType)->path),
             ASTTypeKind::Pointer => {
                 let pointer = _type as *ASTPointerType;
-                let pointee = if this.IsVoidTypeName(pointer->pointee) { this.context.VoidType() as *HIRType } else { this.LowerType(pointer->pointee) };
+                let pointee = this.LowerTypeOrVoid(pointer->pointee);
                 if pointee == null { return null; }
                 this.context.PointerType(pointee, pointer->mutable)
             },

@@ -127,7 +127,7 @@ fn FuncTypeToString(_type: CXType) -> String {
     result += ")";
     let ret_type = clang_getResultType(_type);
 
-    if ret_type.kind != CXTypeKind::CXType_Void {
+    if clang_getCanonicalType(ret_type).kind != CXTypeKind::CXType_Void {
         result += " -> " + TypeToString(ret_type);
     }
 
@@ -749,7 +749,7 @@ extern "C" {
                 clang_visitChildren(cursor, VisitFunctionBody, &mut body as CXClientData);
                 let mut declaration = "fn " + name + "(" + arguments + ")";
 
-                if ret_type.kind != CXTypeKind::CXType_Void {
+                if clang_getCanonicalType(ret_type).kind != CXTypeKind::CXType_Void {
                     declaration += " -> " + TypeToString(ret_type);
                 }
 
@@ -759,7 +759,7 @@ extern "C" {
             } else {
                 let mut declaration = "    fn " + name + "(" + arguments + ")";
 
-                if ret_type.kind != CXTypeKind::CXType_Void {
+                if clang_getCanonicalType(ret_type).kind != CXTypeKind::CXType_Void {
                     declaration += " -> " + TypeToString(ret_type);
                 }
 
