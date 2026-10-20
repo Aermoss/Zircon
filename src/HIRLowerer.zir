@@ -534,9 +534,8 @@ class HIRLowerer {
 
             false
         } else if _type->IsClass() {
-            for parent in (_type as *HIRClassType)->declaration->parents {
-                if this.ContainsByValue(parent, target, visited) { return true; }
-            }
+            let parent = (_type as *HIRClassType)->declaration->parent;
+            if parent != null && this.ContainsByValue(parent, target, visited) { return true; }
 
             for field in (_type as *HIRClassType)->declaration->fields {
                 if this.ContainsByValue(field->_type, target, visited) { return true; }
@@ -609,6 +608,10 @@ class HIRLowerer {
                     return this.builder.Cast(expression, target);
                 }
             }
+        }
+
+        if target->IsClass() && expression->_type->IsClass() && *target != *expression->_type && expression->_type->IsDerivedFrom(target) {
+            return this.builder.Dereference(this.builder.Cast(this.builder.AddressOf(expression), this.context.ReferenceType(target, false)));
         }
 
         expression
@@ -803,6 +806,8 @@ class HIRLowerer {
         let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
         if _return == null { return null; }
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
+        (declaration->_virtual, declaration->_override) = (function->_virtual, function->_override);
+        declaration->abstract = function->_virtual && function->body == null;
 
         if function->track_caller {
             if this.abi != HIRDeclarationABI::Native {
@@ -893,6 +898,7 @@ class HIRLowerer {
         let _type = this.context.ClassType(null);
         let declaration = this.builder.BuildClassDeclaration(_class->name, _type);
         _type->declaration = declaration;
+        declaration->node = _class;
 
         if instance == null {
             this.scope_manager.current->Set(_class->name, _type, _class);
@@ -908,19 +914,16 @@ class HIRLowerer {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
 
-        for parent in _class->parents {
-            let parent_type = this.LowerType(parent);
-            if parent_type == null { continue; }
-            declaration->parents.PushBack(parent_type);
-        }
-
-        for parent in declaration->parents {
+        if _class->parent != null {
+            let parent = this.LowerType(_class->parent);
             let mut visited = Vector<*HIRType>();
 
-            if this.ContainsByValue(parent, declaration->_type, visited) {
+            if parent != null && !parent->IsClass() {
+                Logger::Log("The parent of class '" + declaration->name + "' must be a class.", _class->parent, LogSeverity::Error);
+            } else if parent != null && this.ContainsByValue(parent, declaration->_type, visited) {
                 Logger::Log("Class '" + declaration->name + "' cannot inherit from itself.", _class, LogSeverity::Error);
-                declaration->parents.Clear();
-                break;
+            } else if parent != null {
+                declaration->parent = parent;
             }
         }
 
@@ -934,7 +937,7 @@ class HIRLowerer {
             }
 
             if !this.ValidateFieldType(field->name, field_type, declaration->_type, field) { continue; }
-            let index = declaration->parents.Size() + declaration->fields.Size();
+            let index = (if declaration->parent != null { 1 } else { 0 }) + declaration->fields.Size();
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, index, field->initializer, field->public));
         }
 
@@ -1387,6 +1390,163 @@ class HIRLowerer {
         true
     }
 
+    fn IsSameParameters(&mut this, left: *HIRFunctionDeclaration, right: *HIRFunctionDeclaration) -> bool {
+        if left->name != right->name || left->parameters.Size() != right->parameters.Size() { return false; }
+        if left->parameters.Empty() { return true; }
+        if left->parameters[0]->_type->IsMutable() != right->parameters[0]->_type->IsMutable() { return false; }
+
+        for i in 1..left->parameters.Size() {
+            if *left->parameters[i]->_type != *right->parameters[i]->_type { return false; }
+        }
+
+        true
+    }
+
+    fn EnsureVTable(&mut this, _type: *HIRType) {
+        let declaration = unsafe { (_type as *HIRClassType)->declaration as *mut HIRClassDeclaration };
+        if declaration->vtable_ready { return; }
+        declaration->vtable_ready = true;
+        let _class = declaration->node;
+        let mut vtable = Vector<*HIRFunctionDeclaration>();
+        let mut shared = false;
+
+        if declaration->parent != null {
+            let parent = declaration->parent;
+            this.EnsureVTable(parent);
+            let parent_declaration = (parent as *HIRClassType)->declaration;
+
+            if !parent_declaration->destructor->_virtual {
+                Logger::Log("Class '" + declaration->name + "' cannot derive from '" + parent_declaration->name + "', whose destructor is not virtual.", _class, LogSeverity::Error);
+            }
+
+            vtable = parent_declaration->vtable;
+            shared = !vtable.Empty();
+            declaration->destructor->_virtual = true;
+        }
+
+        if vtable.Empty() && declaration->destructor->_virtual {
+            vtable.PushBack(declaration->destructor);
+        }
+
+        let mut index: usize = 0;
+
+        for method in _class->methods {
+            if method->generic || !method->pack_name.Empty() { continue; }
+            if index >= declaration->methods.Size() { break; }
+            let function = declaration->methods[index];
+            index += 1;
+            let (mut slot, mut conflict): (isize, isize) = (-1, -1);
+
+            for i in 1..vtable.Size() {
+                if this.IsSameParameters(vtable[i], function) {
+                    if *vtable[i]->_return == *function->_return { slot = i as isize; } else { conflict = i as isize; }
+                    break;
+                }
+            }
+
+            if (function->_virtual || function->_override) && method->instance_kind != ASTInstanceKind::ConstRef && method->instance_kind != ASTInstanceKind::MutRef {
+                Logger::Log("Virtual method '" + function->name + "' must take '&this' or '&mut this'.", method, LogSeverity::Error);
+            } else if conflict >= 0 {
+                let expected = vtable[conflict as usize]->_return->ToString();
+                Logger::Log("Method '" + function->name + "' has the parameters of a virtual method but returns '" + function->_return->ToString() + "' instead of '" + expected + "'.", method, LogSeverity::Error);
+            } else if function->_override {
+                if slot < 0 {
+                    Logger::Log("Method '" + function->name + "' is marked 'override' but does not override a virtual method.", method, LogSeverity::Error);
+                } else if method->body == null {
+                    Logger::Log("Method '" + function->name + "' overrides a virtual method, so it must have a body.", method, LogSeverity::Error);
+                } else {
+                    vtable[slot as usize] = function;
+                    function->virtual_index = slot;
+                }
+            } else if slot >= 0 {
+                Logger::Log("Method '" + function->name + "' overrides a virtual method, so it must be marked 'override'.", method, LogSeverity::Error);
+            } else if function->_virtual {
+                if vtable.Empty() { vtable.PushBack(declaration->destructor); }
+                function->virtual_index = vtable.Size() as isize;
+                vtable.PushBack(function);
+            }
+        }
+
+        if !vtable.Empty() {
+            vtable[0] = declaration->destructor;
+            declaration->destructor->virtual_index = 0;
+        }
+
+        declaration->vptr = !vtable.Empty() && !shared;
+        declaration->vtable = vtable;
+    }
+
+    fn RejectAbstractClass(&mut this, _type: *HIRType, node: *ASTNode) -> bool {
+        if !_type->IsClass() { return false; }
+        this.EnsureVTable(_type);
+
+        for function in (_type as *HIRClassType)->declaration->vtable {
+            if function->abstract {
+                Logger::Log("Cannot create an instance of abstract class '" + _type->ToString() + "', method '" + function->name + "' has no body.", node, LogSeverity::Error);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn LowerVTableStore(&mut this, this_reference: *HIRExpression) {
+        let _type = this.current_type;
+        if _type == null || !_type->IsClass() || (_type as *HIRClassType)->declaration->vtable.Empty() { return; }
+        this.builder.BuildExpressionStatement(this.builder.VTable(this_reference, _type));
+    }
+
+    fn ParentSubobject(&mut this, reference: *HIRExpression, parent: *HIRType, mutable: bool) -> *HIRExpression {
+        this.builder.Dereference(this.builder.Cast(reference, this.context.ReferenceType(parent, mutable)))
+    }
+
+    fn LowerParentConstructor(&mut this, this_reference: *HIRExpression, parent: *HIRType, initializers: &Vector<*ASTCallExpression>, node: *ASTNode) {
+        let mut initializer: *ASTCallExpression = null;
+
+        for candidate in initializers {
+            let _type = this.LowerType((candidate->expression as *ASTPathExpression)->path);
+            if _type == null { continue; }
+
+            if !_type->IsClass() {
+                Logger::Log("Constructor target must be a class.", candidate, LogSeverity::Error);
+            } else if parent == null || *_type != *parent {
+                Logger::Log("Type '" + _type->ToString() + "' is not the parent of '" + this.current_type->ToString() + "'.", candidate, LogSeverity::Error);
+            } else if initializer != null {
+                Logger::Log("Parent '" + _type->ToString() + "' is initialized more than once.", candidate, LogSeverity::Error);
+            } else {
+                initializer = candidate;
+            }
+        }
+
+        if parent == null { return; }
+        let mut values = Vector<*HIRExpression>();
+        values.PushBack(this.builder.Cast(this_reference, this.context.ReferenceType(parent, true)));
+
+        if initializer != null {
+            let mut invalid = false;
+            values += this.LowerCallArguments(initializer->arguments, initializer, &mut invalid);
+            if invalid { return; }
+        }
+
+        let mut candidates = Vector<*HIRFunctionDeclaration>();
+
+        for candidate in (parent as *HIRClassType)->declaration->constructors {
+            candidates.PushBack(candidate);
+        }
+
+        let constructor = this.ResolveOverload(candidates, values, initializer, initializer == null);
+
+        if constructor == null {
+            if initializer == null {
+                Logger::Log("Parent '" + parent->ToString() + "' has no default constructor, it must be initialized explicitly.", node, LogSeverity::Error);
+            } return;
+        }
+
+        let call = this.LowerResolvedCallExpression(constructor, values, initializer);
+        if call == null { return; }
+        this.builder.BuildExpressionStatement(call);
+    }
+
     fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
         if !_type->HasSpecialMembers() { return; }
         let function = this.GetDestructor(_type);
@@ -1413,7 +1573,7 @@ class HIRLowerer {
         }
     }
 
-    fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parents: &Vector<*HIRType>, fields: &Vector<*HIRFieldDeclaration>) {
+    fn LowerConstructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parent: *HIRType, fields: &Vector<*HIRFieldDeclaration>) {
         if function->body == null { return; }
         this.builder.SetCurrentFunction(declaration);
         this.scope_manager.PushScope(function->name, false);
@@ -1434,39 +1594,8 @@ class HIRLowerer {
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
 
-        for constructor in function->constructors {
-            let _type = this.LowerType((constructor->expression as *ASTPathExpression)->path);
-            if _type == null { continue; }
-
-            if !_type->IsClass() {
-                Logger::Log("Constructor target must be a class.", constructor, LogSeverity::Error);
-                continue;
-            }
-
-            for parent in parents {
-                if *parent != *_type { continue; }
-                let mut values = Vector<*HIRExpression>();
-                values.PushBack(this.builder.Cast(this_reference, this.context.ReferenceType(parent, true)));
-
-                let mut invalid = false;
-                values += this.LowerCallArguments(constructor->arguments, constructor, &mut invalid);
-                if invalid { break; }
-
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
-                let function = this.ResolveOverload(candidates, values, null, false);
-                if function == null { break; }
-                let call = this.LowerResolvedCallExpression(function, values, null);
-                if call == null { break; }
-                this.builder.BuildExpressionStatement(call);
-                break;
-            }
-        }
-
+        this.LowerParentConstructor(this_reference, parent, function->constructors, function);
+        this.LowerVTableStore(this_reference);
         this.LowerFieldConstructors(this_dereferenced, fields);
 
         for statement in function->body->statements {
@@ -1481,7 +1610,7 @@ class HIRLowerer {
         this.scope_manager.PopScope();
     }
 
-    fn LowerDestructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, fields: &Vector<*HIRFieldDeclaration>) {
+    fn LowerDestructorDeclaration(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration, parent: *HIRType, fields: &Vector<*HIRFieldDeclaration>) {
         if function->body == null { return; }
         this.builder.SetCurrentFunction(declaration);
         this.scope_manager.PushScope(function->name, false);
@@ -1489,6 +1618,10 @@ class HIRLowerer {
         let this_parameter = declaration->parameters[0];
         let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
         let this_dereferenced = this.builder.Dereference(this_reference);
+
+        if parent != null {
+            this.scope_manager.current->instances.PushBack(this.ParentSubobject(this_reference, parent, true));
+        }
 
         for field in fields {
             let this_field = this.builder.FieldAccess(this_dereferenced, field);
@@ -1509,6 +1642,7 @@ class HIRLowerer {
         let block = this.builder.Block();
         this.builder.SetCurrentBlock(block);
         declaration->body = block;
+        this.LowerVTableStore(this_reference);
 
         for statement in function->body->statements {
             this.LowerStatement(statement);
@@ -1526,14 +1660,15 @@ class HIRLowerer {
         let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
-        let parents = (declaration->_type as *HIRClassType)->declaration->parents;
+        this.EnsureVTable(declaration->_type);
+        let parent = (declaration->_type as *HIRClassType)->declaration->parent;
         let fields = (declaration->_type as *HIRClassType)->declaration->fields;
         let mut index: usize = 0;
 
         for constructor in _class->constructors {
             if constructor->generic || !constructor->pack_name.Empty() { continue; }
             let function = declaration->constructors[index];
-            this.LowerConstructorDeclaration(function, constructor, parents, fields);
+            this.LowerConstructorDeclaration(function, constructor, parent, fields);
             index += 1;
 
             if this.IsCopyConstructor(function, declaration->_type) {
@@ -1553,6 +1688,8 @@ class HIRLowerer {
             let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
+            this.LowerParentConstructor(this_reference, parent, Vector<*ASTCallExpression>(), _class);
+            this.LowerVTableStore(this_reference);
             this.LowerFieldConstructors(this_dereferenced, fields);
             this.scope_manager.PopScope();
         }
@@ -1573,6 +1710,12 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
+            if parent != null {
+                this.LowerFieldCopyConstructor(this.ParentSubobject(this_reference, parent, true), this.ParentSubobject(other_reference, parent, false), parent, _class);
+            }
+
+            this.LowerVTableStore(this_reference);
+
             for field in fields {
                 this.LowerFieldCopyConstructor(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, _class);
             }
@@ -1581,7 +1724,7 @@ class HIRLowerer {
         }
 
         if _class->destructor != null {
-            this.LowerDestructorDeclaration(declaration->destructor, _class->destructor, fields);
+            this.LowerDestructorDeclaration(declaration->destructor, _class->destructor, parent, fields);
         } else {
             let function = declaration->destructor;
             this.scope_manager.PushScope(function->name, false);
@@ -1593,9 +1736,14 @@ class HIRLowerer {
             let this_parameter = function->parameters[0];
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
+            this.LowerVTableStore(this_reference);
 
             for field in fields {
                 this.LowerFieldDestructor(this.builder.FieldAccess(this_dereferenced, field), field->_type, _class);
+            }
+
+            if parent != null {
+                this.LowerFieldDestructor(this.ParentSubobject(this_reference, parent, true), parent, _class);
             }
 
             this.scope_manager.PopScope();
@@ -1612,6 +1760,8 @@ class HIRLowerer {
             if this.IsCopyAssignment(function, declaration->_type) {
                 this.LowerFunctionDeclarationSecondPass(function, method);
                 has_copy_assign = true;
+            } else if function->virtual_index >= 0 {
+                this.LowerFunctionDeclarationSecondPass(function, method);
             } else {
                 this.LowerMethodDeclarationSecondPass(function, method, declaration->instance);
             }
@@ -1632,6 +1782,10 @@ class HIRLowerer {
             let other_parameter = function->parameters[1];
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
+
+            if parent != null {
+                this.LowerFieldCopyAssignment(this.ParentSubobject(this_reference, parent, true), this.ParentSubobject(other_reference, parent, false), parent, _class);
+            }
 
             for field in fields {
                 this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, _class);
@@ -3122,10 +3276,8 @@ class HIRLowerer {
             }
         }
 
-        if result.Empty() && _type->IsClass() {
-            for parent in (_type as *HIRClassType)->declaration->parents {
-                result += this.ResolveGenericMethods(parent, name, types, values, node);
-            }
+        if result.Empty() && _type->IsClass() && (_type as *HIRClassType)->declaration->parent != null {
+            result += this.ResolveGenericMethods((_type as *HIRClassType)->declaration->parent, name, types, values, node);
         }
 
         result
@@ -3219,6 +3371,7 @@ class HIRLowerer {
                     }
 
                     let target_type: *HIRType = target->_type->Pointee();
+                    if this.RejectAbstractClass(target_type, call) { return null; }
 
                     if target_type->IsClass() {
                         let mut candidates = Vector<*HIRFunctionDeclaration>();
@@ -3279,7 +3432,9 @@ class HIRLowerer {
                         let function = this.GetDestructor(target_type);
                         if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function, false);
-                        this.builder.BuildExpressionStatement(this.builder.Destructor(target, callee));
+                        let destructor = this.builder.Destructor(target, callee);
+                        destructor->dynamic = true;
+                        this.builder.BuildExpressionStatement(destructor);
                     } return null;
                 }
             }
@@ -3298,6 +3453,7 @@ class HIRLowerer {
                         continue;
                     }
 
+                    if this.RejectAbstractClass(symbol->_type, call) { return null; }
                     let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                     for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
@@ -3354,7 +3510,9 @@ class HIRLowerer {
                 let candidates = this.scope_manager.ResolveCandidates(path, values, true);
 
                 if !candidates.Empty() {
-                    return this.LowerResolvedCallExpression(candidates, values, call);
+                    let result = this.LowerResolvedCallExpression(candidates, values, call);
+                    if result != null { result->direct = true; }
+                    return result;
                 }
             },
             ASTExpressionKind::MemberAccess => {
@@ -3484,17 +3642,17 @@ class HIRLowerer {
         true
     }
 
-    fn LowerResolvedCallExpression(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+    fn LowerResolvedCallExpression(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode) -> *mut HIRCallExpression {
         let function = this.ResolveOverload(candidates, values, node, false);
         if function == null { return null; }
         this.LowerResolvedCallExpression(function, values, node)
     }
 
-    fn LowerResolvedCallExpression(&mut this, function: *HIRFunctionDeclaration, values: &Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+    fn LowerResolvedCallExpression(&mut this, function: *HIRFunctionDeclaration, values: &Vector<*HIRExpression>, node: *ASTNode) -> *mut HIRCallExpression {
         this.LowerResolvedCallExpression(this.builder.ReferenceDeclaration(function, false), values, node)
     }
 
-    fn LowerResolvedCallExpression(&mut this, callee: *HIRExpression, mut values: Vector<*HIRExpression>, node: *ASTNode) -> *HIRCallExpression {
+    fn LowerResolvedCallExpression(&mut this, callee: *HIRExpression, mut values: Vector<*HIRExpression>, node: *ASTNode) -> *mut HIRCallExpression {
         if !this.ValidateCallArguments(callee, values, node) {
             return null;
         }
@@ -3554,6 +3712,7 @@ class HIRLowerer {
     fn LowerNewExpression(&mut this, _new: *ASTNewExpression) -> *HIRExpression {
         let _type = this.LowerType(_new->_type);
         if _type == null { return null; }
+        if this.RejectAbstractClass(_type, _new) { return null; }
 
         if _type->IsNever() {
             Logger::Log("Cannot allocate a value of type '" + _type->ToString() + "'.", _new, LogSeverity::Error);
@@ -3884,17 +4043,12 @@ class HIRLowerer {
             return null;
         }
 
-        let (mut path, mut ambiguous) = (Vector<u32>(), false);
-        let field = instance->_type->FindField(member_access->member, path, ambiguous);
-
-        if ambiguous {
-            Logger::Log("Field '" + member_access->member + "' is ambiguous in type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
-            return null;
-        }
+        let mut depth: u32 = 0;
+        let field = instance->_type->FindField(member_access->member, depth);
 
         if field != null {
-            for index in path {
-                let parent = (instance->_type as *HIRClassType)->declaration->parents[index as usize];
+            for _ in 0..depth {
+                let parent = (instance->_type as *HIRClassType)->declaration->parent;
                 instance = this.builder.Dereference(this.builder.Cast(this.builder.AddressOf(instance), this.context.ReferenceType(parent, instance->mutable)));
             }
 

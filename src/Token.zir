@@ -24,7 +24,7 @@ enum TokenType: i32 {
     NEW, DELETE, ASYNC, AWAIT, AS, THIS, OPERATOR,
     IF, ELSE, FOR, IN, WHILE, LOOP, MATCH, RETURN, BREAK, CONTINUE,
     FUNCTION, CLASS, STRUCTURE, ENUMERATION, EXTEND, TYPE, EXTERN, LET, MUT, CONST, STATIC,
-    PUBLIC, ASSEMBLY, ASSEMBLY_TEXT, VOLATILE, UNSAFE,
+    PUBLIC, VIRTUAL, OVERRIDE, ASSEMBLY, ASSEMBLY_TEXT, VOLATILE, UNSAFE,
 
     ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,
     LSHIFT_ASSIGN, RSHIFT_ASSIGN, AND_ASSIGN, OR_ASSIGN, XOR_ASSIGN,
@@ -82,6 +82,8 @@ extend TokenType {
             TokenType::CONST => "CONST",
             TokenType::STATIC => "STATIC",
             TokenType::PUBLIC => "PUBLIC",
+            TokenType::VIRTUAL => "VIRTUAL",
+            TokenType::OVERRIDE => "OVERRIDE",
             TokenType::ASSEMBLY => "ASSEMBLY",
             TokenType::ASSEMBLY_TEXT => "ASSEMBLY_TEXT",
             TokenType::VOLATILE => "VOLATILE",
@@ -157,6 +159,7 @@ fn StringToKeyword(string: &String) -> TokenType {
     else if string == "await" { TokenType::AWAIT }
     else if string == "as" { TokenType::AS }
     else if string == "this" { TokenType::THIS }
+    else if string == "operator" { TokenType::OPERATOR }
     else if string == "if" { TokenType::IF }
     else if string == "else" { TokenType::ELSE }
     else if string == "for" { TokenType::FOR }
@@ -179,7 +182,8 @@ fn StringToKeyword(string: &String) -> TokenType {
     else if string == "const" { TokenType::CONST }
     else if string == "static" { TokenType::STATIC }
     else if string == "pub" { TokenType::PUBLIC }
-    else if string == "operator" { TokenType::OPERATOR }
+    else if string == "virtual" { TokenType::VIRTUAL }
+    else if string == "override" { TokenType::OVERRIDE }
     else if string == "asm" { TokenType::ASSEMBLY }
     else if string == "volatile" { TokenType::VOLATILE }
     else if string == "unsafe" { TokenType::UNSAFE }

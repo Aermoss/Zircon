@@ -25,6 +25,7 @@ class MIRLowerer {
     temporaries: Map<*HIRExpression, *MIRValue>,
     namespaces: Vector<String>,
     strings: Map<String, *MIRStaticDeclaration>,
+    vtables: Map<*HIRDeclaration, *mut MIRStaticDeclaration>,
     declarations: Map<*HIRDeclaration, *mut MIRTypedDeclaration>,
     types: Map<*HIRType, *mut MIRTypedDeclaration>,
     runtime_functions: Map<String, *MIRFunctionDeclaration>,
@@ -188,10 +189,83 @@ class MIRLowerer {
     }
 
     fn LowerStaticDeclarationSecondPass(&mut this, _static: *HIRStaticDeclaration) {
-        if _static->initializer == null { return; }
-        let initializer = this.LowerConstantExpression(_static->initializer);
-        if initializer == null { return; }
-        (this.declarations[_static] as *mut MIRStaticDeclaration)->initializer = initializer;
+        let declaration = this.declarations[_static] as *mut MIRStaticDeclaration;
+
+        if _static->initializer != null {
+            let initializer = this.LowerConstantExpression(_static->initializer);
+            if initializer == null { return; }
+            declaration->initializer = initializer;
+        } else if _static->linkage != HIRDeclarationLinkage::External {
+            declaration->initializer = this.ZeroConstant(_static->_type, _static->_type);
+        }
+    }
+
+    fn ContainsVTable(&this, _type: *HIRType) -> bool {
+        if _type->IsArray() {
+            this.ContainsVTable(_type->Element())
+        } else if _type->IsTuple() {
+            for element in (_type as *HIRTupleType)->elements {
+                if this.ContainsVTable(element) { return true; }
+            }
+
+            false
+        } else if _type->IsClass() || _type->IsStructure() {
+            if _type->IsClass() && !(_type as *HIRClassType)->declaration->vtable.Empty() { return true; }
+
+            for field in _type->Fields() {
+                if this.ContainsVTable(field->_type) { return true; }
+            }
+
+            false
+        } else {
+            false
+        }
+    }
+
+    fn ZeroConstant(&mut this, _type: *HIRType, dynamic: *HIRType) -> *MIRValue {
+        let lowered = this.LowerType(_type);
+
+        if !this.ContainsVTable(_type) {
+            return this.builder.ConstantNull(lowered);
+        }
+
+        if _type->IsArray() {
+            let element = this.ZeroConstant(_type->Element(), _type->Element());
+            let mut elements = Vector<*MIRValue>();
+
+            for _ in 0.._type->Length() {
+                elements.PushBack(element);
+            }
+
+            return this.builder.ConstantArray(elements, lowered);
+        }
+
+        let mut fields = Vector<*MIRValue>();
+
+        if _type->IsTuple() {
+            for element in (_type as *HIRTupleType)->elements {
+                fields.PushBack(this.ZeroConstant(element, element));
+            }
+        } else {
+            if _type->IsClass() {
+                let declaration = (_type as *HIRClassType)->declaration;
+
+                if declaration->vptr {
+                    let table = this.builder.ReferenceDeclaration(this.vtables[(dynamic as *HIRClassType)->declaration]);
+                    fields.PushBack(this.builder.ConstantCast(MIRCastKind::Bitcast, table, this.VTablePointerType()));
+                }
+
+                if declaration->parent != null {
+                    fields.PushBack(this.ZeroConstant(declaration->parent, dynamic));
+                }
+            }
+
+            for field in _type->Fields() {
+                fields.PushBack(this.ZeroConstant(field->_type, field->_type));
+            }
+        }
+
+        this.builder.ConstantStruct(fields, lowered)
     }
 
     fn IsAggregate(&mut this, _type: *HIRType) -> bool {
@@ -325,8 +399,12 @@ class MIRLowerer {
     fn LowerClassDeclarationSecondPass(&mut this, _class: *HIRClassDeclaration) {
         let mut fields = Vector<*MIRType>();
 
-        for parent in _class->parents {
-            let lowered_parent = this.LowerType(parent);
+        if _class->vptr {
+            fields.PushBack(this.VTablePointerType());
+        }
+
+        if _class->parent != null {
+            let lowered_parent = this.LowerType(_class->parent);
             if lowered_parent == null { return; }
             fields.PushBack(lowered_parent);
         }
@@ -345,6 +423,11 @@ class MIRLowerer {
         if _class->instance != null { types = _class->instance->types; }
         this.namespaces.PushBack(Mangler::MangleName(_class->name, types, this.namespaces));
 
+        if !_class->vtable.Empty() {
+            let _type = this.context.ArrayType(this.context.PointerType(this.context.IntegerType(8)), _class->vtable.Size());
+            this.vtables[_class] = this.builder.BuildStatic(Mangler::MangleName("vtable".ToString(), Vector<*HIRType>(), this.namespaces), _type, false, null, MIRDeclarationLinkage::Internal);
+        }
+
         for constructor in _class->constructors {
             this.LowerFunctionDeclarationFirstPass(constructor);
         }
@@ -361,6 +444,25 @@ class MIRLowerer {
     }
 
     fn LowerClassDeclarationFourthPass(&mut this, _class: *HIRClassDeclaration) {
+        if !_class->vtable.Empty() {
+            let pointer = this.context.PointerType(this.context.IntegerType(8));
+            let mut entries = Vector<*MIRValue>();
+
+            for function in _class->vtable {
+                let mut entry: *MIRValue = null;
+
+                if function->abstract {
+                    entry = this.builder.ConstantNull(pointer);
+                } else {
+                    entry = this.builder.ConstantCast(MIRCastKind::Bitcast, this.builder.ReferenceDeclaration(this.declarations[function]), pointer);
+                }
+
+                entries.PushBack(entry);
+            }
+
+            this.vtables[_class]->initializer = this.builder.ConstantArray(entries, this.context.ArrayType(pointer, entries.Size()));
+        }
+
         for constructor in _class->constructors {
             this.LowerFunctionDeclarationSecondPass(constructor);
         }
@@ -1049,6 +1151,7 @@ class MIRLowerer {
             HIRExpressionKind::Assignment => this.LowerAssignmentExpression(expression as *HIRAssignmentExpression),
             HIRExpressionKind::Call if !this.IsAggregate(expression->_type) => this.LowerCallExpression(expression as *HIRCallExpression, null),
             HIRExpressionKind::Destructor => this.LowerDestructorExpression(expression as *HIRDestructorExpression),
+            HIRExpressionKind::VTable => this.LowerVTableExpression(expression as *HIRVTableExpression),
             HIRExpressionKind::New => this.LowerNewExpression(expression as *HIRNewExpression),
             HIRExpressionKind::Delete => this.LowerDeleteExpression(expression as *HIRDeleteExpression),
             HIRExpressionKind::Cast => this.LowerCastExpression(expression as *HIRCastExpression),
@@ -1233,7 +1336,7 @@ class MIRLowerer {
     fn LowerCallExpression(&mut this, call: *HIRCallExpression, destination: *MIRValue) -> *MIRValue {
         let _return = call->callee->_type->Return();
         let parameters = call->callee->_type->Parameters();
-        let callee = this.LowerExpression(call->callee);
+        let mut callee = this.LowerExpression(call->callee);
         if callee == null { return null; }
 
         let mut arguments = Vector<*MIRValue>();
@@ -1245,6 +1348,16 @@ class MIRLowerer {
             locations.PushBack(call->location);
             types.PushBack(call->location->_type);
             arguments += this.LowerCallArguments(locations, types);
+        }
+
+        if call->callee->kind == HIRExpressionKind::DeclarationReference && (call->callee as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Function {
+            let function = (call->callee as *HIRDeclarationReference)->declaration as *HIRFunctionDeclaration;
+
+            if function->virtual_index > 0 && !call->direct {
+                let receiver = arguments[if this.IsIndirectAggregate(_return) { 1 } else { 0 }];
+                let _type: *HIRType = function->parameters[0]->_type->Pointee();
+                callee = this.LowerVirtualCallee(receiver, _type, function->virtual_index, callee->_type);
+            }
         }
 
         let result = this.builder.BuildCall("call".ToString(), callee, arguments);
@@ -1283,8 +1396,14 @@ class MIRLowerer {
     fn LowerDestructorExpression(&mut this, destructor: *HIRDestructorExpression) -> *MIRValue {
         let instance = this.LowerExpression(destructor->instance);
         if instance == null { return null; }
-        let callee = this.LowerExpression(destructor->callee);
+        let mut callee = this.LowerExpression(destructor->callee);
         if callee == null { return null; }
+        let _type: *HIRType = destructor->instance->_type->Pointee();
+
+        if destructor->dynamic && this.IsPolymorphic(_type) {
+            callee = this.LowerVirtualCallee(instance, _type, 0, callee->_type);
+        }
+
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(instance);
         this.builder.BuildCall("destructor".ToString(), callee, arguments);
@@ -1432,8 +1551,14 @@ class MIRLowerer {
                 this.builder.SetCurrentBlock(end_block);
             }
         } else if _delete->callee != null {
-            let callee = this.LowerExpression(_delete->callee);
+            let mut callee = this.LowerExpression(_delete->callee);
             if callee == null { return null; }
+            let _type: *HIRType = _delete->value->_type->Pointee();
+
+            if this.IsPolymorphic(_type) {
+                callee = this.LowerVirtualCallee(pointer, _type, 0, callee->_type);
+            }
+
             let mut arguments = Vector<*MIRValue>();
             arguments.PushBack(pointer);
             this.builder.BuildCall("delete.destructor".ToString(), callee, arguments);
@@ -1445,10 +1570,49 @@ class MIRLowerer {
         this.UnitConstant()
     }
 
-    fn UpcastPointer(&mut this, mut value: *MIRValue, mut source: *HIRType, path: &Vector<u32>) -> *MIRValue {
-        for index in path {
-            let destination = (source as *HIRClassType)->declaration->parents[index as usize];
-            value = this.builder.BuildStructGEP("cast.base".ToString(), value, index, this.context.PointerType(this.LowerType(destination)));
+    fn VPtrOffset(&this, _type: *HIRType) -> u32 {
+        if _type->IsClass() && (_type as *HIRClassType)->declaration->vptr { 1 } else { 0 }
+    }
+
+    fn VTablePointerType(&mut this) -> *MIRType {
+        this.context.PointerType(this.context.PointerType(this.context.IntegerType(8)))
+    }
+
+    fn VTablePointer(&mut this, mut value: *MIRValue, mut _type: *HIRType) -> *MIRValue {
+        while !(_type as *HIRClassType)->declaration->vptr {
+            let parent = (_type as *HIRClassType)->declaration->parent;
+            value = this.builder.BuildStructGEP("vptr.base".ToString(), value, 0, this.context.PointerType(this.LowerType(parent)));
+            _type = parent;
+        }
+
+        this.builder.BuildStructGEP("vptr".ToString(), value, 0, this.context.PointerType(this.VTablePointerType()))
+    }
+
+    fn LowerVirtualCallee(&mut this, instance: *MIRValue, _type: *HIRType, index: isize, callee_type: *MIRType) -> *MIRValue {
+        let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+        let table = this.builder.BuildLoad("vtable".ToString(), this.VTablePointer(instance, _type));
+        let slot = this.builder.BuildArrayGEP("vtable.slot".ToString(), table, this.builder.ConstantInteger(index as u64, size_type));
+        let entry = this.builder.BuildLoad("vtable.entry".ToString(), slot);
+        this.builder.BuildCast("vtable.function".ToString(), MIRCastKind::Bitcast, entry, callee_type)
+    }
+
+    fn IsPolymorphic(&this, _type: *HIRType) -> bool {
+        _type->IsClass() && !(_type as *HIRClassType)->declaration->vtable.Empty()
+    }
+
+    fn LowerVTableExpression(&mut this, vtable: *HIRVTableExpression) -> *MIRValue {
+        let instance = this.LowerExpression(vtable->instance);
+        if instance == null { return null; }
+        let table = this.builder.ReferenceDeclaration(this.vtables[(vtable->_class as *HIRClassType)->declaration]);
+        let value = this.builder.BuildCast("vtable.cast".ToString(), MIRCastKind::Bitcast, table, this.context.PointerType(this.context.PointerType(this.context.IntegerType(8))));
+        this.builder.BuildStore(value, this.VTablePointer(instance, vtable->_class));
+        this.UnitConstant()
+    }
+
+    fn UpcastPointer(&mut this, mut value: *MIRValue, mut source: *HIRType, depth: isize) -> *MIRValue {
+        for _ in 0..depth {
+            let destination = (source as *HIRClassType)->declaration->parent;
+            value = this.builder.BuildStructGEP("cast.base".ToString(), value, this.VPtrOffset(source), this.context.PointerType(this.LowerType(destination)));
             source = destination;
         }
 
@@ -1544,22 +1708,18 @@ class MIRLowerer {
             if target_type->IsPointer() {
                 if value_type->Pointee().IsClass() && target_type->Pointee().IsClass() {
                     let (source, destination) = (value_type->Pointee(), target_type->Pointee());
-                    let mut path = Vector<u32>();
+                    let (upcast, downcast) = (source.ParentDepth(destination), destination.ParentDepth(source));
 
-                    if source.FindParentPath(destination, path) {
-                        return this.UpcastPointer(value, source, path);
-                    } else {
-                        path.Clear();
-
-                        if destination.FindParentPath(source, path) {
-                            let result_type = this.context.PointerType(this.LowerType(destination));
-                            let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
-                            let base = this.UpcastPointer(this.builder.ConstantNull(result_type), destination, path);
-                            let offset = this.builder.BuildCast("cast.offset".ToString(), MIRCastKind::PtrToInt, base, size_type);
-                            let address = this.builder.BuildCast("cast.address".ToString(), MIRCastKind::PtrToInt, value, size_type);
-                            let adjusted = this.builder.BuildBinary("cast.adjust".ToString(), MIRBinaryKind::Sub, address, offset, size_type);
-                            return this.builder.BuildCast("cast.derived".ToString(), MIRCastKind::IntToPtr, adjusted, result_type);
-                        }
+                    if upcast > 0 {
+                        return this.UpcastPointer(value, source, upcast);
+                    } else if downcast > 0 {
+                        let result_type = this.context.PointerType(this.LowerType(destination));
+                        let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+                        let base = this.UpcastPointer(this.builder.ConstantNull(result_type), destination, downcast);
+                        let offset = this.builder.BuildCast("cast.offset".ToString(), MIRCastKind::PtrToInt, base, size_type);
+                        let address = this.builder.BuildCast("cast.address".ToString(), MIRCastKind::PtrToInt, value, size_type);
+                        let adjusted = this.builder.BuildBinary("cast.adjust".ToString(), MIRBinaryKind::Sub, address, offset, size_type);
+                        return this.builder.BuildCast("cast.derived".ToString(), MIRCastKind::IntToPtr, adjusted, result_type);
                     }
                 }
 
@@ -1618,7 +1778,7 @@ class MIRLowerer {
         let instance = this.LowerPlaceExpression(field_access->instance);
         if instance == null { return null; }
         let field_type = this.context.PointerType(this.LowerType(field_access->_type));
-        this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32, field_type)
+        this.builder.BuildStructGEP("field.access".ToString(), instance, field_access->field->index as u32 + this.VPtrOffset(field_access->instance->_type), field_type)
     }
 
     fn LowerMemberAccessExpression(&mut this, member_access: *HIRMemberAccessExpression) -> *MIRValue {

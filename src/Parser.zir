@@ -1359,18 +1359,30 @@ class Parser {
         }
 
         let mut public = this.Match(TokenType::PUBLIC);
+        let _virtual = this.Match(TokenType::VIRTUAL);
+        let _override = !_virtual && this.Match(TokenType::OVERRIDE);
         let mut name = String();
 
-        if !_class || public {
+        if (_virtual || _override) && !_class {
+            Logger::Log("Only methods can be 'virtual' or 'override'.", token, LogSeverity::Error);
+            return null;
+        }
+
+        if _virtual && !public && this.Current()._type == TokenType::IDENTIFIER {
+            Logger::Log("Constructors cannot be virtual.", token, LogSeverity::Error);
+            return null;
+        }
+
+        if !_class || public || _override || (_virtual && this.Current()._type != TokenType::TILDE) {
             if !this.ExpectSuccess(TokenType::FUNCTION) { return null; }
         } else {
             if this.Match(TokenType::TILDE) {
-                name += token.value;
+                name += '~';
                 let identifier = this.Expect(TokenType::IDENTIFIER);
                 if identifier._type == TokenType::UNKNOWN { return null; }
                 name += identifier.value;
                 public = true;
-            } else if this.Match(TokenType::IDENTIFIER) {
+            } else if !_virtual && this.Match(TokenType::IDENTIFIER) {
                 name += token.value;
                 public = true;
             } else if !this.ExpectSuccess(TokenType::FUNCTION) {
@@ -1397,6 +1409,7 @@ class Parser {
         }
 
         let function = this.arena.New<ASTFunctionDeclaration>(name, public, no_mangle, track_caller, token);
+        (function->_virtual, function->_override) = (_virtual, _override);
 
         if this.Match(TokenType::LESS) {
             function->generic = true;
@@ -1468,7 +1481,7 @@ class Parser {
             function->_return = this.ParseType();
             if function->_return == null { return null; }
         } else {
-            if token._type != TokenType::FUNCTION && token._type != TokenType::PUBLIC {
+            if token._type != TokenType::PUBLIC && token._type != TokenType::VIRTUAL && token._type != TokenType::OVERRIDE && token._type != TokenType::FUNCTION {
                 while (this.Match(TokenType::COLON) && function->constructors.Empty()) || (this.Match(TokenType::COMMA) && !function->constructors.Empty()) {
                     let expression = this.ParseExpression();
                     if expression == null { return null; }
@@ -1533,14 +1546,12 @@ class Parser {
         }
 
         if this.Match(TokenType::COLON) {
-            let _type = this.ParseType();
-            if _type == null { return null; }
-            _class->parents.PushBack(_type);
+            _class->parent = this.ParseType();
+            if _class->parent == null { return null; }
 
-            while this.Match(TokenType::COMMA) {
-                let _type = this.ParseType();
-                if _type == null { return null; }
-                _class->parents.PushBack(_type);
+            if this.Current()._type == TokenType::COMMA {
+                Logger::Log("A class can have only one parent.", this.Current(), LogSeverity::Error);
+                return null;
             }
         }
 
@@ -1577,17 +1588,17 @@ class Parser {
                 let function = this.ParseFunctionDeclaration(attributes, true);
                 if function == null { return null; }
 
-                if token._type == TokenType::PUBLIC || token._type == TokenType::FUNCTION {
-                    _class->methods.PushBack(function);
-                } else if token._type != TokenType::TILDE {
-                    _class->constructors.PushBack(function);
-                } else {
+                if function->name.StartsWith('~') {
                     if _class->destructor != null {
                         Logger::Log("Multiple destructor declarations are not allowed.", token, LogSeverity::Error);
                         return null;
                     }
 
                     _class->destructor = function;
+                } else if token._type == TokenType::PUBLIC || token._type == TokenType::VIRTUAL || token._type == TokenType::OVERRIDE || token._type == TokenType::FUNCTION {
+                    _class->methods.PushBack(function);
+                } else {
+                    _class->constructors.PushBack(function);
                 }
             }
         }

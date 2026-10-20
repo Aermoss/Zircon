@@ -29,6 +29,8 @@ class HIRType {
         this.kind = kind;
     }
 
+    virtual ~HIRType(&mut this) {}
+
     pub fn IsMutable(&this) -> bool { (this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->mutable) || (this.kind == HIRTypeKind::Reference && (this as *HIRReferenceType)->mutable) }
     pub fn IsLiteral(&this) -> bool { (this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal) || (this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal) }
     pub fn IsSigned(&this) -> bool { this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->signed }
@@ -90,48 +92,34 @@ class HIRType {
         }
     }
 
-    pub fn FindField(&this, name: &String, path: &mut Vector<u32>, ambiguous: &mut bool) -> *HIRFieldDeclaration {
-        let parents = (this as *HIRClassType)->declaration->parents;
-        let (index, mut result) = (this.Index(name), null as *HIRFieldDeclaration);
+    pub fn FindField(&this, name: &String, depth: &mut u32) -> *HIRFieldDeclaration {
+        if !this.HasFields() { return null; }
+        let index = this.Index(name);
         if index != -1 { return this.Fields()[index as usize]; }
-
-        for i in 0..parents.Size() {
-            let mut parent_path = Vector<u32>();
-            let field = parents[i]->FindField(name, &mut parent_path, ambiguous);
-            if field == null { continue; }
-
-            if result != null {
-                ambiguous = true;
-                return result;
-            }
-            
-            path.Clear();
-            path.PushBack(i as u32);
-            path += parent_path;
-            result = field;
-        }
-
-        result
+        if !this.IsClass() || (this as *HIRClassType)->declaration->parent == null { return null; }
+        depth += 1;
+        (this as *HIRClassType)->declaration->parent->FindField(name, depth)
     }
 
-    pub fn FindParentPath(&this, other: &HIRType, path: &mut Vector<u32>) -> bool {
-        let parents = (this as *HIRClassType)->declaration->parents;
+    pub fn ParentDepth(&this, other: &HIRType) -> isize {
+        if !this.IsClass() { return -1; }
+        let mut current = (this as *HIRClassType)->declaration->parent;
+        let mut depth: isize = 1;
 
-        for i in 0..parents.Size() {
-            path.PushBack(i as u32);
-
-            if *parents[i] == other || parents[i]->FindParentPath(other, path) {
-                return true;
-            }
-
-            path.PopBack();
+        while current != null {
+            if *current == other { return depth; }
+            current = (current as *HIRClassType)->declaration->parent;
+            depth += 1;
         }
 
-        false
+        -1
     }
 
     pub fn IsDerivedFrom(&this, other: &HIRType) -> bool {
-        for parent in (this as *HIRClassType)->declaration->parents {
+        if !this.IsClass() { return false; }
+        let parent = (this as *HIRClassType)->declaration->parent;
+
+        if parent != null {
             if *parent == other || parent->IsDerivedFrom(other) {
                 return true;
             }
@@ -370,9 +358,14 @@ class HIRType {
             let mut alignment: usize = 1;
 
             if this.IsClass() {
-                for parent in (this as *HIRClassType)->declaration->parents {
-                    let parent_alignment = parent->Alignment();
-                    if parent_alignment > alignment { alignment = parent_alignment; }
+                if (this as *HIRClassType)->declaration->vptr {
+                    alignment = llvm_lowerer->target->Info().pointer_size;
+                }
+
+                let parent = (this as *HIRClassType)->declaration->parent;
+
+                if parent != null && parent->Alignment() > alignment {
+                    alignment = parent->Alignment();
                 }
             }
 
@@ -429,7 +422,14 @@ class HIRType {
             let mut alignment: usize = 1;
 
             if this.IsClass() {
-                for parent in (this as *HIRClassType)->declaration->parents {
+                if (this as *HIRClassType)->declaration->vptr {
+                    size = llvm_lowerer->target->Info().pointer_size;
+                    alignment = size;
+                }
+
+                let parent = (this as *HIRClassType)->declaration->parent;
+
+                if parent != null {
                     let parent_alignment = parent->Alignment();
                     if parent_alignment > alignment { alignment = parent_alignment; }
                     let remainder = size % parent_alignment;
@@ -600,10 +600,8 @@ class HIRType {
             } found = true;
         }
 
-        if !found && this.IsClass() && name != "operator=" {
-            for parent in (this as *HIRClassType)->declaration->parents {
-                parent->CollectMethods(name, result, found);
-            }
+        if !found && this.IsClass() && name != "operator=" && (this as *HIRClassType)->declaration->parent != null {
+            (this as *HIRClassType)->declaration->parent->CollectMethods(name, result, found);
         }
     }
 
@@ -689,31 +687,13 @@ class HIRType {
         !(this == other)
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            HIRTypeKind::Never => (this as *HIRNeverType)->ToString(),
-            HIRTypeKind::Void => (this as *HIRVoidType)->ToString(),
-            HIRTypeKind::Boolean => (this as *HIRBooleanType)->ToString(),
-            HIRTypeKind::Character => (this as *HIRCharacterType)->ToString(),
-            HIRTypeKind::Integer => (this as *HIRIntegerType)->ToString(),
-            HIRTypeKind::Float => (this as *HIRFloatType)->ToString(),
-            HIRTypeKind::Pointer => (this as *HIRPointerType)->ToString(),
-            HIRTypeKind::Reference => (this as *HIRReferenceType)->ToString(),
-            HIRTypeKind::Array => (this as *HIRArrayType)->ToString(),
-            HIRTypeKind::Tuple => (this as *HIRTupleType)->ToString(),
-            HIRTypeKind::Function => (this as *HIRFunctionType)->ToString(),
-            HIRTypeKind::Class => (this as *HIRClassType)->ToString(),
-            HIRTypeKind::Structure => (this as *HIRStructureType)->ToString(),
-            HIRTypeKind::Enumeration => (this as *HIREnumerationType)->ToString(),
-            HIRTypeKind::Variant => (this as *HIRVariantType)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 class HIRNeverType : HIRType {
     HIRNeverType(&mut this) : HIRType(HIRTypeKind::Never) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '!'.ToString()
     }
 }
@@ -721,7 +701,7 @@ class HIRNeverType : HIRType {
 class HIRVoidType : HIRType {
     HIRVoidType(&mut this) : HIRType(HIRTypeKind::Void) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "void".ToString()
     }
 }
@@ -729,7 +709,7 @@ class HIRVoidType : HIRType {
 class HIRBooleanType : HIRType {
     HIRBooleanType(&mut this) : HIRType(HIRTypeKind::Boolean) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "bool".ToString()
     }
 }
@@ -737,7 +717,7 @@ class HIRBooleanType : HIRType {
 class HIRCharacterType : HIRType {
     HIRCharacterType(&mut this) : HIRType(HIRTypeKind::Character) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "char".ToString()
     }
 }
@@ -752,7 +732,7 @@ class HIRIntegerType : HIRType {
         (this.width, this.signed, this.literal, this.native) = (width, signed, literal, native);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if !this.literal {
             if !this.native {
                 (if this.signed { 'i' } else { 'u' }) + String::FromInteger(this.width as u64)
@@ -773,7 +753,7 @@ class HIRFloatType : HIRType {
         (this.width, this.literal) = (width, literal);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if !this.literal {
             'f' + String::FromInteger(this.width as u64)
         } else {
@@ -791,7 +771,7 @@ class HIRPointerType : HIRType {
         (this.pointee, this.mutable) = (pointee, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.mutable { "*mut " } else { "*" }) + this.pointee->ToString()
     }
 }
@@ -804,7 +784,7 @@ class HIRReferenceType : HIRType {
         (this.referent, this.mutable) = (referent, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.mutable { "&mut " } else { "&" }) + this.referent->ToString()
     }
 }
@@ -820,7 +800,7 @@ class HIRArrayType : HIRType {
         (this.element, this.length) = (element, length);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
     }
 }
@@ -835,7 +815,7 @@ class HIRTupleType : HIRType {
         this.elements = elements;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
         for i in 0..this.elements.Size() {
@@ -855,7 +835,7 @@ class HIRFunctionType : HIRType {
         (this.parameters, this._return) = (parameters, _return);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
         for i in 0..this.parameters.Size() {
@@ -878,7 +858,7 @@ class HIRClassType : HIRType {
         this.declaration = declaration;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.declaration->name
     }
 }
@@ -890,7 +870,7 @@ class HIRStructureType : HIRType {
         this.declaration = declaration;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.declaration->name
     }
 }
@@ -903,7 +883,7 @@ class HIREnumerationType : HIRType {
         (this.declaration, this.underlying) = (declaration, underlying);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.declaration->name
     }
 }
@@ -915,7 +895,7 @@ class HIRVariantType : HIRType {
         this.declaration = declaration;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.declaration->name
     }
 }
@@ -930,6 +910,8 @@ class HIRPattern {
     HIRPattern(&mut this, kind: HIRPatternKind) {
         this.kind = kind;
     }
+
+    virtual ~HIRPattern(&mut this) {}
 
     pub fn IsIrrefutable(&this) -> bool {
         match this.kind {
@@ -977,28 +959,13 @@ class HIRPattern {
         false
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            HIRPatternKind::Wildcard => (this as *HIRWildcardPattern)->ToString(),
-            HIRPatternKind::Rest => (this as *HIRRestPattern)->ToString(),
-            HIRPatternKind::Literal => (this as *HIRLiteralPattern)->ToString(),
-            HIRPatternKind::Range => (this as *HIRRangePattern)->ToString(),
-            HIRPatternKind::Identifier => (this as *HIRIdentifierPattern)->ToString(),
-            HIRPatternKind::Tuple => (this as *HIRTuplePattern)->ToString(),
-            HIRPatternKind::Field => (this as *HIRFieldPattern)->ToString(),
-            HIRPatternKind::Structure => (this as *HIRStructurePattern)->ToString(),
-            HIRPatternKind::Enumeration => (this as *HIREnumerationPattern)->ToString(),
-            HIRPatternKind::Variant => (this as *HIRVariantPattern)->ToString(),
-            HIRPatternKind::Or => (this as *HIROrPattern)->ToString(),
-            HIRPatternKind::Dereference => (this as *HIRDereferencePattern)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 class HIRWildcardPattern : HIRPattern {
     HIRWildcardPattern(&mut this) : HIRPattern(HIRPatternKind::Wildcard) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '_'.ToString()
     }
 }
@@ -1006,7 +973,7 @@ class HIRWildcardPattern : HIRPattern {
 class HIRRestPattern : HIRPattern {
     HIRRestPattern(&mut this) : HIRPattern(HIRPatternKind::Rest) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "..".ToString()
     }
 }
@@ -1018,7 +985,7 @@ class HIRLiteralPattern : HIRPattern {
         this.literal = literal;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.literal->ToString()
     }
 }
@@ -1032,7 +999,7 @@ class HIRRangePattern : HIRPattern {
         (this.start, this.end, this.inclusive) = (start, end, inclusive);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
         if this.start != null { result += this.start->ToString(); }
         result += if this.inclusive { "..=" } else { ".." };
@@ -1051,7 +1018,7 @@ class HIRIdentifierPattern : HIRPattern {
         (this.name, this._type, this.value, this.mutable) = (name, _type, value, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
         if this.mutable { result += "mut "; }
         result + this.name
@@ -1066,7 +1033,7 @@ class HIRTuplePattern : HIRPattern {
         (this.patterns, this._type) = (patterns, _type);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
         for i in 0..this.patterns.Size() {
@@ -1086,7 +1053,7 @@ class HIRFieldPattern : HIRPattern {
         (this.name, this.pattern) = (name, pattern);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.name + ": " + this.pattern->ToString()
     }
 }
@@ -1099,7 +1066,7 @@ class HIRStructurePattern : HIRPattern {
         (this.declaration, this.patterns) = (declaration, patterns);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.declaration->name + " { ";
 
         for i in 0..this.patterns.Size() {
@@ -1118,7 +1085,7 @@ class HIREnumerationPattern : HIRPattern {
         this.member = member;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.member->name
     }
 }
@@ -1131,7 +1098,7 @@ class HIRVariantPattern : HIRPattern {
         (this.member, this.patterns) = (member, patterns);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.member->name + '(';
 
         for i in 0..this.patterns.Size() {
@@ -1151,7 +1118,7 @@ class HIRDereferencePattern : HIRPattern {
         (this.binding, this.pattern) = (binding, pattern);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '*' + this.pattern->ToString()
     }
 }
@@ -1163,7 +1130,7 @@ class HIROrPattern : HIRPattern {
         this.patterns = patterns;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         for i in 0..this.patterns.Size() {
@@ -1180,7 +1147,7 @@ enum HIRExpressionKind: u8 {
     BindingReference, DeclarationReference,
     Assignment, Unary, Binary, Call, Cast,
     IndexAccess, TupleAccess, FieldAccess, MemberAccess, TagAccess,
-    New, Delete, Constructor, Destructor,
+    New, Delete, Constructor, Destructor, VTable,
     Intrinsic, Deferred,
     Block, If, While, Loop, For, Match, Return, Break, Continue
 }
@@ -1202,6 +1169,8 @@ class HIRExpression {
     HIRExpression(&mut this, kind: HIRExpressionKind, _type: *HIRType, category: HIRExpressionCategory, mutable: bool) {
         (this.kind, this._type, this.category, this.mutable) = (kind, _type, category, mutable);
     }
+
+    virtual ~HIRExpression(&mut this) {}
 
     pub fn Precedence(&this) -> u8 {
         match this.kind {
@@ -1229,44 +1198,12 @@ class HIRExpression {
         }
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            HIRExpressionKind::Literal => (this as *HIRLiteral)->ToString(),
-            HIRExpressionKind::BindingReference => (this as *HIRBindingReference)->ToString(),
-            HIRExpressionKind::DeclarationReference => (this as *HIRDeclarationReference)->ToString(),
-            HIRExpressionKind::Assignment => (this as *HIRAssignmentExpression)->ToString(),
-            HIRExpressionKind::Unary => (this as *HIRUnaryExpression)->ToString(),
-            HIRExpressionKind::Binary => (this as *HIRBinaryExpression)->ToString(),
-            HIRExpressionKind::Call => (this as *HIRCallExpression)->ToString(),
-            HIRExpressionKind::Cast => (this as *HIRCastExpression)->ToString(),
-            HIRExpressionKind::IndexAccess => (this as *HIRIndexAccessExpression)->ToString(),
-            HIRExpressionKind::TupleAccess => (this as *HIRTupleAccessExpression)->ToString(),
-            HIRExpressionKind::FieldAccess => (this as *HIRFieldAccessExpression)->ToString(),
-            HIRExpressionKind::MemberAccess => (this as *HIRMemberAccessExpression)->ToString(),
-            HIRExpressionKind::TagAccess => (this as *HIRTagAccessExpression)->ToString(),
-            HIRExpressionKind::New => (this as *HIRNewExpression)->ToString(),
-            HIRExpressionKind::Delete => (this as *HIRDeleteExpression)->ToString(),
-            HIRExpressionKind::Constructor => (this as *HIRConstructorExpression)->ToString(),
-            HIRExpressionKind::Destructor => (this as *HIRDestructorExpression)->ToString(),
-            HIRExpressionKind::Intrinsic => (this as *HIRIntrinsicExpression)->ToString(),
-            HIRExpressionKind::Deferred => (this as *HIRDeferredExpression)->ToString(),
-            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => this.ToString(0)
-        }
+    pub virtual fn ToString(&this) -> String {
+        this.ToString(0)
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
-        match this.kind {
-            HIRExpressionKind::Block => (this as *HIRBlockExpression)->ToString(indent),
-            HIRExpressionKind::If => (this as *HIRIfExpression)->ToString(indent),
-            HIRExpressionKind::While => (this as *HIRWhileExpression)->ToString(indent),
-            HIRExpressionKind::Loop => (this as *HIRLoopExpression)->ToString(indent),
-            HIRExpressionKind::For => (this as *HIRForExpression)->ToString(indent),
-            HIRExpressionKind::Match => (this as *HIRMatchExpression)->ToString(indent),
-            HIRExpressionKind::Return => (this as *HIRReturnExpression)->ToString(indent),
-            HIRExpressionKind::Break => (this as *HIRBreakExpression)->ToString(indent),
-            HIRExpressionKind::Continue => (this as *HIRContinueExpression)->ToString(indent),
-            _ => this.ToString()
-        }
+    pub virtual fn ToString(&this, indent: usize) -> String {
+        this.ToString()
     }
 
     pub fn IsBlockLike(&this) -> bool {
@@ -1288,21 +1225,6 @@ class HIRLiteral : HIRExpression {
     HIRLiteral(&mut this, kind: HIRLiteralKind, _type: *HIRType) : HIRExpression(HIRExpressionKind::Literal, _type) {
         this.kind = kind;
     }
-
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            HIRLiteralKind::Boolean => (this as *HIRBooleanLiteral)->ToString(),
-            HIRLiteralKind::Character => (this as *HIRCharacterLiteral)->ToString(),
-            HIRLiteralKind::Integer => (this as *HIRIntegerLiteral)->ToString(),
-            HIRLiteralKind::Float => (this as *HIRFloatLiteral)->ToString(),
-            HIRLiteralKind::String => (this as *HIRStringLiteral)->ToString(),
-            HIRLiteralKind::Array => (this as *HIRArrayLiteral)->ToString(),
-            HIRLiteralKind::Tuple => (this as *HIRTupleLiteral)->ToString(),
-            HIRLiteralKind::Structure => (this as *HIRStructureLiteral)->ToString(),
-            HIRLiteralKind::Variant => (this as *HIRVariantLiteral)->ToString(),
-            HIRLiteralKind::Null => (this as *HIRNullLiteral)->ToString()
-        }
-    }
 }
 
 class HIRBooleanLiteral : HIRLiteral {
@@ -1312,7 +1234,7 @@ class HIRBooleanLiteral : HIRLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.value { "true" } else { "false" }).ToString()
     }
 }
@@ -1324,7 +1246,7 @@ class HIRCharacterLiteral : HIRLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '\'' + String(this.value as i8).Escape() + '\''
     }
 }
@@ -1336,7 +1258,7 @@ class HIRIntegerLiteral : HIRLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromInteger(this.value)
     }
 }
@@ -1348,7 +1270,7 @@ class HIRFloatLiteral : HIRLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromFloat(this.value)
     }
 }
@@ -1360,7 +1282,7 @@ class HIRStringLiteral : HIRLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '"' + this.value.Escape() + '"'
     }
 }
@@ -1373,7 +1295,7 @@ class HIRArrayLiteral : HIRLiteral {
         this.elements = elements;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.repeat {
             return '[' + this.elements[0]->ToString() + "; " + String::FromInteger(this._type->Length() as u64) + ']';
         }
@@ -1396,7 +1318,7 @@ class HIRTupleLiteral : HIRLiteral {
         this.elements = elements;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
         for i in 0..this.elements.Size() {
@@ -1415,7 +1337,7 @@ class HIRStructureLiteral : HIRLiteral {
         this.fields = fields;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '{'.ToString();
 
         for i in 0..this.fields.Size() {
@@ -1435,7 +1357,7 @@ class HIRVariantLiteral : HIRLiteral {
         (this.member, this.fields) = (member, fields);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.member->name + (if this.member->structure { '{' } else { '(' }).ToString();
 
         for i in 0..this.fields.Size() {
@@ -1455,7 +1377,7 @@ class HIRVariantLiteral : HIRLiteral {
 class HIRNullLiteral : HIRLiteral {
     HIRNullLiteral(&mut this, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Null, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "null".ToString()
     }
 }
@@ -1467,7 +1389,7 @@ class HIRBindingReference : HIRExpression {
         this.binding = binding;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.binding->name
     }
 }
@@ -1479,7 +1401,7 @@ class HIRDeclarationReference : HIRExpression {
         this.declaration = declaration;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         match this.declaration->kind {
             HIRDeclarationKind::Parameter => '%' + this.declaration->name,
             HIRDeclarationKind::Function => "@\"" + this.declaration->name + '"',
@@ -1496,7 +1418,7 @@ class HIRAssignmentExpression : HIRExpression {
         (this.left, this.right) = (left, right);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.left->Precedence() {
@@ -1540,7 +1462,7 @@ class HIRUnaryExpression : HIRExpression {
         (this.kind, this.operand) = (kind, operand);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.kind.ToString();
 
         if this.kind == HIRUnaryKind::AddressOf && this._type->IsMutable() {
@@ -1599,7 +1521,7 @@ class HIRBinaryExpression : HIRExpression {
         (this.kind, this.left, this.right, this.destructors) = (kind, left, right, destructors);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.left->Precedence() {
@@ -1623,13 +1545,14 @@ class HIRBinaryExpression : HIRExpression {
 class HIRCallExpression : HIRExpression {
     pub callee: *HIRExpression,
     pub arguments: Vector<*HIRExpression>,
-    pub location: *HIRExpression = null;
+    pub location: *HIRExpression = null,
+    pub direct: bool = false;
 
     HIRCallExpression(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>) : HIRExpression(HIRExpressionKind::Call, callee->_type->Return()) {
         (this.callee, this.arguments) = (callee, arguments);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "call ".ToString();
 
         if this.Precedence() > this.callee->Precedence() {
@@ -1654,7 +1577,7 @@ class HIRCastExpression : HIRExpression {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.value->Precedence() {
@@ -1675,7 +1598,7 @@ class HIRIndexAccessExpression : HIRExpression {
         (this.value, this.index) = (value, index);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.value->Precedence() {
@@ -1696,7 +1619,7 @@ class HIRTupleAccessExpression : HIRExpression {
         (this.instance, this.index) = (instance, index);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.instance->Precedence() {
@@ -1717,7 +1640,7 @@ class HIRFieldAccessExpression : HIRExpression {
         (this.instance, this.field) = (instance, field);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.instance->Precedence() {
@@ -1739,7 +1662,7 @@ class HIRMemberAccessExpression : HIRExpression {
         (this.instance, this.member, this.field) = (instance, member, field);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.instance->Precedence() {
@@ -1759,7 +1682,7 @@ class HIRTagAccessExpression : HIRExpression {
         this.instance = instance;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = String();
 
         if this.Precedence() > this.instance->Precedence() {
@@ -1783,7 +1706,7 @@ class HIRNewExpression : HIRExpression {
         (this._type, this.size, this.initialized, this.callee, this.arguments) = (_type, size, initialized, callee, arguments);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "new " + this._type->ToString();
 
         if this.size != null {
@@ -1801,6 +1724,19 @@ class HIRNewExpression : HIRExpression {
     }
 }
 
+class HIRVTableExpression : HIRExpression {
+    pub instance: *HIRExpression,
+    pub _class: *HIRType;
+
+    HIRVTableExpression(&mut this, instance: *HIRExpression, _class: *HIRType, _type: *HIRType) : HIRExpression(HIRExpressionKind::VTable, _type) {
+        (this.instance, this._class) = (instance, _class);
+    }
+
+    pub override fn ToString(&this) -> String {
+        "vtable " + this.instance->ToString() + " = " + this._class->ToString()
+    }
+}
+
 class HIRDeleteExpression : HIRExpression {
     pub value: *HIRExpression,
     pub array: bool,
@@ -1811,7 +1747,7 @@ class HIRDeleteExpression : HIRExpression {
         (this.value, this.array, this.callee, this.arguments) = (value, array, callee, arguments);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "delete ".ToString();
 
         if this.Precedence() > this.value->Precedence() {
@@ -1832,7 +1768,7 @@ class HIRConstructorExpression : HIRExpression {
         (this.callee, this.arguments) = (callee, arguments);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "constructor ".ToString();
 
         if this.Precedence() > this.callee->Precedence() {
@@ -1852,13 +1788,14 @@ class HIRConstructorExpression : HIRExpression {
 
 class HIRDestructorExpression : HIRExpression {
     pub instance: *HIRExpression,
-    pub callee: *HIRExpression;
+    pub callee: *HIRExpression,
+    pub dynamic: bool = false;
 
     HIRDestructorExpression(&mut this, instance: *HIRExpression, callee: *HIRExpression, _type: *HIRType) : HIRExpression(HIRExpressionKind::Destructor, _type) {
         (this.instance, this.callee) = (instance, callee);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "destructor ".ToString();
 
         if this.Precedence() > this.callee->Precedence() {
@@ -1892,7 +1829,7 @@ class HIRIntrinsicExpression : HIRExpression {
         (this.kind, this._type) = (kind, _type);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.kind.ToString() + '(' + this._type->ToString() + ')'
     }
 }
@@ -1904,7 +1841,7 @@ class HIRDeferredExpression : HIRExpression {
         this.expression = expression;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "<deferred expression>".ToString()
     }
 }
@@ -1916,7 +1853,7 @@ class HIRBlockExpression : HIRExpression {
 
     HIRBlockExpression(&mut this, _type: *HIRType) : HIRExpression(HIRExpressionKind::Block, _type) {}
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let mut result = '{'.ToString();
 
         if this.statements.Empty() && this.tail == null && this.destructors.Empty() {
@@ -1978,7 +1915,7 @@ class HIRIfExpression : HIRExpression {
         (this.condition, this.destructors, this.then_body, this.else_body) = (condition, destructors, then_body, else_body);
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let mut result = "if " + this.condition->ToString() + ' ' + this.then_body->ToString(indent);
 
         if this.else_body != null {
@@ -1999,7 +1936,7 @@ class HIRWhileExpression : HIRExpression {
         (this.condition, this.destructors, this.while_body, this.else_body) = (condition, destructors, while_body, else_body);
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let mut result = "while " + this.condition->ToString() + ' ' + this.while_body->ToString(indent);
 
         if this.else_body != null {
@@ -2016,7 +1953,7 @@ class HIRLoopExpression : HIRExpression {
 
     HIRLoopExpression(&mut this, _type: *HIRType) : HIRExpression(HIRExpressionKind::Loop, _type) {}
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         "loop " + this.body->ToString(indent)
     }
 }
@@ -2033,7 +1970,7 @@ class HIRForExpression : HIRExpression {
         (this.iterator, this.target, this.condition, this.step, this.destructors, this.body) = (iterator, target, condition, step, destructors, body);
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         "for " + this.iterator->ToString() + ", " + this.condition->ToString() + ", " + this.step->ToString() + ' ' + this.body->ToString(indent)
     }
 }
@@ -2696,7 +2633,7 @@ class HIRMatchExpression : HIRExpression {
         this.Uncovered().Empty()
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let mut result = "match " + this.target->ToString() + " {\n";
 
         for i in 0..this.arms.Size() {
@@ -2716,7 +2653,7 @@ class HIRReturnExpression : HIRExpression {
         (this.value, this.destructors) = (value, destructors);
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let result = DestructorsToString(this.destructors, indent) + "return";
 
         if this.value != null {
@@ -2735,7 +2672,7 @@ class HIRBreakExpression : HIRExpression {
         (this.value, this.destructors) = (value, destructors);
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         let result = DestructorsToString(this.destructors, indent) + "break";
 
         if this.value != null {
@@ -2753,7 +2690,7 @@ class HIRContinueExpression : HIRExpression {
         this.destructors = destructors;
     }
 
-    pub fn ToString(&this, indent: usize) -> String {
+    pub override fn ToString(&this, indent: usize) -> String {
         DestructorsToString(this.destructors, indent) + "continue"
     }
 }
@@ -2768,6 +2705,8 @@ class HIRStatement {
     HIRStatement(&mut this, kind: HIRStatementKind) {
         this.kind = kind;
     }
+
+    virtual ~HIRStatement(&mut this) {}
 
     pub fn HasBlock(&this) -> bool {
         this.kind == HIRStatementKind::Assembly || (this.kind == HIRStatementKind::Expression && (this as *HIRExpressionStatement)->expression->IsBlockLike())
@@ -2895,23 +2834,9 @@ class HIRDeclaration {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            HIRDeclarationKind::Parameter => (this as *HIRParameterDeclaration)->ToString(),
-            HIRDeclarationKind::Function => (this as *HIRFunctionDeclaration)->ToString(0),
-            HIRDeclarationKind::Field => (this as *HIRFieldDeclaration)->ToString(),
-            HIRDeclarationKind::Class => (this as *HIRClassDeclaration)->ToString(),
-            HIRDeclarationKind::Structure => (this as *HIRStructureDeclaration)->ToString(),
-            HIRDeclarationKind::EnumerationMember => (this as *HIREnumerationMember)->ToString(),
-            HIRDeclarationKind::Enumeration => (this as *HIREnumerationDeclaration)->ToString(),
-            HIRDeclarationKind::VariantMember => (this as *HIRVariantMember)->ToString(),
-            HIRDeclarationKind::Variant => (this as *HIRVariantDeclaration)->ToString(),
-            HIRDeclarationKind::Extend => (this as *HIRExtendDeclaration)->ToString(),
-            HIRDeclarationKind::Constant => (this as *HIRConstantDeclaration)->ToString(),
-            HIRDeclarationKind::Static => (this as *HIRStaticDeclaration)->ToString(),
-            HIRDeclarationKind::Assembly => (this as *HIRAssemblyDeclaration)->ToString()
-        }
-    }
+    virtual ~HIRDeclaration(&mut this) {}
+
+    pub virtual fn ToString(&this) -> String;
 }
 
 class HIRTypedDeclaration : HIRDeclaration {
@@ -2948,7 +2873,7 @@ class HIRParameterDeclaration : HIRTypedDeclaration {
         this.mutable = mutable;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '%' + this.name + ": " + this._type->ToString()
     }
 }
@@ -2962,10 +2887,18 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub instance: *GenericInstance = null,
     pub caller_location: *HIRParameterDeclaration = null,
     pub referenced: bool = false,
-    pub deferred: bool = false;
+    pub deferred: bool = false,
+    pub _virtual: bool = false,
+    pub _override: bool = false,
+    pub abstract: bool = false,
+    pub virtual_index: isize = -1;
 
     HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRLinkableDeclaration(HIRDeclarationKind::Function, name, _type, abi, HIRDeclarationLinkage::External) {
         (this.parameters, this._return, this.no_mangle, this.public) = (parameters, _return, no_mangle, public);
+    }
+
+    pub override fn ToString(&this) -> String {
+        this.ToString(0)
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2997,7 +2930,7 @@ class HIRFieldDeclaration : HIRTypedDeclaration {
         (this.index, this.initializer, this.public) = (index, initializer, public);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '%' + this.name + ": " + this._type->ToString();
 
         if this.initializer != null {
@@ -3009,25 +2942,24 @@ class HIRFieldDeclaration : HIRTypedDeclaration {
 }
 
 class HIRClassDeclaration : HIRTypedDeclaration {
-    pub parents: Vector<*HIRType>,
+    pub parent: *HIRType = null,
     pub fields: Vector<*HIRFieldDeclaration>,
     pub constructors: Vector<*mut HIRFunctionDeclaration>,
     pub destructor: *mut HIRFunctionDeclaration = null,
     pub methods: Vector<*mut HIRFunctionDeclaration>,
-    pub instance: *GenericInstance = null;
+    pub instance: *GenericInstance = null,
+    pub node: *ASTClassDeclaration = null,
+    pub vtable: Vector<*HIRFunctionDeclaration>,
+    pub vtable_ready: bool = false,
+    pub vptr: bool = false;
 
     HIRClassDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Class, name, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "class %" + this.name;
 
-        if !this.parents.Empty() {
-            result += " : ";
-
-            for i in 0..this.parents.Size() {
-                if i != 0 { result += ", "; }
-                result += this.parents[i]->ToString();
-            }
+        if this.parent != null {
+            result += " : " + this.parent->ToString();
         } result += " {";
 
         if !this.fields.Empty() {
@@ -3070,7 +3002,7 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
 
     HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Structure, name, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "struct %" + this.name + " {";
 
         if !this.fields.Empty() {
@@ -3114,7 +3046,7 @@ class HIREnumerationMember : HIRTypedDeclaration {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '%' + this.name;
 
         if this.value != null {
@@ -3130,7 +3062,7 @@ class HIREnumerationDeclaration : HIRTypedDeclaration {
 
     HIREnumerationDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Enumeration, name, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "enum %" + this.name + " {";
 
         if !this.members.Empty() {
@@ -3173,7 +3105,7 @@ class HIRVariantMember : HIRTypedDeclaration {
         this.index = index;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '%' + this.name;
 
         if !this.fields.Empty() {
@@ -3199,7 +3131,7 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
 
     HIRVariantDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Variant, name, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "enum %" + this.name + " {";
 
         if !this.members.Empty() {
@@ -3241,7 +3173,7 @@ class HIRExtendDeclaration : HIRTypedDeclaration {
 
     HIRExtendDeclaration(&mut this, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Extend, _type->ToString(), _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "extend " + this.name + " {";
 
         for method in this.methods {
@@ -3300,7 +3232,7 @@ class HIRConstantDeclaration : HIRTypedDeclaration {
         this.initializer = initializer;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "const @" + this.name + ": " + this._type->ToString() + " = " + this.initializer->ToString()
     }
 }
@@ -3314,7 +3246,7 @@ class HIRStaticDeclaration : HIRLinkableDeclaration {
         (this.initializer, this.alignment, this.mutable) = (initializer, alignment, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "static @" + this.name + ": " + this._type->ToString();
 
         if this.initializer != null {
@@ -3330,6 +3262,10 @@ class HIRAssemblyDeclaration : HIRDeclaration {
 
     HIRAssemblyDeclaration(&mut this, text: String) : HIRDeclaration(HIRDeclarationKind::Assembly) {
         this.text = text;
+    }
+
+    pub override fn ToString(&this) -> String {
+        "asm {" + this.text + '}'
     }
 }
 
@@ -3861,6 +3797,10 @@ class HIRBuilder {
 
     pub fn Destructor(&mut this, instance: *HIRExpression, callee: *HIRExpression) -> *mut HIRDestructorExpression {
         this.context->arena.New<HIRDestructorExpression>(instance, callee, this.context->UnitType())
+    }
+
+    pub fn VTable(&mut this, instance: *HIRExpression, _class: *HIRType) -> *mut HIRVTableExpression {
+        this.context->arena.New<HIRVTableExpression>(instance, _class, this.context->UnitType())
     }
 
     pub fn Intrinsic(&mut this, kind: HIRIntrinsicKind, _type: *HIRType) -> *mut HIRIntrinsicExpression {

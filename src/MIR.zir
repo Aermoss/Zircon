@@ -27,23 +27,15 @@ class MIRType {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            MIRTypeKind::Void => (this as *MIRVoidType)->ToString(),
-            MIRTypeKind::Integer => (this as *MIRIntegerType)->ToString(),
-            MIRTypeKind::Float => (this as *MIRFloatType)->ToString(),
-            MIRTypeKind::Pointer => (this as *MIRPointerType)->ToString(),
-            MIRTypeKind::Array => (this as *MIRArrayType)->ToString(),
-            MIRTypeKind::Structure => (this as *MIRStructureType)->ToString(),
-            MIRTypeKind::Function => (this as *MIRFunctionType)->ToString()
-        }
-    }
+    virtual ~MIRType(&mut this) {}
+
+    pub virtual fn ToString(&this) -> String;
 }
 
 class MIRVoidType : MIRType {
     MIRVoidType(&mut this) : MIRType(MIRTypeKind::Void) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "void".ToString()
     }
 }
@@ -55,7 +47,7 @@ class MIRIntegerType : MIRType {
         this.width = width;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         'i' + String::FromInteger(this.width as u64)
     }
 }
@@ -67,7 +59,7 @@ class MIRFloatType : MIRType {
         this.width = width;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         'f' + String::FromInteger(this.width as u64)
     }
 }
@@ -79,7 +71,7 @@ class MIRPointerType : MIRType {
         this.pointee = pointee;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '*' + this.pointee->ToString()
     }
 }
@@ -92,7 +84,7 @@ class MIRArrayType : MIRType {
         (this.element, this.length) = (element, length);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
     }
 }
@@ -124,7 +116,7 @@ class MIRStructureType : MIRType {
         result + " }"
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.name.Empty()  {
             return this.ToDefinitionString();
         }
@@ -141,7 +133,7 @@ class MIRFunctionType : MIRType {
         (this.parameters, this._return) = (parameters, _return);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
         for i in 0..this.parameters.Size() {
@@ -168,6 +160,8 @@ class MIRValue {
     MIRValue(&mut this, kind: MIRValueKind, _type: *MIRType) {
         (this.kind, this._type) = (kind, _type);
     }
+
+    virtual ~MIRValue(&mut this) {}
 
     pub fn ToString(&this) -> String {
         let mut _type = this._type;
@@ -196,18 +190,7 @@ class MIRConstant : MIRValue {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            MIRConstantKind::Integer => (this as *MIRConstantInteger)->ToString(),
-            MIRConstantKind::Float => (this as *MIRConstantFloat)->ToString(),
-            MIRConstantKind::String => (this as *MIRConstantString)->ToString(),
-            MIRConstantKind::Array => (this as *MIRConstantArray)->ToString(),
-            MIRConstantKind::Structure => (this as *MIRConstantStructure)->ToString(),
-            MIRConstantKind::Null => (this as *MIRConstantNull)->ToString(),
-            MIRConstantKind::Expression => (this as *MIRConstantExpression)->ToString(),
-            MIRConstantKind::Undef => (this as *MIRConstantUndef)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 class MIRConstantInteger : MIRConstant {
@@ -217,7 +200,7 @@ class MIRConstantInteger : MIRConstant {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if (this._type as *MIRIntegerType)->width == 1 {
             return (if this.value != 0 { "true" } else { "false" }).ToString();
         }
@@ -233,7 +216,7 @@ class MIRConstantFloat : MIRConstant {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromFloat(this.value)
     }
 }
@@ -245,7 +228,7 @@ class MIRConstantString : MIRConstant {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '"' + this.value.Escape() + '"'
     }
 }
@@ -257,7 +240,7 @@ class MIRConstantArray : MIRConstant {
         this.elements = elements;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '['.ToString();
 
         for i in 0..this.elements.Size() {
@@ -276,7 +259,7 @@ class MIRConstantStructure : MIRConstant {
         this.fields = fields;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '{'.ToString();
 
         for i in 0..this.fields.Size() {
@@ -291,7 +274,7 @@ class MIRConstantStructure : MIRConstant {
 class MIRConstantNull : MIRConstant {
     MIRConstantNull(&mut this, _type: *MIRType) : MIRConstant(MIRConstantKind::Null, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "null".ToString()
     }
 }
@@ -299,7 +282,7 @@ class MIRConstantNull : MIRConstant {
 class MIRConstantUndef : MIRConstant {
     MIRConstantUndef(&mut this, _type: *MIRType) : MIRConstant(MIRConstantKind::Undef, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "undef".ToString()
     }
 }
@@ -313,16 +296,6 @@ class MIRConstantExpression : MIRConstant {
 
     MIRConstantExpression(&mut this, kind: MIRConstantExpressionKind, _type: *MIRType) : MIRConstant(MIRConstantKind::Expression, _type) {
         this.kind = kind;
-    }
-
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            MIRConstantExpressionKind::Unary => (this as *MIRUnaryExpression)->ToString(),
-            MIRConstantExpressionKind::Binary => (this as *MIRBinaryExpression)->ToString(),
-            MIRConstantExpressionKind::Cast => (this as *MIRCastExpression)->ToString(),
-            MIRConstantExpressionKind::ArrayGEP => (this as *MIRArrayGEPExpression)->ToString(),
-            MIRConstantExpressionKind::StructGEP => (this as *MIRStructGEPExpression)->ToString()
-        }
     }
 }
 
@@ -348,7 +321,7 @@ class MIRUnaryExpression : MIRConstantExpression {
         (this.kind, this.operand) = (kind, operand);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.kind.ToString() + ' ' + this.operand->ToString()
     }
 }
@@ -411,7 +384,7 @@ class MIRBinaryExpression : MIRConstantExpression {
         (this.kind, this.left, this.right) = (kind, left, right);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.kind.ToString() + ' ' + this.left->ToString() + ", " + this.right->ToString()
     }
 }
@@ -449,7 +422,7 @@ class MIRCastExpression : MIRConstantExpression {
         (this.kind, this.value) = (kind, value);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.kind.ToString() + ' ' + this.value->ToString() + " to " + this._type->ToString()
     }
 }
@@ -462,7 +435,7 @@ class MIRArrayGEPExpression : MIRConstantExpression {
         (this.pointer, this.index) = (pointer, index);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "getelementptr " + this.pointer->ToString() + ", " + this.index->ToString()
     }
 }
@@ -475,7 +448,7 @@ class MIRStructGEPExpression : MIRConstantExpression {
         (this.pointer, this.index) = (pointer, index);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64)
     }
 }
@@ -803,14 +776,7 @@ class MIRTerminator : MIRInstruction {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            MIRTerminatorKind::Return => (this as *MIRReturnInstruction)->ToString(),
-            MIRTerminatorKind::Branch => (this as *MIRBranchInstruction)->ToString(),
-            MIRTerminatorKind::ConditionalBranch => (this as *MIRConditionalBranchInstruction)->ToString(),
-            MIRTerminatorKind::Unreachable => (this as *MIRUnreachableInstruction)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 class MIRReturnInstruction : MIRTerminator {
@@ -820,7 +786,7 @@ class MIRReturnInstruction : MIRTerminator {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "return".ToString();
 
         if this.value != null {
@@ -838,7 +804,7 @@ class MIRBranchInstruction : MIRTerminator {
         this.target = target;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "branch " + this.target->ToString()
     }
 }
@@ -852,7 +818,7 @@ class MIRConditionalBranchInstruction : MIRTerminator {
         (this.condition, this.then_target, this.else_target) = (condition, then_target, else_target);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "branch " + this.condition->ToString() + ", " + this.then_target->ToString() + ", " + this.else_target->ToString()
     }
 }
@@ -860,7 +826,7 @@ class MIRConditionalBranchInstruction : MIRTerminator {
 class MIRUnreachableInstruction : MIRTerminator {
     MIRUnreachableInstruction(&mut this, _type: *MIRType) : MIRTerminator(MIRTerminatorKind::Unreachable, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "unreachable".ToString()
     }
 }
@@ -970,15 +936,9 @@ class MIRDeclaration {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            MIRDeclarationKind::Type => (this as *MIRTypeDeclaration)->ToString(),
-            MIRDeclarationKind::Function => (this as *MIRFunctionDeclaration)->ToString(),
-            MIRDeclarationKind::Constant => (this as *MIRConstantDeclaration)->ToString(),
-            MIRDeclarationKind::Static => (this as *MIRStaticDeclaration)->ToString(),
-            MIRDeclarationKind::Assembly => (this as *MIRAssemblyDeclaration)->ToString()
-        }
-    }
+    virtual ~MIRDeclaration(&mut this) {}
+
+    pub virtual fn ToString(&this) -> String;
 }
 
 class MIRTypedDeclaration : MIRDeclaration {
@@ -1005,7 +965,7 @@ class MIRLinkableDeclaration : MIRTypedDeclaration {
 class MIRTypeDeclaration : MIRTypedDeclaration {
     MIRTypeDeclaration(&mut this, name: String, _type: *MIRType) : MIRTypedDeclaration(MIRDeclarationKind::Type, name, _type) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "type %" + this.name + " = ";
 
         if this._type->kind == MIRTypeKind::Structure {
@@ -1055,7 +1015,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         name + '.' + String::FromInteger(count as u64)
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "fn @\"" + this.name + "\"(";
 
         for i in 0..this.parameters.Size() {
@@ -1088,7 +1048,7 @@ class MIRConstantDeclaration : MIRTypedDeclaration {
         this.initializer = initializer;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "const @\"" + this.name + "\": " + this._type->ToString() + " = " + this.initializer->ToString()
     }
 }
@@ -1101,7 +1061,7 @@ class MIRStaticDeclaration : MIRLinkableDeclaration {
         (this.initializer, this.mutable) = (initializer, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "static @\"" + this.name + "\": " + this._type->ToString();
 
         if this.initializer != null {
@@ -1119,7 +1079,7 @@ class MIRAssemblyDeclaration : MIRDeclaration {
         this.text = text;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "asm {" + this.text + '}'
     }
 }

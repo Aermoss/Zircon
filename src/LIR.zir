@@ -27,15 +27,9 @@ class LIROperand {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            LIROperandKind::Register => (this as *LIRRegisterOperand)->ToString(),
-            LIROperandKind::Immediate => (this as *LIRImmediateOperand)->ToString(),
-            LIROperandKind::Memory => (this as *LIRMemoryOperand)->ToString(),
-            LIROperandKind::Block => (this as *LIRBlockOperand)->ToString(),
-            LIROperandKind::Symbol => (this as *LIRSymbolOperand)->ToString()
-        }
-    }
+    virtual ~LIROperand(&mut this) {}
+
+    pub virtual fn ToString(&this) -> String;
 }
 
 enum LIRRegisterKind: u8 {
@@ -48,13 +42,6 @@ class LIRRegisterOperand : LIROperand {
     LIRRegisterOperand(&mut this, kind: LIRRegisterKind) : LIROperand(LIROperandKind::Register) {
         this.kind = kind;
     }
-
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            LIRRegisterKind::Virtual => (this as *LIRVirtualRegister)->ToString(),
-            LIRRegisterKind::Physical => (this as *LIRPhysicalRegister)->ToString()
-        }
-    }
 }
 
 class LIRVirtualRegister : LIRRegisterOperand {
@@ -64,7 +51,7 @@ class LIRVirtualRegister : LIRRegisterOperand {
         this.index = index;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         'v' + String::FromInteger(this.index as u64)
     }
 }
@@ -133,7 +120,7 @@ class LIRPhysicalRegister : LIRRegisterOperand {
         (this.index, this.name) = (index, name);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.name.Empty() {
             return 'x' + String::FromInteger(this.index as u64);
         }
@@ -149,7 +136,7 @@ class LIRImmediateOperand : LIROperand {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromInteger(this.value)
     }
 }
@@ -162,7 +149,7 @@ class LIRMemoryOperand : LIROperand {
         (this.base, this.offset) = (base, offset);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromInteger(this.offset as i64) + '(' + this.base->ToString() + ')'
     }
 }
@@ -174,7 +161,7 @@ class LIRBlockOperand : LIROperand {
         this.block = block;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.block->ToString()
     }
 }
@@ -186,7 +173,7 @@ class LIRSymbolOperand : LIROperand {
         this.name = name;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "@\"" + this.name + '"'
     }
 }

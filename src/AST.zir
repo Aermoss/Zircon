@@ -41,6 +41,8 @@ class ASTNode {
     ASTNode(&mut this, kind: ASTNodeKind, start: Token) {
         (this.kind, this.start) = (kind, start);
     }
+
+    virtual ~ASTNode(&mut this) {}
 }
 
 class ASTPathSegment {
@@ -121,23 +123,13 @@ class ASTType : ASTNode {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            ASTTypeKind::Never => (this as *ASTNeverType)->ToString(),
-            ASTTypeKind::Path => (this as *ASTPathType)->ToString(),
-            ASTTypeKind::Pointer => (this as *ASTPointerType)->ToString(),
-            ASTTypeKind::Reference => (this as *ASTReferenceType)->ToString(),
-            ASTTypeKind::Array => (this as *ASTArrayType)->ToString(),
-            ASTTypeKind::Tuple => (this as *ASTTupleType)->ToString(),
-            ASTTypeKind::Function => (this as *ASTFunctionType)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 class ASTNeverType : ASTType {
     ASTNeverType(&mut this, start: Token) : ASTType(ASTTypeKind::Never, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '!'.ToString()
     }
 }
@@ -149,7 +141,7 @@ class ASTPathType : ASTType {
         this.path = path;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.path->ToString()
     }
 }
@@ -162,7 +154,7 @@ class ASTPointerType : ASTType {
         (this.pointee, this.mutable) = (pointee, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.mutable { "*mut " } else { "*" }) + this.pointee->ToString()
     }
 }
@@ -175,7 +167,7 @@ class ASTReferenceType : ASTType {
         (this.pointee, this.mutable) = (pointee, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.mutable { "&mut " } else { "&" }) + this.pointee->ToString()
     }
 }
@@ -188,7 +180,7 @@ class ASTArrayType : ASTType {
         (this.element, this.length) = (element, length);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '[' + this.element->ToString() + "; " + this.length->ToString() + ']'
     }
 }
@@ -198,7 +190,7 @@ class ASTTupleType : ASTType {
 
     ASTTupleType(&mut this, start: Token) : ASTType(ASTTypeKind::Tuple, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
         for i in 0..this.elements.Size() {
@@ -217,7 +209,7 @@ class ASTFunctionType : ASTType {
 
     ASTFunctionType(&mut this, start: Token) : ASTType(ASTTypeKind::Function, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
         for i in 0..this.parameters.Size() {
@@ -398,35 +390,7 @@ class ASTExpression : ASTNode {
         this.kind = kind;
     }
 
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            ASTExpressionKind::Literal => (this as *ASTLiteral)->ToString(),
-            ASTExpressionKind::Path => (this as *ASTPathExpression)->ToString(),
-            ASTExpressionKind::Unary => (this as *ASTUnaryExpression)->ToString(),
-            ASTExpressionKind::Binary => (this as *ASTBinaryExpression)->ToString(),
-            ASTExpressionKind::Call => (this as *ASTCallExpression)->ToString(),
-            ASTExpressionKind::PackSplat => (this as *ASTPackSplatExpression)->ToString(),
-            ASTExpressionKind::MemberAccess => (this as *ASTMemberAccessExpression)->ToString(),
-            ASTExpressionKind::TupleAccess => (this as *ASTTupleAccessExpression)->ToString(),
-            ASTExpressionKind::IndexAccess => (this as *ASTIndexAccessExpression)->ToString(),
-            ASTExpressionKind::Cast => (this as *ASTCastExpression)->ToString(),
-            ASTExpressionKind::New => (this as *ASTNewExpression)->ToString(),
-            ASTExpressionKind::Delete => (this as *ASTDeleteExpression)->ToString(),
-            ASTExpressionKind::Assignment => (this as *ASTAssignmentExpression)->ToString(),
-            ASTExpressionKind::Await => (this as *ASTAwaitExpression)->ToString(),
-            ASTExpressionKind::Range => (this as *ASTRangeExpression)->ToString(),
-            ASTExpressionKind::Block => (this as *ASTBlockExpression)->ToString(),
-            ASTExpressionKind::If => (this as *ASTIfExpression)->ToString(),
-            ASTExpressionKind::While => (this as *ASTWhileExpression)->ToString(),
-            ASTExpressionKind::Loop => (this as *ASTLoopExpression)->ToString(),
-            ASTExpressionKind::For => (this as *ASTForExpression)->ToString(),
-            ASTExpressionKind::Match => (this as *ASTMatchExpression)->ToString(),
-            ASTExpressionKind::Return => (this as *ASTReturnExpression)->ToString(),
-            ASTExpressionKind::Break => (this as *ASTBreakExpression)->ToString(),
-            ASTExpressionKind::Continue => (this as *ASTContinueExpression)->ToString(),
-            ASTExpressionKind::Try => (this as *ASTTryExpression)->ToString()
-        }
-    }
+    pub virtual fn ToString(&this) -> String;
 }
 
 enum ASTLiteralKind: u8 {
@@ -455,20 +419,6 @@ class ASTLiteral : ASTExpression {
     ASTLiteral(&mut this, kind: ASTLiteralKind, start: Token) : ASTExpression(ASTExpressionKind::Literal, start) {
         this.kind = kind;
     }
-
-    pub fn ToString(&this) -> String {
-        match this.kind {
-            ASTLiteralKind::Boolean => (this as *ASTBooleanLiteral)->ToString(),
-            ASTLiteralKind::Character => (this as *ASTCharacterLiteral)->ToString(),
-            ASTLiteralKind::Integer => (this as *ASTIntegerLiteral)->ToString(),
-            ASTLiteralKind::Float => (this as *ASTFloatLiteral)->ToString(),
-            ASTLiteralKind::String => (this as *ASTStringLiteral)->ToString(),
-            ASTLiteralKind::Array => (this as *ASTArrayLiteral)->ToString(),
-            ASTLiteralKind::Tuple => (this as *ASTTupleLiteral)->ToString(),
-            ASTLiteralKind::Structure => (this as *ASTStructureLiteral)->ToString(),
-            ASTLiteralKind::Null => (this as *ASTNullLiteral)->ToString()
-        }
-    }
 }
 
 class ASTBooleanLiteral : ASTLiteral {
@@ -478,7 +428,7 @@ class ASTBooleanLiteral : ASTLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.value { "true" } else { "false" }).ToString()
     }
 }
@@ -490,7 +440,7 @@ class ASTCharacterLiteral : ASTLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '\'' + String(this.value as i8).Escape() + '\''
     }
 }
@@ -503,7 +453,7 @@ class ASTIntegerLiteral : ASTLiteral {
         (this.value, this.suffix) = (value, suffix);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromInteger(this.value) + this.suffix
     }
 }
@@ -516,7 +466,7 @@ class ASTFloatLiteral : ASTLiteral {
         (this.value, this.suffix) = (value, suffix);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         String::FromFloat(this.value) + this.suffix
     }
 }
@@ -528,7 +478,7 @@ class ASTStringLiteral : ASTLiteral {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '"' + this.value.Escape() + '"'
     }
 }
@@ -539,7 +489,7 @@ class ASTArrayLiteral : ASTLiteral {
 
     ASTArrayLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Array, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.count != null {
             return '[' + this.elements[0]->ToString() + "; " + this.count->ToString() + ']';
         }
@@ -560,7 +510,7 @@ class ASTTupleLiteral : ASTLiteral {
 
     ASTTupleLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Tuple, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
         for i in 0..this.elements.Size() {
@@ -580,7 +530,7 @@ class ASTStructureLiteral : ASTLiteral {
         this.target = target;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.target->ToString() + " { ";
 
         for i in 0..this.fields.Size() {
@@ -596,7 +546,7 @@ class ASTStructureLiteral : ASTLiteral {
 class ASTNullLiteral : ASTLiteral {
     ASTNullLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Null, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "null".ToString()
     }
 }
@@ -608,7 +558,7 @@ class ASTPathExpression : ASTExpression {
         this.path = path;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.path->ToString()
     }
 }
@@ -637,7 +587,7 @@ class ASTUnaryExpression : ASTExpression {
         (this.kind, this.operand, this.mutable) = (kind, operand, mutable);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.kind.ToString() + this.operand->ToString()
     }
 }
@@ -683,7 +633,7 @@ class ASTBinaryExpression : ASTExpression {
         (this.kind, this.left, this.right) = (kind, left, right);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.left->ToString() + ' ' + this.kind.ToString() + ' ' + this.right->ToString()
     }
 }
@@ -696,7 +646,7 @@ class ASTCallExpression : ASTExpression {
         this.expression = expression;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = this.expression->ToString() + '(';
 
         for i in 0..this.arguments.Size() {
@@ -715,7 +665,7 @@ class ASTPackSplatExpression : ASTExpression {
         this.expression = expression;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.expression->ToString() + "..."
     }
 }
@@ -730,7 +680,7 @@ class ASTMemberAccessExpression : ASTExpression {
         (this.expression, this.arrow) = (expression, arrow);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.expression->ToString() + (if this.arrow { "->" } else { "." }) + this.member
     }
 }
@@ -744,7 +694,7 @@ class ASTTupleAccessExpression : ASTExpression {
         (this.expression, this.index, this.arrow) = (expression, index, arrow);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.expression->ToString() + (if this.arrow { "->" } else { "." }) + String::FromInteger(this.index as u64)
     }
 }
@@ -757,7 +707,7 @@ class ASTIndexAccessExpression : ASTExpression {
         (this.expression, this.index) = (expression, index);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.expression->ToString() + '[' + this.index->ToString() + ']'
     }
 }
@@ -770,7 +720,7 @@ class ASTCastExpression : ASTExpression {
         (this.expression, this.target) = (expression, target);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         '(' + this.expression->ToString() + " as " + this.target->ToString() + ')'
     }
 }
@@ -785,7 +735,7 @@ class ASTNewExpression : ASTExpression {
         this._type = _type;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         let mut result = "new " + this._type->ToString();
 
         if this.size != null {
@@ -809,7 +759,7 @@ class ASTDeleteExpression : ASTExpression {
 
     ASTDeleteExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Delete, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this.array { "delete[] " } else { "delete " }) + this.expression->ToString()
     }
 }
@@ -848,7 +798,7 @@ class ASTAssignmentExpression : ASTExpression {
         (this.kind, this.left, this.right) = (kind, left, right);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.next == null {
             this.left->ToString() + ' ' + this.kind.ToString() + ' ' + this.right->ToString()
         } else {
@@ -881,7 +831,7 @@ class ASTAwaitExpression : ASTExpression {
         this.expression = expression;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "await " + this.expression->ToString()
     }
 }
@@ -895,7 +845,7 @@ class ASTRangeExpression : ASTExpression {
         (this.start, this.end) = (start, end);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.start->ToString() + (if this.inclusive { "..=" } else { ".." }) + this.end->ToString()
     }
 }
@@ -907,7 +857,7 @@ class ASTBlockExpression : ASTExpression {
 
     ASTBlockExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Block, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         (if this._unsafe { "unsafe { ... }" } else { "{ ... }" }).ToString()
     }
 }
@@ -942,7 +892,7 @@ class ASTIfExpression : ASTExpression {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "if " + this.condition->ToString() + " { ... }"
     }
 }
@@ -956,7 +906,7 @@ class ASTWhileExpression : ASTExpression {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "while " + this.condition->ToString() + " { ... }"
     }
 }
@@ -968,7 +918,7 @@ class ASTLoopExpression : ASTExpression {
         this.body = body;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "loop { ... }".ToString()
     }
 }
@@ -982,7 +932,7 @@ class ASTForExpression : ASTExpression {
         (this.pattern, this.iterable, this.body) = (pattern, iterable, body);
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "for ... in " + this.iterable->ToString() + " { ... }"
     }
 }
@@ -1005,7 +955,7 @@ class ASTMatchExpression : ASTExpression {
         this.target = target;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "match " + this.target->ToString() + " { ... }"
     }
 }
@@ -1017,7 +967,7 @@ class ASTReturnExpression : ASTExpression {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.value != null {
             return "return " + this.value->ToString();
         }
@@ -1033,7 +983,7 @@ class ASTBreakExpression : ASTExpression {
         this.value = value;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         if this.value != null {
             return "break " + this.value->ToString();
         }
@@ -1045,7 +995,7 @@ class ASTBreakExpression : ASTExpression {
 class ASTContinueExpression : ASTExpression {
     ASTContinueExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Continue, start) {}
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         "continue".ToString()
     }
 }
@@ -1057,7 +1007,7 @@ class ASTTryExpression : ASTExpression {
         this.expression = expression;
     }
 
-    pub fn ToString(&this) -> String {
+    pub override fn ToString(&this) -> String {
         this.expression->ToString() + "?"
     }
 }
@@ -1182,6 +1132,8 @@ class ASTFunctionDeclaration : ASTDeclaration {
     pub pack_name: String,
     pub var_arg: bool = false,
     pub _async: bool = false,
+    pub _virtual: bool = false,
+    pub _override: bool = false,
     pub _return: *ASTType = null,
     pub constructors: Vector<*ASTCallExpression>,
     pub body: *ASTBlockExpression = null,
@@ -1206,7 +1158,7 @@ class ASTFieldDeclaration : ASTDeclaration {
 
 class ASTClassDeclaration : ASTDeclaration {
     pub name: String,
-    pub parents: Vector<*ASTType>,
+    pub parent: *ASTType = null,
     pub fields: Vector<*ASTFieldDeclaration>,
     pub constructors: Vector<*ASTFunctionDeclaration>,
     pub destructor: *ASTFunctionDeclaration = null,
