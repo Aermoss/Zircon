@@ -122,7 +122,7 @@ extern "C" {
             syscall
         } -> rax(result) : memory, rcx, r11;
 
-        return result as i32;
+        result as i32
     } #[endif]
 
     fn fork() -> i32 #[if LIBC] ; #[else] {
@@ -132,7 +132,7 @@ extern "C" {
             syscall
         } -> rax(result) : memory, rcx, r11;
 
-        return result as i32;
+        result as i32
     } #[endif]
 
     fn execve(path: *i8, argv: **i8, envp: **i8) -> i32 #[if LIBC] ; #[else] {
@@ -142,7 +142,7 @@ extern "C" {
             syscall
         } -> rax(result) : memory, rcx, r11;
 
-        return result as i32;
+        result as i32
     } #[endif]
 
     fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32 #[if LIBC] ; #[else] {
@@ -152,7 +152,7 @@ extern "C" {
             syscall
         } -> rax(result) : memory, rcx, r11;
 
-        return result as i32;
+        result as i32
     } #[endif]
 }
 
@@ -182,7 +182,7 @@ fn Execute(command: *i8) -> u32 {
         Exit(1);
     }
 
-    let mut status: i32 = 0;
+    let mut status = 0;
     waitpid(pid, &mut status, 0);
     ((status >> 8) & 0xFF) as u32
 }
