@@ -104,10 +104,8 @@ class Shared<T> {
     }
 
     pub fn operator=(&mut this, other: &Shared<T>) -> &mut Shared<T> {
-        if &this == &other { return this; }
         if this.control == other.control { return this; }
         this.Release();
-
         if other.control == null { return this; }
         let mut count = AtomicLoad64(&other.control->strong);
 
@@ -232,7 +230,7 @@ class Weak<T> {
     }
 
     pub fn operator=(&mut this, other: &Weak<T>) -> &mut Weak<T> {
-        if &this == &other { return this; }
+        if this.control == other.control { return this; }
         this.Release();
         if other.control == null { return this; }
         AtomicFetchAdd64(&mut other.control->weak, 1);

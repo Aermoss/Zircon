@@ -225,6 +225,7 @@ class MIRLowerer {
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *HIRFunctionDeclaration) {
+        if function->deferred { return; }
         let mut name = function->name;
 
         if function->abi == HIRDeclarationABI::Native && !function->no_mangle {

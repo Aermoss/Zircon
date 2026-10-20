@@ -50,6 +50,18 @@ class HIRLoweringFrame {
     }
 }
 
+class HIRDeferredMethod {
+    pub function: *mut HIRFunctionDeclaration,
+    pub method: *ASTFunctionDeclaration,
+    pub scope: *mut Scope,
+    pub generic: *mut GenericDeclaration,
+    pub _type: *HIRType;
+
+    HIRDeferredMethod(&mut this, function: *mut HIRFunctionDeclaration, method: *ASTFunctionDeclaration, scope: *mut Scope, generic: *mut GenericDeclaration, _type: *HIRType) {
+        (this.function, this.method, this.scope, this.generic, this._type) = (function, method, scope, generic, _type);
+    }
+}
+
 class HIRLowerer {
     context: HIRContext,
     pub module: *mut HIRModule = null,
@@ -75,6 +87,7 @@ class HIRLowerer {
     _unsafe: bool = false,
 
     pub generics: Vector<*mut GenericDeclaration>,
+    deferred_methods: Vector<*mut HIRDeferredMethod>,
     current_generic: *mut GenericDeclaration = null,
     pub current_type: *HIRType = null;
 
@@ -146,6 +159,7 @@ class HIRLowerer {
             generic->LowerInstances();
         }
 
+        this.LowerDeferredMethods();
         this.class_data.Clear();
         this.structure_data.Clear();
         this.variant_data.Clear();
@@ -752,6 +766,38 @@ class HIRLowerer {
         }
 
         declaration
+    }
+
+    fn LowerMethodDeclarationSecondPass(&mut this, declaration: *mut HIRFunctionDeclaration, method: *ASTFunctionDeclaration, instance: *GenericInstance) {
+        if instance == null {
+            this.LowerFunctionDeclarationSecondPass(declaration, method);
+            return;
+        }
+
+        declaration->deferred = true;
+        this.deferred_methods.PushBack(this.context.arena.New<HIRDeferredMethod>(declaration, method, this.scope_manager.current, this.current_generic, this.current_type));
+    }
+
+    fn LowerDeferredMethods(&mut this) {
+        let mut lowered = true;
+
+        while lowered {
+            lowered = false;
+
+            for i in 0..this.deferred_methods.Size() {
+                let deferred = this.deferred_methods[i];
+                if !deferred->function->deferred || !deferred->function->referenced { continue; }
+                deferred->function->deferred = false;
+
+                let mut frame = HIRLoweringFrame(deferred->scope, deferred->generic, deferred->_type);
+                this.SwapFrame(frame);
+                this.LowerFunctionDeclarationSecondPass(deferred->function, deferred->method);
+                this.SwapFrame(frame);
+                lowered = true;
+            }
+        }
+
+        this.deferred_methods.Clear();
     }
 
     pub fn LowerFunctionDeclarationSecondPass(&mut this, declaration: *mut HIRFunctionDeclaration, function: *ASTFunctionDeclaration) {
@@ -1457,11 +1503,13 @@ class HIRLowerer {
             if method->generic || !method->pack_name.Empty() { continue; }
             if index >= declaration->methods.Size() { break; }
             let function = declaration->methods[index];
-            this.LowerFunctionDeclarationSecondPass(function, method);
             index += 1;
 
             if this.IsCopyAssignment(function, declaration->_type) {
+                this.LowerFunctionDeclarationSecondPass(function, method);
                 has_copy_assign = true;
+            } else {
+                this.LowerMethodDeclarationSecondPass(function, method, declaration->instance);
             }
         }
 
@@ -1561,7 +1609,7 @@ class HIRLowerer {
         for method in structure->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
             if index >= declaration->methods.Size() { break; }
-            this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
+            this.LowerMethodDeclarationSecondPass(declaration->methods[index], method, declaration->instance);
             index += 1;
         }
 
@@ -1756,7 +1804,7 @@ class HIRLowerer {
         for method in variant->methods {
             if method->generic || !method->pack_name.Empty() { continue; }
             if index >= declaration->methods.Size() { break; }
-            this.LowerFunctionDeclarationSecondPass(declaration->methods[index], method);
+            this.LowerMethodDeclarationSecondPass(declaration->methods[index], method, declaration->instance);
             index += 1;
         }
 
@@ -3919,33 +3967,15 @@ class HIRLowerer {
         if function != null {
             return this.LowerResolvedCallExpression(function, values, node);
         } else if left->_type->HasFields() || right->_type->HasFields() {
-            let reciever = if left->_type->HasFields() { left } else { right };
-            let argument = if left->_type->HasFields() { right } else { left };
-
             let mut values = Vector<*HIRExpression>();
+            let reciever = if left->_type->HasFields() { left } else { right };
             values.PushBack(reciever);
-            values.PushBack(argument);
-
-            if reciever->_type->HasMethods() {
-                let candidates = reciever->_type->GetCandidates(name, node, true);
-                let function = this.ResolveOverload(candidates, values, node, true);
-
-                if function != null {
-                    return this.LowerResolvedCallExpression(function, values, node);
-                }
-            }
-
-            if *left->_type == *right->_type {
-                if kind != ASTBinaryKind::Equal && kind != ASTBinaryKind::NotEqual {
-                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
-                    return null;
-                }
-
-                return this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType());
-            } else {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
-                return null;
-            }
+            values.PushBack(if left->_type->HasFields() { right } else { left });
+            let candidates = reciever->_type->GetCandidates(name, node, false);
+            if candidates.Empty() { return null }
+            let function = this.ResolveOverload(candidates, values, node, false);
+            if function == null { return null }
+            return this.LowerResolvedCallExpression(function, values, node);
         }
 
         if kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift {

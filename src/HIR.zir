@@ -2943,7 +2943,9 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub _return: *HIRType,
     pub body: *HIRBlockExpression = null,
     pub instance: *GenericInstance = null,
-    pub caller_location: *HIRParameterDeclaration = null;
+    pub caller_location: *HIRParameterDeclaration = null,
+    pub referenced: bool = false,
+    pub deferred: bool = false;
 
     HIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*HIRParameterDeclaration>, _return: *HIRType, _type: *HIRType, no_mangle: bool, public: bool, abi: HIRDeclarationABI) : HIRLinkableDeclaration(HIRDeclarationKind::Function, name, _type, abi, HIRDeclarationLinkage::External) {
         (this.parameters, this._return, this.no_mangle, this.public) = (parameters, _return, no_mangle, public);
@@ -3033,6 +3035,7 @@ class HIRClassDeclaration : HIRTypedDeclaration {
         }
 
         for method in this.methods {
+            if method->deferred { continue; }
             result += "\n    " + method->ToString(1) + '\n';
         }
 
@@ -3075,6 +3078,7 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
         }
 
         for method in this.methods {
+            if method->deferred { continue; }
             result += "\n    " + method->ToString(1) + '\n';
         }
 
@@ -3203,6 +3207,7 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
         }
 
         for method in this.methods {
+            if method->deferred { continue; }
             result += "\n    " + method->ToString(1) + '\n';
         }
 
@@ -3574,6 +3579,10 @@ class HIRBuilder {
     }
 
     pub fn ReferenceDeclaration(&mut this, declaration: *HIRTypedDeclaration, mutable: bool) -> *mut HIRDeclarationReference {
+        if declaration->kind == HIRDeclarationKind::Function {
+            (declaration as *mut HIRFunctionDeclaration)->referenced = true;
+        }
+
         this.context->arena.New<HIRDeclarationReference>(declaration, mutable)
     }
 
