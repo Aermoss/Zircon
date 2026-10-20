@@ -437,7 +437,7 @@ fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
 }
 
 fn GetTemporaryPath() -> Result<String, IOError> {
-    Result<String, IOError>::Ok("/tmp/".ToString());
+    Result<String, IOError>::Ok("/tmp/".ToString())
 }
 
 fn AbsolutePath(path: &String) -> Result<String, IOError> {

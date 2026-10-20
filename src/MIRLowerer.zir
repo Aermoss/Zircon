@@ -204,6 +204,14 @@ class MIRLowerer {
         (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial()
     }
 
+    fn LowerReturnType(&mut this, _type: *HIRType) -> *MIRType {
+        if _type->IsUnit() { this.context.VoidType() } else { this.LowerAggregateType(_type) }
+    }
+
+    fn UnitConstant(&mut this) -> *MIRValue {
+        this.builder.ConstantStruct(Vector<*MIRValue>(), this.context.StructureType(Vector<*MIRType>()))
+    }
+
     fn LowerAggregateType(&mut this, _type: *HIRType) -> *MIRType {
         let lowered_type = this.LowerType(_type);
 
@@ -226,7 +234,7 @@ class MIRLowerer {
         }
 
         let mut _parameters = Vector<*MIRParameter>();
-        let mut _return = this.LowerAggregateType(function->_return);
+        let mut _return = this.LowerReturnType(function->_return);
         if _return == null { return; }
 
         if this.IsIndirectAggregate(function->_return) {
@@ -297,7 +305,7 @@ class MIRLowerer {
         this.LowerBlockExpression(function->body, null);
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
-            if function->_return->IsVoid() {
+            if function->_return->IsUnit() {
                 this.builder.BuildReturn(null);
             } else {
                 this.builder.BuildUnreachable();
@@ -834,14 +842,16 @@ class MIRLowerer {
         } else {
             let mut value: *MIRValue = null;
 
-            if _return->value != null {
+            if _return->value != null && !this.current_return->IsUnit() {
                 value = this.LowerExpression(_return->value);
                 if value == null { return; }
             }
 
             for destructor in _return->destructors {
                 this.LowerExpression(destructor);
-            } this.builder.BuildReturn(value);
+            }
+
+            this.builder.BuildReturn(value);
         }
     }
 
@@ -1011,6 +1021,7 @@ class MIRLowerer {
         }
 
         match expression->kind {
+            HIRExpressionKind::Literal if expression->_type->IsUnit() => this.UnitConstant(),
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind != HIRLiteralKind::Array && (expression as *HIRLiteral)->kind != HIRLiteralKind::Tuple && (expression as *HIRLiteral)->kind != HIRLiteralKind::Structure && (expression as *HIRLiteral)->kind != HIRLiteralKind::Variant => this.LowerLiteral(expression as *HIRLiteral),
             HIRExpressionKind::Intrinsic => this.LowerIntrinsicExpression(expression as *HIRIntrinsicExpression),
             HIRExpressionKind::Assignment => this.LowerAssignmentExpression(expression as *HIRAssignmentExpression),
@@ -1021,10 +1032,15 @@ class MIRLowerer {
             HIRExpressionKind::Cast => this.LowerCastExpression(expression as *HIRCastExpression),
             HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
             HIRExpressionKind::Binary => this.LowerBinaryExpression(expression as *HIRBinaryExpression),
-            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsVoid() || expression->_type->IsNever() => {
+            HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsNever() || expression->_type->IsUnit() => {
                 this.LowerControlExpression(expression, null);
                 this.EnsureReachable();
-                this.builder.ConstantUndef(this.LowerType(expression->_type))
+
+                if expression->_type->IsNever() {
+                    this.builder.ConstantUndef(this.LowerType(expression->_type))
+                } else {
+                    this.UnitConstant()
+                }
             },
             _ => {
                 let place = this.LowerPlaceExpression(expression);
@@ -1124,7 +1140,7 @@ class MIRLowerer {
         let value = this.LowerExpression(assignment->right);
         if place == null || value == null { return null; }
         this.builder.BuildStore(value, place);
-        value
+        this.UnitConstant()
     }
 
     fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>) -> Vector<*MIRValue> {
@@ -1180,6 +1196,8 @@ class MIRLowerer {
         if _return.IsNever() {
             this.builder.BuildUnreachable();
             this.builder.SetCurrentBlock(this.builder.BuildBlock("unreachable".ToString()));
+        } else if _return.IsUnit() {
+            return this.UnitConstant();
         } else if this.IsIndirectAggregate(_return) {
             return destination;
         } else if this.IsAggregate(_return) {
@@ -1214,7 +1232,7 @@ class MIRLowerer {
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(instance);
         this.builder.BuildCall("destructor".ToString(), callee, arguments);
-        null
+        this.UnitConstant()
     }
 
     fn LowerRuntimeFunction(&mut this, name: String, parameter_types: &Vector<*MIRType>, _return: *MIRType) -> *MIRFunctionDeclaration {
@@ -1368,7 +1386,7 @@ class MIRLowerer {
         let mut arguments = Vector<*MIRValue>();
         arguments.PushBack(raw_pointer);
         this.builder.BuildCall("delete".ToString(), callee, arguments);
-        null
+        this.UnitConstant()
     }
 
     fn UpcastPointer(&mut this, mut value: *MIRValue, mut source: *HIRType, path: &Vector<u32>) -> *MIRValue {
@@ -1642,7 +1660,13 @@ class MIRLowerer {
             }
         }
 
-        if left_type->IsBoolean() && right_type->IsBoolean() {
+        if left_type->IsUnit() {
+            match binary->kind {
+                HIRBinaryKind::Equal => this.builder.ConstantInteger(1, result_type),
+                HIRBinaryKind::NotEqual => this.builder.ConstantInteger(0, result_type),
+                _ => null
+            }
+        } else if left_type->IsBoolean() && right_type->IsBoolean() {
             match binary->kind {
                 HIRBinaryKind::BitwiseAnd => this.builder.BuildBinary("and".ToString(), MIRBinaryKind::And, left, right, result_type),
                 HIRBinaryKind::BitwiseOr => this.builder.BuildBinary("or".ToString(), MIRBinaryKind::Or, left, right, result_type),
@@ -1992,7 +2016,7 @@ class MIRLowerer {
             if declaration != null { declaration->_type } else { null }
         } else if _type->IsFunction() {
             let mut parameters = Vector<*MIRType>();
-            let mut _return = this.LowerAggregateType(_type->Return());
+            let mut _return = this.LowerReturnType(_type->Return());
             if _return == null { return null; }
 
             if this.IsIndirectAggregate(_type->Return()) {

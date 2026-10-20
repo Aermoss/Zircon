@@ -349,7 +349,7 @@ class HIRLowerer {
 
         if expression == null {
             return expression;
-        } else if expression->_type->IsNever() && target != null && !target->IsNever() && !target->IsVoid() {
+        } else if expression->_type->IsNever() && target != null && !target->IsNever() && !target->IsUnit() {
             return this.builder.Cast(expression, target);
         }
 
@@ -434,10 +434,10 @@ class HIRLowerer {
                     return this.Coerce(this.LowerExpression((expression as *HIRDeferredExpression)->expression, null));
                 },
                 HIRExpressionKind::Literal if ((expression as *HIRLiteral)->kind == HIRLiteralKind::Array || (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple) => {
-                    return this.Coerce(expression, this.context.VoidType());
+                    return this.Coerce(expression, this.context.UnitType());
                 },
                 HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::Match | HIRExpressionKind::Loop if expression->_type->IsLiteral() => {
-                    return this.Coerce(expression, this.context.VoidType());
+                    return this.Coerce(expression, this.context.UnitType());
                 },
                 _ if expression->_type->IsLiteral() => {
                     if expression->_type->IsInteger() {
@@ -521,7 +521,7 @@ class HIRLowerer {
     }
 
     fn ValidateFieldType(&mut this, name: &String, _type: *HIRType, owner: *HIRType, node: *ASTNode) -> bool {
-        if _type->IsVoid() || _type->IsNever() {
+        if _type->IsNever() {
             Logger::Log("Field '" + name + "' cannot have type '" + _type->ToString() + "'.", node, LogSeverity::Error);
             return false;
         }
@@ -719,7 +719,7 @@ class HIRLowerer {
             let _type = this.LowerType(parameter->_type);
             if _type == null { return null; }
 
-            if _type->IsVoid() || _type->IsNever() {
+            if _type->IsNever() {
                 Logger::Log("Parameter '" + parameter->name + "' cannot have type '" + _type->ToString() + "'.", parameter->_type, LogSeverity::Error);
             }
 
@@ -738,7 +738,7 @@ class HIRLowerer {
             }
         }
 
-        let _return = this.LowerType(function->_return);
+        let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
         if _return == null { return null; }
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
 
@@ -781,7 +781,7 @@ class HIRLowerer {
         if declaration->body != null && !declaration->body->_type->IsNever() {
             if declaration->_return->IsNever() {
                 Logger::Log("Function '" + function->name + "' has return type '!' but may return.", function, LogSeverity::Error);
-            } else if !declaration->_return->IsVoid() {
+            } else if !declaration->_return->IsUnit() {
                 Logger::Log("Function '" + function->name + "' does not return a value on all paths.", function, LogSeverity::Error);
             }
         }
@@ -875,7 +875,7 @@ class HIRLowerer {
         this.current_type = _type;
 
         if _type->copy_constructor == null {
-            let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
+            let function = this.LowerImplicitDeclaration(name, _type, this.context.UnitType(), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -903,7 +903,7 @@ class HIRLowerer {
         }
 
         if _type->destructor == null {
-            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
+            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.UnitType(), false, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -969,7 +969,7 @@ class HIRLowerer {
         this.current_type = _type;
 
         if _type->copy_constructor == null {
-            let function = this.LowerImplicitDeclaration(name, _type, this.context.VoidType(), true, null);
+            let function = this.LowerImplicitDeclaration(name, _type, this.context.UnitType(), true, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -996,7 +996,7 @@ class HIRLowerer {
         }
 
         if _type->destructor == null {
-            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.VoidType(), false, null);
+            let function = this.LowerImplicitDeclaration('~' + name, _type, this.context.UnitType(), false, null);
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -1157,11 +1157,11 @@ class HIRLowerer {
         }
 
         if _class->constructors.Empty() {
-            declaration->constructors.PushBack(this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), false, _class));
+            declaration->constructors.PushBack(this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.UnitType(), false, _class));
         }
 
         if !has_copy_constructor {
-            declaration->constructors.PushBack(this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), true, _class));
+            declaration->constructors.PushBack(this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.UnitType(), true, _class));
         }
 
         if _class->destructor != null {
@@ -1171,7 +1171,7 @@ class HIRLowerer {
                 declaration->destructor = function;
             }
         } else {
-            declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.VoidType(), false, _class);
+            declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.UnitType(), false, _class);
         }
 
         for method in _class->methods {
@@ -1551,8 +1551,8 @@ class HIRLowerer {
             }
         }
 
-        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), true, structure);
-        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.VoidType(), false, structure);
+        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.UnitType(), true, structure);
+        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.UnitType(), false, structure);
         declaration->copy_assign = this.LowerImplicitDeclaration("operator=".ToString(), declaration->_type, this.context.ReferenceType(declaration->_type, false), true, structure);
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
@@ -1746,8 +1746,8 @@ class HIRLowerer {
             }
         }
 
-        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.VoidType(), true, variant);
-        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.VoidType(), false, variant);
+        declaration->copy_constructor = this.LowerImplicitDeclaration(declaration->name, declaration->_type, this.context.UnitType(), true, variant);
+        declaration->destructor = this.LowerImplicitDeclaration('~' + declaration->name, declaration->_type, this.context.UnitType(), false, variant);
         declaration->copy_assign = this.LowerImplicitDeclaration("operator=".ToString(), declaration->_type, this.context.ReferenceType(declaration->_type, false), true, variant);
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
     }
@@ -1796,7 +1796,7 @@ class HIRLowerer {
 
                 this.builder.BuildExpressionStatement(this.builder.Return(null, Vector<*HIRExpression>()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.UnitType()));
             }
 
             this.scope_manager.PopScope();
@@ -1828,7 +1828,7 @@ class HIRLowerer {
 
                 this.builder.BuildExpressionStatement(this.builder.Return(null, Vector<*HIRExpression>()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.UnitType()));
             }
 
             this.scope_manager.PopScope();
@@ -1883,7 +1883,7 @@ class HIRLowerer {
                     }
 
                     this.builder.SetCurrentBlock(previous_block);
-                    this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
+                    this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.UnitType()));
                 }
 
                 for field in other_member->fields {
@@ -1892,9 +1892,9 @@ class HIRLowerer {
 
                 this.builder.BuildExpressionStatement(this.builder.Assignment(this_tag, member_tag));
                 this.builder.SetCurrentBlock(then_block);
-                this.builder.BuildExpressionStatement(this.builder.If(same_condition, Vector<*HIRExpression>(), same_block, different_block, this.context.VoidType()));
+                this.builder.BuildExpressionStatement(this.builder.If(same_condition, Vector<*HIRExpression>(), same_block, different_block, this.context.UnitType()));
                 this.builder.SetCurrentBlock(previous_block);
-                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.VoidType()));
+                this.builder.BuildExpressionStatement(this.builder.If(condition, Vector<*HIRExpression>(), then_block, null, this.context.UnitType()));
             }
 
             this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
@@ -2115,10 +2115,10 @@ class HIRLowerer {
     }
 
     fn LowerBlockTail(&mut this, expression: *ASTExpression, tail: HIRBlockTail, block: *mut HIRBlockExpression, expected: *HIRType) {
-        let returns = tail == HIRBlockTail::Return && !this.builder.GetCurrentFunction()->_return->IsVoid();
+        let returns = tail == HIRBlockTail::Return;
         let mut value = this.LowerExpectedExpression(expression, if returns { this.builder.GetCurrentFunction()->_return } else { expected });
 
-        if value != null && tail == HIRBlockTail::Value && expected != null && !value->_type->IsNever() && !value->_type->IsVoid() {
+        if value != null && tail == HIRBlockTail::Value && expected != null && !value->_type->IsNever() {
             value = this.Validate(value, expected, "Incompatible types", expression);
         }
 
@@ -2127,7 +2127,7 @@ class HIRLowerer {
             return;
         }
 
-        if value->_type->IsNever() || (value->_type->IsVoid() && !returns) {
+        if value->_type->IsNever() || (tail == HIRBlockTail::Discard && value->_type->IsUnit()) {
             this.builder.BuildExpressionStatement(value);
             this.BuildTemporaryDestructors(null);
         } else if returns {
@@ -2144,7 +2144,7 @@ class HIRLowerer {
             (block->tail, block->_type) = (moved, moved->_type);
             block->destructors = this.GetTemporaryDestructors(moved);
         } else {
-            Logger::Log("Expected a value of type 'void', but found '" + value->_type->ToString() + "'; add ';' to discard it.", expression, LogSeverity::Error);
+            Logger::Log("Expected a value of type '()', but found '" + value->_type->ToString() + "'; add ';' to discard it.", expression, LogSeverity::Error);
         }
     }
 
@@ -2210,13 +2210,13 @@ class HIRLowerer {
             if else_body == null { return null; }
         }
 
-        let result = this.builder.If(condition, destructors, then_body, else_body, this.context.VoidType());
+        let result = this.builder.If(condition, destructors, then_body, else_body, this.context.UnitType());
 
         if else_body != null {
             let _type = this.UnifyBranches(result, _if);
             if _type == null { return null; }
             result->_type = _type;
-        } else if !then_body->_type->IsVoid() && !then_body->_type->IsNever() {
+        } else if !then_body->_type->IsNever() && !then_body->_type->IsUnit() {
             Logger::Log("An 'if' without an 'else' cannot produce a value.", _if, LogSeverity::Error);
             return null;
         }
@@ -2438,7 +2438,7 @@ class HIRLowerer {
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
         if target == null { return null; }
 
-        if !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() {
+        if !target->_type->IsUnit() && !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() {
             Logger::Log("Cannot match on a value of type '" + target->_type->ToString() + "'.", _match->target, LogSeverity::Error);
             return null;
         }
@@ -2484,7 +2484,7 @@ class HIRLowerer {
             arms.PushBack(match_arm);
         }
 
-        let expression = this.builder.Match(target, destructors, arms, this.context.VoidType());
+        let expression = this.builder.Match(target, destructors, arms, this.context.UnitType());
         this.CheckUnreachableArms(_match, arms, target->_type);
         let missing = expression->Uncovered();
 
@@ -2545,7 +2545,7 @@ class HIRLowerer {
 
         if _return->value != null {
             let return_type = this.builder.GetCurrentFunction()->_return;
-            value = this.LowerExpectedExpression(_return->value, if return_type->IsVoid() || return_type->IsNever() { null } else { return_type });
+            value = this.LowerExpectedExpression(_return->value, if return_type->IsNever() { null } else { return_type });
             if value == null { return null; }
         }
 
@@ -2560,7 +2560,7 @@ class HIRLowerer {
             return null;
         }
 
-        if value == null && !return_type->IsVoid() {
+        if value == null && !return_type->IsUnit() {
             Logger::Log("Expected a return value of type '" + return_type->ToString() + "'.", node, LogSeverity::Error);
             return null;
         }
@@ -2678,7 +2678,7 @@ class HIRLowerer {
             if concrete->IsInteger() || concrete->IsFloat() {
                 if this.CoerceBranch(expression, concrete, false, node) == null { return null; }
             } else {
-                if this.CoerceBranch(expression, this.context.VoidType(), false, node) == null { return null; }
+                if this.CoerceBranch(expression, this.context.UnitType(), false, node) == null { return null; }
             }
         }
 
@@ -3098,12 +3098,6 @@ class HIRLowerer {
                 for element in (literal as *ASTArrayLiteral)->elements {
                     let mut value = this.LowerExpression(element);
                     if value == null { return null; }
-
-                    if value->_type->IsVoid() {
-                        Logger::Log("Array elements cannot have type 'void'.", element, LogSeverity::Error);
-                        return null;
-                    }
-
                     value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
                     elements.PushBack(value);
@@ -3128,12 +3122,6 @@ class HIRLowerer {
                 for element in (literal as *ASTTupleLiteral)->elements {
                     let mut value = this.LowerExpression(element);
                     if value == null { return null; }
-
-                    if value->_type->IsVoid() {
-                        Logger::Log("Tuple elements cannot have type 'void'.", element, LogSeverity::Error);
-                        return null;
-                    }
-
                     value = this.LowerCopyOrMoveValue(value);
                     if value == null { return null; }
                     types.PushBack(value->_type);
@@ -3509,6 +3497,8 @@ class HIRLowerer {
                                 return null;
                             }
                         }
+                    } else if argument->kind == ASTExpressionKind::Literal && (argument as *ASTLiteral)->kind == ASTLiteralKind::Tuple && (argument as *ASTTupleLiteral)->elements.Empty() {
+                        _type = this.context.UnitType();
                     } else {
                         Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
@@ -3879,7 +3869,7 @@ class HIRLowerer {
         let _type = this.LowerType(_new->_type);
         if _type == null { return null; }
 
-        if _type->IsVoid() || _type->IsNever() {
+        if _type->IsNever() {
             Logger::Log("Cannot allocate a value of type '" + _type->ToString() + "'.", _new, LogSeverity::Error);
             return null;
         }
@@ -4457,7 +4447,14 @@ class HIRLowerer {
             (left, right) = (this.Coerce(left, right->_type), this.Coerce(right, left->_type));
         }
 
-        if left->_type->IsBoolean() && right->_type->IsBoolean() {
+        if left->_type->IsUnit() && right->_type->IsUnit() {
+            if kind == ASTBinaryKind::Equal || kind == ASTBinaryKind::NotEqual {
+                this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType())
+            } else {
+                Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '()'.", node, LogSeverity::Error);
+                null
+            }
+        } else if left->_type->IsBoolean() && right->_type->IsBoolean() {
             match kind {
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 ASTBinaryKind::LogicalAnd | ASTBinaryKind::BitwiseAnd | ASTBinaryKind::LogicalOr | ASTBinaryKind::BitwiseOr | ASTBinaryKind::BitwiseXor => this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type),
@@ -4920,11 +4917,6 @@ class HIRLowerer {
                     value = this.builder.Constructor(callee, values, target_type);
                 }
 
-                if target_type->IsVoid() {
-                    Logger::Log("Cannot bind a value of type 'void'.", pattern, LogSeverity::Error);
-                    return null;
-                }
-
                 let lowered = this.builder.IdentifierPattern(identifier->name, target_type, value, identifier->mutable);
                 this.scope_manager.current->Set(identifier->name, lowered, pattern);
 
@@ -5189,6 +5181,12 @@ class HIRLowerer {
         }
     }
 
+    fn IsVoidTypeName(&mut this, _type: *ASTType) -> bool {
+        if _type->kind != ASTTypeKind::Path { return false; }
+        let path = (_type as *ASTPathType)->path;
+        !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() && path->segments[0].name == "void"
+    }
+
     fn IsPrimitiveTypeName(&mut this, path: *ASTPath) -> bool {
         if path->absolute || path->segments.Size() != 1 || !path->segments[0].types.Empty() {
             return false;
@@ -5211,14 +5209,15 @@ class HIRLowerer {
 
     fn LowerType(&mut this, path: *ASTPath) -> *HIRType {
         if path == null {
-            return this.context.VoidType();
+            return this.context.UnitType();
         }
 
         if this.IsPrimitiveTypeName(path) {
             let name = path->segments[0].name;
 
             if name == "void" {
-                return this.context.VoidType();
+                Logger::Log("Type 'void' can only be used behind a pointer; use '()' for no value.", path, LogSeverity::Error);
+                return null;
             } else if name == "bool" {
                 return this.context.BooleanType();
             } else if name == "char" {
@@ -5278,7 +5277,7 @@ class HIRLowerer {
 
     pub fn LowerType(&mut this, _type: *ASTType) -> *HIRType {
         if _type == null {
-            return this.context.VoidType();
+            return this.context.UnitType();
         }
 
         match _type->kind {
@@ -5286,7 +5285,7 @@ class HIRLowerer {
             ASTTypeKind::Path => this.LowerType((_type as *ASTPathType)->path),
             ASTTypeKind::Pointer => {
                 let pointer = _type as *ASTPointerType;
-                let pointee = this.LowerType(pointer->pointee);
+                let pointee = if this.IsVoidTypeName(pointer->pointee) { this.context.VoidType() as *HIRType } else { this.LowerType(pointer->pointee) };
                 if pointee == null { return null; }
                 this.context.PointerType(pointee, pointer->mutable)
             },
@@ -5302,7 +5301,7 @@ class HIRLowerer {
                 if element == null { return null; }
 
                 if array->length != null {
-                    if element->IsVoid() || element->IsNever() {
+                    if element->IsNever() {
                         Logger::Log("Array elements cannot have type '" + element->ToString() + "'.", array->element, LogSeverity::Error);
                         return null;
                     }
@@ -5327,7 +5326,7 @@ class HIRLowerer {
                     let lowered_element = this.LowerType(element);
                     if lowered_element == null { return null; }
 
-                    if lowered_element->IsVoid() || lowered_element->IsNever() {
+                    if lowered_element->IsNever() {
                         Logger::Log("Tuple elements cannot have type '" + lowered_element->ToString() + "'.", element, LogSeverity::Error);
                         return null;
                     }
@@ -5347,7 +5346,7 @@ class HIRLowerer {
                     parameters.PushBack(lowered_parameter);
                 }
 
-                let _return = this.LowerType(function->_return);
+                let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
                 if _return == null { return null; }
                 this.context.FunctionType(parameters, _return)
             }

@@ -47,6 +47,7 @@ class HIRType {
     pub fn IsReference(&this) -> bool { this.kind == HIRTypeKind::Reference }
     pub fn IsArray(&this) -> bool { this.kind == HIRTypeKind::Array }
     pub fn IsTuple(&this) -> bool { this.kind == HIRTypeKind::Tuple }
+    pub fn IsUnit(&this) -> bool { this.IsTuple() && (this as *HIRTupleType)->elements.Empty() }
     pub fn IsFunction(&this) -> bool { this.kind == HIRTypeKind::Function }
     pub fn IsClass(&this) -> bool { this.kind == HIRTypeKind::Class }
     pub fn IsStructure(&this) -> bool { this.kind == HIRTypeKind::Structure }
@@ -513,7 +514,7 @@ class HIRType {
     }
 
     pub fn HasSpecialMembers(&this) -> bool {
-        this.IsClass() || this.IsStructure() || this.IsVariant() || this.IsArray() || this.IsTuple()
+        this.IsClass() || this.IsStructure() || this.IsVariant() || this.IsArray() || (this.IsTuple() && !this.IsUnit())
     }
 
     pub fn Index(&this, name: &String) -> isize {
@@ -623,6 +624,7 @@ class HIRType {
             left->element == right->element && left->length == right->length
         } else if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
+            if left->elements.Size() != right->elements.Size() { return false; }
 
             for i in 0..left->elements.Size() {
                 let (left_element, right_element) = (left->elements[i], right->elements[i]);
@@ -2955,7 +2957,7 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
             result += this.parameters[i]->ToString();
         } result += ')';
 
-        if !this._type->Return().IsVoid() {
+        if !this._type->Return().IsUnit() {
             result += " -> " + this._type->Return().ToString();
         }
 
@@ -3440,6 +3442,10 @@ class HIRContext {
         _type
     }
 
+    pub fn UnitType(&mut this) -> *mut HIRTupleType {
+        this.TupleType(Vector<*HIRType>())
+    }
+
     pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) -> *mut HIRFunctionType {
         this.arena.New<HIRFunctionType>(parameters, _return)
     }
@@ -3583,7 +3589,7 @@ class HIRBuilder {
 
     pub fn Assignment(&mut this, left: *HIRExpression, right: *HIRExpression) -> *mut HIRAssignmentExpression {
         this.SetAddressable(left);
-        this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->VoidType())
+        this.context->arena.New<HIRAssignmentExpression>(left, right, this.context->UnitType())
     }
 
     pub fn AddressOf(&mut this, operand: *HIRExpression, mutable: bool) -> *HIRExpression {
@@ -3816,7 +3822,7 @@ class HIRBuilder {
     }
 
     pub fn Delete(&mut this, value: *HIRExpression, array: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRDeleteExpression {
-        this.context->arena.New<HIRDeleteExpression>(value, array, callee, arguments, this.context->VoidType())
+        this.context->arena.New<HIRDeleteExpression>(value, array, callee, arguments, this.context->UnitType())
     }
 
     pub fn Constructor(&mut this, callee: *HIRExpression, arguments: Vector<*HIRExpression>, _type: *HIRType) -> *mut HIRConstructorExpression {
@@ -3824,7 +3830,7 @@ class HIRBuilder {
     }
 
     pub fn Destructor(&mut this, instance: *HIRExpression, callee: *HIRExpression) -> *mut HIRDestructorExpression {
-        this.context->arena.New<HIRDestructorExpression>(instance, callee, this.context->VoidType())
+        this.context->arena.New<HIRDestructorExpression>(instance, callee, this.context->UnitType())
     }
 
     pub fn Intrinsic(&mut this, kind: HIRIntrinsicKind, _type: *HIRType) -> *mut HIRIntrinsicExpression {
@@ -3836,7 +3842,7 @@ class HIRBuilder {
     }
 
     pub fn Block(&mut this) -> *mut HIRBlockExpression {
-        this.context->arena.New<HIRBlockExpression>(this.context->VoidType())
+        this.context->arena.New<HIRBlockExpression>(this.context->UnitType())
     }
 
     pub fn SetCurrentBlock(&mut this, block: *mut HIRBlockExpression) {
@@ -3860,15 +3866,15 @@ class HIRBuilder {
     }
 
     pub fn While(&mut this, condition: *HIRCondition, destructors: Vector<*HIRExpression>, while_body: *HIRBlockExpression, else_body: *HIRBlockExpression) -> *mut HIRWhileExpression {
-        this.context->arena.New<HIRWhileExpression>(condition, destructors, while_body, else_body, this.context->VoidType())
+        this.context->arena.New<HIRWhileExpression>(condition, destructors, while_body, else_body, this.context->UnitType())
     }
 
     pub fn Loop(&mut this) -> *mut HIRLoopExpression {
-        this.context->arena.New<HIRLoopExpression>(this.context->VoidType())
+        this.context->arena.New<HIRLoopExpression>(this.context->UnitType())
     }
 
     pub fn For(&mut this, iterator: *HIRPattern, target: *HIRPattern, condition: *HIRExpression, step: *HIRExpression, destructors: Vector<*HIRExpression>, body: *HIRBlockExpression) -> *mut HIRForExpression {
-        this.context->arena.New<HIRForExpression>(iterator, target, condition, step, destructors, body, this.context->VoidType())
+        this.context->arena.New<HIRForExpression>(iterator, target, condition, step, destructors, body, this.context->UnitType())
     }
 
     pub fn BuildMatchArm(&mut this, pattern: *HIRPattern, guard: *HIRExpression, body: *HIRBlockExpression) -> *mut HIRMatchArm {

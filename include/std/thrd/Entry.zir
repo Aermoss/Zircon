@@ -62,35 +62,35 @@ extern "C" {
     fn thrd_current() -> thrd_t;
     fn thrd_detach(thr: thrd_t) -> i32;
     fn thrd_equal(thr0: thrd_t, thr1: thrd_t) -> i32;
-    fn thrd_exit(res: i32) -> void;
+    fn thrd_exit(res: i32);
     fn thrd_join(thr: thrd_t, res: *mut i32) -> i32;
 #[if WINDOWS]
-    fn Sleep(dwMilliseconds: u32) -> void;
+    fn Sleep(dwMilliseconds: u32);
 #[else]
     fn thrd_sleep(duration: *timespec, remaining: *mut timespec) -> i32;
 #[endif]
-    fn thrd_yield() -> void;
+    fn thrd_yield();
 
     fn mtx_init(mutex: *mut mtx_t, type_: i32) -> i32;
     fn mtx_lock(mutex: *mut mtx_t) -> i32;
     fn mtx_timedlock(mutex: *mut mtx_t, time_point: *timespec) -> i32;
     fn mtx_trylock(mutex: *mut mtx_t) -> i32;
     fn mtx_unlock(mutex: *mut mtx_t) -> i32;
-    fn mtx_destroy(mutex: *mut mtx_t) -> void;
+    fn mtx_destroy(mutex: *mut mtx_t);
 
     fn cnd_init(cond: *mut cnd_t) -> i32;
     fn cnd_signal(cond: *mut cnd_t) -> i32;
     fn cnd_broadcast(cond: *mut cnd_t) -> i32;
     fn cnd_wait(cond: *mut cnd_t, mutex: *mut mtx_t) -> i32;
     fn cnd_timedwait(cond: *mut cnd_t, mutex: *mut mtx_t, time_point: *timespec) -> i32;
-    fn cnd_destroy(cond: *mut cnd_t) -> void;
+    fn cnd_destroy(cond: *mut cnd_t);
 
     fn tss_create(key: *mut tss_t, dtor: tss_dtor_t) -> i32;
     fn tss_get(key: tss_t) -> *mut void;
     fn tss_set(key: tss_t, val: *mut void) -> i32;
-    fn tss_delete(key: tss_t) -> void;
+    fn tss_delete(key: tss_t);
 
-    fn call_once(flag: *mut once_flag, func_ptr: *mut void) -> void;
+    fn call_once(flag: *mut once_flag, func_ptr: *mut void);
 }
 
 type ThreadFunction = thrd_start_t;

@@ -919,7 +919,7 @@ class Parser {
             _ => {
                 let index = this.index;
 
-                if this.Match(TokenType::LPAREN) {
+                if this.Peek(1)._type != TokenType::RPAREN && this.Match(TokenType::LPAREN) {
                     let mut current: *mut ASTAssignmentExpression = null;
                     let mut root: *mut ASTAssignmentExpression = null;
 

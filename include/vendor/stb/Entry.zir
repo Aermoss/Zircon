@@ -29,7 +29,7 @@ type stbi_us = u16;
 
 class stbi_io_callbacks {
     pub read: fn(user: *mut void, data: *mut i8, size: i32) -> i32,
-    pub skip: fn(user: *mut void, n: i32) -> void,
+    pub skip: fn(user: *mut void, n: i32),
     pub eof: fn(user: *mut void) -> i32
 }
 
