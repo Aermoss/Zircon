@@ -842,13 +842,17 @@ class MIRLowerer {
         } else {
             let mut value: *MIRValue = null;
 
-            if _return->value != null && !this.current_return->IsUnit() {
+            if _return->value != null {
                 value = this.LowerExpression(_return->value);
                 if value == null { return; }
             }
 
             for destructor in _return->destructors {
                 this.LowerExpression(destructor);
+            }
+
+            if this.current_return->IsUnit() {
+                value = null;
             }
 
             this.builder.BuildReturn(value);
