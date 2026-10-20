@@ -381,15 +381,30 @@ class HIRLowerer {
                     } return expression;
                 }
 
+                let mut element: *HIRType = null;
+
                 for i in 0..array->elements.Size() {
                     array->elements[i] = if target->IsArray() {
                         this.Coerce(array->elements[i], target->Element())
                     } else {
                         this.Coerce(array->elements[i])
                     };
+
+                    if element == null && !array->elements[i]->_type->IsNullPointer() {
+                        element = array->elements[i]->_type;
+                    }
                 }
 
-                expression->_type = this.context.ArrayType(array->elements[0]->_type, array->elements.Size());
+                if element == null {
+                    element = array->elements[0]->_type;
+                    if target->IsArray() && target->Element().IsCompatible(element) { element = target->Element(); }
+                }
+
+                for i in 0..array->elements.Size() {
+                    array->elements[i] = this.CoerceNull(array->elements[i], element);
+                }
+
+                expression->_type = this.context.ArrayType(element, expression->_type->Length());
                 return expression;
             },
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple => {
@@ -398,7 +413,7 @@ class HIRLowerer {
 
                 for i in 0..tuple->elements.Size() {
                     tuple->elements[i] = if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
-                        this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i])
+                        this.CoerceNull(this.Coerce(tuple->elements[i], (target as *HIRTupleType)->elements[i]), (target as *HIRTupleType)->elements[i])
                     } else {
                         this.Coerce(tuple->elements[i])
                     };
@@ -461,6 +476,32 @@ class HIRLowerer {
         }
 
         expression
+    }
+
+    fn CoerceNull(&mut this, _expression: *HIRExpression, target: *HIRType) -> *HIRExpression {
+        let expression = unsafe { _expression as *mut HIRExpression };
+
+        if expression == null || !expression->_type->IsNullPointer() || target->IsNullPointer() || !target->IsCompatible(expression->_type) {
+            return expression;
+        } else if expression->kind != HIRExpressionKind::Literal {
+            return this.builder.Cast(expression, target);
+        }
+
+        expression->_type = target;
+        expression
+    }
+
+    fn LowerArrayLength(&mut this, expression: *ASTExpression) -> isize {
+        let length = this.LowerExpression(expression);
+        if length == null { return -1; }
+        let mut value: u64 = 0;
+
+        if !this.IntegerLiteralValue(length, &mut value) {
+            Logger::Log("Array length must be an integer literal.", expression, LogSeverity::Error);
+            return -1;
+        }
+
+        value as isize
     }
 
     fn IntegerLiteralValue(&mut this, expression: *HIRExpression, value: &mut u64) -> bool {
@@ -649,7 +690,9 @@ class HIRLowerer {
         if _type == null { return; }
 
         if constant->initializer != null {
+            let index = this.temporaries.Size();
             initializer = this.Validate(this.LowerExpression(constant->initializer), _type, "Incompatible constant initializer types", constant->initializer);
+            this.temporaries.Resize(index);
             if initializer == null { return; }
 
             if !this.IsConstantExpression(initializer) {
@@ -667,8 +710,10 @@ class HIRLowerer {
         let _type = this.LowerType(_static->_type);
         if _type == null { return; }
 
-        if _static->initializer != null && !_static->zero_initializer {
+        if _static->initializer != null {
+            let index = this.temporaries.Size();
             initializer = this.Validate(this.LowerExpression(_static->initializer), _type, "Incompatible static initializer types", _static->initializer);
+            this.temporaries.Resize(index);
             if initializer == null { return; }
 
             if !this.IsConstantExpression(initializer) {
@@ -2650,6 +2695,27 @@ class HIRLowerer {
                 this.builder.FloatLiteral(float->value, _type)
             },
             ASTLiteralKind::String => this.builder.StringLiteral((literal as *ASTStringLiteral)->value, this.context.PointerType(this.context.IntegerType(8, true), false)),
+            ASTLiteralKind::Array if (literal as *ASTArrayLiteral)->count != null => {
+                let array = literal as *ASTArrayLiteral;
+                let length = this.LowerArrayLength(array->count);
+                if length < 0 { return null; }
+                let mut value = this.LowerExpression(array->elements[0]);
+                if value == null { return null; }
+
+                if !value->_type->IsTrivial() {
+                    Logger::Log("Type '" + value->_type->ToString() + "' cannot be repeated in an array, because it is not trivially copyable.", array->elements[0], LogSeverity::Error);
+                    return null;
+                }
+
+                value = this.LowerCopyOrMoveValue(value);
+                if value == null { return null; }
+                let mut elements = Vector<*HIRExpression>();
+                elements.PushBack(value);
+                let literal = this.builder.ArrayLiteral(elements, this.context.ArrayType(value->_type, length as usize));
+                literal->repeat = true;
+                this.temporaries.PushBack(literal);
+                literal
+            },
             ASTLiteralKind::Array => {
                 let mut elements = Vector<*HIRExpression>();
                 let mut _type: *HIRType = null;
@@ -2661,9 +2727,9 @@ class HIRLowerer {
                     if value == null { return null; }
                     elements.PushBack(value);
 
-                    if _type == null {
+                    if _type == null || (_type->IsNullPointer() && !value->_type->IsNullPointer() && (value->_type->IsPointer() || value->_type->IsFunction())) {
                         _type = value->_type;
-                    } else if *_type != *value->_type && !(_type->IsPointer() && value->_type->IsNullPointer()) {
+                    } else if *_type != *value->_type && !((_type->IsPointer() || _type->IsFunction()) && value->_type->IsNullPointer()) {
                         Logger::Log("Array elements must have the same type.", element, LogSeverity::Error);
                         return null;
                     }
@@ -3522,7 +3588,7 @@ class HIRLowerer {
     }
 
     fn LiteralNeedsExplicitType(&mut this, _type: *HIRType, target: *HIRType) -> bool {
-        if _type->IsNever() {
+        if _type->IsNever() || _type->IsNullPointer() {
             true
         } else if _type->IsArray() && target->IsArray() {
             this.LiteralNeedsExplicitType(_type->Element(), target->Element())
@@ -5337,15 +5403,9 @@ class HIRLowerer {
                         return null;
                     }
 
-                    let length = this.LowerExpression(array->length);
-                    if length == null { return null; }
-
-                    if length->kind != HIRExpressionKind::Literal || (length as *HIRLiteral)->kind != HIRLiteralKind::Integer {
-                        Logger::Log("Array length must be an integer literal.", array->length, LogSeverity::Error);
-                        return null;
-                    }
-
-                    this.context.ArrayType(element, (length as *HIRIntegerLiteral)->value as usize)
+                    let length = this.LowerArrayLength(array->length);
+                    if length < 0 { return null; }
+                    this.context.ArrayType(element, length as usize)
                 } else {
                     this.context.PointerType(element, true)
                 }

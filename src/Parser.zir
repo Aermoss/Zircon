@@ -277,6 +277,13 @@ class Parser {
                     if expression == null { return null; }
                     array->elements.PushBack(expression);
 
+                    if this.Match(TokenType::SEMICOLON) {
+                        array->count = this.ParseExpression();
+                        if array->count == null { return null; }
+                        if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+                        return array;
+                    }
+
                     while this.Match(TokenType::COMMA) {
                         let expression = this.ParseExpression();
                         if expression == null { return null; }
@@ -1903,12 +1910,8 @@ class Parser {
         let _static = this.arena.New<ASTStaticDeclaration>(identifier.value, _type, mutable, alignment, token);
 
         if this.Match(TokenType::ASSIGN) {
-            if this.Match(TokenType::ZERO) {
-                _static->zero_initializer = true;
-            } else {
-                _static->initializer = this.ParseExpression();
-                if _static->initializer == null { return null; }
-            }
+            _static->initializer = this.ParseExpression();
+            if _static->initializer == null { return null; }
         }
 
         if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }

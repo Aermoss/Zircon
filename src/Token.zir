@@ -19,7 +19,7 @@
 enum TokenType: i32 {
     UNKNOWN, EOF,
 
-    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR, TRUE, FALSE, NULL, ZERO,
+    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR, TRUE, FALSE, NULL,
 
     NEW, DELETE, ASYNC, AWAIT, AS, THIS, OPERATOR,
     IF, ELSE, FOR, IN, WHILE, LOOP, MATCH, RETURN, BREAK, CONTINUE,
@@ -53,7 +53,6 @@ extend TokenType {
             TokenType::TRUE => "TRUE",
             TokenType::FALSE => "FALSE",
             TokenType::NULL => "NULL",
-            TokenType::ZERO => "ZERO",
             TokenType::NEW => "NEW",
             TokenType::DELETE => "DELETE",
             TokenType::ASYNC => "ASYNC",
@@ -152,7 +151,6 @@ fn StringToKeyword(string: &String) -> TokenType {
     if string == "true" { TokenType::TRUE }
     else if string == "false" { TokenType::FALSE }
     else if string == "null" { TokenType::NULL }
-    else if string == "zero" { TokenType::ZERO }
     else if string == "new" { TokenType::NEW }
     else if string == "delete" { TokenType::DELETE }
     else if string == "async" { TokenType::ASYNC }

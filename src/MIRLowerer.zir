@@ -900,6 +900,23 @@ class MIRLowerer {
                 HIRLiteralKind::String => {
                     return this.builder.ConstantString((literal as *HIRStringLiteral)->value, _type);
                 },
+                HIRLiteralKind::Array if (literal as *HIRArrayLiteral)->repeat => {
+                    let value = this.LowerConstantExpression((literal as *HIRArrayLiteral)->elements[0]);
+                    if value == null { return null; }
+                    let constant = value as *MIRConstant;
+
+                    if value->kind == MIRValueKind::Constant && (constant->kind == MIRConstantKind::Null || (constant->kind == MIRConstantKind::Integer && (constant as *MIRConstantInteger)->value == 0)) {
+                        return this.builder.ConstantNull(_type);
+                    }
+
+                    let mut elements = Vector<*MIRValue>();
+
+                    for _ in 0..literal->_type->Length() {
+                        elements.PushBack(value);
+                    }
+
+                    return this.builder.ConstantArray(elements, _type);
+                },
                 HIRLiteralKind::Array => {
                     let mut elements = Vector<*MIRValue>();
 
@@ -1091,6 +1108,40 @@ class MIRLowerer {
         if _type == null { return; }
         let base = this.builder.BuildCast("array.cast".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(_type->element));
         let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+
+        if literal->repeat {
+            let length = literal->_type->Length();
+
+            if length == 0 {
+                this.LowerExpression(literal->elements[0]);
+                return;
+            }
+
+            let first = this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(0, size_type));
+            this.LowerExpressionTo(literal->elements[0], first);
+            if length == 1 { return; }
+
+            let value = this.builder.BuildLoad("array.repeat.value".ToString(), first);
+            let entry_block = this.builder.GetCurrentBlock();
+            let condition_block = this.builder.BuildBlock("array.repeat.cond".ToString());
+            let body_block = this.builder.BuildBlock("array.repeat.body".ToString());
+            let end_block = this.builder.BuildBlock("array.repeat.end".ToString());
+            this.builder.BuildBranch(condition_block);
+
+            this.builder.SetCurrentBlock(condition_block);
+            let index = this.builder.BuildPhi("array.repeat.index".ToString(), size_type);
+            index->AddIncoming(this.builder.ConstantInteger(1, size_type), entry_block);
+            let condition = this.builder.BuildBinary("array.repeat.test".ToString(), MIRBinaryKind::ICmpUlt, index, this.builder.ConstantInteger(length as u64, size_type), this.context.IntegerType(1));
+            this.builder.BuildConditionalBranch(condition, body_block, end_block);
+
+            this.builder.SetCurrentBlock(body_block);
+            this.builder.BuildStore(value, this.builder.BuildArrayGEP("array.element".ToString(), base, index));
+            index->AddIncoming(this.builder.BuildBinary("array.repeat.next".ToString(), MIRBinaryKind::Add, index, this.builder.ConstantInteger(1, size_type), size_type), body_block);
+            this.builder.BuildBranch(condition_block);
+
+            this.builder.SetCurrentBlock(end_block);
+            return;
+        }
 
         for i in 0..literal->elements.Size() {
             this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as u64, size_type)));

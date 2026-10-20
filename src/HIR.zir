@@ -1354,13 +1354,18 @@ class HIRStringLiteral : HIRLiteral {
 }
 
 class HIRArrayLiteral : HIRLiteral {
-    pub elements: Vector<*HIRExpression>;
+    pub elements: Vector<*HIRExpression>,
+    pub repeat: bool = false;
 
     HIRArrayLiteral(&mut this, elements: Vector<*HIRExpression>, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Array, _type) {
         this.elements = elements;
     }
 
     pub fn ToString(&this) -> String {
+        if this.repeat {
+            return '[' + this.elements[0]->ToString() + "; " + String::FromInteger(this._type->Length() as u64) + ']';
+        }
+
         let mut result = '['.ToString();
 
         for i in 0..this.elements.Size() {

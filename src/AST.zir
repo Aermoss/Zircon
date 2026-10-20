@@ -534,11 +534,16 @@ class ASTStringLiteral : ASTLiteral {
 }
 
 class ASTArrayLiteral : ASTLiteral {
-    pub elements: Vector<*ASTExpression>;
+    pub elements: Vector<*ASTExpression>,
+    pub count: *ASTExpression = null;
 
     ASTArrayLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Array, start) {}
 
     pub fn ToString(&this) -> String {
+        if this.count != null {
+            return '[' + this.elements[0]->ToString() + "; " + this.count->ToString() + ']';
+        }
+
         let mut result = '['.ToString();
 
         for i in 0..this.elements.Size() {
@@ -1295,8 +1300,7 @@ class ASTStaticDeclaration : ASTDeclaration {
     pub _type: *ASTType,
     pub mutable: bool,
     pub initializer: *ASTExpression = null,
-    pub alignment: *ASTExpression,
-    pub zero_initializer: bool = false;
+    pub alignment: *ASTExpression;
 
     ASTStaticDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, alignment: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Static, start) {
         (this.name, this._type, this.mutable, this.alignment) = (name, _type, mutable, alignment);
