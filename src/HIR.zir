@@ -3732,6 +3732,32 @@ class HIRBuilder {
         value & ((1u64 << width) - 1)
     }
 
+    fn SaturateToInteger(&this, value: f64, target: *HIRType) -> u64 {
+        let width = target->Width();
+        let limit = (1u64 << (width - 1)) - 1;
+        let half = (1u64 << (width - 1)) as f64;
+
+        let raw = if value != value {
+            0
+        } else if target->IsSigned() {
+            if value >= half {
+                limit
+            } else if value <= -half {
+                limit + 1
+            } else {
+                value as i64 as u64
+            }
+        } else if value <= 0.0 {
+            0
+        } else if value >= half * 2.0 {
+            limit * 2 + 1
+        } else {
+            value as u64
+        };
+
+        this.MaskToWidth(raw, width)
+    }
+
     fn FoldUnary(&mut this, kind: HIRUnaryKind, operand: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
         match kind {
             HIRUnaryKind::Negate => {
@@ -3882,7 +3908,7 @@ class HIRBuilder {
                 let value = (value as *HIRFloatLiteral)->value;
 
                 if target->IsInteger() {
-                    this.IntegerLiteral(this.MaskToWidth(value as u64, target->Width()), target)
+                    this.IntegerLiteral(this.SaturateToInteger(value, target), target)
                 } else {
                     this.FloatLiteral(value, target)
                 }

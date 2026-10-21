@@ -30,6 +30,9 @@ class Map<K, V> {
     pub fn Data(&this) -> *(K, V) { this.vector.Data() }
     pub fn Data(&mut this) -> *mut (K, V) { this.vector.Data() }
 
+    pub fn AsSlice(&this) -> &[(K, V)] { this.vector.AsSlice() }
+    pub fn AsSlice(&mut this) -> &mut [(K, V)] { this.vector.AsSlice() }
+
     pub fn Empty(&this) -> bool { this.vector.Empty() }
     pub fn Length(&this) -> usize { this.vector.Length() }
 
@@ -126,14 +129,6 @@ class Map<K, V> {
         this.vector.Resize(index + 1);
         this.vector[index].0 = key;
         this.vector[index].1
-    }
-
-    pub fn operator[](&this, index: usize) -> &(K, V) {
-        this.vector[index]
-    }
-
-    pub fn operator[](&mut this, index: usize) -> &mut (K, V) {
-        this.vector[index]
     }
 
     pub fn Begin(&this) -> *(K, V) {

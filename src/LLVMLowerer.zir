@@ -564,14 +564,63 @@ class LLVMLowerer {
             MIRCastKind::SExt => LLVMBuildSExt(this.builder, value, target, name),
             MIRCastKind::FPTrunc => LLVMBuildFPTrunc(this.builder, value, target, name),
             MIRCastKind::FPExt => LLVMBuildFPExt(this.builder, value, target, name),
-            MIRCastKind::FPToSI => LLVMBuildFPToSI(this.builder, value, target, name),
-            MIRCastKind::FPToUI => LLVMBuildFPToUI(this.builder, value, target, name),
+            MIRCastKind::FPToSI => this.LowerSaturatingCast(value, target, true, name),
+            MIRCastKind::FPToUI => this.LowerSaturatingCast(value, target, false, name),
             MIRCastKind::SIToFP => LLVMBuildSIToFP(this.builder, value, target, name),
             MIRCastKind::UIToFP => LLVMBuildUIToFP(this.builder, value, target, name),
             MIRCastKind::PtrToInt => LLVMBuildPtrToInt(this.builder, value, target, name),
             MIRCastKind::IntToPtr => LLVMBuildIntToPtr(this.builder, value, target, name),
             MIRCastKind::Bitcast => LLVMBuildBitCast(this.builder, value, target, name)
         }
+    }
+
+    fn LowerSaturatingCast(&mut this, mut value: LLVMValueRef, target: LLVMTypeRef, signed: bool, name: *i8) -> LLVMValueRef {
+        if LLVMIsAConstantFP(value) != null {
+            let mut loses_info = 0;
+            let number = LLVMConstRealGetDouble(value, &mut loses_info);
+            let width = LLVMGetIntTypeWidth(target);
+            let limit = (1u64 << (width - 1)) - 1;
+            let half = (1u64 << (width - 1)) as f64;
+
+            if signed {
+                let result = if number != number {
+                    0
+                } else if number >= half {
+                    limit as i64
+                } else if number <= -half {
+                    -(limit as i64) - 1
+                } else {
+                    number as i64
+                };
+
+                return LLVMConstInt(target, result as u64, 1);
+            }
+
+            let result = if number != number || number <= 0.0 {
+                0
+            } else if number >= half * 2.0 {
+                limit * 2 + 1
+            } else {
+                number as u64
+            };
+
+            return LLVMConstInt(target, result, 0);
+        }
+
+        if LLVMIsConstant(value) != 0 {
+            return if signed {
+                LLVMBuildFPToSI(this.builder, value, target, name)
+            } else {
+                LLVMBuildFPToUI(this.builder, value, target, name)
+            };
+        }
+
+        let mut types = [target, LLVMTypeOf(value)];
+        let intrinsic = (if signed { "llvm.fptosi.sat" } else { "llvm.fptoui.sat" }).ToString();
+        let id = LLVMLookupIntrinsicID(intrinsic.Data(), intrinsic.Length());
+        let function = LLVMGetIntrinsicDeclaration(this.module, id, &mut types[0], 2);
+        let _type = LLVMIntrinsicGetType(this.context, id, &mut types[0], 2);
+        LLVMBuildCall2(this.builder, _type, function, &mut value, 1, name)
     }
 
     fn LowerSelectInstruction(&mut this, select: *MIRSelectInstruction) -> LLVMValueRef {

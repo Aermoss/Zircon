@@ -539,7 +539,7 @@ class ASTStructureLiteral : ASTLiteral {
 
         for i in 0..this.fields.Length() {
             if i > 0 { result += ", "; }
-            let (name, expression) = this.fields[i];
+            let (name, expression) = this.fields.AsSlice()[i];
             result += name + ": " + expression->ToString();
         }
 
