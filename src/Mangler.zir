@@ -104,7 +104,7 @@ class Mangler {
     }
 
     fn MangleTypeSubstituted(_type: *HIRType, substitution_table: &mut Map<*HIRType, String>) -> String {
-        for i in 0..substitution_table.Size() {
+        for i in 0..substitution_table.Length() {
             let pair = substitution_table[i];
 
             if *_type == *pair.0 {
@@ -130,7 +130,7 @@ class Mangler {
 
         let result = Mangler::MangleType(_type);
 
-        if result.Length() >= String::FromInteger(substitution_table.Size() as u64).Length() + 2 {
+        if result.Length() >= String::FromInteger(substitution_table.Length() as u64).Length() + 2 {
             substitution_table[_type] = result;
         }
 
@@ -159,7 +159,7 @@ class Mangler {
             }
         }
 
-        if names.Size() > 1 || !types.Empty() || has_namespace {
+        if names.Length() > 1 || !types.Empty() || has_namespace {
             result += "N";
         }
 
@@ -173,7 +173,7 @@ class Mangler {
             } result += "E";
         }
 
-        if names.Size() > 1 || !types.Empty() || has_namespace {
+        if names.Length() > 1 || !types.Empty() || has_namespace {
             result += "E";
         }
 
@@ -202,7 +202,7 @@ class Mangler {
             }
         }
 
-        if names.Size() > 1 || !types.Empty() || has_namespace {
+        if names.Length() > 1 || !types.Empty() || has_namespace {
             result += "N";
         }
 
@@ -216,7 +216,7 @@ class Mangler {
             } result += "E";
         }
 
-        if names.Size() > 1 || !types.Empty() || has_namespace {
+        if names.Length() > 1 || !types.Empty() || has_namespace {
             result += "E";
         }
 

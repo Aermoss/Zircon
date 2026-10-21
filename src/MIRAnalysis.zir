@@ -131,7 +131,7 @@ fn MIRBuildAdjacency(count: usize, sources: &Vector<usize>, targets: &Vector<usi
         offsets.PushBack(0);
     }
 
-    for i in 0..sources.Size() {
+    for i in 0..sources.Length() {
         offsets[sources[i] + 1] += 1;
         list.PushBack(0);
     }
@@ -146,7 +146,7 @@ fn MIRBuildAdjacency(count: usize, sources: &Vector<usize>, targets: &Vector<usi
         cursor.PushBack(offsets[i]);
     }
 
-    for i in 0..sources.Size() {
+    for i in 0..sources.Length() {
         list[cursor[sources[i]]] = targets[i];
         cursor[sources[i]] += 1;
     }
@@ -171,7 +171,7 @@ class MIRControlFlow {
     }
 
     pub fn Compute(&mut this, function: *MIRFunctionDeclaration) {
-        let count = function->blocks.Size();
+        let count = function->blocks.Length();
         this.indices.Clear();
 
         for i in 0..count {

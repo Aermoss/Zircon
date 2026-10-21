@@ -56,6 +56,7 @@ class ScopeManager {
             for symbol in scope->Get(segment.name, SymbolKind::Generic) {
                 let instance = symbol->generic->Instantiate(types, path);
                 if instance == null { return null; }
+                hir_lowerer->CompleteInstance(instance);
                 return instance->scope;
             }
         } else {
@@ -101,10 +102,10 @@ class ScopeManager {
         if path->absolute {
             let mut root = this.current;
             while root->parent != null { root = root->parent; }
-            if path->segments.Size() == 1 { return root; }
+            if path->segments.Length() == 1 { return root; }
             scope = this.LookupScope(root, path->segments[0], path);
         } else {
-            if path->segments.Size() == 1 { return null; }
+            if path->segments.Length() == 1 { return null; }
             let mut cursor = this.current;
 
             while cursor != null {
@@ -114,7 +115,7 @@ class ScopeManager {
             }
         }
 
-        for i in 1..(path->segments.Size() - 1) {
+        for i in 1..(path->segments.Length() - 1) {
             if scope == null { break; }
             scope = this.LookupScope(scope, path->segments[i], path);
         }
@@ -127,7 +128,7 @@ class ScopeManager {
             return Vector<*Symbol>();
         }
 
-        if path->segments.Size() == 1 && !path->absolute {
+        if path->segments.Length() == 1 && !path->absolute {
             let mut cursor = this.current;
 
             while cursor != null {
@@ -156,7 +157,7 @@ class ScopeManager {
             return Vector<*Symbol>();
         }
 
-        if path->segments.Size() == 1 && !path->absolute {
+        if path->segments.Length() == 1 && !path->absolute {
             let mut cursor = this.current;
 
             while cursor != null {
@@ -200,7 +201,7 @@ class ScopeManager {
         if path == null || path->segments.Empty() { return result; }
         let segment = path->segments.Back();
 
-        if path->segments.Size() == 1 && !path->absolute {
+        if path->segments.Length() == 1 && !path->absolute {
             let mut cursor = this.current;
 
             while cursor != null {
@@ -233,10 +234,10 @@ class ScopeManager {
                     }
 
                     if !function->pack_name.Empty() {
-                        let fixed = function->parameters.Size();
-                        let start = if fixed < values.Size() { fixed } else { values.Size() };
+                        let fixed = function->parameters.Length();
+                        let start = if fixed < values.Length() { fixed } else { values.Length() };
 
-                        for i in start..values.Size() {
+                        for i in start..values.Length() {
                             types.PushBack(values[i]->_type);
                         }
                     }

@@ -102,10 +102,10 @@ class Scope {
                 }
 
                 let other = (symbol->declaration as *HIRFunctionDeclaration)->_type->Parameters();
-                if other.Size() != parameters.Size() { continue; }
+                if other.Length() != parameters.Length() { continue; }
                 let mut same = true;
 
-                for i in 0..parameters.Size() {
+                for i in 0..parameters.Length() {
                     if !parameters[i]->IsSame(other[i]) {
                         same = false;
                         break;

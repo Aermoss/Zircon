@@ -18,6 +18,8 @@
     "src/Scope.zir", "src/Symbol.zir", "src/HIR.zir" : *]
 
 class GenericInstance {
+    pub generic: *mut GenericDeclaration = null,
+    pub demanded: bool = false,
     pub symbol: *Symbol = null,
     pub scope: *mut Scope = null,
     pub declaration: *mut HIRTypedDeclaration = null,
@@ -75,7 +77,7 @@ class GenericDeclaration {
         hir_lowerer->SwapFrame(frame);
         hir_lowerer->scope_manager.PushScope("<generic>".ToString(), true);
 
-        for i in 0..this.types.Size() {
+        for i in 0..this.types.Length() {
             hir_lowerer->scope_manager.current->Set(this.types[i], instance->types[i], this.declaration);
         }
 
@@ -98,13 +100,13 @@ class GenericDeclaration {
                     (instance->completed, instance->active) = (HIRLoweringPass::Second, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
+                if instance->demanded && instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
                     instance->active = HIRLoweringPass::Third;
                     hir_lowerer->LowerClassDeclarationThirdPass(instance->declaration as *mut HIRClassDeclaration, _class, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
+                if instance->demanded && instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
                     instance->active = HIRLoweringPass::Fourth;
                     hir_lowerer->LowerClassDeclarationFourthPass(instance->declaration as *mut HIRClassDeclaration, _class, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
@@ -128,13 +130,13 @@ class GenericDeclaration {
                     (instance->completed, instance->active) = (HIRLoweringPass::Second, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
+                if instance->demanded && instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
                     instance->active = HIRLoweringPass::Third;
                     hir_lowerer->LowerStructureDeclarationThirdPass(instance->declaration as *mut HIRStructureDeclaration, structure, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
+                if instance->demanded && instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
                     instance->active = HIRLoweringPass::Fourth;
                     hir_lowerer->LowerStructureDeclarationFourthPass(instance->declaration as *mut HIRStructureDeclaration, structure, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
@@ -158,13 +160,13 @@ class GenericDeclaration {
                     (instance->completed, instance->active) = (HIRLoweringPass::Second, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
+                if instance->demanded && instance->completed < HIRLoweringPass::Third && hir_lowerer->current_pass >= HIRLoweringPass::Third {
                     instance->active = HIRLoweringPass::Third;
                     hir_lowerer->LowerVariantDeclarationThirdPass(instance->declaration as *mut HIRVariantDeclaration, variant, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Third, HIRLoweringPass::None);
                 }
 
-                if instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
+                if instance->demanded && instance->completed < HIRLoweringPass::Fourth && hir_lowerer->current_pass >= HIRLoweringPass::Fourth {
                     instance->active = HIRLoweringPass::Fourth;
                     hir_lowerer->LowerVariantDeclarationFourthPass(instance->declaration as *mut HIRVariantDeclaration, variant, instance->scope);
                     (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
@@ -194,6 +196,14 @@ class GenericDeclaration {
         hir_lowerer->SwapFrame(frame);
     }
 
+    pub fn Complete(&mut this, instance: *mut GenericInstance) {
+        instance->demanded = true;
+
+        if instance->active == HIRLoweringPass::None {
+            this.LowerInstance(instance);
+        }
+    }
+
     pub fn Instantiate(&mut this, types: &Vector<*HIRType>, node: *ASTNode) -> *GenericInstance {
         let mut pack = false;
 
@@ -202,28 +212,28 @@ class GenericDeclaration {
         }
 
         let mismatch = if pack {
-            types.Size() < this.types.Size()
+            types.Length() < this.types.Length()
         } else {
-            types.Size() != this.types.Size()
+            types.Length() != this.types.Length()
         };
 
         if mismatch {
-            let mut expected = String::FromInteger(this.types.Size() as u64);
+            let mut expected = String::FromInteger(this.types.Length() as u64);
             if pack { expected = "at least " + expected; }
-            Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Size() as u64) + " were provided.", node, LogSeverity::Error);
+            Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Length() as u64) + " were provided.", node, LogSeverity::Error);
             return null;
         }
 
         let mut instance: *mut GenericInstance = null;
 
         for current in this.instances {
-            if current->types.Size() != types.Size() {
+            if current->types.Length() != types.Length() {
                 continue;
             }
 
             let mut _match = true;
 
-            for i in 0..types.Size() {
+            for i in 0..types.Length() {
                 if !current->types[i]->IsSame(types[i]) {
                     _match = false;
                     break;
@@ -238,6 +248,7 @@ class GenericDeclaration {
 
         if instance == null {
             instance = this.arena.New<GenericInstance>(types);
+            instance->generic = this;
             this.instances.PushBack(instance);
         }
 

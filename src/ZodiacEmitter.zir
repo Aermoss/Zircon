@@ -165,7 +165,7 @@ class ZodiacEmitter {
 
     fn FrameSize(&this) -> u32 {
         let function = this.function;
-        this.AlignUp(function->frame_size + function->saved_registers.Size() as u32 * 4 + function->outgoing_size, 4)
+        this.AlignUp(function->frame_size + function->saved_registers.Length() as u32 * 4 + function->outgoing_size, 4)
     }
 
     fn EmitPrologue(&mut this) {
@@ -182,7 +182,7 @@ class ZodiacEmitter {
             this.Line("sub sp, sp, t6");
         }
 
-        for i in 0..function->saved_registers.Size() {
+        for i in 0..function->saved_registers.Length() {
             this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
         }
     }
@@ -191,7 +191,7 @@ class ZodiacEmitter {
         let function = this.function;
 
         if this.has_frame {
-            for i in 0..function->saved_registers.Size() {
+            for i in 0..function->saved_registers.Length() {
                 this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
             }
 
@@ -206,7 +206,7 @@ class ZodiacEmitter {
     fn EmitFunction(&mut this, function: *LIRFunction) {
         this.function = function;
 
-        for i in 0..function->blocks.Size() {
+        for i in 0..function->blocks.Length() {
             function->blocks[i]->index = i as u32;
         }
 
@@ -219,11 +219,11 @@ class ZodiacEmitter {
         this.output += name + ":\n";
         if this.has_frame { this.EmitPrologue(); }
 
-        for i in 0..function->blocks.Size() {
+        for i in 0..function->blocks.Length() {
             let block = function->blocks[i];
-            let next = if i + 1 < function->blocks.Size() { function->blocks[i + 1] } else { null };
+            let next = if i + 1 < function->blocks.Length() { function->blocks[i + 1] } else { null };
             this.output += this.Label(block) + ":\n";
-            let size = block->instructions.Size();
+            let size = block->instructions.Length();
 
             for k in 0..size {
                 let instruction = block->instructions[k];
@@ -283,8 +283,8 @@ class ZodiacEmitter {
             || opcode == LIROpcode::And || opcode == LIROpcode::Or || opcode == LIROpcode::Xor || opcode == LIROpcode::Sll
             || opcode == LIROpcode::Srl || opcode == LIROpcode::Sra || opcode == LIROpcode::Slt || opcode == LIROpcode::Sltu;
 
-        for i in 0..instruction->uses.Size() {
-            let last = i + 1 == instruction->uses.Size();
+        for i in 0..instruction->uses.Length() {
+            let last = i + 1 == instruction->uses.Length();
 
             if instruction->uses[i]->kind == LIROperandKind::Immediate && opcode != LIROpcode::Li && (register_form || !last) {
                 Logger::Log("Invalid immediate operand in '" + instruction->ToString() + "' (in '" + this.function->name + "').", LogSeverity::Error);
@@ -314,10 +314,10 @@ class ZodiacEmitter {
         this.output += name + ":\n";
         let mut offset: usize = 0;
 
-        while offset < global->data.Size() {
+        while offset < global->data.Length() {
             let mut relocation: i64 = -1;
 
-            for i in 0..global->relocations.Size() {
+            for i in 0..global->relocations.Length() {
                 if global->relocations[i].offset as usize == offset {
                     relocation = i as i64;
                     break;
@@ -333,7 +333,7 @@ class ZodiacEmitter {
             let mut text = "\t.byte\t".ToString();
             let mut count: usize = 0;
 
-            while offset < global->data.Size() && count < 16 {
+            while offset < global->data.Length() && count < 16 {
                 let mut relocated = false;
 
                 for other in global->relocations {

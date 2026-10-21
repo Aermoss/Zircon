@@ -31,7 +31,7 @@ class Map<K, V> {
     pub fn Data(&mut this) -> *mut (K, V) { this.vector.Data() }
 
     pub fn Empty(&this) -> bool { this.vector.Empty() }
-    pub fn Size(&this) -> usize { this.vector.Size() }
+    pub fn Length(&this) -> usize { this.vector.Length() }
 
     pub fn Clear(&mut this) {
         this.vector.Clear();
@@ -92,7 +92,7 @@ class Map<K, V> {
     }
 
     pub fn Remove(&mut this, key: K) {
-        for i in 0..this.vector.Size() {
+        for i in 0..this.vector.Length() {
             if this.vector[i].0 == key {
                 this.vector.RemoveAt(i);
                 return;
@@ -101,7 +101,7 @@ class Map<K, V> {
     }
 
     pub fn Index(&this, key: K) -> Option<usize> {
-        for i in 0..this.vector.Size() {
+        for i in 0..this.vector.Length() {
             if this.vector[i].0 == key {
                 return Option<usize>::Some(i);
             }
@@ -122,7 +122,7 @@ class Map<K, V> {
             }
         }
 
-        let index = this.vector.Size();
+        let index = this.vector.Length();
         this.vector.Resize(index + 1);
         this.vector[index].0 = key;
         this.vector[index].1

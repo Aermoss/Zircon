@@ -211,7 +211,7 @@ fn GetWindowsSDKPath() -> String {
                 let parts = file_name.Split('.');
                 let (mut parsed_v1, mut parsed_v2, mut parsed_v3, mut parsed_v4) = (0u64, 0u64, 0u64, 0u64);
 
-                if parts.Size() == 4 {
+                if parts.Length() == 4 {
                     (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap(), parts[3].ToUnsignedInteger().Unwrap());
                 } else {
                     WriteLine("\x1b[31mFailed to parse Windows SDK version.\x1b[0m");
@@ -331,7 +331,7 @@ fn GetMSVCPath() -> String {
                 let parts = file_name.Split('.');
                 let (mut parsed_v1, mut parsed_v2, mut parsed_v3) = (0u64, 0u64, 0u64);
 
-                if parts.Size() == 3 {
+                if parts.Length() == 3 {
                     (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap());
                 } else {
                     WriteLine("\x1b[31mFailed to parse MSVC version.\x1b[0m");
@@ -414,7 +414,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
-    if args.Size() < 2 {
+    if args.Length() < 2 {
         PrintUsage(executable);
         return 1;
     }
@@ -456,7 +456,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (mut freestanding, mut no_red_zone) = (false, false);
     let mut i: usize = 1;
 
-    while i < args.Size() {
+    while i < args.Length() {
         let &arg = args[i];
 
         if arg == "--help" || arg == "-h" {
@@ -509,7 +509,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-o" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 output_file = args[i];
             } else {
                 Logger::Log("Missing argument to '-o'.", LogSeverity::Error);
@@ -521,7 +521,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if path.Empty() {
                 i += 1;
 
-                if i < args.Size() {
+                if i < args.Length() {
                     path = args[i];
                 } else {
                     Logger::Log("Missing argument to '-I'.", LogSeverity::Error);
@@ -536,7 +536,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if path.Empty() {
                 i += 1;
 
-                if i < args.Size() {
+                if i < args.Length() {
                     path = args[i];
                 } else {
                     Logger::Log("Missing argument to '-L'.", LogSeverity::Error);
@@ -551,7 +551,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if name.Empty() {
                 i += 1;
 
-                if i < args.Size() {
+                if i < args.Length() {
                     name = args[i];
                 } else {
                     Logger::Log("Missing argument to '-l'.", LogSeverity::Error);
@@ -566,7 +566,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             if define.Empty() {
                 i += 1;
 
-                if i < args.Size() {
+                if i < args.Length() {
                     define = args[i];
                 } else {
                     Logger::Log("Missing argument to '-D'.", LogSeverity::Error);
@@ -578,7 +578,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-target" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 triple = args[i];
             } else {
                 Logger::Log("Missing argument to '-target'.", LogSeverity::Error);
@@ -587,7 +587,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-march" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 arch = args[i];
             } else {
                 Logger::Log("Missing argument to '-march'.", LogSeverity::Error);
@@ -596,7 +596,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-mcmodel" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 code_model = args[i];
             } else {
                 Logger::Log("Missing argument to '-mcmodel'.", LogSeverity::Error);
@@ -620,7 +620,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    if !output_file.Empty() && input_files.Size() > 1 && (emit_object || emit_asm) {
+    if !output_file.Empty() && input_files.Length() > 1 && (emit_object || emit_asm) {
         Logger::Log("Cannot specify '-o' when generating multiple output files.", LogSeverity::Error);
         return 1;
     }

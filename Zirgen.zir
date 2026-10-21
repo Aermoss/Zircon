@@ -808,7 +808,7 @@ fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
 fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
 
-    if args.Size() < 2 {
+    if args.Length() < 2 {
         WriteLine("Usage: " + executable + " <header.h | input_directory> [-o output_directory] [-I include_directory] [-ignore file_name]");
         return 1;
     }
@@ -822,13 +822,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut ignored_files = Vector<String>();
     let mut i: usize = 2;
 
-    while i < args.Size() {
+    while i < args.Length() {
         let &arg = args[i];
 
         if arg == "-o" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 output_directory = args[i];
             } else {
                 WriteLine(executable + ": \x1b[31mError:\x1b[0m Missing argument to '-o'.");
@@ -837,7 +837,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-ignore" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 ignored_files.PushBack(args[i]);
             } else {
                 WriteLine(executable + ": \x1b[31mError:\x1b[0m Missing argument to '-ignore'.");
@@ -891,7 +891,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     state.last_anonymous_enum = clang_getNullCursor();
 
     for header_file in input_files {
-        let translation_unit = clang_parseTranslationUnit(index, header_file.Data(), clang_args.Data(), clang_args.Size() as i32, null, 0, CXTranslationUnit_Flags::CXTranslationUnit_DetailedPreprocessingRecord as u32);
+        let translation_unit = clang_parseTranslationUnit(index, header_file.Data(), clang_args.Data(), clang_args.Length() as i32, null, 0, CXTranslationUnit_Flags::CXTranslationUnit_DetailedPreprocessingRecord as u32);
 
         if translation_unit != null {
             state.translation_unit = translation_unit;

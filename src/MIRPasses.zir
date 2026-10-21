@@ -71,7 +71,7 @@ class MIRReorderBlocks {
     MIRReorderBlocks(&mut this) {}
 
     pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
-        let count = function->blocks.Size();
+        let count = function->blocks.Length();
         let mut indices = Map<*MIRBlock, usize>();
         let mut visited = Vector<bool>();
 
@@ -88,12 +88,12 @@ class MIRReorderBlocks {
         visited[0] = true;
 
         while !stack.Empty() {
-            let top = stack[stack.Size() - 1];
+            let top = stack[stack.Length() - 1];
             let successors = MIRSuccessors(function->blocks[top]);
-            let k = next[next.Size() - 1];
+            let k = next[next.Length() - 1];
 
-            if k < successors.Size() {
-                next[next.Size() - 1] = k + 1;
+            if k < successors.Length() {
+                next[next.Length() - 1] = k + 1;
                 let index = indices.Get(successors[k], MIR_NO_BLOCK);
 
                 if index != MIR_NO_BLOCK && !visited[index] {
@@ -109,15 +109,15 @@ class MIRReorderBlocks {
         }
 
         let mut blocks = Vector<*mut MIRBlock>();
-        let mut changed = postorder.Size() != count;
+        let mut changed = postorder.Length() != count;
 
-        for i in 0..postorder.Size() {
-            let index = postorder[postorder.Size() - 1 - i];
+        for i in 0..postorder.Length() {
+            let index = postorder[postorder.Length() - 1 - i];
             if index != i { changed = true; }
             blocks.PushBack(function->blocks[index]);
         }
 
-        if postorder.Size() != count {
+        if postorder.Length() != count {
             for block in blocks {
                 for instruction in block->instructions {
                     if instruction->kind != MIRInstructionKind::Phi { continue; }
@@ -207,7 +207,7 @@ class MIRPromoteAllocas {
             if instruction->kind != MIRInstructionKind::Alloca { continue; }
             let alloca = instruction as *mut MIRAllocaInstruction;
             if !this.IsScalar(alloca->_type) { continue; }
-            candidate_slots[alloca] = candidates.Size();
+            candidate_slots[alloca] = candidates.Length();
             candidates.PushBack(alloca);
         }
 
@@ -219,9 +219,9 @@ class MIRPromoteAllocas {
         }
 
         for block in this.function->blocks {
-            for k in 0..(block->instructions.Size() + 1) {
+            for k in 0..(block->instructions.Length() + 1) {
                 let mut instruction: *MIRInstruction = block->terminator;
-                if k < block->instructions.Size() { instruction = block->instructions[k]; }
+                if k < block->instructions.Length() { instruction = block->instructions[k]; }
                 if instruction == null { continue; }
 
                 for operand in MIROperands(instruction) {
@@ -246,9 +246,9 @@ class MIRPromoteAllocas {
             }
         }
 
-        for i in 0..candidates.Size() {
+        for i in 0..candidates.Length() {
             if !promotable[i] { continue; }
-            this.slots[candidates[i]] = this.allocas.Size();
+            this.slots[candidates[i]] = this.allocas.Length();
             this.allocas.PushBack(candidates[i]);
         }
     }
@@ -257,7 +257,7 @@ class MIRPromoteAllocas {
         let mut store_slots = Vector<usize>();
         let mut store_blocks = Vector<usize>();
 
-        for b in 0..this.function->blocks.Size() {
+        for b in 0..this.function->blocks.Length() {
             for instruction in this.function->blocks[b]->instructions {
                 if instruction->kind != MIRInstructionKind::Store { continue; }
                 let slot = this.Slot((instruction as *MIRStoreInstruction)->pointer);
@@ -267,19 +267,19 @@ class MIRPromoteAllocas {
             }
         }
 
-        for slot in 0..this.allocas.Size() {
+        for slot in 0..this.allocas.Length() {
             let alloca = this.allocas[slot];
             let mut has_phi = Vector<bool>();
             let mut queued = Vector<bool>();
 
-            for b in 0..this.function->blocks.Size() {
+            for b in 0..this.function->blocks.Length() {
                 has_phi.PushBack(false);
                 queued.PushBack(false);
             }
 
             let mut worklist = Vector<usize>();
 
-            for i in 0..store_slots.Size() {
+            for i in 0..store_slots.Length() {
                 if store_slots[i] != slot || queued[store_blocks[i]] { continue; }
                 queued[store_blocks[i]] = true;
                 worklist.PushBack(store_blocks[i]);
@@ -313,9 +313,9 @@ class MIRPromoteAllocas {
 
     fn Rename(&mut this, index: usize) {
         let block = this.function->blocks[index];
-        let saved = this.undo_slots.Size();
+        let saved = this.undo_slots.Length();
 
-        for i in 0..this.phis.Size() {
+        for i in 0..this.phis.Length() {
             if this.phi_blocks[i] == index {
                 this.Define(this.phi_slots[i], this.phis[i]);
             }
@@ -357,7 +357,7 @@ class MIRPromoteAllocas {
         for k in this.control_flow.successor_offsets[index]..this.control_flow.successor_offsets[index + 1] {
             let successor = this.control_flow.successors[k];
 
-            for i in 0..this.phis.Size() {
+            for i in 0..this.phis.Length() {
                 if this.phi_blocks[i] == successor {
                     this.phis[i]->AddIncoming(this.current[this.phi_slots[i]], block);
                 }
@@ -368,7 +368,7 @@ class MIRPromoteAllocas {
             this.Rename(this.control_flow.children[k]);
         }
 
-        while this.undo_slots.Size() > saved {
+        while this.undo_slots.Length() > saved {
             let slot = this.undo_slots.PopBack().Unwrap();
             this.current[slot] = this.undo_values.PopBack().Unwrap();
         }
@@ -443,7 +443,7 @@ class MIRPromoteAllocas {
                 let call = instruction as *mut MIRCallInstruction;
                 call->callee = this.Resolve(call->callee);
 
-                for i in 0..call->arguments.Size() {
+                for i in 0..call->arguments.Length() {
                     call->arguments[i] = this.Resolve(call->arguments[i]);
                 }
             },
@@ -460,20 +460,20 @@ class MIRPromoteAllocas {
             MIRInstructionKind::Phi => {
                 let phi = instruction as *mut MIRPhiInstruction;
 
-                for i in 0..phi->incomings.Size() {
+                for i in 0..phi->incomings.Length() {
                     phi->incomings[i].value = this.Resolve(phi->incomings[i].value);
                 }
             },
             MIRInstructionKind::Assembly => {
                 let assembly = instruction as *mut MIRAssemblyInstruction;
 
-                for i in 0..assembly->inputs.Size() {
+                for i in 0..assembly->inputs.Length() {
                     let operand = assembly->inputs[i];
                     let value = this.Resolve(operand->value);
                     if value != operand->value { assembly->inputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
                 }
 
-                for i in 0..assembly->outputs.Size() {
+                for i in 0..assembly->outputs.Length() {
                     let operand = assembly->outputs[i];
                     let value = this.Resolve(operand->value);
                     if value != operand->value { assembly->outputs[i] = this.context->arena.New<MIRAssemblyOperand>(operand->name, value); }
@@ -515,16 +515,16 @@ class MIRPromoteAllocas {
         let mut uses = Vector<u32>();
         let mut dead = Vector<bool>();
 
-        for i in 0..this.phis.Size() {
+        for i in 0..this.phis.Length() {
             indices[this.phis[i]] = i;
             uses.PushBack(0);
             dead.PushBack(false);
         }
 
         for block in this.function->blocks {
-            for k in 0..(block->instructions.Size() + 1) {
+            for k in 0..(block->instructions.Length() + 1) {
                 let mut instruction: *MIRInstruction = block->terminator;
-                if k < block->instructions.Size() { instruction = block->instructions[k]; }
+                if k < block->instructions.Length() { instruction = block->instructions[k]; }
                 if instruction == null { continue; }
 
                 for operand in MIROperands(instruction) {
@@ -536,7 +536,7 @@ class MIRPromoteAllocas {
 
         let mut worklist = Vector<usize>();
 
-        for i in 0..this.phis.Size() {
+        for i in 0..this.phis.Length() {
             if uses[i] == 0 {
                 dead[i] = true;
                 worklist.PushBack(i);

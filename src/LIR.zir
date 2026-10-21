@@ -268,7 +268,7 @@ class LIRInstruction {
         let mut result = String();
 
         if !this.defines.Empty() {
-            for i in 0..this.defines.Size() {
+            for i in 0..this.defines.Length() {
                 if i > 0 { result += ", "; }
                 result += this.defines[i]->ToString();
             } result += " = ";
@@ -283,7 +283,7 @@ class LIRInstruction {
         if !this.uses.Empty() {
             result += ' ';
 
-            for i in 0..this.uses.Size() {
+            for i in 0..this.uses.Length() {
                 if i > 0 { result += ", "; }
                 result += this.uses[i]->ToString();
             }
@@ -292,7 +292,7 @@ class LIRInstruction {
         if !this.implicit_uses.Empty() {
             result += " [";
 
-            for i in 0..this.implicit_uses.Size() {
+            for i in 0..this.implicit_uses.Length() {
                 if i > 0 { result += ", "; }
                 result += this.implicit_uses[i]->ToString();
             } result += ']';
@@ -348,7 +348,7 @@ class LIRFunction {
         if !this.blocks.Empty() {
             result += " {\n";
 
-            for i in 0..this.blocks.Size() {
+            for i in 0..this.blocks.Length() {
                 if i != 0 { result += '\n'; }
                 result += this.blocks[i]->ToDefinitionString() + '\n';
             } result += '}';
@@ -387,7 +387,7 @@ class LIRGlobal {
     pub fn ToString(&this) -> String {
         let mut result = "global @\"" + this.name + "\" = [";
 
-        for i in 0..this.data.Size() {
+        for i in 0..this.data.Length() {
             if i > 0 { result += ", "; }
             result += String::FromInteger(this.data[i] as u64);
         } result += ']';

@@ -71,17 +71,17 @@ class ASTPath : ASTNode {
             result += "::";
         }
 
-        for i in 0..this.segments.Size() {
+        for i in 0..this.segments.Length() {
             let segment = this.segments[i];
             result += segment.name;
 
             if !segment.types.Empty() {
                 result += "<";
 
-                for j in 0..segment.types.Size() {
+                for j in 0..segment.types.Length() {
                     result += segment.types[j]->kind.ToString();
 
-                    if j < segment.types.Size() - 1 {
+                    if j < segment.types.Length() - 1 {
                         result += ", ";
                     }
                 }
@@ -89,7 +89,7 @@ class ASTPath : ASTNode {
                 result += ">";
             }
 
-            if i < this.segments.Size() - 1 {
+            if i < this.segments.Length() - 1 {
                 result += "::";
             }
         }
@@ -197,7 +197,7 @@ class ASTTupleType : ASTType {
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -216,7 +216,7 @@ class ASTFunctionType : ASTType {
     pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
-        for i in 0..this.parameters.Size() {
+        for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
         }
@@ -500,7 +500,7 @@ class ASTArrayLiteral : ASTLiteral {
 
         let mut result = '['.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i > 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -517,7 +517,7 @@ class ASTTupleLiteral : ASTLiteral {
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -537,7 +537,7 @@ class ASTStructureLiteral : ASTLiteral {
     pub override fn ToString(&this) -> String {
         let mut result = this.target->ToString() + " { ";
 
-        for i in 0..this.fields.Size() {
+        for i in 0..this.fields.Length() {
             if i > 0 { result += ", "; }
             let (name, expression) = this.fields[i];
             result += name + ": " + expression->ToString();
@@ -653,7 +653,7 @@ class ASTCallExpression : ASTExpression {
     pub override fn ToString(&this) -> String {
         let mut result = this.expression->ToString() + '(';
 
-        for i in 0..this.arguments.Size() {
+        for i in 0..this.arguments.Length() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
         }
@@ -747,7 +747,7 @@ class ASTNewExpression : ASTExpression {
         } else if this.initialized {
             result += '(';
 
-            for i in 0..this.arguments.Size() {
+            for i in 0..this.arguments.Length() {
                 if i != 0 { result += ", "; }
                 result += this.arguments[i]->ToString();
             } result += ')';

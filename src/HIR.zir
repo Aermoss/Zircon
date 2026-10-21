@@ -177,9 +177,9 @@ class HIRType {
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
-            if lefts.Size() != rights.Size() { return true; }
+            if lefts.Length() != rights.Length() { return true; }
 
-            for i in 0..lefts.Size() {
+            for i in 0..lefts.Length() {
                 if !lefts[i]->IsMutabilityCompatible(rights[i]) { return false; }
             }
 
@@ -208,9 +208,9 @@ class HIRType {
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
-            if lefts.Size() != rights.Size() { return false; }
+            if lefts.Length() != rights.Length() { return false; }
 
-            for i in 0..lefts.Size() {
+            for i in 0..lefts.Length() {
                 if !lefts[i]->IsSame(rights[i]) { return false; }
             }
 
@@ -301,10 +301,10 @@ class HIRType {
 
         if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
-            if left->elements.Size() != right->elements.Size() { return 0; }
+            if left->elements.Length() != right->elements.Length() { return 0; }
             let mut score: u64 = 100;
 
-            for i in 0..left->elements.Size() {
+            for i in 0..left->elements.Length() {
                 let element_score = left->elements[i]->ScoreParameter(*right->elements[i]);
                 if element_score == 0 { return 0; }
                 if element_score < score { score = element_score; }
@@ -571,7 +571,7 @@ class HIRType {
     pub fn Index(&this, name: &String) -> isize {
         let fields = this.Fields();
 
-        for i in 0..fields.Size() {
+        for i in 0..fields.Length() {
             if fields[i]->name == name {
                 return i as isize;
             }
@@ -599,6 +599,7 @@ class HIRType {
     }
 
     pub fn GetCandidates(&this, name: &String, node: *ASTNode, test: bool) -> Vector<*HIRFunctionDeclaration> {
+        hir_lowerer->CompleteType(this);
         let mut result = Vector<*HIRFunctionDeclaration>();
         let mut found = false;
 
@@ -629,6 +630,8 @@ class HIRType {
     }
 
     fn CollectMethods(&this, name: &String, result: &mut Vector<*HIRFunctionDeclaration>, found: &mut bool) {
+        hir_lowerer->CompleteType(this);
+
         for method in this.Methods() {
             if method->name != name {
                 continue;
@@ -675,9 +678,9 @@ class HIRType {
             left->length == right->length && *left->element == *right->element
         } else if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
-            if left->elements.Size() != right->elements.Size() { return false; }
+            if left->elements.Length() != right->elements.Length() { return false; }
 
-            for i in 0..left->elements.Size() {
+            for i in 0..left->elements.Length() {
                 let (left_element, right_element) = (left->elements[i], right->elements[i]);
 
                 if left_element != right_element {
@@ -690,11 +693,11 @@ class HIRType {
         } else if this.IsFunction() && other.IsFunction() {
             let (left, right) = (this as *HIRFunctionType, other as *HIRFunctionType);
 
-            if left->parameters.Size() != right->parameters.Size() {
+            if left->parameters.Length() != right->parameters.Length() {
                 return false;
             }
 
-            for i in 0..left->parameters.Size() {
+            for i in 0..left->parameters.Length() {
                 let (left_parameter, right_parameter) = (left->parameters[i], right->parameters[i]);
 
                 if left_parameter != right_parameter {
@@ -872,7 +875,7 @@ class HIRTupleType : HIRType {
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -892,7 +895,7 @@ class HIRFunctionType : HIRType {
     pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
-        for i in 0..this.parameters.Size() {
+        for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
         } result += ')';
@@ -991,7 +994,7 @@ class HIRPattern {
             HIRPatternKind::Variant => {
                 let variant = this as *HIRVariantPattern;
 
-                if (variant->member->_type as *HIRVariantType)->declaration->members.Size() != 1 {
+                if (variant->member->_type as *HIRVariantType)->declaration->members.Length() != 1 {
                     return false;
                 }
 
@@ -1090,7 +1093,7 @@ class HIRTuplePattern : HIRPattern {
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
-        for i in 0..this.patterns.Size() {
+        for i in 0..this.patterns.Length() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
         }
@@ -1123,7 +1126,7 @@ class HIRStructurePattern : HIRPattern {
     pub override fn ToString(&this) -> String {
         let mut result = this.declaration->name + " { ";
 
-        for i in 0..this.patterns.Size() {
+        for i in 0..this.patterns.Length() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
         }
@@ -1155,7 +1158,7 @@ class HIRVariantPattern : HIRPattern {
     pub override fn ToString(&this) -> String {
         let mut result = this.member->name + '(';
 
-        for i in 0..this.patterns.Size() {
+        for i in 0..this.patterns.Length() {
             if i != 0 { result += ", "; }
             result += this.patterns[i]->ToString();
         }
@@ -1187,7 +1190,7 @@ class HIROrPattern : HIRPattern {
     pub override fn ToString(&this) -> String {
         let mut result = String();
 
-        for i in 0..this.patterns.Size() {
+        for i in 0..this.patterns.Length() {
             if i != 0 { result += " | "; }
             result += this.patterns[i]->ToString();
         }
@@ -1356,7 +1359,7 @@ class HIRArrayLiteral : HIRLiteral {
 
         let mut result = '['.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i > 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -1375,7 +1378,7 @@ class HIRTupleLiteral : HIRLiteral {
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i > 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -1394,7 +1397,7 @@ class HIRStructureLiteral : HIRLiteral {
     pub override fn ToString(&this) -> String {
         let mut result = '{'.ToString();
 
-        for i in 0..this.fields.Size() {
+        for i in 0..this.fields.Length() {
             if i > 0 { result += ", "; }
             result += this.fields[i]->ToString();
         }
@@ -1414,7 +1417,7 @@ class HIRVariantLiteral : HIRLiteral {
     pub override fn ToString(&this) -> String {
         let mut result = this.member->name + (if this.member->structure { '{' } else { '(' }).ToString();
 
-        for i in 0..this.fields.Size() {
+        for i in 0..this.fields.Length() {
             if i > 0 { result += ", "; }
 
             if this.member->structure {
@@ -1615,7 +1618,7 @@ class HIRCallExpression : HIRExpression {
             result += this.callee->ToString();
         } result += '(';
 
-        for i in 0..this.arguments.Size() {
+        for i in 0..this.arguments.Length() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
         }
@@ -1830,7 +1833,7 @@ class HIRNewExpression : HIRExpression {
         } else if this.initialized {
             result += '(';
 
-            for i in 0..this.arguments.Size() {
+            for i in 0..this.arguments.Length() {
                 if i != 0 { result += ", "; }
                 result += this.arguments[i]->ToString();
             } result += ')';
@@ -1893,7 +1896,7 @@ class HIRConstructorExpression : HIRExpression {
             result += this.callee->ToString();
         } result += '(';
 
-        for i in 0..this.arguments.Size() {
+        for i in 0..this.arguments.Length() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
         }
@@ -2202,7 +2205,7 @@ class HIRPatternChecker {
             if end < high && end + 1 > low && !points.Contains(end + 1) { points.PushBack(end + 1); }
         }
 
-        for i in 1..points.Size() {
+        for i in 1..points.Length() {
             let mut j = i;
 
             while j > 0 && points[j - 1] > points[j] {
@@ -2229,7 +2232,7 @@ class HIRPatternChecker {
 
             let mut rest = Vector<*HIRPattern>();
 
-            for i in 1..row.Size() {
+            for i in 1..row.Length() {
                 rest.PushBack(row[i]);
             } specialized.PushBack(rest);
         }
@@ -2238,7 +2241,7 @@ class HIRPatternChecker {
     }
 
     fn PieceEnd(&this, points: &Vector<u64>, index: usize, high: u64) -> u64 {
-        if index + 1 < points.Size() { return points[index + 1] - 1; }
+        if index + 1 < points.Length() { return points[index + 1] - 1; }
         high
     }
 
@@ -2247,10 +2250,10 @@ class HIRPatternChecker {
         let (mut low, mut high) = (0u64, this.RangeMax(_type));
         if head != null && !this.RangeOf(head, _type, low, high) { return true; }
         let mut rest = Vector<*HIRPattern>();
-        for i in 1..vector.Size() { rest.PushBack(vector[i]); }
+        for i in 1..vector.Length() { rest.PushBack(vector[i]); }
         let points = this.Split(rows, _type, low, high);
 
-        for i in 0..points.Size() {
+        for i in 0..points.Length() {
             if this.Useful(this.SpecializeRange(rows, _type, points[i], this.PieceEnd(points, i, high)), rest, this.Tail(types)) {
                 return true;
             }
@@ -2263,7 +2266,7 @@ class HIRPatternChecker {
         let high = this.RangeMax(_type);
         let points = this.Split(rows, _type, 0, high);
 
-        for i in 0..points.Size() {
+        for i in 0..points.Length() {
             let end = this.PieceEnd(points, i, high);
             let mut inner = Vector<String>();
 
@@ -2409,7 +2412,7 @@ class HIRPatternChecker {
             _ => {}
         }
 
-        while fields.Size() < arity {
+        while fields.Length() < arity {
             fields.PushBack(null);
         }
 
@@ -2448,7 +2451,7 @@ class HIRPatternChecker {
             let mut fields = Vector<*HIRPattern>();
 
             if head == null {
-                while fields.Size() < arity {
+                while fields.Length() < arity {
                     fields.PushBack(null);
                 }
             } else if this.Key(head) == key {
@@ -2457,7 +2460,7 @@ class HIRPatternChecker {
                 continue;
             }
 
-            for i in 1..row.Size() {
+            for i in 1..row.Length() {
                 fields.PushBack(row[i]);
             }
 
@@ -2474,7 +2477,7 @@ class HIRPatternChecker {
             if this.Normalize(row[0]) != null { continue; }
             let mut rest = Vector<*HIRPattern>();
 
-            for i in 1..row.Size() {
+            for i in 1..row.Length() {
                 rest.PushBack(row[i]);
             } defaulted.PushBack(rest);
         }
@@ -2508,7 +2511,7 @@ class HIRPatternChecker {
     fn Tail(&this, types: &Vector<*HIRType>) -> Vector<*HIRType> {
         let mut tail = Vector<*HIRType>();
 
-        for i in 1..types.Size() {
+        for i in 1..types.Length() {
             tail.PushBack(types[i]);
         }
 
@@ -2536,26 +2539,26 @@ class HIRPatternChecker {
         if head != null {
             let key = this.Key(head);
             let mut field_types = this.FieldTypes(_type, key);
-            let mut fields = this.Fields(head, field_types.Size());
-            for i in 1..vector.Size() { fields.PushBack(vector[i]); }
-            for i in 1..types.Size() { field_types.PushBack(types[i]); }
-            return this.Useful(this.Specialize(expanded, key, this.FieldTypes(_type, key).Size()), fields, field_types);
+            let mut fields = this.Fields(head, field_types.Length());
+            for i in 1..vector.Length() { fields.PushBack(vector[i]); }
+            for i in 1..types.Length() { field_types.PushBack(types[i]); }
+            return this.Useful(this.Specialize(expanded, key, this.FieldTypes(_type, key).Length()), fields, field_types);
         }
 
         if this.IsComplete(this.Heads(expanded), _type) {
             for key in this.Constructors(_type) {
                 let mut field_types = this.FieldTypes(_type, key);
-                let arity = field_types.Size();
+                let arity = field_types.Length();
                 let mut fields = Vector<*HIRPattern>();
-                while fields.Size() < arity { fields.PushBack(null); }
-                for i in 1..vector.Size() { fields.PushBack(vector[i]); }
-                for i in 1..types.Size() { field_types.PushBack(types[i]); }
+                while fields.Length() < arity { fields.PushBack(null); }
+                for i in 1..vector.Length() { fields.PushBack(vector[i]); }
+                for i in 1..types.Length() { field_types.PushBack(types[i]); }
                 if this.Useful(this.Specialize(expanded, key, arity), fields, field_types) { return true; }
             } return false;
         }
 
         let mut rest = Vector<*HIRPattern>();
-        for i in 1..vector.Size() { rest.PushBack(vector[i]); }
+        for i in 1..vector.Length() { rest.PushBack(vector[i]); }
         this.Useful(this.Default(expanded), rest, this.Tail(types))
     }
 
@@ -2573,15 +2576,15 @@ class HIRPatternChecker {
         if this.IsComplete(heads, _type) {
             for key in this.Constructors(_type) {
                 let mut field_types = this.FieldTypes(_type, key);
-                let arity = field_types.Size();
-                for i in 1..types.Size() { field_types.PushBack(types[i]); }
+                let arity = field_types.Length();
+                for i in 1..types.Length() { field_types.PushBack(types[i]); }
                 let mut inner = Vector<String>();
 
                 if this.Missing(this.Specialize(expanded, key, arity), field_types, inner) {
                     let mut fields = Vector<String>();
                     for i in 0..arity { fields.PushBack(inner[i]); }
                     witness.PushBack(this.Format(_type, key, fields));
-                    for i in arity..inner.Size() { witness.PushBack(inner[i]); }
+                    for i in arity..inner.Length() { witness.PushBack(inner[i]); }
                     return true;
                 }
             } return false;
@@ -2597,7 +2600,7 @@ class HIRPatternChecker {
                 if heads.Contains(key) { continue; }
                 let mut fields = Vector<String>();
 
-                while fields.Size() < this.FieldTypes(_type, key).Size() {
+                while fields.Length() < this.FieldTypes(_type, key).Length() {
                     fields.PushBack('_'.ToString());
                 }
 
@@ -2617,7 +2620,7 @@ class HIRPatternChecker {
         let mut result = String();
         let mut omitted = false;
 
-        for i in 0..fields.Size() {
+        for i in 0..fields.Length() {
             if fields[i] == "_" {
                 omitted = true;
                 continue;
@@ -2659,7 +2662,7 @@ class HIRPatternChecker {
 
             result += "(";
 
-            for i in 0..fields.Size() {
+            for i in 0..fields.Length() {
                 if i != 0 { result += ", "; }
                 result += fields[i];
             } return result + ")";
@@ -2671,7 +2674,7 @@ class HIRPatternChecker {
         } else if _type->IsTuple() {
             let mut result = "(".ToString();
 
-            for i in 0..fields.Size() {
+            for i in 0..fields.Length() {
                 if i != 0 { result += ", "; }
                 result += fields[i];
             } return result + ")";
@@ -2728,7 +2731,7 @@ class HIRMatchExpression : HIRExpression {
                 let field_types = checker.FieldTypes(_type, key);
                 let mut fields = Vector<String>();
 
-                if checker.Missing(checker.Specialize(expanded, key, field_types.Size()), field_types, fields) {
+                if checker.Missing(checker.Specialize(expanded, key, field_types.Length()), field_types, fields) {
                     missing.PushBack(checker.Format(_type, key, fields));
                 }
             } return missing;
@@ -2752,7 +2755,7 @@ class HIRMatchExpression : HIRExpression {
     pub override fn ToString(&this, indent: usize) -> String {
         let mut result = "match " + this.target->ToString() + " {\n";
 
-        for i in 0..this.arms.Size() {
+        for i in 0..this.arms.Length() {
             if i != 0 { result += ",\n"; }
             result += (' ' * (indent + 1) * 4) + this.arms[i]->ToString(indent + 1);
         }
@@ -2909,7 +2912,7 @@ class HIRAssemblyStatement : HIRStatement {
         if !this.inputs.Empty() {
             result += ": ";
 
-            for i in 0..this.inputs.Size() {
+            for i in 0..this.inputs.Length() {
                 if i != 0 { result += ", "; }
                 result += this.inputs[i]->name + '(' + this.inputs[i]->expression->ToString() + ')';
             } result += " -> ";
@@ -2920,7 +2923,7 @@ class HIRAssemblyStatement : HIRStatement {
         if !this.outputs.Empty() {
             result += " -> ";
 
-            for i in 0..this.outputs.Size() {
+            for i in 0..this.outputs.Length() {
                 if i != 0 { result += ", "; }
                 result += this.outputs[i]->name + '(' + this.outputs[i]->expression->ToString() + ')';
             }
@@ -2929,7 +2932,7 @@ class HIRAssemblyStatement : HIRStatement {
         if !this.clobbers.Empty() {
             result += " : ";
 
-            for i in 0..this.clobbers.Size() {
+            for i in 0..this.clobbers.Length() {
                 if i != 0 { result += ", "; }
                 result += this.clobbers[i];
             }
@@ -3001,6 +3004,7 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub _return: *HIRType,
     pub body: *HIRBlockExpression = null,
     pub instance: *GenericInstance = null,
+    pub node: *ASTFunctionDeclaration = null,
     pub caller_location: *HIRParameterDeclaration = null,
     pub referenced: bool = false,
     pub deferred: bool = false,
@@ -3020,7 +3024,7 @@ class HIRFunctionDeclaration : HIRLinkableDeclaration {
     pub fn ToString(&this, indent: usize) -> String {
         let mut result = "fn @\"" + this.name + "\"(";
 
-        for i in 0..this.parameters.Size() {
+        for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
         } result += ')';
@@ -3081,7 +3085,7 @@ class HIRClassDeclaration : HIRTypedDeclaration {
         if !this.fields.Empty() {
             result += '\n';
 
-            for i in 0..this.fields.Size() {
+            for i in 0..this.fields.Length() {
                 if i != 0 { result += ",\n"; }
                 result += "    " + this.fields[i]->ToString();
             }
@@ -3124,7 +3128,7 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
         if !this.fields.Empty() {
             result += '\n';
 
-            for i in 0..this.fields.Size() {
+            for i in 0..this.fields.Length() {
                 if i != 0 { result += ",\n"; }
                 result += "    " + this.fields[i]->ToString();
             }
@@ -3184,7 +3188,7 @@ class HIREnumerationDeclaration : HIRTypedDeclaration {
         if !this.members.Empty() {
             result += '\n';
 
-            for i in 0..this.members.Size() {
+            for i in 0..this.members.Length() {
                 if i != 0 { result += ",\n"; }
                 result += "    " + this.members[i]->ToString();
             } result += '\n';
@@ -3227,7 +3231,7 @@ class HIRVariantMember : HIRTypedDeclaration {
         if !this.fields.Empty() {
             result += if this.structure { " { " } else { "(" };
 
-            for i in 0..this.fields.Size() {
+            for i in 0..this.fields.Length() {
                 if i != 0 { result += ", "; }
                 result += this.fields[i]->ToString();
             } result += if this.structure { " }" } else { ")" };
@@ -3253,7 +3257,7 @@ class HIRVariantDeclaration : HIRTypedDeclaration {
         if !this.members.Empty() {
             result += '\n';
 
-            for i in 0..this.members.Size() {
+            for i in 0..this.members.Length() {
                 if i != 0 { result += ",\n"; }
                 result += "    " + this.members[i]->ToString();
             }
@@ -3510,13 +3514,13 @@ class HIRContext {
         }
 
         for existing in this.tuple_types {
-            if existing->elements.Size() != elements.Size() {
+            if existing->elements.Length() != elements.Length() {
                 continue;
             }
 
             let mut same = true;
 
-            for i in 0..elements.Size() {
+            for i in 0..elements.Length() {
                 if !existing->elements[i]->IsSame(elements[i]) {
                     same = false;
                     break;

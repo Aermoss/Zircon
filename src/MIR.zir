@@ -108,7 +108,7 @@ class MIRStructureType : MIRType {
     pub fn ToDefinitionString(&this) -> String {
         let mut result = "{ ".ToString();
 
-        for i in 0..this.fields.Size() {
+        for i in 0..this.fields.Length() {
             if i != 0 { result += ", "; }
             result += this.fields[i]->ToString();
         }
@@ -136,7 +136,7 @@ class MIRFunctionType : MIRType {
     pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
 
-        for i in 0..this.parameters.Size() {
+        for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
         } result += ')';
@@ -243,7 +243,7 @@ class MIRConstantArray : MIRConstant {
     pub override fn ToString(&this) -> String {
         let mut result = '['.ToString();
 
-        for i in 0..this.elements.Size() {
+        for i in 0..this.elements.Length() {
             if i != 0 { result += ", "; }
             result += this.elements[i]->ToString();
         }
@@ -262,7 +262,7 @@ class MIRConstantStructure : MIRConstant {
     pub override fn ToString(&this) -> String {
         let mut result = '{'.ToString();
 
-        for i in 0..this.fields.Size() {
+        for i in 0..this.fields.Length() {
             if i != 0 { result += ", "; }
             result += this.fields[i]->ToString();
         }
@@ -642,7 +642,7 @@ class MIRCallInstruction : MIRInstruction {
     pub fn ToString(&this) -> String {
         let mut result = "call " + this.callee->ToString() + '(';
 
-        for i in 0..this.arguments.Size() {
+        for i in 0..this.arguments.Length() {
             if i != 0 { result += ", "; }
             result += this.arguments[i]->ToString();
         }
@@ -701,7 +701,7 @@ class MIRPhiInstruction : MIRInstruction {
     pub fn ToString(&this) -> String {
         let mut result = "phi ".ToString();
 
-        for i in 0..this.incomings.Size() {
+        for i in 0..this.incomings.Length() {
             if i != 0 { result += ", "; }
             result += '[' + this.incomings[i].value->ToString() + ", " + this.incomings[i].block->ToString() + ']';
         }
@@ -736,7 +736,7 @@ class MIRAssemblyInstruction : MIRInstruction {
         if !this.inputs.Empty() {
             result += ": ";
 
-            for i in 0..this.inputs.Size() {
+            for i in 0..this.inputs.Length() {
                 if i != 0 { result += ", "; }
                 result += this.inputs[i]->name + '(' + this.inputs[i]->value->ToString() + ')';
             } result += " -> ";
@@ -747,7 +747,7 @@ class MIRAssemblyInstruction : MIRInstruction {
         if !this.outputs.Empty() {
             result += " -> ";
 
-            for i in 0..this.outputs.Size() {
+            for i in 0..this.outputs.Length() {
                 if i != 0 { result += ", "; }
                 result += this.outputs[i]->name + '(' + this.outputs[i]->value->ToString() + ')';
             }
@@ -756,7 +756,7 @@ class MIRAssemblyInstruction : MIRInstruction {
         if !this.clobbers.Empty() {
             result += " : ";
 
-            for i in 0..this.clobbers.Size() {
+            for i in 0..this.clobbers.Length() {
                 if i != 0 { result += ", "; }
                 result += this.clobbers[i];
             }
@@ -1019,7 +1019,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
     pub override fn ToString(&this) -> String {
         let mut result = "fn @\"" + this.name + "\"(";
 
-        for i in 0..this.parameters.Size() {
+        for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToDefinitionString();
         } result += ')';
@@ -1031,7 +1031,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         if !this.blocks.Empty() {
             result += " {\n";
 
-            for i in 0..this.blocks.Size() {
+            for i in 0..this.blocks.Length() {
                 if i != 0 { result += '\n'; }
                 let block: *MIRBlock = this.blocks[i];
                 result += block->ToDefinitionString() + '\n';

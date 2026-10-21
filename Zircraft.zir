@@ -786,8 +786,8 @@ class TextureManager {
             let data = stbi_load(path.Data(), &mut width, &mut height, &mut channels, 0);
 
             if data != null {
-                Logger::Info("Texture '" + path + "' loaded successfully, id: " + String::FromInteger(this.textures.Size() as u64 - 1) + ".");
-                glTextureSubImage3D(this.id, 0, 0, 0, this.textures.Size() as i32 - 1, this.width, this.height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                Logger::Info("Texture '" + path + "' loaded successfully, id: " + String::FromInteger(this.textures.Length() as u64 - 1) + ".");
+                glTextureSubImage3D(this.id, 0, 0, 0, this.textures.Length() as i32 - 1, this.width, this.height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
                 stbi_image_free(data);
             } else {
                 Logger::Error("Failed to load texture: '" + path + "'.");
@@ -1245,7 +1245,7 @@ class Chunk {
             let subchunk = this.subchunks[i];
             this.vertices += subchunk->vertices;
 
-            for j in 0..subchunk->indices.Size() {
+            for j in 0..subchunk->indices.Length() {
                 this.indices.PushBack(subchunk->indices[j] + this.offset);
             } this.offset += subchunk->offset;
         }
@@ -1262,8 +1262,8 @@ class Chunk {
             glCreateBuffers(1, &mut this.index_buffer);
         }
 
-        glNamedBufferData(this.vertex_buffer, this.vertices.Size() as i64 * 4, this.vertices.Data(), GL_STATIC_DRAW);
-        glNamedBufferData(this.index_buffer, this.indices.Size() as i64 * 4, this.indices.Data(), GL_STATIC_DRAW);
+        glNamedBufferData(this.vertex_buffer, this.vertices.Length() as i64 * 4, this.vertices.Data(), GL_STATIC_DRAW);
+        glNamedBufferData(this.index_buffer, this.indices.Length() as i64 * 4, this.indices.Data(), GL_STATIC_DRAW);
 
         glVertexArrayVertexBuffer(this.vertex_array, 0, this.vertex_buffer, 0, 9 * 4);
 
@@ -1286,7 +1286,7 @@ class Chunk {
         glEnableVertexArrayAttrib(this.vertex_array, 4);
 
         glVertexArrayElementBuffer(this.vertex_array, this.index_buffer);
-        this.index_count = this.indices.Size() as i32;
+        this.index_count = this.indices.Length() as i32;
     }
 
     pub fn Delete(&mut this) {
@@ -1611,7 +1611,7 @@ class World {
                     mtx_lock(&mut this.chunk_mutex);
                     let mut j: usize = 0;
 
-                    while j < this.buckets[i]->Size() {
+                    while j < this.buckets[i]->Length() {
                         let chunk = this.buckets[i]->Data()[j];
                         let dist_x = chunk->position.x - current_chunk.x;
                         let dist_z = chunk->position.z - current_chunk.z;
@@ -1756,7 +1756,7 @@ class World {
                 let mut best_index: usize = 0;
                 let mut min_dist_sq: f32 = 1.0 / 0.0;
 
-                for i in 0..this.chunk_update_queue.Size() {
+                for i in 0..this.chunk_update_queue.Length() {
                     let chunk = this.chunk_update_queue[i];
                     let dist_x = chunk->position.x - current_chunk.x;
                     let dist_z = chunk->position.z - current_chunk.z;

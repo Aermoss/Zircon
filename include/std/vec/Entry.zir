@@ -57,7 +57,7 @@ class Vector<T> {
     pub fn Back(&mut this) -> &mut T { this.data[this.size - 1] }
 
     pub fn Empty(&this) -> bool { this.size == 0 }
-    pub fn Size(&this) -> usize { this.size }
+    pub fn Length(&this) -> usize { this.size }
 
     fn Release(&mut this) {
         if this.data == null { return; }
@@ -125,6 +125,17 @@ class Vector<T> {
         let (data, capacity, size) = (this.data, this.capacity, this.size);
         (this.data, this.capacity, this.size) = (other.data, other.capacity, other.size);
         (other.data, other.capacity, other.size) = (data, capacity, size);
+    }
+
+    pub fn Enumerate(&this) -> Vector<(usize, T)> {
+        let mut result = Vector<(usize, T)>();
+        result.Reserve(this.size);
+
+        for i in 0..this.size {
+            result.PushBack((i, this.data[i]));
+        }
+
+        result
     }
 
     pub fn Reverse(&this) -> Vector<T> {

@@ -26,8 +26,8 @@ class Preprocessor {
     index: usize;
 
     fn Current(&this) -> Token {
-        if this.index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+        if this.index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[this.index]
         }
@@ -36,8 +36,8 @@ class Preprocessor {
     fn Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
 
-        if index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+        if index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[index]
         }
@@ -46,7 +46,7 @@ class Preprocessor {
     fn Advance(&mut this) -> Token {
         let token = this.Current();
 
-        if this.index < this.tokens.Size() {
+        if this.index < this.tokens.Length() {
             this.index += 1;
         }
 
@@ -224,20 +224,20 @@ class Preprocessor {
 
             if this.conditions.Empty() {
                 Logger::Log("Unexpected 'elif' directive.", token, LogSeverity::Error);
-            } else if this.taken[this.taken.Size() - 1] {
-                this.conditions[this.conditions.Size() - 1] = false;
+            } else if this.taken[this.taken.Length() - 1] {
+                this.conditions[this.conditions.Length() - 1] = false;
             } else {
-                this.conditions[this.conditions.Size() - 1] = active;
-                this.taken[this.taken.Size() - 1] = active;
+                this.conditions[this.conditions.Length() - 1] = active;
+                this.taken[this.taken.Length() - 1] = active;
             }
         } else if this.Match(TokenType::ELSE) {
             if this.conditions.Empty() {
                 Logger::Log("Unexpected 'else' directive.", token, LogSeverity::Error);
-            } else if this.taken[this.taken.Size() - 1] {
-                this.conditions[this.conditions.Size() - 1] = false;
+            } else if this.taken[this.taken.Length() - 1] {
+                this.conditions[this.conditions.Length() - 1] = false;
             } else {
-                this.conditions[this.conditions.Size() - 1] = true;
-                this.taken[this.taken.Size() - 1] = true;
+                this.conditions[this.conditions.Length() - 1] = true;
+                this.taken[this.taken.Length() - 1] = true;
             }
         } else if this.Match(TokenType::ENDIF) {
             if !this.conditions.Empty() {

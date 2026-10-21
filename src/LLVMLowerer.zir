@@ -180,7 +180,7 @@ class LLVMLowerer {
             fields.PushBack(lowered_field);
         }
 
-        LLVMStructSetBody(this.types[_type->_type], fields.Data(), fields.Size() as u32, 0);
+        LLVMStructSetBody(this.types[_type->_type], fields.Data(), fields.Length() as u32, 0);
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *MIRFunctionDeclaration) {
@@ -194,7 +194,7 @@ class LLVMLowerer {
 
         let _return = this.LowerType(function->_return);
         if _return == null { return; }
-        let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0));
+        let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, 0));
         this.declarations[function] = value;
 
         for parameter in function->parameters {
@@ -335,7 +335,7 @@ class LLVMLowerer {
 
                 let _type = this.LowerType((constant->_type as *MIRArrayType)->element);
                 if _type == null { return null; }
-                LLVMConstArray2(_type, elements.Data(), elements.Size() as u64)
+                LLVMConstArray2(_type, elements.Data(), elements.Length() as u64)
             },
             MIRConstantKind::Structure => {
                 let mut fields = Vector<LLVMValueRef>();
@@ -346,7 +346,7 @@ class LLVMLowerer {
                     fields.PushBack(lowered_field);
                 }
 
-                LLVMConstNamedStruct(_type, fields.Data(), fields.Size() as u32)
+                LLVMConstNamedStruct(_type, fields.Data(), fields.Length() as u32)
             },
             MIRConstantKind::Null => LLVMConstNull(_type),
             MIRConstantKind::Undef => LLVMGetUndef(_type),
@@ -540,7 +540,7 @@ class LLVMLowerer {
             arguments.PushBack(lowered_argument);
         }
 
-        let result = LLVMBuildCall2(this.builder, _type, callee, arguments.Data(), arguments.Size() as u32, call->name.Data());
+        let result = LLVMBuildCall2(this.builder, _type, callee, arguments.Data(), arguments.Length() as u32, call->name.Data());
 
         if call->sret != null {
             LLVMAddCallSiteAttribute(result, 1 as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(call->sret)));
@@ -624,9 +624,9 @@ class LLVMLowerer {
             constraints += "~{" + clobber + '}';
         }
 
-        let _type = LLVMFunctionType(_return, if parameters.Empty() { null } else { parameters.Data() }, parameters.Size() as u32, 0);
+        let _type = LLVMFunctionType(_return, if parameters.Empty() { null } else { parameters.Data() }, parameters.Length() as u32, 0);
         let inline = LLVMGetInlineAsm(_type, assembly->text.Data(), assembly->text.Length(), constraints.Data(), constraints.Length(), assembly->_volatile as i32, 0, LLVMInlineAsmDialect::LLVMInlineAsmDialectATT, 0);
-        let result = LLVMBuildCall2(this.builder, _type, inline, if inputs.Empty() { null } else { inputs.Data() }, inputs.Size() as u32, "");
+        let result = LLVMBuildCall2(this.builder, _type, inline, if inputs.Empty() { null } else { inputs.Data() }, inputs.Length() as u32, "");
 
         if output != null {
             LLVMBuildStore(this.builder, result, output);
@@ -685,7 +685,7 @@ class LLVMLowerer {
 
         let _return = this.LowerType(function->_return);
         if _return == null { return null; }
-        LLVMFunctionType(_return, parameters.Data(), parameters.Size() as u32, 0)
+        LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, 0)
     }
 
     fn LowerType(&mut this, _type: *MIRType) -> LLVMTypeRef {
@@ -718,7 +718,7 @@ class LLVMLowerer {
                         fields.PushBack(lowered_field);
                     }
 
-                    LLVMStructTypeInContext(this.context, fields.Data(), fields.Size() as u32, 0)
+                    LLVMStructTypeInContext(this.context, fields.Data(), fields.Length() as u32, 0)
                 }
             },
             MIRTypeKind::Function => LLVMPointerTypeInContext(this.context, 0)

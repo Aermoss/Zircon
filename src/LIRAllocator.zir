@@ -121,7 +121,7 @@ class LIRAllocator {
 
     fn AllocateFunction(&mut this, function: *mut LIRFunction) {
         this.function = function;
-        let block_count = function->blocks.Size();
+        let block_count = function->blocks.Length();
         let register_count = function->register_index;
         let words = ((register_count + 63) / 64) as usize + 1;
         let mut block_starts = Vector<u32>();
@@ -132,7 +132,7 @@ class LIRAllocator {
             let block = function->blocks[i];
             block->index = i as u32;
             block_starts.PushBack(position);
-            position += 2 + 2 * block->instructions.Size() as u32;
+            position += 2 + 2 * block->instructions.Length() as u32;
             block_ends.PushBack(position - 1);
         }
 
@@ -315,7 +315,7 @@ class LIRAllocator {
             open.PushBack(LIR_NO_POSITION);
         }
 
-        for i in 0..this.function->blocks.Size() {
+        for i in 0..this.function->blocks.Length() {
             for r in 0usize..32 {
                 open[r] = LIR_NO_POSITION;
             }
@@ -323,16 +323,16 @@ class LIRAllocator {
             let mut use_position = block_starts[i] + 2;
 
             for instruction in this.function->blocks[i]->instructions {
-                for k in 0..(instruction->uses.Size() + instruction->implicit_uses.Size()) {
-                    let operand = if k < instruction->uses.Size() { instruction->uses[k] } else { instruction->implicit_uses[k - instruction->uses.Size()] };
+                for k in 0..(instruction->uses.Length() + instruction->implicit_uses.Length()) {
+                    let operand = if k < instruction->uses.Length() { instruction->uses[k] } else { instruction->implicit_uses[k - instruction->uses.Length()] };
                     let index = this.PhysicalIndex(this.UsedRegister(operand));
                     if index < 0 || !this.IsAllocatable(index as u8) { continue; }
                     let start = if open[index as usize] != LIR_NO_POSITION { open[index as usize] } else { block_starts[i] };
                     ranges.PushBack(LIRFixedRange(index as u8, start, use_position));
                 }
 
-                for k in 0..(instruction->defines.Size() + instruction->implicit_defines.Size()) {
-                    let operand = if k < instruction->defines.Size() { instruction->defines[k] } else { instruction->implicit_defines[k - instruction->defines.Size()] };
+                for k in 0..(instruction->defines.Length() + instruction->implicit_defines.Length()) {
+                    let operand = if k < instruction->defines.Length() { instruction->defines[k] } else { instruction->implicit_defines[k - instruction->defines.Length()] };
                     let index = this.PhysicalIndex(operand);
                     if index < 0 || !this.IsAllocatable(index as u8) { continue; }
                     open[index as usize] = use_position + 1;
@@ -417,13 +417,13 @@ class LIRAllocator {
 
         let mut sorted = Vector<u32>();
 
-        for i in 0..this.intervals.Size() {
+        for i in 0..this.intervals.Length() {
             sorted.PushBack(0);
         }
 
         let mut sorted_count: usize = 0;
 
-        for i in 0..this.intervals.Size() {
+        for i in 0..this.intervals.Length() {
             let start = this.intervals[i].start;
             if start == LIR_NO_POSITION { continue; }
             sorted[counts[start as usize] as usize] = i as u32;
@@ -443,7 +443,7 @@ class LIRAllocator {
             let (start, end) = (this.intervals[current as usize].start, this.intervals[current as usize].end);
             let mut i: usize = 0;
 
-            while i < active.Size() {
+            while i < active.Length() {
                 let other = this.intervals[active[i] as usize];
 
                 if other.end < start {
@@ -476,7 +476,7 @@ class LIRAllocator {
                 let mut victim: i64 = -1;
                 let mut furthest = end;
 
-                for k in 0..active.Size() {
+                for k in 0..active.Length() {
                     let other = this.intervals[active[k] as usize];
 
                     if other.end > furthest && !this.Conflicts(other.register as u8, start, end) {

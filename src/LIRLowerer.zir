@@ -138,7 +138,7 @@ class LIRLowerer {
                     let element_size = this.SizeOf((constant->_type as *MIRArrayType)->element);
                     let elements = (constant as *MIRConstantArray)->elements;
 
-                    for i in 0..elements.Size() {
+                    for i in 0..elements.Length() {
                         this.WriteConstant(global, offset + i as u32 * element_size, elements[i]);
                     } return;
                 },
@@ -146,7 +146,7 @@ class LIRLowerer {
                     let _type = constant->_type as *MIRStructureType;
                     let fields = (constant as *MIRConstantStructure)->fields;
 
-                    for i in 0..fields.Size() {
+                    for i in 0..fields.Length() {
                         this.WriteConstant(global, offset + this.FieldOffset(_type, i as u32), fields[i]);
                     } return;
                 },
@@ -331,7 +331,7 @@ class LIRLowerer {
 
         this.builder.SetCurrentBlock(this.blocks[function->blocks[0]]);
 
-        for i in 0..function->parameters.Size() {
+        for i in 0..function->parameters.Length() {
             let destination = this.builder.VirtualRegister();
 
             if i < LIR_ARGUMENT_COUNT {
@@ -416,7 +416,7 @@ class LIRLowerer {
         }
 
         for block in function->blocks {
-            let size = block->instructions.Size();
+            let size = block->instructions.Length();
             if size < 2 { continue; }
             let branch = block->instructions[size - 2];
             if branch->opcode != LIROpcode::Bne || block->instructions[size - 1]->opcode != LIROpcode::B { continue; }
@@ -436,7 +436,7 @@ class LIRLowerer {
                 Option<usize>::None => continue
             };
 
-            if definer->uses.Size() != 2 { continue; }
+            if definer->uses.Length() != 2 { continue; }
             let mut left = definer->uses[0];
             let mut right = definer->uses[1];
             let mut stable = true;
@@ -557,7 +557,7 @@ class LIRLowerer {
         let current = this.builder.GetCurrentBlock();
 
         if !conditional {
-            this.edges.PushBack(LIRPhiEdge(this.block, to, current, current->instructions.Size()));
+            this.edges.PushBack(LIRPhiEdge(this.block, to, current, current->instructions.Length()));
             return target;
         }
 
@@ -573,7 +573,7 @@ class LIRLowerer {
         let mut sources: Vector<*LIROperand> = initial_sources;
         let mut pending = Vector<usize>();
 
-        for i in 0..destinations.Size() {
+        for i in 0..destinations.Length() {
             if destinations[i] != sources[i] {
                 pending.PushBack(i);
             }
@@ -582,7 +582,7 @@ class LIRLowerer {
         while !pending.Empty() {
             let mut ready: i64 = -1;
 
-            for k in 0..pending.Size() {
+            for k in 0..pending.Length() {
                 let mut blocked = false;
 
                 for other in pending {
@@ -644,7 +644,7 @@ class LIRLowerer {
 
             this.EmitParallelCopy(destinations, sources);
 
-            for i in 0..scratch.instructions.Size() {
+            for i in 0..scratch.instructions.Length() {
                 edge.block->instructions.Insert(edge.index + i, scratch.instructions[i]);
             }
         }
@@ -828,7 +828,7 @@ class LIRLowerer {
             offset += this.SizeOf(field);
         }
 
-        if index as usize < _type->fields.Size() {
+        if index as usize < _type->fields.Length() {
             offset = this.AlignUp(offset, this.AlignOf(_type->fields[index as usize]));
         }
 
@@ -1235,7 +1235,7 @@ class LIRLowerer {
         let function = this.builder.GetCurrentFunction();
         let mut sources = Vector<*LIROperand>();
 
-        for i in 0..call->arguments.Size() {
+        for i in 0..call->arguments.Length() {
             let argument = call->arguments[i];
 
             if !this.IsScalar(argument->_type) && !this.IsAggregate(argument->_type) {
@@ -1264,7 +1264,7 @@ class LIRLowerer {
 
         let mut arguments = Vector<*LIROperand>();
 
-        for i in 0..sources.Size() {
+        for i in 0..sources.Length() {
             let register = this.Physical(LIR_A0 + (i as u8));
             this.EmitMove(register, sources[i]);
             arguments.PushBack(register);
@@ -1377,8 +1377,8 @@ class LIRLowerer {
         instruction->implicit_uses = inputs;
         instruction->implicit_defines = defines;
 
-        for i in 0..assembly->outputs.Size() {
-            if i >= outputs.Size() { break; }
+        for i in 0..assembly->outputs.Length() {
+            if i >= outputs.Length() { break; }
             let output = assembly->outputs[i];
             let pointer = this.LowerValue(output->value);
             if pointer == null { continue; }

@@ -326,7 +326,7 @@ class MIRLowerer {
 
         for parameter in parameters {
             let lowered_type = this.LowerAggregateType(parameter->_type);
-            let lowered_parameter = this.builder.BuildParameter(parameter->name, _parameters.Size() as u32, lowered_type);
+            let lowered_parameter = this.builder.BuildParameter(parameter->name, _parameters.Length() as u32, lowered_type);
             _parameters.PushBack(lowered_parameter);
 
             if this.IsAggregate(parameter->_type) && lowered_type->kind == MIRTypeKind::Pointer && function->abi == HIRDeclarationABI::C {
@@ -356,7 +356,7 @@ class MIRLowerer {
             parameters.PushBack(function->caller_location);
         }
 
-        for i in 0..parameters.Size() {
+        for i in 0..parameters.Length() {
             let parameter = parameters[i];
             let lowered = this.builder.GetCurrentFunction()->parameters[(if indirect_return { 1 } else { 0 }) + i];
 
@@ -424,7 +424,7 @@ class MIRLowerer {
         this.namespaces.PushBack(Mangler::MangleName(_class->name, types, this.namespaces));
 
         if !_class->vtable.Empty() {
-            let _type = this.context.ArrayType(this.context.PointerType(this.context.IntegerType(8)), _class->vtable.Size());
+            let _type = this.context.ArrayType(this.context.PointerType(this.context.IntegerType(8)), _class->vtable.Length());
             this.vtables[_class] = this.builder.BuildStatic(Mangler::MangleName("vtable".ToString(), Vector<*HIRType>(), this.namespaces), _type, false, null, MIRDeclarationLinkage::Internal);
         }
 
@@ -460,7 +460,7 @@ class MIRLowerer {
                 entries.PushBack(entry);
             }
 
-            this.vtables[_class]->initializer = this.builder.ConstantArray(entries, this.context.ArrayType(pointer, entries.Size()));
+            this.vtables[_class]->initializer = this.builder.ConstantArray(entries, this.context.ArrayType(pointer, entries.Length()));
         }
 
         for constructor in _class->constructors {
@@ -1200,7 +1200,7 @@ class MIRLowerer {
                 if this.strings.Has(value) {
                     _static = this.strings[value];
                 } else {
-                    let name = "string." + String::FromInteger(this.strings.Size() as u64);
+                    let name = "string." + String::FromInteger(this.strings.Length() as u64);
                     let array_type = this.context.ArrayType(this.context.IntegerType(8), value.Length() + 1);
                     let initializer = this.builder.ConstantString(value, array_type);
                     _static = this.builder.BuildStatic(name, array_type, false, initializer, MIRDeclarationLinkage::Private);
@@ -1255,7 +1255,7 @@ class MIRLowerer {
             return;
         }
 
-        for i in 0..literal->elements.Size() {
+        for i in 0..literal->elements.Length() {
             this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as u64, size_type)));
         }
     }
@@ -1264,7 +1264,7 @@ class MIRLowerer {
         let _type = this.LowerType(literal->_type) as *MIRStructureType;
         if _type == null { return; }
 
-        for i in 0..literal->elements.Size() {
+        for i in 0..literal->elements.Length() {
             this.LowerExpressionTo(literal->elements[i], this.builder.BuildStructGEP("tuple.element".ToString(), destination, i as u32, this.context.PointerType(_type->fields[i])));
         }
     }
@@ -1273,7 +1273,7 @@ class MIRLowerer {
         let _type = this.LowerType(literal->_type) as *MIRStructureType;
         if _type == null { return; }
 
-        for i in 0..literal->fields.Size() {
+        for i in 0..literal->fields.Length() {
             this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("struct.field".ToString(), destination, i as u32, this.context.PointerType(_type->fields[i])));
         }
     }
@@ -1293,7 +1293,7 @@ class MIRLowerer {
         let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
         this.builder.BuildStore(this.builder.ConstantInteger(member->index as u64, tag_type), tag_pointer);
 
-        for i in 0..literal->fields.Size() {
+        for i in 0..literal->fields.Length() {
             this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1])));
         }
     }
@@ -1314,7 +1314,7 @@ class MIRLowerer {
     fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>) -> Vector<*MIRValue> {
         let mut lowered_arguments = Vector<*MIRValue>();
 
-        for i in 0..arguments.Size() {
+        for i in 0..arguments.Length() {
             let (argument, _type) = (arguments[i], types[i]);
 
             if this.IsAggregate(_type) {
@@ -1433,7 +1433,7 @@ class MIRLowerer {
 
         let mut parameters = Vector<*MIRParameter>();
 
-        for i in 0..parameter_types.Size() {
+        for i in 0..parameter_types.Length() {
             parameters.PushBack(this.builder.BuildParameter('_' + String::FromInteger(i as u64), i as u32, parameter_types[i]));
         }
 
@@ -1770,7 +1770,7 @@ class MIRLowerer {
         if place != null {
             let location_type = this.LowerType(location->_type) as *MIRStructureType;
 
-            for i in 0..location_type->fields.Size() {
+            for i in 0..location_type->fields.Length() {
                 let pointer = this.builder.BuildStructGEP("bounds.location".ToString(), place, i as u32, this.context.PointerType(location_type->fields[i]));
                 arguments.PushBack(this.builder.BuildLoad("bounds.location".ToString(), pointer));
             }
@@ -2140,7 +2140,7 @@ class MIRLowerer {
         let bool_type = this.context.IntegerType(1);
         let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
 
-        for i in 0..tuple->patterns.Size() {
+        for i in 0..tuple->patterns.Length() {
             let element_type = this.LowerType(tuple->_type->elements[i]);
             if element_type == null { return null; }
             let field_type = this.context.PointerType(element_type);
@@ -2218,7 +2218,7 @@ class MIRLowerer {
                 let field = pattern as *HIRFieldPattern;
                 let mut index: isize = -1;
 
-                for i in 0..member->fields.Size() {
+                for i in 0..member->fields.Length() {
                     if member->fields[i]->name == field->name {
                         index = i as isize;
                         break;
@@ -2232,7 +2232,7 @@ class MIRLowerer {
                 condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
             }
         } else {
-            for i in 0..variant->patterns.Size() {
+            for i in 0..variant->patterns.Length() {
                 let field_pointer = this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1]));
                 let result = this.TestPattern(variant->patterns[i], field_pointer);
                 if result == null { return null; }

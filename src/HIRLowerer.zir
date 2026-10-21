@@ -383,7 +383,7 @@ class HIRLowerer {
 
                 let mut element: *HIRType = null;
 
-                for i in 0..array->elements.Size() {
+                for i in 0..array->elements.Length() {
                     array->elements[i] = if target->IsArray() || target->IsSlice() {
                         this.Coerce(array->elements[i], target->Element())
                     } else {
@@ -403,7 +403,7 @@ class HIRLowerer {
                     }
                 }
 
-                for i in 0..array->elements.Size() {
+                for i in 0..array->elements.Length() {
                     array->elements[i] = this.CoerceNull(array->elements[i], element);
                 }
 
@@ -414,8 +414,8 @@ class HIRLowerer {
                 let tuple = expression as *mut HIRTupleLiteral;
                 let mut types = Vector<*HIRType>();
 
-                for i in 0..tuple->elements.Size() {
-                    tuple->elements[i] = if target->IsTuple() && (target as *HIRTupleType)->elements.Size() == tuple->elements.Size() {
+                for i in 0..tuple->elements.Length() {
+                    tuple->elements[i] = if target->IsTuple() && (target as *HIRTupleType)->elements.Length() == tuple->elements.Length() {
                         let element_target = (target as *HIRTupleType)->elements[i];
                         let mut element = tuple->elements[i];
 
@@ -732,7 +732,7 @@ class HIRLowerer {
         if _type == null { return; }
 
         if constant->initializer != null {
-            let index = this.temporaries.Size();
+            let index = this.temporaries.Length();
             initializer = this.Validate(this.LowerExpression(constant->initializer), _type, "Incompatible constant initializer types", constant->initializer);
             this.temporaries.Resize(index);
             if initializer == null { return; }
@@ -753,7 +753,7 @@ class HIRLowerer {
         if _type == null { return; }
 
         if _static->initializer != null {
-            let index = this.temporaries.Size();
+            let index = this.temporaries.Length();
             initializer = this.Validate(this.LowerExpression(_static->initializer), _type, "Incompatible static initializer types", _static->initializer);
             this.temporaries.Resize(index);
             if initializer == null { return; }
@@ -825,9 +825,9 @@ class HIRLowerer {
         }
 
         if !function->pack_name.Empty() {
-            let start = function->types.Size();
+            let start = function->types.Length();
 
-            for i in start..instance->types.Size() {
+            for i in start..instance->types.Length() {
                 let _type = instance->types[i];
                 let name = function->pack_name + String::FromInteger((i - start) as u64);
                 parameters.PushBack(this.builder.BuildParameterDeclaration(name, _type, false));
@@ -838,7 +838,7 @@ class HIRLowerer {
         let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
         if _return == null { return null; }
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
-        (declaration->_virtual, declaration->_override) = (function->_virtual, function->_override);
+        (declaration->_virtual, declaration->_override, declaration->node) = (function->_virtual, function->_override, function);
         declaration->abstract = function->_virtual && function->body == null;
 
         if function->track_caller {
@@ -867,13 +867,46 @@ class HIRLowerer {
         this.deferred_methods.PushBack(this.context.arena.New<HIRDeferredMethod>(declaration, method, this.scope_manager.current, this.current_generic, this.current_type));
     }
 
+    pub fn CompleteInstance(&mut this, instance: *GenericInstance) {
+        if instance == null || instance->generic == null { return; }
+        let target = if this.current_pass < HIRLoweringPass::Fourth { this.current_pass } else { HIRLoweringPass::Fourth };
+
+        if !instance->demanded || instance->completed < target {
+            let pending = unsafe { instance as *mut GenericInstance };
+            pending->generic->Complete(pending);
+        }
+    }
+
+    pub fn CompleteType(&mut this, _type: *HIRType) {
+        if _type == null { return; }
+
+        if _type->IsClass() {
+            this.CompleteInstance((_type as *HIRClassType)->declaration->instance);
+        } else if _type->IsStructure() {
+            this.CompleteInstance((_type as *HIRStructureType)->declaration->instance);
+        } else if _type->IsVariant() {
+            this.CompleteInstance((_type as *HIRVariantType)->declaration->instance);
+        }
+    }
+
+    fn Constructors(&mut this, _type: *HIRType) -> Vector<*HIRFunctionDeclaration> {
+        this.CompleteType(_type);
+        let mut constructors = Vector<*HIRFunctionDeclaration>();
+
+        for constructor in (_type as *HIRClassType)->declaration->constructors {
+            constructors.PushBack(constructor);
+        }
+
+        constructors
+    }
+
     fn LowerDeferredMethods(&mut this) {
         let mut lowered = true;
 
         while lowered {
             lowered = false;
 
-            for i in 0..this.deferred_methods.Size() {
+            for i in 0..this.deferred_methods.Length() {
                 let deferred = this.deferred_methods[i];
                 if !deferred->function->deferred || !deferred->function->referenced { continue; }
                 deferred->function->deferred = false;
@@ -969,8 +1002,14 @@ class HIRLowerer {
             }
 
             if !this.ValidateFieldType(field->name, field_type, declaration->_type, field) { continue; }
-            let index = (if declaration->parent != null { 1 } else { 0 }) + declaration->fields.Size();
+            let index = (if declaration->parent != null { 1 } else { 0 }) + declaration->fields.Length();
             declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, index, field->initializer, field->public));
+        }
+
+        declaration->vptr = _class->parent == null && _class->destructor != null && _class->destructor->_virtual;
+
+        for method in _class->methods {
+            if _class->parent == null && method->_virtual { declaration->vptr = true; }
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -1113,7 +1152,7 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->elements.Size() {
+            for i in 0.._type->elements.Length() {
                 let this_element = this.builder.TupleAccess(this_dereferenced, i);
                 let other_element = this.builder.TupleAccess(other_dereferenced, i);
                 this.LowerFieldCopyConstructor(this_element, other_element, _type->elements[i], null);
@@ -1136,7 +1175,7 @@ class HIRLowerer {
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            for i in 0.._type->elements.Size() {
+            for i in 0.._type->elements.Length() {
                 let this_element = this.builder.TupleAccess(this_dereferenced, i);
                 this.LowerFieldDestructor(this_element, _type->elements[i], null);
             }
@@ -1162,7 +1201,7 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->elements.Size() {
+            for i in 0.._type->elements.Length() {
                 let this_element = this.builder.TupleAccess(this_dereferenced, i);
                 let other_element = this.builder.TupleAccess(other_dereferenced, i);
                 this.LowerFieldCopyAssignment(this_element, other_element, _type->elements[i], null);
@@ -1181,10 +1220,12 @@ class HIRLowerer {
     }
 
     fn IsCopyConstructor(&mut this, function: *HIRFunctionDeclaration, _type: *HIRType) -> bool {
-        function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false)
+        function->parameters.Length() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false)
     }
 
     fn GetCopyConstructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        this.CompleteType(_type);
+
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
             (_type as *HIRArrayType)->copy_constructor
@@ -1207,6 +1248,8 @@ class HIRLowerer {
     }
 
     fn GetDestructor(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        this.CompleteType(_type);
+
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
             (_type as *HIRArrayType)->destructor
@@ -1225,10 +1268,12 @@ class HIRLowerer {
     }
 
     fn IsCopyAssignment(&mut this, function: *HIRFunctionDeclaration, _type: *HIRType) -> bool {
-        function->name == "operator=" && function->parameters.Size() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false)
+        function->name == "operator=" && function->parameters.Length() == 2 && *function->parameters[1]->_type == *this.context.ReferenceType(_type, false)
     }
 
     fn GetCopyAssignment(&mut this, _type: *HIRType) -> *HIRFunctionDeclaration {
+        this.CompleteType(_type);
+
         if _type->IsArray() {
             this.EnsureArraySpecialMembers(_type as *mut HIRArrayType);
             (_type as *HIRArrayType)->copy_assign
@@ -1333,14 +1378,9 @@ class HIRLowerer {
                     this.builder.BuildExpressionStatement(this.builder.Assignment(this_field, initializer));
                 }
             } else if field->_type->IsClass() {
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (field->_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this_field);
+                let candidates = this.Constructors(field->_type);
                 let function = this.ResolveOverload(candidates, values, null, true);
 
                 if function == null {
@@ -1374,14 +1414,9 @@ class HIRLowerer {
         if _type->IsUnit() {
             return true;
         } else if _type->IsClass() {
-            let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-            for candidate in (_type as *HIRClassType)->declaration->constructors {
-                candidates.PushBack(candidate);
-            }
-
             let mut values = Vector<*HIRExpression>();
             values.PushBack(target);
+            let candidates = this.Constructors(_type);
             let function = this.ResolveOverload(candidates, values, node, false);
             if function == null { return false; }
             let call = this.LowerResolvedCallExpression(function, values, node);
@@ -1409,7 +1444,7 @@ class HIRLowerer {
         } else if _type->IsTuple() {
             let &elements = (_type as *HIRTupleType)->elements;
 
-            for i in 0..elements.Size() {
+            for i in 0..elements.Length() {
                 if !this.LowerDefaultConstruction(this.builder.TupleAccess(target, i), elements[i], node) { return false; }
             }
         } else if _type->IsArray() {
@@ -1423,11 +1458,11 @@ class HIRLowerer {
     }
 
     fn IsSameParameters(&mut this, left: *HIRFunctionDeclaration, right: *HIRFunctionDeclaration) -> bool {
-        if left->name != right->name || left->parameters.Size() != right->parameters.Size() { return false; }
+        if left->name != right->name || left->parameters.Length() != right->parameters.Length() { return false; }
         if left->parameters.Empty() { return true; }
         if left->parameters[0]->_type->IsMutable() != right->parameters[0]->_type->IsMutable() { return false; }
 
-        for i in 1..left->parameters.Size() {
+        for i in 1..left->parameters.Length() {
             if *left->parameters[i]->_type != *right->parameters[i]->_type { return false; }
         }
 
@@ -1435,6 +1470,7 @@ class HIRLowerer {
     }
 
     fn EnsureVTable(&mut this, _type: *HIRType) {
+        this.CompleteType(_type);
         let declaration = unsafe { (_type as *HIRClassType)->declaration as *mut HIRClassDeclaration };
         if declaration->vtable_ready { return; }
         declaration->vtable_ready = true;
@@ -1460,16 +1496,12 @@ class HIRLowerer {
             vtable.PushBack(declaration->destructor);
         }
 
-        let mut index: usize = 0;
-
-        for method in _class->methods {
-            if method->generic || !method->pack_name.Empty() { continue; }
-            if index >= declaration->methods.Size() { break; }
-            let function = declaration->methods[index];
-            index += 1;
+        for function in declaration->methods {
+            let method = function->node;
+            if method == null { continue; }
             let (mut slot, mut conflict): (isize, isize) = (-1, -1);
 
-            for i in 1..vtable.Size() {
+            for i in 1..vtable.Length() {
                 if this.IsSameParameters(vtable[i], function) {
                     if *vtable[i]->_return == *function->_return { slot = i as isize; } else { conflict = i as isize; }
                     break;
@@ -1494,7 +1526,7 @@ class HIRLowerer {
                 Logger::Log("Method '" + function->name + "' overrides a virtual method, so it must be marked 'override'.", method, LogSeverity::Error);
             } else if function->_virtual {
                 if vtable.Empty() { vtable.PushBack(declaration->destructor); }
-                function->virtual_index = vtable.Size() as isize;
+                function->virtual_index = vtable.Length() as isize;
                 vtable.PushBack(function);
             }
         }
@@ -1560,12 +1592,7 @@ class HIRLowerer {
             if invalid { return; }
         }
 
-        let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-        for candidate in (parent as *HIRClassType)->declaration->constructors {
-            candidates.PushBack(candidate);
-        }
-
+        let candidates = this.Constructors(parent);
         let constructor = this.ResolveOverload(candidates, values, initializer, initializer == null);
 
         if constructor == null {
@@ -1689,28 +1716,24 @@ class HIRLowerer {
     }
 
     pub fn LowerClassDeclarationFourthPass(&mut this, declaration: *mut HIRClassDeclaration, _class: *ASTClassDeclaration, scope: *mut Scope) {
-        let (mut has_copy_constructor, mut has_copy_assign) = (false, false);
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
         this.EnsureVTable(declaration->_type);
-        let parent = (declaration->_type as *HIRClassType)->declaration->parent;
-        let fields = (declaration->_type as *HIRClassType)->declaration->fields;
-        let mut index: usize = 0;
+        let (mut implicit_default, mut implicit_copy, mut implicit_assign): (*mut HIRFunctionDeclaration, *mut HIRFunctionDeclaration, *mut HIRFunctionDeclaration) = (null, null, null);
+        let (parent, fields) = ((declaration->_type as *HIRClassType)->declaration->parent, (declaration->_type as *HIRClassType)->declaration->fields);
 
-        for constructor in _class->constructors {
-            if constructor->generic || !constructor->pack_name.Empty() { continue; }
-            let function = declaration->constructors[index];
-            this.LowerConstructorDeclaration(function, constructor, parent, fields);
-            index += 1;
-
-            if this.IsCopyConstructor(function, declaration->_type) {
-                has_copy_constructor = true;
+        for function in declaration->constructors {
+            if function->node != null {
+                this.LowerConstructorDeclaration(function, function->node, parent, fields);
+            } else if this.IsCopyConstructor(function, declaration->_type) {
+                implicit_copy = function;
+            } else {
+                implicit_default = function;
             }
         }
 
-        if _class->constructors.Empty() {
-            let index = declaration->constructors.Size() - (if has_copy_constructor { 1 } else { 2 });
-            let function = declaration->constructors[index];
+        if implicit_default != null {
+            let function = implicit_default;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -1726,8 +1749,8 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        if !has_copy_constructor {
-            let function: *mut HIRFunctionDeclaration = declaration->constructors.Back();
+        if implicit_copy != null {
+            let function = implicit_copy;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -1781,26 +1804,18 @@ class HIRLowerer {
             this.scope_manager.PopScope();
         }
 
-        index = 0;
-
-        for method in _class->methods {
-            if method->generic || !method->pack_name.Empty() { continue; }
-            if index >= declaration->methods.Size() { break; }
-            let function = declaration->methods[index];
-            index += 1;
-
-            if this.IsCopyAssignment(function, declaration->_type) {
-                this.LowerFunctionDeclarationSecondPass(function, method);
-                has_copy_assign = true;
-            } else if function->virtual_index >= 0 {
-                this.LowerFunctionDeclarationSecondPass(function, method);
+        for function in declaration->methods {
+            if function->node == null {
+                implicit_assign = function;
+            } else if this.IsCopyAssignment(function, declaration->_type) || function->virtual_index >= 0 {
+                this.LowerFunctionDeclarationSecondPass(function, function->node);
             } else {
-                this.LowerMethodDeclarationSecondPass(function, method, declaration->instance);
+                this.LowerMethodDeclarationSecondPass(function, function->node, declaration->instance);
             }
         }
 
-        if !has_copy_assign {
-            let function: *mut HIRFunctionDeclaration = declaration->methods.Back();
+        if implicit_assign != null {
+            let function = implicit_assign;
             this.scope_manager.PushScope(function->name, false);
             this.builder.SetCurrentFunction(function);
             let block = this.builder.Block();
@@ -1867,7 +1882,7 @@ class HIRLowerer {
             }
 
             if !this.ValidateFieldType(field->name, field_type, declaration->_type, field) { continue; }
-            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Size(), field->initializer, field->public));
+            declaration->fields.PushBack(this.builder.BuildFieldDeclaration(field->name, field_type, declaration->fields.Length(), field->initializer, field->public));
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -1894,13 +1909,9 @@ class HIRLowerer {
     pub fn LowerStructureDeclarationFourthPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
-        let mut index: usize = 0;
 
-        for method in structure->methods {
-            if method->generic || !method->pack_name.Empty() { continue; }
-            if index >= declaration->methods.Size() { break; }
-            this.LowerMethodDeclarationSecondPass(declaration->methods[index], method, declaration->instance);
-            index += 1;
+        for function in declaration->methods {
+            this.LowerMethodDeclarationSecondPass(function, function->node, declaration->instance);
         }
 
         if declaration->copy_constructor != null {
@@ -2055,9 +2066,9 @@ class HIRLowerer {
                 }
 
                 let mut name = field->name;
-                if !member->structure { name = member->name + "." + String::FromInteger(lowered_member->fields.Size() as u64); }
+                if !member->structure { name = member->name + "." + String::FromInteger(lowered_member->fields.Length() as u64); }
                 if !this.ValidateFieldType(name, field_type, declaration->_type, variant) { continue; }
-                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, field_type, lowered_member->fields.Size()));
+                lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, field_type, lowered_member->fields.Length()));
             }
 
             lowered_member->structure = member->structure;
@@ -2089,13 +2100,9 @@ class HIRLowerer {
     pub fn LowerVariantDeclarationFourthPass(&mut this, declaration: *mut HIRVariantDeclaration, variant: *ASTVariantDeclaration, scope: *mut Scope) {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
-        let mut index: usize = 0;
 
-        for method in variant->methods {
-            if method->generic || !method->pack_name.Empty() { continue; }
-            if index >= declaration->methods.Size() { break; }
-            this.LowerMethodDeclarationSecondPass(declaration->methods[index], method, declaration->instance);
-            index += 1;
+        for function in declaration->methods {
+            this.LowerMethodDeclarationSecondPass(function, function->node, declaration->instance);
         }
 
         if declaration->copy_constructor != null {
@@ -2264,9 +2271,8 @@ class HIRLowerer {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
 
-        for i in 0.._extend->methods.Size() {
-            if i >= declaration->methods.Size() { break; }
-            this.LowerFunctionDeclarationSecondPass(declaration->methods[i], _extend->methods[i]);
+        for function in declaration->methods {
+            this.LowerFunctionDeclarationSecondPass(function, function->node);
         }
 
         (this.current_type, this.scope_manager.current) = (previous_type, previous_scope);
@@ -2453,10 +2459,10 @@ class HIRLowerer {
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
-            if lefts.Size() != rights.Size() { return null; }
+            if lefts.Length() != rights.Length() { return null; }
             let mut elements = Vector<*HIRType>();
 
-            for i in 0..lefts.Size() {
+            for i in 0..lefts.Length() {
                 let element = this.CommonType(lefts[i], rights[i]);
                 if element == null { return null; }
                 elements.PushBack(element);
@@ -2605,7 +2611,7 @@ class HIRLowerer {
 
     fn GetPendingTemporaryDestructors(&mut this, from: usize) -> Vector<*HIRExpression> {
         let mut destructors = Vector<*HIRExpression>();
-        let mut i = this.temporary_stack.Size();
+        let mut i = this.temporary_stack.Length();
 
         while i > from {
             i -= 1;
@@ -2625,7 +2631,7 @@ class HIRLowerer {
         let mut destructors = Vector<*HIRExpression>();
         let mut carry = Vector<*HIRExpression>();
 
-        for i in 0..this.temporaries.Size() {
+        for i in 0..this.temporaries.Length() {
             let instance = this.temporaries[i];
 
             if i < index {
@@ -2825,7 +2831,7 @@ class HIRLowerer {
                                     let member = declaration as *HIRVariantMember;
 
                                     if !member->fields.Empty() {
-                                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Size() as u64) + " argument(s), but none were provided.", expression, LogSeverity::Error);
+                                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as u64) + " argument(s), but none were provided.", expression, LogSeverity::Error);
                                         return null;
                                     }
 
@@ -2981,7 +2987,7 @@ class HIRLowerer {
                 }
 
                 if _type == null { _type = this.context.NeverType(); }
-                let literal = this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Size()));
+                let literal = this.builder.ArrayLiteral(elements, this.context.ArrayType(_type, elements.Length()));
                 this.temporaries.PushBack(literal);
                 literal
             },
@@ -3021,9 +3027,9 @@ class HIRLowerer {
                     let fields = _type->Fields();
                     let mut values = Vector<*HIRExpression>();
                     let mut initialized_fields = Vector<usize>();
-                    values.Resize(fields.Size());
+                    values.Resize(fields.Length());
 
-                    if structure->fields.Size() != fields.Size() {
+                    if structure->fields.Length() != fields.Length() {
                         Logger::Log("Structure '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
                         return null;
                     }
@@ -3079,9 +3085,9 @@ class HIRLowerer {
 
                     let mut values = Vector<*HIRExpression>();
                     let mut initialized_fields = Vector<usize>();
-                    values.Resize(member->fields.Size());
+                    values.Resize(member->fields.Length());
 
-                    if structure->fields.Size() != member->fields.Size() {
+                    if structure->fields.Length() != member->fields.Length() {
                         Logger::Log("Variant member '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
                         return null;
                     }
@@ -3089,7 +3095,7 @@ class HIRLowerer {
                     for field in structure->fields {
                         let mut index: isize = -1;
 
-                        for i in 0..member->fields.Size() {
+                        for i in 0..member->fields.Length() {
                             if member->fields[i]->name == field.0 {
                                 index = i as isize;
                                 break;
@@ -3230,16 +3236,16 @@ class HIRLowerer {
                 let function = this.current_generic->declaration as *ASTFunctionDeclaration;
                 let path = (splat->expression as *ASTPathExpression)->path;
 
-                if !function->pack_name.Empty() && !path->absolute && path->segments.Size() == 1 && path->segments[0].name == function->pack_name && path->segments[0].types.Empty() {
+                if !function->pack_name.Empty() && !path->absolute && path->segments.Length() == 1 && path->segments[0].name == function->pack_name && path->segments[0].types.Empty() {
                     let declaration = this.builder.GetCurrentFunction();
-                    let mut start = function->parameters.Size();
+                    let mut start = function->parameters.Length();
 
                     if function->instance_kind != ASTInstanceKind::None {
                         start += 1;
                     }
 
-                    if declaration != null && start <= declaration->parameters.Size() {
-                        for i in start..declaration->parameters.Size() {
+                    if declaration != null && start <= declaration->parameters.Length() {
+                        for i in start..declaration->parameters.Length() {
                             values.PushBack(this.builder.ReferenceDeclaration(declaration->parameters[i], false));
                         } expanded = true;
                     }
@@ -3288,14 +3294,14 @@ class HIRLowerer {
             let mut types = Vector<*HIRType>(lowered_types);
 
             if !function->pack_name.Empty() {
-                let mut start = function->parameters.Size();
+                let mut start = function->parameters.Length();
 
                 if function->instance_kind != ASTInstanceKind::None {
                     start += 1;
                 }
 
-                if start <= values.Size() {
-                    for i in start..values.Size() {
+                if start <= values.Length() {
+                    for i in start..values.Length() {
                         types.PushBack(this.Coerce(values[i])->_type);
                     }
                 }
@@ -3319,9 +3325,9 @@ class HIRLowerer {
         if call->expression->kind == ASTExpressionKind::Path {
             let path = (call->expression as *ASTPathExpression)->path;
 
-            if !path->absolute && path->segments.Size() == 1 && path->segments[0].types.Empty() {
+            if !path->absolute && path->segments.Length() == 1 && path->segments[0].types.Empty() {
                 if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" {
-                    if call->arguments.Size() != 1 {
+                    if call->arguments.Length() != 1 {
                         Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
                     }
@@ -3374,14 +3380,14 @@ class HIRLowerer {
 
                     return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
                 } else if path->segments[0].name == "caller_location" {
-                    if call->arguments.Size() != 0 {
+                    if call->arguments.Length() != 0 {
                         Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
                     }
 
                     return this.LowerCallerLocation(call);
                 } else if path->segments[0].name == "slice" {
-                    if call->arguments.Size() != 2 {
+                    if call->arguments.Length() != 2 {
                         Logger::Log("Invalid number of arguments for 'slice'.", call, LogSeverity::Error);
                         return null;
                     }
@@ -3406,7 +3412,7 @@ class HIRLowerer {
 
                     return this.builder.Slice(data, length, this.context.SliceType(data->_type->Pointee(), data->_type->IsMutable()));
                 } else if path->segments[0].name == "construct" {
-                    if call->arguments.Size() == 0 {
+                    if call->arguments.Length() == 0 {
                         Logger::Log("Invalid number of arguments for 'construct'.", call, LogSeverity::Error);
                         return null;
                     }
@@ -3431,12 +3437,7 @@ class HIRLowerer {
                     if this.RejectAbstractClass(target_type, call) { return null; }
 
                     if target_type->IsClass() {
-                        let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                        for candidate in (target_type as *HIRClassType)->declaration->constructors {
-                            candidates.PushBack(candidate);
-                        }
-
+                        let candidates = this.Constructors(target_type);
                         let function = this.ResolveOverload(candidates, values, call, false);
                         if function == null { return null; }
                         let call = this.LowerResolvedCallExpression(function, values, call);
@@ -3445,12 +3446,12 @@ class HIRLowerer {
                     } else {
                         values.RemoveAt(0);
 
-                        if values.Size() > 1 {
+                        if values.Length() > 1 {
                             Logger::Log("Primitive type initialization accepts at most 1 argument.", call, LogSeverity::Error);
                             return null;
                         }
 
-                        if values.Size() != 0 {
+                        if values.Length() != 0 {
                             let mut value = this.ImplicitDereference(values[0]);
                             value = this.Validate(value, target_type, "Incompatible primitive type initialization types", call);
                             if value == null { return null; }
@@ -3462,7 +3463,7 @@ class HIRLowerer {
                         }
                     } return target;
                 } else if path->segments[0].name == "destruct" {
-                    if call->arguments.Size() != 1 {
+                    if call->arguments.Length() != 1 {
                         Logger::Log("Invalid number of arguments for 'destruct'.", call, LogSeverity::Error);
                         return null;
                     }
@@ -3511,13 +3512,8 @@ class HIRLowerer {
                     }
 
                     if this.RejectAbstractClass(symbol->_type, call) { return null; }
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                    for candidate in (symbol->_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
-                    }
-
                     values.Insert(0, this.builder.NullLiteral());
+                    let mut candidates = this.Constructors(symbol->_type);
                     let mut function = this.ResolveOverload(candidates, values, call, true);
 
                     if function == null {
@@ -3546,12 +3542,12 @@ class HIRLowerer {
                         return null;
                     }
 
-                    if values.Size() != member->fields.Size() {
-                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Size() as u64) + " argument(s), but " + String::FromInteger(values.Size() as u64) + " were provided.", call, LogSeverity::Error);
+                    if values.Length() != member->fields.Length() {
+                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as u64) + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", call, LogSeverity::Error);
                         return null;
                     }
 
-                    for i in 0..values.Size() {
+                    for i in 0..values.Length() {
                         let mut value = this.Validate(values[i], member->fields[i]->_type, "Incompatible variant member argument types", call);
                         if value == null { return null; }
                         value = this.LowerCopyOrMoveValue(value);
@@ -3631,13 +3627,13 @@ class HIRLowerer {
         let mut index: usize = 0;
         let mut best: u64 = 0;
 
-        for i in 0..candidates.Size() {
+        for i in 0..candidates.Length() {
             let function = candidates[i];
             let parameters = function->_type->Parameters();
-            if values.Size() != parameters.Size() { continue; }
+            if values.Length() != parameters.Length() { continue; }
             let (mut _match, mut score) = (true, 1u64);
 
-            for j in 0..parameters.Size() {
+            for j in 0..parameters.Length() {
                 let mut parameter_score = parameters[j]->ScoreParameter(values[j]->_type);
 
                 if parameter_score != 0 && (parameters[j]->IsReference() || (parameters[j]->IsSlice() && values[j]->_type->IsArray())) && !values[j]->_type->IsPointer() && values[j]->category == HIRExpressionCategory::Place {
@@ -3684,12 +3680,12 @@ class HIRLowerer {
 
         let parameter_types = callee->_type->Parameters();
 
-        if values.Size() != parameter_types.Size() {
-            Logger::Log("Function expects " + String::FromInteger(parameter_types.Size() as u64) + " argument(s), but " + String::FromInteger(values.Size() as u64) + " were provided.", node, LogSeverity::Error);
+        if values.Length() != parameter_types.Length() {
+            Logger::Log("Function expects " + String::FromInteger(parameter_types.Length() as u64) + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", node, LogSeverity::Error);
             return false;
         }
 
-        for i in 0..parameter_types.Size() {
+        for i in 0..parameter_types.Length() {
             let mut message = String();
 
             if callee->kind == HIRExpressionKind::DeclarationReference {
@@ -3797,12 +3793,7 @@ class HIRLowerer {
             if _type->IsClass() {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(this.builder.NullLiteral());
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
+                let candidates = this.Constructors(_type);
                 let function = this.ResolveOverload(candidates, values, _new, false);
                 if function == null { return null; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
@@ -3816,13 +3807,8 @@ class HIRLowerer {
             if invalid { return null; }
 
             if _type->IsClass() {
-                let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                for candidate in (_type as *HIRClassType)->declaration->constructors {
-                    candidates.PushBack(candidate);
-                }
-
                 values.Insert(0, this.builder.NullLiteral());
+                let mut candidates = this.Constructors(_type);
                 let mut function = this.ResolveOverload(candidates, values, _new, true);
 
                 if function == null {
@@ -3836,7 +3822,7 @@ class HIRLowerer {
                 values.RemoveAt(0);
                 this.builder.New(_type, null, true, callee, values)
             } else {
-                if values.Size() != 1 {
+                if values.Length() != 1 {
                     Logger::Log("Primitive type initialization requires exactly 1 argument.", _new, LogSeverity::Error);
                     return null;
                 }
@@ -3881,9 +3867,9 @@ class HIRLowerer {
         } else if _type->IsTuple() && target->IsTuple() {
             let &elements = (_type as *HIRTupleType)->elements;
             let &targets = (target as *HIRTupleType)->elements;
-            if elements.Size() != targets.Size() { return false; }
+            if elements.Length() != targets.Length() { return false; }
 
-            for i in 0..elements.Size() {
+            for i in 0..elements.Length() {
                 if this.LiteralNeedsExplicitType(elements[i], targets[i]) {
                     return true;
                 }
@@ -4116,7 +4102,7 @@ class HIRLowerer {
             return null;
         }
 
-        if tuple_access->index >= (instance->_type as *HIRTupleType)->elements.Size() {
+        if tuple_access->index >= (instance->_type as *HIRTupleType)->elements.Length() {
             Logger::Log("Field '" + String::FromInteger(tuple_access->index as u64) + "' not found in type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
@@ -4321,7 +4307,7 @@ class HIRLowerer {
                 return null;
             }
 
-            let index = this.temporaries.Size();
+            let index = this.temporaries.Length();
             let right = this.ImplicitDereference(this.LowerExpression(binary->right));
             let destructors = this.GetTemporaryDestructorsSince(index, right);
             if right == null { return null; }
@@ -4585,7 +4571,7 @@ class HIRLowerer {
 
     fn LowerIfExpression(&mut this, _if: *ASTIfExpression, expected: *HIRType) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
-        let temporary_index = this.temporaries.Size();
+        let temporary_index = this.temporaries.Length();
         let expression = this.ImplicitDereference(this.LowerExpression(_if->condition->expression));
         if expression == null { return null; }
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, expression);
@@ -4641,7 +4627,7 @@ class HIRLowerer {
 
     fn LowerWhileExpression(&mut this, _while: *ASTWhileExpression) -> *HIRExpression {
         let mut condition: *HIRCondition = null;
-        let temporary_index = this.temporaries.Size();
+        let temporary_index = this.temporaries.Length();
         let expression = this.ImplicitDereference(this.LowerExpression(_while->condition->expression));
         if expression == null { return null; }
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, expression);
@@ -4666,7 +4652,7 @@ class HIRLowerer {
 
         this.loop_scopes.PushBack(this.scope_manager.current);
         this.loop_targets.PushBack(null);
-        this.loop_temporaries.PushBack(this.temporary_stack.Size());
+        this.loop_temporaries.PushBack(this.temporary_stack.Length());
         let while_body = this.LowerBlockExpression(_while->body, true, HIRBlockTail::Discard, null);
         this.loop_temporaries.PopBack();
         this.loop_targets.PopBack();
@@ -4688,7 +4674,7 @@ class HIRLowerer {
         this.scope_manager.PushScope("<loop>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
         this.loop_targets.PushBack(result);
-        this.loop_temporaries.PushBack(this.temporary_stack.Size());
+        this.loop_temporaries.PushBack(this.temporary_stack.Length());
         result->body = this.LowerBlockExpression(_loop->body, true, HIRBlockTail::Discard, null);
         this.loop_temporaries.PopBack();
         this.loop_targets.PopBack();
@@ -4710,7 +4696,7 @@ class HIRLowerer {
 
         if values == 0 {
             return result;
-        } else if values != result->breaks.Size() {
+        } else if values != result->breaks.Length() {
             Logger::Log("Every 'break' of a 'loop' that produces a value must have a value.", _loop, LogSeverity::Error);
             return null;
         }
@@ -4724,7 +4710,7 @@ class HIRLowerer {
     fn LowerForExpression(&mut this, _for: *ASTForExpression) -> *HIRExpression {
         let (mut start, mut end): (*HIRExpression, *HIRExpression);
         let (mut is_range, mut inclusive) = (false, false);
-        let temporary_index = this.temporaries.Size();
+        let temporary_index = this.temporaries.Length();
 
         if _for->iterable->kind == ASTExpressionKind::Range {
             let range = _for->iterable as *ASTRangeExpression;
@@ -4817,7 +4803,7 @@ class HIRLowerer {
         this.scope_manager.PushScope("<for>".ToString(), false);
         this.loop_scopes.PushBack(this.scope_manager.current);
         this.loop_targets.PushBack(null);
-        this.loop_temporaries.PushBack(this.temporary_stack.Size());
+        this.loop_temporaries.PushBack(this.temporary_stack.Length());
         let previous_block = this.builder.GetCurrentBlock();
         let body = this.builder.Block();
         this.builder.SetCurrentBlock(body);
@@ -4853,7 +4839,7 @@ class HIRLowerer {
     }
 
     fn LowerMatchExpression(&mut this, _match: *ASTMatchExpression, expected: *HIRType) -> *HIRExpression {
-        let temporary_index = this.temporaries.Size();
+        let temporary_index = this.temporaries.Length();
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
         if target == null { return null; }
 
@@ -4875,7 +4861,7 @@ class HIRLowerer {
             }
 
             let mut guard: *HIRExpression = null;
-            let guard_index = this.temporaries.Size();
+            let guard_index = this.temporaries.Length();
 
             if arm->guard != null {
                 guard = this.ImplicitDereference(this.LowerExpression(arm->guard));
@@ -4907,12 +4893,12 @@ class HIRLowerer {
         this.CheckUnreachableArms(_match, arms, target->_type);
         let missing = expression->Uncovered();
 
-        if missing.Size() == 1 && missing[0] == "_" {
+        if missing.Length() == 1 && missing[0] == "_" {
             Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
         } else if !missing.Empty() {
             let mut names = String();
 
-            for i in 0..missing.Size() {
+            for i in 0..missing.Length() {
                 if i != 0 { names += ", "; }
                 names += "'" + missing[i] + "'";
             }
@@ -4932,7 +4918,7 @@ class HIRLowerer {
         let mut types = Vector<*HIRType>();
         types.PushBack(_type);
 
-        for i in 0..arms.Size() {
+        for i in 0..arms.Length() {
             let (arm, node) = (arms[i], _match->arms[i]);
             let mut vector = Vector<*HIRPattern>();
             vector.PushBack(arm->pattern);
@@ -4943,7 +4929,7 @@ class HIRLowerer {
                 let mut previous = rows;
                 let alternatives = (arm->pattern as *HIROrPattern)->patterns;
 
-                for j in 0..alternatives.Size() {
+                for j in 0..alternatives.Length() {
                     let mut alternative = Vector<*HIRPattern>();
                     alternative.PushBack(alternatives[j]);
 
@@ -5093,7 +5079,7 @@ class HIRLowerer {
     fn ExpandRestPatterns(&mut this, patterns: &Vector<*ASTPattern>, count: usize, description: &String, node: *ASTNode, expanded: &mut Vector<*ASTPattern>) -> bool {
         let mut rest: isize = -1;
 
-        for i in 0..patterns.Size() {
+        for i in 0..patterns.Length() {
             if patterns[i]->kind != ASTPatternKind::Rest {
                 continue;
             }
@@ -5106,14 +5092,14 @@ class HIRLowerer {
             rest = i as isize;
         }
 
-        let explicit = if rest == -1 { patterns.Size() } else { patterns.Size() - 1 };
+        let explicit = if rest == -1 { patterns.Length() } else { patterns.Length() - 1 };
 
         if (rest == -1 && explicit != count) || explicit > count {
             Logger::Log(description + " has " + String::FromInteger(count as u64) + " field(s), but the pattern has " + String::FromInteger(explicit as u64) + '.', node, LogSeverity::Error);
             return false;
         }
 
-        for i in 0..patterns.Size() {
+        for i in 0..patterns.Length() {
             if i as isize == rest {
                 for j in 0..count - explicit {
                     expanded.PushBack(null);
@@ -5138,7 +5124,7 @@ class HIRLowerer {
             let name = (pattern as *ASTFieldPattern)->name;
             let mut index: isize = -1;
 
-            for i in 0..names.Size() {
+            for i in 0..names.Length() {
                 if names[i] == name {
                     index = i as isize;
                     break;
@@ -5158,8 +5144,8 @@ class HIRLowerer {
             indices.PushBack(index as usize);
         }
 
-        if !rest && indices.Size() != names.Size() {
-            for i in 0..names.Size() {
+        if !rest && indices.Length() != names.Length() {
+            for i in 0..names.Length() {
                 if !indices.Contains(i) {
                     Logger::Log("Pattern does not mention field '" + names[i] + "' of " + description + "; use '..' to ignore the remaining fields.", node, LogSeverity::Error);
                     return false;
@@ -5323,13 +5309,8 @@ class HIRLowerer {
                     if value == null { return null; }
                 } else if target_type->IsClass() {
                     let mut values = Vector<*HIRExpression>();
-                    let mut candidates = Vector<*HIRFunctionDeclaration>();
-
-                    for candidate in (target_type as *HIRClassType)->declaration->constructors {
-                        candidates.PushBack(candidate);
-                    }
-
                     values.Insert(0, this.builder.NullLiteral());
+                    let candidates = this.Constructors(target_type);
                     let function = this.ResolveOverload(candidates, values, pattern, true);
                     if function == null { return null; }
                     values.RemoveAt(0);
@@ -5375,13 +5356,13 @@ class HIRLowerer {
                 let tuple_type = any_type as *HIRTupleType;
                 let mut expanded = Vector<*ASTPattern>();
 
-                if !this.ExpandRestPatterns(tuple->patterns, tuple_type->elements.Size(), "Tuple type '" + any_type->ToString() + "'", pattern, expanded) {
+                if !this.ExpandRestPatterns(tuple->patterns, tuple_type->elements.Length(), "Tuple type '" + any_type->ToString() + "'", pattern, expanded) {
                     return null;
                 }
 
                 let mut patterns = Vector<*HIRPattern>();
 
-                for i in 0..expanded.Size() {
+                for i in 0..expanded.Length() {
                     if expanded[i] == null {
                         patterns.PushBack(this.builder.WildcardPattern());
                         continue;
@@ -5522,11 +5503,11 @@ class HIRLowerer {
 
                     let mut expanded = Vector<*ASTPattern>();
 
-                    if !this.ExpandRestPatterns(variant->patterns, member->fields.Size(), "Variant member '" + variant->path->ToString() + "'", pattern, expanded) {
+                    if !this.ExpandRestPatterns(variant->patterns, member->fields.Length(), "Variant member '" + variant->path->ToString() + "'", pattern, expanded) {
                         return null;
                     }
 
-                    for i in 0..expanded.Size() {
+                    for i in 0..expanded.Length() {
                         if expanded[i] == null {
                             patterns.PushBack(this.builder.WildcardPattern());
                             continue;
@@ -5602,7 +5583,7 @@ class HIRLowerer {
     }
 
     fn IsPrimitiveTypeName(&mut this, path: *ASTPath) -> bool {
-        if path->absolute || path->segments.Size() != 1 || !path->segments[0].types.Empty() {
+        if path->absolute || path->segments.Length() != 1 || !path->segments[0].types.Empty() {
             return false;
         }
 

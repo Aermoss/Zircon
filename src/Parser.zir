@@ -23,8 +23,8 @@ class Parser {
     index: usize;
 
     fn Current(&this) -> Token {
-        if this.index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+        if this.index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[this.index]
         }
@@ -33,8 +33,8 @@ class Parser {
     fn Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
 
-        if index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+        if index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[index]
         }
@@ -51,7 +51,7 @@ class Parser {
     fn Advance(&mut this) -> Token {
         let token = this.Current();
 
-        if this.index < this.tokens.Size() {
+        if this.index < this.tokens.Length() {
             this.index += 1;
         }
 
@@ -1357,7 +1357,7 @@ class Parser {
                 return null;
             }
 
-            if attribute.1.Size() != 0 {
+            if attribute.1.Length() != 0 {
                 Logger::Log("Invalid number of arguments for attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                 return null;
             }
@@ -1911,7 +1911,7 @@ class Parser {
 
         for attribute in attributes {
             if attribute.0 == "align" {
-                if attribute.1.Size() != 1 {
+                if attribute.1.Length() != 1 {
                     Logger::Log("Invalid number of arguments for attribute '" + attribute.0 + "'.", token, LogSeverity::Error);
                     return null;
                 }
