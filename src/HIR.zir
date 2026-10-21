@@ -19,7 +19,7 @@
 
 enum HIRTypeKind: u8 {
     Never, Void, Boolean, Character, Integer, Float, Pointer, Reference,
-    Array, Tuple, Function, Class, Structure, Enumeration, Variant
+    Slice, Array, Tuple, Function, Class, Structure, Enumeration, Variant
 }
 
 class HIRType {
@@ -31,7 +31,7 @@ class HIRType {
 
     virtual ~HIRType(&mut this) {}
 
-    pub fn IsMutable(&this) -> bool { (this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->mutable) || (this.kind == HIRTypeKind::Reference && (this as *HIRReferenceType)->mutable) }
+    pub fn IsMutable(&this) -> bool { (this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->mutable) || (this.kind == HIRTypeKind::Reference && (this as *HIRReferenceType)->mutable) || (this.kind == HIRTypeKind::Slice && (this as *HIRSliceType)->mutable) }
     pub fn IsLiteral(&this) -> bool { (this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->literal) || (this.kind == HIRTypeKind::Float && (this as *HIRFloatType)->literal) }
     pub fn IsSigned(&this) -> bool { this.kind == HIRTypeKind::Integer && (this as *HIRIntegerType)->signed }
 
@@ -47,6 +47,7 @@ class HIRType {
     pub fn IsPointer(&this) -> bool { this.kind == HIRTypeKind::Pointer || this.kind == HIRTypeKind::Reference }
     pub fn IsNullPointer(&this) -> bool { this.kind == HIRTypeKind::Pointer && (this as *HIRPointerType)->_null == true }
     pub fn IsReference(&this) -> bool { this.kind == HIRTypeKind::Reference }
+    pub fn IsSlice(&this) -> bool { this.kind == HIRTypeKind::Slice }
     pub fn IsArray(&this) -> bool { this.kind == HIRTypeKind::Array }
     pub fn IsTuple(&this) -> bool { this.kind == HIRTypeKind::Tuple }
     pub fn IsUnit(&this) -> bool { this.IsTuple() && (this as *HIRTupleType)->elements.Empty() }
@@ -57,7 +58,7 @@ class HIRType {
     pub fn IsVariant(&this) -> bool { this.kind == HIRTypeKind::Variant }
 
     pub fn IsTrivial(&this) -> bool {
-        if this.IsNever() || this.IsVoid() || this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() || this.IsFunction() || this.IsEnumeration() {
+        if this.IsNever() || this.IsVoid() || this.IsBoolean() || this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsPointer() || this.IsReference() || this.IsSlice() || this.IsFunction() || this.IsEnumeration() {
             true
         } else if this.IsArray() {
             (this as *HIRArrayType)->element->IsTrivial()
@@ -168,7 +169,10 @@ class HIRType {
             (left, right) = (left->Pointee(), right->Pointee());
         }
 
-        if left->IsArray() && right->IsArray() {
+        if left->IsSlice() && right->IsSlice() {
+            if left->IsMutable() && !right->IsMutable() { return false; }
+            left->Element().IsMutabilityCompatible(right->Element())
+        } else if left->IsArray() && right->IsArray() {
             left->Element().IsMutabilityCompatible(right->Element())
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
@@ -199,6 +203,8 @@ class HIRType {
 
         if left->IsArray() && right->IsArray() {
             left->Length() == right->Length() && left->Element().IsSame(right->Element())
+        } else if left->IsSlice() && right->IsSlice() {
+            left->IsMutable() == right->IsMutable() && left->Element().IsSame(right->Element())
         } else if left->IsTuple() && right->IsTuple() {
             let &lefts = (left as *HIRTupleType)->elements;
             let &rights = (right as *HIRTupleType)->elements;
@@ -215,7 +221,7 @@ class HIRType {
     }
 
     pub fn ContainsLiteral(&this) -> bool {
-        if this.IsArray() {
+        if this.IsArray() || this.IsSlice() {
             this.Element().ContainsLiteral()
         } else if this.IsTuple() {
             for element in (this as *HIRTupleType)->elements {
@@ -267,6 +273,28 @@ class HIRType {
             } return 0;
         }
 
+        if this.IsSlice() {
+            let element: *HIRType = this.Element();
+            let mut source: *HIRType = other;
+            let mut base: u64 = 80;
+
+            if other.IsSlice() {
+                if this.IsMutable() && !other.IsMutable() { return 0; }
+                if !element->IsSame(other.Element()) { return 0; }
+                return if this.IsMutable() == other.IsMutable() { 100 } else { 99 };
+            }
+
+            if other.IsReference() {
+                if this.IsMutable() && !other.IsMutable() { return 0; }
+                (source, base) = (other.Pointee(), 77);
+            }
+
+            if !source->IsArray() { return 0; }
+            let element_score = element->ScoreParameter(source->Element());
+            if element_score == 0 || (!source->Element().IsLiteral() && !element->IsSame(source->Element())) { return 0; }
+            return if element_score < base { element_score } else { base };
+        }
+
         if this == other {
             return this.ScorePointer(other, 100);
         }
@@ -281,6 +309,11 @@ class HIRType {
                 if element_score == 0 { return 0; }
                 if element_score < score { score = element_score; }
             } return score;
+        }
+
+        if this.IsArray() && other.IsArray() {
+            if this.Length() != other.Length() { return 0; }
+            return this.Element().ScoreParameter(other.Element());
         }
 
         if this.IsReference() {
@@ -341,7 +374,7 @@ class HIRType {
             1
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             (this.Width() / 8) as usize
-        } else if this.IsPointer() || this.IsFunction() {
+        } else if this.IsPointer() || this.IsFunction() || this.IsSlice() {
             llvm_lowerer->target->Info().pointer_size
         } else if this.IsArray() {
             this.Element().Alignment()
@@ -400,6 +433,8 @@ class HIRType {
             (this.Width() / 8) as usize
         } else if this.IsPointer() || this.IsFunction() {
             llvm_lowerer->target->Info().pointer_size
+        } else if this.IsSlice() {
+            llvm_lowerer->target->Info().pointer_size * 2
         } else if this.IsArray() {
             this.Element().Size() * this.Length()
         } else if this.IsTuple() {
@@ -486,11 +521,15 @@ class HIRType {
     }
 
     pub fn Element(&this) -> &HIRType {
-        if !this.IsArray() {
-            Logger::Log("HIRType", "Not an array!", LogSeverity::Fatal);
+        if !this.IsArray() && !this.IsSlice() {
+            Logger::Log("HIRType", "Not an array or a slice!", LogSeverity::Fatal);
         }
 
-        (this as *HIRArrayType)->element
+        if this.IsArray() {
+            (this as *HIRArrayType)->element
+        } else {
+            (this as *HIRSliceType)->element
+        }
     }
 
     pub fn Parameters(&this) -> &Vector<*HIRType> {
@@ -629,9 +668,11 @@ class HIRType {
             }
 
             *left == *right
+        } else if this.IsSlice() && other.IsSlice() {
+            *(this as *HIRSliceType)->element == *(other as *HIRSliceType)->element
         } else if this.IsArray() && other.IsArray() {
             let (left, right) = (this as *HIRArrayType, other as *HIRArrayType);
-            left->element == right->element && left->length == right->length
+            left->length == right->length && *left->element == *right->element
         } else if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
             if left->elements.Size() != right->elements.Size() { return false; }
@@ -786,6 +827,19 @@ class HIRReferenceType : HIRType {
 
     pub override fn ToString(&this) -> String {
         (if this.mutable { "&mut " } else { "&" }) + this.referent->ToString()
+    }
+}
+
+class HIRSliceType : HIRType {
+    pub element: *HIRType,
+    pub mutable: bool;
+
+    HIRSliceType(&mut this, element: *HIRType, mutable: bool) : HIRType(HIRTypeKind::Slice) {
+        (this.element, this.mutable) = (element, mutable);
+    }
+
+    pub override fn ToString(&this) -> String {
+        (if this.mutable { "&mut [" } else { "&[" }) + this.element->ToString() + ']'
     }
 }
 
@@ -1146,7 +1200,7 @@ enum HIRExpressionKind: u8 {
     Literal,
     BindingReference, DeclarationReference,
     Assignment, Unary, Binary, Call, Cast,
-    IndexAccess, TupleAccess, FieldAccess, MemberAccess, TagAccess,
+    IndexAccess, TupleAccess, FieldAccess, MemberAccess, TagAccess, SliceAccess, Slice, Subslice,
     New, Delete, Constructor, Destructor, VTable,
     Intrinsic, Deferred,
     Block, If, While, Loop, For, Match, Return, Break, Continue
@@ -1193,7 +1247,7 @@ class HIRExpression {
             },
             HIRExpressionKind::Unary | HIRExpressionKind::New | HIRExpressionKind::Delete => 130,
             HIRExpressionKind::Cast => 140,
-            HIRExpressionKind::Call | HIRExpressionKind::Constructor | HIRExpressionKind::Destructor | HIRExpressionKind::IndexAccess | HIRExpressionKind::TupleAccess | HIRExpressionKind::FieldAccess | HIRExpressionKind::MemberAccess | HIRExpressionKind::TagAccess => 150,
+            HIRExpressionKind::Call | HIRExpressionKind::Constructor | HIRExpressionKind::Destructor | HIRExpressionKind::IndexAccess | HIRExpressionKind::TupleAccess | HIRExpressionKind::FieldAccess | HIRExpressionKind::MemberAccess | HIRExpressionKind::TagAccess | HIRExpressionKind::SliceAccess | HIRExpressionKind::Subslice => 150,
             _ => 160
         }
     }
@@ -1592,7 +1646,8 @@ class HIRCastExpression : HIRExpression {
 
 class HIRIndexAccessExpression : HIRExpression {
     pub value: *HIRExpression,
-    pub index: *HIRExpression;
+    pub index: *HIRExpression,
+    pub location: *HIRExpression = null;
 
     HIRIndexAccessExpression(&mut this, value: *HIRExpression, index: *HIRExpression, _type: *HIRType, mutable: bool) : HIRExpression(HIRExpressionKind::IndexAccess, _type, HIRExpressionCategory::Place, mutable) {
         (this.value, this.index) = (value, index);
@@ -1692,6 +1747,67 @@ class HIRTagAccessExpression : HIRExpression {
         }
 
         result + ".tag"
+    }
+}
+
+enum HIRSliceField: u8 {
+    Data, Length
+}
+
+class HIRSliceAccessExpression : HIRExpression {
+    pub instance: *HIRExpression,
+    pub field: HIRSliceField;
+
+    HIRSliceAccessExpression(&mut this, instance: *HIRExpression, field: HIRSliceField, _type: *HIRType) : HIRExpression(HIRExpressionKind::SliceAccess, _type) {
+        (this.instance, this.field) = (instance, field);
+    }
+
+    pub override fn ToString(&this) -> String {
+        let mut result = String();
+
+        if this.Precedence() > this.instance->Precedence() {
+            result += '(' + this.instance->ToString() + ')';
+        } else {
+            result += this.instance->ToString();
+        }
+
+        result + (if this.field == HIRSliceField::Data { ".Data()" } else { ".Length()" })
+    }
+}
+
+class HIRSliceExpression : HIRExpression {
+    pub data: *HIRExpression,
+    pub length: *HIRExpression;
+
+    HIRSliceExpression(&mut this, data: *HIRExpression, length: *HIRExpression, _type: *HIRType) : HIRExpression(HIRExpressionKind::Slice, _type) {
+        (this.data, this.length) = (data, length);
+    }
+
+    pub override fn ToString(&this) -> String {
+        "slice(" + this.data->ToString() + ", " + this.length->ToString() + ')'
+    }
+}
+
+class HIRSubsliceExpression : HIRExpression {
+    pub instance: *HIRExpression,
+    pub start: *HIRExpression,
+    pub end: *HIRExpression,
+    pub location: *HIRExpression;
+
+    HIRSubsliceExpression(&mut this, instance: *HIRExpression, start: *HIRExpression, end: *HIRExpression, location: *HIRExpression) : HIRExpression(HIRExpressionKind::Subslice, instance->_type) {
+        (this.instance, this.start, this.end, this.location) = (instance, start, end, location);
+    }
+
+    pub override fn ToString(&this) -> String {
+        let mut result = String();
+
+        if this.Precedence() > this.instance->Precedence() {
+            result += '(' + this.instance->ToString() + ')';
+        } else {
+            result += this.instance->ToString();
+        }
+
+        result + '[' + this.start->ToString() + ".." + this.end->ToString() + ']'
     }
 }
 
@@ -3304,6 +3420,7 @@ class HIRModule {
 
 class HIRContext {
     pub arena: Arena,
+    slice_types: Vector<*mut HIRSliceType>,
     array_types: Vector<*mut HIRArrayType>,
     tuple_types: Vector<*mut HIRTupleType>;
 
@@ -3351,6 +3468,22 @@ class HIRContext {
 
     pub fn ReferenceType(&mut this, referent: *HIRType, mutable: bool) -> *mut HIRReferenceType {
         this.arena.New<HIRReferenceType>(referent, mutable)
+    }
+
+    pub fn SliceType(&mut this, element: *HIRType, mutable: bool) -> *mut HIRSliceType {
+        if element->ContainsLiteral() {
+            return this.arena.New<HIRSliceType>(element, mutable);
+        }
+
+        for existing in this.slice_types {
+            if existing->mutable == mutable && existing->element->IsSame(element) {
+                return existing;
+            }
+        }
+
+        let _type = this.arena.New<HIRSliceType>(element, mutable);
+        this.slice_types.PushBack(_type);
+        _type
     }
 
     pub fn ArrayType(&mut this, element: *HIRType, length: usize) -> *mut HIRArrayType {
@@ -3559,6 +3692,10 @@ class HIRBuilder {
     }
 
     pub fn AddressOf(&mut this, operand: *HIRExpression, mutable: bool) -> *HIRExpression {
+        if operand->category != HIRExpressionCategory::Place {
+            return this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::AddressOf, operand, this.context->ReferenceType(operand->_type, mutable), HIRExpressionCategory::Value, false);
+        }
+
         let address = this.AddressOf(operand);
         if mutable || !address->_type->IsMutable() { return address; }
 
@@ -3762,6 +3899,8 @@ class HIRBuilder {
     pub fn IndexAccess(&mut this, value: *HIRExpression, index: *HIRExpression) -> *mut HIRIndexAccessExpression {
         if value->_type->IsArray() {
             this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Element(), value->mutable)
+        } else if value->_type->IsSlice() {
+            this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Element(), value->_type->IsMutable())
         } else {
             this.context->arena.New<HIRIndexAccessExpression>(value, index, value->_type->Pointee(), value->_type->IsMutable())
         }
@@ -3781,6 +3920,24 @@ class HIRBuilder {
 
     pub fn TagAccess(&mut this, instance: *HIRExpression) -> *mut HIRTagAccessExpression {
         this.context->arena.New<HIRTagAccessExpression>(instance, this.context->IntegerType(8, false))
+    }
+
+    pub fn SliceAccess(&mut this, instance: *HIRExpression, field: HIRSliceField) -> *mut HIRSliceAccessExpression {
+        let mut _type: *HIRType = this.context->IntegerPointerType(false);
+
+        if field == HIRSliceField::Data {
+            _type = this.context->PointerType(instance->_type->Element(), instance->_type->IsMutable());
+        }
+
+        this.context->arena.New<HIRSliceAccessExpression>(instance, field, _type)
+    }
+
+    pub fn Slice(&mut this, data: *HIRExpression, length: *HIRExpression, _type: *HIRType) -> *mut HIRSliceExpression {
+        this.context->arena.New<HIRSliceExpression>(data, length, _type)
+    }
+
+    pub fn Subslice(&mut this, instance: *HIRExpression, start: *HIRExpression, end: *HIRExpression, location: *HIRExpression) -> *mut HIRSubsliceExpression {
+        this.context->arena.New<HIRSubsliceExpression>(instance, start, end, location)
     }
 
     pub fn New(&mut this, _type: *HIRType, size: *HIRExpression, initialized: bool, callee: *HIRExpression, arguments: Vector<*HIRExpression>) -> *mut HIRNewExpression {

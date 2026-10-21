@@ -440,8 +440,19 @@ class Parser {
                 },
                 TokenType::LBRACKET => {
                     this.Advance();
-                    let _expression = this.ParseExpression();
+                    let mut _expression = this.ParseExpression();
                     if _expression == null { return null; }
+
+                    if this.Current()._type == TokenType::TWO_DOT {
+                        let range_token = this.Advance();
+                        let inclusive = this.Match(TokenType::ASSIGN);
+                        let end = this.ParseExpression();
+                        if end == null { return null; }
+                        let range = this.arena.New<ASTRangeExpression>(_expression, end, range_token);
+                        range->inclusive = inclusive;
+                        _expression = range;
+                    }
+
                     expression = this.arena.New<ASTIndexAccessExpression>(expression, _expression, token);
                     if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
                 },
@@ -856,10 +867,15 @@ class Parser {
         } else if this.Match(TokenType::LBRACKET) {
             let element = this.ParseType();
             if element == null { return null; }
-            if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-            let length = this.ParseExpression();
-            if length == null { return null; }
-            if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+            let mut length: *ASTExpression = null;
+
+            if !this.Match(TokenType::RBRACKET) {
+                if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
+                length = this.ParseExpression();
+                if length == null { return null; }
+                if !this.ExpectSuccess(TokenType::RBRACKET) { return null; }
+            }
+
             this.arena.New<ASTArrayType>(element, length, token)
         } else if this.Match(TokenType::LPAREN) {
             let tuple = this.arena.New<ASTTupleType>(token);

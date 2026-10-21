@@ -42,6 +42,8 @@ class Mangler {
             result += 'f' + String::FromInteger(_type->Width() as u64);
         } else if _type->IsPointer() {
             result += (if _type->IsReference() { 'R' } else { 'P' }) + Mangler::MangleType(_type->Pointee());
+        } else if _type->IsSlice() {
+            result += 'L' + Mangler::MangleType(_type->Element());
         } else if _type->IsArray() {
             let array = _type as *HIRArrayType;
             result += 'A' + String::FromInteger(array->length as u64) + '_' + Mangler::MangleType(array->element);
@@ -110,9 +112,14 @@ class Mangler {
                 let mut right = pair.0;
                 let mut equal = true;
 
-                while left->IsPointer() {
+                while left->IsPointer() || left->IsSlice() {
                     if left->IsMutable() != right->IsMutable() { equal = false; }
-                    (left, right) = (left->Pointee(), right->Pointee());
+
+                    if left->IsSlice() {
+                        (left, right) = (left->Element(), right->Element());
+                    } else {
+                        (left, right) = (left->Pointee(), right->Pointee());
+                    }
                 }
 
                 if equal {

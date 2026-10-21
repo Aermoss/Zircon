@@ -181,6 +181,10 @@ class ASTArrayType : ASTType {
     }
 
     pub override fn ToString(&this) -> String {
+        if this.length == null {
+            return '[' + this.element->ToString() + ']';
+        }
+
         '[' + this.element->ToString() + "; " + this.length->ToString() + ']'
     }
 }

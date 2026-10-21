@@ -376,7 +376,7 @@ class HIRLowerer {
                 let array = expression as *mut HIRArrayLiteral;
 
                 if array->elements.Empty() {
-                    if target != null && target->IsArray() {
+                    if target != null && (target->IsArray() || target->IsSlice()) {
                         expression->_type = this.context.ArrayType(target->Element(), 0);
                     } return expression;
                 }
@@ -384,7 +384,7 @@ class HIRLowerer {
                 let mut element: *HIRType = null;
 
                 for i in 0..array->elements.Size() {
-                    array->elements[i] = if target->IsArray() {
+                    array->elements[i] = if target->IsArray() || target->IsSlice() {
                         this.Coerce(array->elements[i], target->Element())
                     } else {
                         this.Coerce(array->elements[i])
@@ -397,7 +397,10 @@ class HIRLowerer {
 
                 if element == null {
                     element = array->elements[0]->_type;
-                    if target->IsArray() && target->Element().IsCompatible(element) { element = target->Element(); }
+
+                    if (target->IsArray() || target->IsSlice()) && target->Element().IsCompatible(element) {
+                        element = target->Element();
+                    }
                 }
 
                 for i in 0..array->elements.Size() {
@@ -601,6 +604,26 @@ class HIRLowerer {
         expression
     }
 
+    fn CoerceToSlice(&mut this, expression: *HIRExpression, target: *HIRType) -> *HIRExpression {
+        let mut array = expression;
+
+        if array->_type->IsReference() && array->_type->Pointee().IsArray() {
+            array = this.builder.Dereference(array);
+        }
+
+        if !array->_type->IsArray() || !array->_type->Element().IsSame(target->Element()) {
+            return expression;
+        }
+
+        let element: *HIRType = array->_type->Element();
+        let index_type = this.context.IntegerPointerType(false);
+        let first = this.builder.AddressOf(this.builder.IndexAccess(array, this.builder.IntegerLiteral(0, index_type)));
+        let data = this.builder.Cast(first, this.context.PointerType(element, array->mutable));
+        let length = this.builder.IntegerLiteral(array->_type->Length() as u64, index_type);
+        let slice = this.builder.Slice(data, length, this.context.SliceType(element, array->mutable));
+        slice
+    }
+
     fn MakeCompatible(&mut this, expression: *HIRExpression, target: *HIRType) -> *HIRExpression {
         if target->IsPointer() && expression->_type->IsPointer() {
             if target->Pointee().IsClass() && expression->_type->Pointee().IsClass() {
@@ -621,6 +644,10 @@ class HIRLowerer {
         expression = this.Coerce(expression, target);
         if expression == null { return null; }
 
+        if target->IsSlice() {
+            expression = this.CoerceToSlice(expression, target);
+        }
+
         if target->IsReference() && target->Pointee().IsCompatible(expression->_type) {
             expression = this.builder.AddressOf(expression);
         }
@@ -635,7 +662,12 @@ class HIRLowerer {
         }
 
         if !target->IsMutabilityCompatible(expression->_type) {
-            Logger::Log("Cannot assign immutable pointer to mutable pointer.", node, LogSeverity::Error);
+            if target->IsSlice() && !expression->_type->IsMutable() {
+                Logger::Log("Cannot create a mutable slice of an immutable value.", node, LogSeverity::Error);
+            } else {
+                Logger::Log("Cannot assign immutable pointer to mutable pointer.", node, LogSeverity::Error);
+            }
+
             return null;
         }
 
@@ -3348,6 +3380,31 @@ class HIRLowerer {
                     }
 
                     return this.LowerCallerLocation(call);
+                } else if path->segments[0].name == "slice" {
+                    if call->arguments.Size() != 2 {
+                        Logger::Log("Invalid number of arguments for 'slice'.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let mut invalid = false;
+                    let values = this.LowerCallArguments(call->arguments, call, &mut invalid);
+                    if invalid { return null; }
+                    let data = this.ImplicitDereference(values[0]);
+
+                    if !data->_type->IsPointer() || data->_type->IsReference() || data->_type->Pointee().IsVoid() {
+                        Logger::Log("The first argument of 'slice' must be a non-void pointer.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let length = this.Coerce(this.ImplicitDereference(values[1]), this.context.IntegerPointerType(false));
+                    if length == null { return null; }
+
+                    if !length->_type->IsIntegerPointer() || length->_type->IsSigned() {
+                        Logger::Log("The length of a slice must be of type 'usize'.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.builder.Slice(data, length, this.context.SliceType(data->_type->Pointee(), data->_type->IsMutable()));
                 } else if path->segments[0].name == "construct" {
                     if call->arguments.Size() == 0 {
                         Logger::Log("Invalid number of arguments for 'construct'.", call, LogSeverity::Error);
@@ -3538,6 +3595,15 @@ class HIRLowerer {
                     }
                 }
 
+                if instance->_type->IsSlice() && (member_access->member == "Length" || member_access->member == "Data") && member_access->types.Empty() {
+                    if !values.Empty() {
+                        Logger::Log("Slice method '" + member_access->member + "' takes no arguments.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.builder.SliceAccess(instance, if member_access->member == "Length" { HIRSliceField::Length } else { HIRSliceField::Data });
+                }
+
                 let mut candidates = Vector<*HIRFunctionDeclaration>();
 
                 if !instance->_type->HasMethods() {
@@ -3574,7 +3640,7 @@ class HIRLowerer {
             for j in 0..parameters.Size() {
                 let mut parameter_score = parameters[j]->ScoreParameter(values[j]->_type);
 
-                if parameter_score != 0 && parameters[j]->IsReference() && !values[j]->_type->IsPointer() && values[j]->category == HIRExpressionCategory::Place {
+                if parameter_score != 0 && (parameters[j]->IsReference() || (parameters[j]->IsSlice() && values[j]->_type->IsArray())) && !values[j]->_type->IsPointer() && values[j]->category == HIRExpressionCategory::Place {
                     if parameters[j]->IsMutable() && !values[j]->mutable {
                         parameter_score = 0;
                     } else if !parameters[j]->IsMutable() && values[j]->mutable {
@@ -3945,6 +4011,10 @@ class HIRLowerer {
         let value = this.ImplicitDereference(this.LowerExpression(index_access->expression));
         if value == null { return null; }
 
+        if index_access->index->kind == ASTExpressionKind::Range {
+            return this.LowerSubsliceExpression(value, index_access->index as *ASTRangeExpression, index_access);
+        }
+
         let index = this.Coerce(this.ImplicitDereference(this.LowerExpression(index_access->index)), this.context.IntegerPointerType(false));
         if index == null { return null; }
 
@@ -3963,6 +4033,17 @@ class HIRLowerer {
             }
 
             return this.builder.Dereference(call);
+        }
+
+        if value->_type->IsSlice() {
+            if !index->_type->IsIntegerPointer() || index->_type->IsSigned() {
+                Logger::Log("Index must be of type 'usize'.", index_access, LogSeverity::Error);
+                return null;
+            }
+
+            let access = this.builder.IndexAccess(value, index);
+            access->location = this.LowerCallerLocation(index_access);
+            return access;
         }
 
         if !value->_type->IsPointer() && !value->_type->IsArray() {
@@ -3988,6 +4069,33 @@ class HIRLowerer {
         }
 
         this.builder.IndexAccess(value, index)
+    }
+
+    fn LowerSubsliceExpression(&mut this, mut instance: *HIRExpression, range: *ASTRangeExpression, node: *ASTNode) -> *HIRExpression {
+        if instance->_type->IsArray() {
+            instance = this.CoerceToSlice(instance, this.context.SliceType(instance->_type->Element(), instance->mutable));
+        }
+
+        if !instance->_type->IsSlice() {
+            Logger::Log("Only slices and arrays can be indexed with a range.", node, LogSeverity::Error);
+            return null;
+        }
+
+        let index_type = this.context.IntegerPointerType(false);
+        let start = this.Coerce(this.ImplicitDereference(this.LowerExpression(range->start)), index_type);
+        let mut end = this.Coerce(this.ImplicitDereference(this.LowerExpression(range->end)), index_type);
+        if start == null || end == null { return null; }
+
+        if !start->_type->IsIntegerPointer() || start->_type->IsSigned() || !end->_type->IsIntegerPointer() || end->_type->IsSigned() {
+            Logger::Log("Range bounds must be of type 'usize'.", node, LogSeverity::Error);
+            return null;
+        }
+
+        if range->inclusive {
+            end = this.builder.Binary(HIRBinaryKind::Add, end, this.builder.IntegerLiteral(1, index_type), index_type);
+        }
+
+        this.builder.Subslice(instance, start, end, this.LowerCallerLocation(node))
     }
 
     fn LowerTupleAccessExpression(&mut this, tuple_access: *ASTTupleAccessExpression) -> *HIRExpression {
@@ -4089,12 +4197,12 @@ class HIRLowerer {
 
         match unary->kind {
             ASTUnaryKind::AddressOf => {
-                if value->category != HIRExpressionCategory::Place {
-                    Logger::Log("Cannot take reference to non-place value.", unary, LogSeverity::Error);
+                if value->_type->IsNever() {
+                    Logger::Log("Cannot take reference to a value of type '!'.", unary, LogSeverity::Error);
                     return null;
                 }
 
-                if unary->mutable && !value->mutable {
+                if unary->mutable && value->category == HIRExpressionCategory::Place && !value->mutable {
                     Logger::Log("Cannot take mutable reference to immutable value.", unary, LogSeverity::Error);
                     return null;
                 }
@@ -4635,6 +4743,10 @@ class HIRLowerer {
                 let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->mutable);
                 start = this.builder.Cast(this.builder.AddressOf(this.builder.IndexAccess(iterable, this.builder.IntegerLiteral(0, index_type))), pointer_type);
                 end = this.builder.Binary(HIRBinaryKind::Add, start, this.builder.IntegerLiteral(iterable->_type->Length() as u64, index_type), pointer_type);
+            } else if iterable->_type->IsSlice() {
+                let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->_type->IsMutable());
+                start = this.builder.SliceAccess(iterable, HIRSliceField::Data);
+                end = this.builder.Binary(HIRBinaryKind::Add, this.builder.SliceAccess(iterable, HIRSliceField::Data), this.builder.SliceAccess(iterable, HIRSliceField::Length), pointer_type);
             } else {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(iterable);
@@ -5603,6 +5715,20 @@ class HIRLowerer {
             },
             ASTTypeKind::Reference => {
                 let reference = _type as *ASTReferenceType;
+
+                if reference->pointee->kind == ASTTypeKind::Array && (reference->pointee as *ASTArrayType)->length == null {
+                    let array = reference->pointee as *ASTArrayType;
+                    let element = this.LowerType(array->element);
+                    if element == null { return null; }
+
+                    if element->IsNever() {
+                        Logger::Log("Slice elements cannot have type '" + element->ToString() + "'.", array->element, LogSeverity::Error);
+                        return null;
+                    }
+
+                    return this.context.SliceType(element, reference->mutable);
+                }
+
                 let pointee = this.LowerType(reference->pointee);
                 if pointee == null { return null; }
                 this.context.ReferenceType(pointee, reference->mutable)
@@ -5622,7 +5748,8 @@ class HIRLowerer {
                     if length < 0 { return null; }
                     this.context.ArrayType(element, length as usize)
                 } else {
-                    this.context.PointerType(element, true)
+                    Logger::Log("A slice type must be used behind '&' or '&mut'.", _type, LogSeverity::Error);
+                    null
                 }
             },
             ASTTypeKind::Tuple => {

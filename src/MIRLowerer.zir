@@ -269,13 +269,13 @@ class MIRLowerer {
     }
 
     fn IsAggregate(&mut this, _type: *HIRType) -> bool {
-        _type != null && _type->HasSpecialMembers()
+        _type != null && (_type->HasSpecialMembers() || _type->IsSlice())
     }
 
     fn IsIndirectAggregate(&mut this, _type: *HIRType) -> bool {
         if !this.IsAggregate(_type) { return false; }
         let size = _type->Size();
-        (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial()
+        (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial() || _type->IsSlice()
     }
 
     fn LowerReturnType(&mut this, _type: *HIRType) -> *MIRType {
@@ -1072,7 +1072,7 @@ class MIRLowerer {
 
                     if this.declarations.Has(declaration) {
                         return this.builder.ReferenceDeclaration(this.declarations[declaration]);
-                    } else if declaration->kind == HIRDeclarationKind::Parameter && (declaration as *HIRParameterDeclaration)->addressable {
+                    } else if declaration->kind == HIRDeclarationKind::Parameter && ((declaration as *HIRParameterDeclaration)->addressable || this.IsAggregate((declaration as *HIRParameterDeclaration)->_type)) {
                         return this.parameters.Get(declaration, null);
                     }
                 },
@@ -1114,6 +1114,14 @@ class MIRLowerer {
                 this.LowerVariantLiteral(expression as *HIRVariantLiteral, destination);
                 this.temporaries[expression] = destination;
             },
+            HIRExpressionKind::Slice => {
+                this.LowerSliceExpression(expression as *HIRSliceExpression, destination);
+                this.temporaries[expression] = destination;
+            },
+            HIRExpressionKind::Subslice => {
+                this.LowerSubsliceExpression(expression as *HIRSubsliceExpression, destination);
+                this.temporaries[expression] = destination;
+            },
             HIRExpressionKind::Call => {
                 this.LowerCallExpression(expression as *HIRCallExpression, destination);
                 this.temporaries[expression] = destination;
@@ -1139,7 +1147,7 @@ class MIRLowerer {
         if expression->kind == HIRExpressionKind::DeclarationReference {
             let declaration = (expression as *HIRDeclarationReference)->declaration;
 
-            if declaration->kind == HIRDeclarationKind::Parameter && !(declaration as *HIRParameterDeclaration)->addressable {
+            if declaration->kind == HIRDeclarationKind::Parameter && !(declaration as *HIRParameterDeclaration)->addressable && !this.IsAggregate((declaration as *HIRParameterDeclaration)->_type) {
                 return this.parameters.Get(declaration, null);
             }
         }
@@ -1155,6 +1163,7 @@ class MIRLowerer {
             HIRExpressionKind::New => this.LowerNewExpression(expression as *HIRNewExpression),
             HIRExpressionKind::Delete => this.LowerDeleteExpression(expression as *HIRDeleteExpression),
             HIRExpressionKind::Cast => this.LowerCastExpression(expression as *HIRCastExpression),
+            HIRExpressionKind::SliceAccess => this.LowerSliceAccessExpression(expression as *HIRSliceAccessExpression),
             HIRExpressionKind::Unary if (expression as *HIRUnaryExpression)->kind != HIRUnaryKind::Dereference => this.LowerUnaryExpression(expression as *HIRUnaryExpression),
             HIRExpressionKind::Binary => this.LowerBinaryExpression(expression as *HIRBinaryExpression),
             HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue if expression->_type->IsNever() || expression->_type->IsUnit() => {
@@ -1751,7 +1760,50 @@ class MIRLowerer {
         value
     }
 
+    fn LowerBoundsCheck(&mut this, failed: *MIRValue, name: String, mut arguments: Vector<*MIRValue>, location: *HIRExpression) {
+        let failure_block = this.builder.BuildBlock("bounds.failure".ToString());
+        let success_block = this.builder.BuildBlock("bounds.success".ToString());
+        this.builder.BuildConditionalBranch(failed, failure_block, success_block);
+        this.builder.SetCurrentBlock(failure_block);
+        let place = this.LowerPlaceExpression(location);
+
+        if place != null {
+            let location_type = this.LowerType(location->_type) as *MIRStructureType;
+
+            for i in 0..location_type->fields.Size() {
+                let pointer = this.builder.BuildStructGEP("bounds.location".ToString(), place, i as u32, this.context.PointerType(location_type->fields[i]));
+                arguments.PushBack(this.builder.BuildLoad("bounds.location".ToString(), pointer));
+            }
+        }
+
+        let mut types = Vector<*MIRType>();
+
+        for argument in arguments {
+            types.PushBack(argument->_type);
+        }
+
+        let function = this.LowerRuntimeFunction(name, types, this.context.VoidType());
+        this.builder.BuildCall("bounds.panic".ToString(), this.builder.ReferenceDeclaration(function), arguments);
+        this.builder.BuildUnreachable();
+        this.builder.SetCurrentBlock(success_block);
+    }
+
     fn LowerIndexAccessExpression(&mut this, index_access: *HIRIndexAccessExpression) -> *MIRValue {
+        if index_access->value->_type->IsSlice() {
+            let slice = this.LowerPlaceExpression(index_access->value);
+            let index = this.LowerExpression(index_access->index);
+            if slice == null || index == null { return null; }
+            let data = this.SliceField(slice, index_access->value->_type, 0);
+            let length = this.SliceField(slice, index_access->value->_type, 1);
+            let failed = this.builder.BuildBinary("bounds.check".ToString(), MIRBinaryKind::ICmpUge, index, length, this.context.IntegerType(1));
+
+            let mut arguments = Vector<*MIRValue>();
+            arguments.PushBack(index);
+            arguments.PushBack(length);
+            this.LowerBoundsCheck(failed, "__zircon_bounds_panic".ToString(), arguments, index_access->location);
+            return this.builder.BuildArrayGEP("index.access".ToString(), data, index);
+        }
+
         let mut value: *MIRValue = null;
 
         if index_access->value->_type->IsArray() {
@@ -1804,6 +1856,53 @@ class MIRLowerer {
         let instance = this.LowerPlaceExpression(tag_access->instance);
         if instance == null { return null; }
         this.builder.BuildCast("tag.cast".ToString(), MIRCastKind::Bitcast, instance, this.context.PointerType(this.context.IntegerType(8)))
+    }
+
+    fn SliceField(&mut this, slice: *MIRValue, _type: *HIRType, field: u32) -> *MIRValue {
+        let lowered = this.LowerType(_type) as *MIRStructureType;
+        let pointer = this.builder.BuildStructGEP("slice.field".ToString(), slice, field, this.context.PointerType(lowered->fields[field as usize]));
+        this.builder.BuildLoad("slice.field".ToString(), pointer)
+    }
+
+    fn LowerSliceAccessExpression(&mut this, access: *HIRSliceAccessExpression) -> *MIRValue {
+        let instance = this.LowerPlaceExpression(access->instance);
+        if instance == null { return null; }
+        this.SliceField(instance, access->instance->_type, if access->field == HIRSliceField::Data { 0 } else { 1 })
+    }
+
+    fn LowerSliceExpression(&mut this, slice: *HIRSliceExpression, destination: *MIRValue) {
+        let _type = this.LowerType(slice->_type) as *MIRStructureType;
+        let data = this.LowerExpression(slice->data);
+        let length = this.LowerExpression(slice->length);
+        if _type == null || data == null || length == null { return; }
+        this.builder.BuildStore(data, this.builder.BuildStructGEP("slice.data".ToString(), destination, 0, this.context.PointerType(_type->fields[0])));
+        this.builder.BuildStore(length, this.builder.BuildStructGEP("slice.length".ToString(), destination, 1, this.context.PointerType(_type->fields[1])));
+    }
+
+    fn LowerSubsliceExpression(&mut this, subslice: *HIRSubsliceExpression, destination: *MIRValue) {
+        let instance = this.LowerPlaceExpression(subslice->instance);
+        let start = this.LowerExpression(subslice->start);
+        let end = this.LowerExpression(subslice->end);
+        if instance == null || start == null || end == null { return; }
+
+        let _type = this.LowerType(subslice->_type) as *MIRStructureType;
+        let data = this.SliceField(instance, subslice->instance->_type, 0);
+        let length = this.SliceField(instance, subslice->instance->_type, 1);
+        let boolean = this.context.IntegerType(1);
+        let reversed = this.builder.BuildBinary("bounds.reversed".ToString(), MIRBinaryKind::ICmpUgt, start, end, boolean);
+        let overflow = this.builder.BuildBinary("bounds.overflow".ToString(), MIRBinaryKind::ICmpUgt, end, length, boolean);
+        let failed = this.builder.BuildBinary("bounds.check".ToString(), MIRBinaryKind::Or, reversed, overflow, boolean);
+
+        let mut arguments = Vector<*MIRValue>();
+        arguments.PushBack(start);
+        arguments.PushBack(end);
+        arguments.PushBack(length);
+        this.LowerBoundsCheck(failed, "__zircon_range_panic".ToString(), arguments, subslice->location);
+
+        let pointer = this.builder.BuildArrayGEP("subslice.data".ToString(), data, start);
+        let size = this.builder.BuildBinary("subslice.length".ToString(), MIRBinaryKind::Sub, end, start, _type->fields[1]);
+        this.builder.BuildStore(pointer, this.builder.BuildStructGEP("subslice.data".ToString(), destination, 0, this.context.PointerType(_type->fields[0])));
+        this.builder.BuildStore(size, this.builder.BuildStructGEP("subslice.length".ToString(), destination, 1, this.context.PointerType(_type->fields[1])));
     }
 
     fn LowerUnaryExpression(&mut this, unary: *HIRUnaryExpression) -> *MIRValue {
@@ -2214,6 +2313,13 @@ class MIRLowerer {
             let pointee = this.LowerType(_type->Pointee());
             if pointee == null { return null; }
             this.context.PointerType(pointee)
+        } else if _type->IsSlice() {
+            let element = this.LowerType(_type->Element());
+            if element == null { return null; }
+            let mut fields = Vector<*MIRType>();
+            fields.PushBack(this.context.PointerType(element));
+            fields.PushBack(this.context.IntegerType(this.target_info.pointer_size as u32 * 8));
+            this.context.StructureType(fields)
         } else if _type->IsArray() {
             let element = this.LowerType(_type->Element());
             if element == null { return null; }

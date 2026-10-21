@@ -32,6 +32,15 @@ class Vector<T> {
         } this.size = other.size;
     }
 
+    Vector(&mut this, values: &[T]) {
+        if values.Length() == 0 { return; }
+        this.Reserve(values.Length());
+
+        for i in 0..values.Length() {
+            construct(this.data + i, values[i]);
+        } this.size = values.Length();
+    }
+
     ~Vector(&mut this) {
         this.Release();
     }
@@ -39,6 +48,9 @@ class Vector<T> {
     pub fn Data(&this) -> *T { this.data }
     pub fn Front(&this) -> &T { this.data }
     pub fn Back(&this) -> &T { this.data[this.size - 1] }
+
+    pub fn AsSlice(&this) -> &[T] { slice(this.data, this.size) }
+    pub fn AsSlice(&mut this) -> &mut [T] { slice(this.data, this.size) }
 
     pub fn Data(&mut this) -> *mut T { this.data }
     pub fn Front(&mut this) -> &mut T { this.data }
