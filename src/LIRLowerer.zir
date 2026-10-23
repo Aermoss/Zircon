@@ -757,7 +757,7 @@ class LIRLowerer {
                 let width = (_type as *MIRFloatType)->width;
                 if width <= 8 { 1 } else { width / 8 }
             },
-            MIRTypeKind::Pointer => 4,
+            MIRTypeKind::Pointer | MIRTypeKind::Function => 4,
             MIRTypeKind::Array => this.AlignOf((_type as *MIRArrayType)->element),
             MIRTypeKind::Structure => {
                 let mut alignment: u32 = 1;
@@ -786,7 +786,7 @@ class LIRLowerer {
                 let width = (_type as *MIRFloatType)->width;
                 if width <= 8 { 1 } else { width / 8 }
             },
-            MIRTypeKind::Pointer => 4,
+            MIRTypeKind::Pointer | MIRTypeKind::Function => 4,
             MIRTypeKind::Array => {
                 let array = _type as *MIRArrayType;
                 this.SizeOf(array->element) * array->length as u32

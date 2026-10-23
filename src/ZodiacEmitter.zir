@@ -171,19 +171,26 @@ class ZodiacEmitter {
     fn EmitPrologue(&mut this) {
         let function = this.function;
         let size = this.FrameSize();
-        if function->has_calls { this.Line("sw ra, -4(sp)"); }
-        this.Line("sw fp, -8(sp)");
-        this.Line("addi fp, sp, 0");
 
-        if size <= 32768 {
+        if size <= 32767 {
             this.Line("addi sp, sp, -" + String::FromInteger(size as u64));
+            if function->has_calls { this.Line("sw ra, " + String::FromInteger((size - 4) as u64) + "(sp)"); }
+            this.Line("sw fp, " + String::FromInteger((size - 8) as u64) + "(sp)");
         } else {
-            this.Line("li t6, " + String::FromInteger(size as u64));
+            this.Line("addi sp, sp, -8");
+            if function->has_calls { this.Line("sw ra, 4(sp)"); }
+            this.Line("sw fp, 0(sp)");
+            this.Line("addi fp, sp, 8");
+            this.Line("li t6, " + String::FromInteger((size - 8) as u64));
             this.Line("sub sp, sp, t6");
         }
 
         for i in 0..function->saved_registers.Length() {
             this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
+        }
+
+        if size <= 32767 {
+            this.Line("addi fp, sp, " + String::FromInteger(size as u64));
         }
     }
 
@@ -191,13 +198,30 @@ class ZodiacEmitter {
         let function = this.function;
 
         if this.has_frame {
+            let size = this.FrameSize();
+
+            if size <= 32767 {
+                this.Line("addi sp, fp, -" + String::FromInteger(size as u64));
+            } else {
+                this.Line("li t6, " + String::FromInteger(size as u64));
+                this.Line("sub sp, fp, t6");
+            }
+
             for i in 0..function->saved_registers.Length() {
                 this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
             }
 
-            if function->has_calls { this.Line("lw ra, -4(fp)"); }
-            this.Line("addi sp, fp, 0");
-            this.Line("lw fp, -8(sp)");
+            if size <= 32767 {
+                this.Line("lw fp, " + String::FromInteger((size - 8) as u64) + "(sp)");
+                if function->has_calls { this.Line("lw ra, " + String::FromInteger((size - 4) as u64) + "(sp)"); }
+                this.Line("addi sp, sp, " + String::FromInteger(size as u64));
+            } else {
+                this.Line("li t6, " + String::FromInteger((size - 8) as u64));
+                this.Line("add sp, sp, t6");
+                this.Line("lw fp, 0(sp)");
+                if function->has_calls { this.Line("lw ra, 4(sp)"); }
+                this.Line("addi sp, sp, 8");
+            }
         }
 
         this.Line("br ra");
