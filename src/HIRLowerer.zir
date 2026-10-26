@@ -142,9 +142,7 @@ class HIRLowerer {
             declared[declaration] |= this.LowerDeclarationThirdPass(declaration);
         }
 
-        for generic in this.generics {
-            generic->LowerInstances();
-        }
+        this.LowerGenericInstances();
 
         for declaration in module->declarations {
             this.current_pass = HIRLoweringPass::Fourth;
@@ -155,10 +153,7 @@ class HIRLowerer {
             }
         }
 
-        for generic in this.generics {
-            generic->LowerInstances();
-        }
-
+        this.LowerGenericInstances();
         this.LowerDeferredMethods();
         this.class_data.Clear();
         this.structure_data.Clear();
@@ -166,6 +161,15 @@ class HIRLowerer {
         this.extend_data.Clear();
         this.function_data.Clear();
         this.module
+    }
+
+    fn LowerGenericInstances(&mut this) {
+        let mut i: usize = 0;
+
+        while i < this.generics.Length() {
+            this.generics[i]->LowerInstances();
+            i += 1;
+        }
     }
 
     fn LowerDeclarationFirstPass(&mut this, declaration: *ASTDeclaration) -> bool {
@@ -741,6 +745,9 @@ class HIRLowerer {
                 Logger::Log("Constant initializer must be a constant expression.", constant->initializer, LogSeverity::Error);
                 return;
             }
+
+            let shared = unsafe { initializer as *mut HIRExpression };
+            shared->shared = true;
         }
 
         let declaration = this.builder.BuildConstantDeclaration(constant->name, _type, initializer);
@@ -835,9 +842,16 @@ class HIRLowerer {
             }
         }
 
+        let mut var_arg = function->var_arg;
         let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
         if _return == null { return null; }
-        let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return), function->no_mangle, function->public, this.abi);
+
+        if var_arg && (this.abi != HIRDeclarationABI::C || function->body != null) {
+            Logger::Log("Variadic parameters are only allowed on extern \"C\" function declarations without a body.", function, LogSeverity::Error);
+            var_arg = false;
+        }
+
+        let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return, var_arg), function->no_mangle, function->public, this.abi);
         (declaration->_virtual, declaration->_override, declaration->node) = (function->_virtual, function->_override, function);
         declaration->abstract = function->_virtual && function->body == null;
 
@@ -1029,7 +1043,7 @@ class HIRLowerer {
             parameter_types.PushBack(other_type);
         }
 
-        let function = this.builder.BuildFunctionDeclaration(name, parameters, _return, this.context.FunctionType(parameter_types, _return), false, true, HIRDeclarationABI::Native);
+        let function = this.builder.BuildFunctionDeclaration(name, parameters, _return, this.context.FunctionType(parameter_types, _return, false), false, true, HIRDeclarationABI::Native);
         this.scope_manager.current->Set(name, function, true, node);
         function
     }
@@ -3272,7 +3286,12 @@ class HIRLowerer {
             lowered_types.PushBack(lowered_type);
         }
 
-        for generic in this.generics {
+        let mut index: usize = 0;
+
+        while index < this.generics.Length() {
+            let generic = this.generics[index];
+            index += 1;
+
             if generic->declaration->kind != ASTDeclarationKind::Function || generic->_type == null || *generic->_type != *_type {
                 continue;
             }
@@ -3326,7 +3345,7 @@ class HIRLowerer {
             let path = (call->expression as *ASTPathExpression)->path;
 
             if !path->absolute && path->segments.Length() == 1 && path->segments[0].types.Empty() {
-                if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" {
+                if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" || path->segments[0].name == "typeid" {
                     if call->arguments.Length() != 1 {
                         Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
@@ -3376,6 +3395,10 @@ class HIRLowerer {
                     } else {
                         Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
+                    }
+
+                    if path->segments[0].name == "typeid" {
+                        return this.builder.IntegerLiteral(_type->ToString().Hash(), this.context.IntegerType(64, false));
                     }
 
                     return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
@@ -3630,7 +3653,8 @@ class HIRLowerer {
         for i in 0..candidates.Length() {
             let function = candidates[i];
             let parameters = function->_type->Parameters();
-            if values.Length() != parameters.Length() { continue; }
+            let variadic = function->_type->IsVariadic() && values.Length() > parameters.Length();
+            if values.Length() != parameters.Length() && !variadic { continue; }
             let (mut _match, mut score) = (true, 1u64);
 
             for j in 0..parameters.Length() {
@@ -3672,6 +3696,23 @@ class HIRLowerer {
         }
     }
 
+    fn PromoteVariadicArgument(&mut this, value: *HIRExpression, node: *ASTNode) -> *HIRExpression {
+        let coerced = this.Coerce(value);
+        if coerced == null { return null; }
+        let _type = coerced->_type;
+
+        if _type->IsFloat() && (_type as *HIRFloatType)->width < 64 {
+            this.builder.Cast(coerced, this.context.FloatType(64))
+        } else if _type->IsBoolean() || _type->IsCharacter() || (_type->IsInteger() && (_type as *HIRIntegerType)->width < 32) {
+            this.builder.Cast(coerced, this.context.IntegerType(32, true))
+        } else if _type->IsInteger() || _type->IsFloat() || _type->IsEnumeration() || _type->IsFunction() || _type->kind == HIRTypeKind::Pointer {
+            coerced
+        } else {
+            Logger::Log("Type '" + _type->ToString() + "' cannot be passed as a variadic argument.", node, LogSeverity::Error);
+            null
+        }
+    }
+
     fn ValidateCallArguments(&mut this, callee: *HIRExpression, values: &mut Vector<*HIRExpression>, node: *ASTNode) -> bool {
         if !callee->_type->IsFunction() {
             Logger::Log("Callee is not a function.", node, LogSeverity::Error);
@@ -3679,10 +3720,20 @@ class HIRLowerer {
         }
 
         let parameter_types = callee->_type->Parameters();
+        let variadic = callee->_type->IsVariadic();
 
-        if values.Length() != parameter_types.Length() {
-            Logger::Log("Function expects " + String::FromInteger(parameter_types.Length() as u64) + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", node, LogSeverity::Error);
+        if values.Length() != parameter_types.Length() && !(variadic && values.Length() > parameter_types.Length()) {
+            let expected = String::FromInteger(parameter_types.Length() as u64) + (if variadic { " or more" } else { "" });
+            Logger::Log("Function expects " + expected + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", node, LogSeverity::Error);
             return false;
+        }
+
+        for i in parameter_types.Length()..values.Length() {
+            let mut value = this.PromoteVariadicArgument(values[i], node);
+            if value == null { return false; }
+            value = this.LowerCopyOrMoveValue(value);
+            if value == null { return false; }
+            values[i] = value;
         }
 
         for i in 0..parameter_types.Length() {
@@ -5762,7 +5813,7 @@ class HIRLowerer {
 
                 let _return: *HIRType = if function->_return != null { this.LowerType(function->_return) } else { this.context.UnitType() };
                 if _return == null { return null; }
-                this.context.FunctionType(parameters, _return)
+                this.context.FunctionType(parameters, _return, function->var_arg)
             }
         }
     }

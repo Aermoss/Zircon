@@ -127,10 +127,11 @@ class MIRStructureType : MIRType {
 
 class MIRFunctionType : MIRType {
     pub parameters: Vector<*MIRType>,
-    pub _return: *MIRType;
+    pub _return: *MIRType,
+    pub var_arg: bool;
 
-    MIRFunctionType(&mut this, parameters: Vector<*MIRType>, _return: *MIRType) : MIRType(MIRTypeKind::Function) {
-        (this.parameters, this._return) = (parameters, _return);
+    MIRFunctionType(&mut this, parameters: Vector<*MIRType>, _return: *MIRType, var_arg: bool) : MIRType(MIRTypeKind::Function) {
+        (this.parameters, this._return, this.var_arg) = (parameters, _return, var_arg);
     }
 
     pub override fn ToString(&this) -> String {
@@ -139,6 +140,12 @@ class MIRFunctionType : MIRType {
         for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
+        }
+
+        if this.var_arg {
+            if !this.parameters.Empty() {
+                result += ", ";
+            } result += "...";
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {
@@ -1151,8 +1158,8 @@ class MIRContext {
         this.arena.New<MIRStructureType>(fields)
     }
 
-    pub fn FunctionType(&mut this, parameters: Vector<*MIRType>, _return: *MIRType) -> *MIRType {
-        this.arena.New<MIRFunctionType>(parameters, _return)
+    pub fn FunctionType(&mut this, parameters: Vector<*MIRType>, _return: *MIRType, var_arg: bool) -> *MIRType {
+        this.arena.New<MIRFunctionType>(parameters, _return, var_arg)
     }
 }
 
@@ -1377,10 +1384,10 @@ class MIRBuilder {
         type_declaration
     }
 
-    pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage) -> *mut MIRFunctionDeclaration {
+    pub fn BuildFunction(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, linkage: MIRDeclarationLinkage, var_arg: bool) -> *mut MIRFunctionDeclaration {
         let mut parameter_types = Vector<*MIRType>();
         for parameter in parameters { parameter_types.PushBack(parameter->_type); }
-        let _type = this.context->FunctionType(parameter_types, _return);
+        let _type = this.context->FunctionType(parameter_types, _return, var_arg);
         let function = this.context->arena.New<MIRFunctionDeclaration>(name, parameters, _return, _type, linkage);
         this.module->declarations.PushBack(function);
         function

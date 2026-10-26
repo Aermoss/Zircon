@@ -334,7 +334,7 @@ class MIRLowerer {
             }
         }
 
-        this.declarations[function] = this.builder.BuildFunction(name, _parameters, _return, this.LowerLinkage(function->linkage));
+        this.declarations[function] = this.builder.BuildFunction(name, _parameters, _return, this.LowerLinkage(function->linkage), function->_type->IsVariadic());
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
@@ -992,6 +992,19 @@ class MIRLowerer {
         }
     }
 
+    fn StringStatic(&mut this, value: &String) -> *MIRStaticDeclaration {
+        if this.strings.Has(value) {
+            return this.strings[value];
+        }
+
+        let name = "string." + String::FromInteger(this.strings.Length() as u64);
+        let array_type = this.context.ArrayType(this.context.IntegerType(8), value.Length() + 1);
+        let initializer = this.builder.ConstantString(value, array_type);
+        let _static = this.builder.BuildStatic(name, array_type, false, initializer, MIRDeclarationLinkage::Private);
+        this.strings[value] = _static;
+        _static
+    }
+
     fn LowerConstantExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
         if expression->kind == HIRExpressionKind::Literal {
             let literal = expression as *HIRLiteral;
@@ -1000,7 +1013,11 @@ class MIRLowerer {
 
             match literal->kind {
                 HIRLiteralKind::String => {
-                    return this.builder.ConstantString((literal as *HIRStringLiteral)->value, _type);
+                    if _type->kind == MIRTypeKind::Array {
+                        return this.builder.ConstantString((literal as *HIRStringLiteral)->value, _type);
+                    }
+
+                    return this.builder.ReferenceDeclaration(this.StringStatic((literal as *HIRStringLiteral)->value));
                 },
                 HIRLiteralKind::Array if (literal as *HIRArrayLiteral)->repeat => {
                     let value = this.LowerConstantExpression((literal as *HIRArrayLiteral)->elements[0]);
@@ -1059,8 +1076,14 @@ class MIRLowerer {
         this.LowerExpression(expression)
     }
 
+    fn Remember(&mut this, expression: *HIRExpression, place: *MIRValue) {
+        if !expression->shared {
+            this.temporaries[expression] = place;
+        }
+    }
+
     fn LowerPlaceExpression(&mut this, expression: *HIRExpression) -> *MIRValue {
-        if this.temporaries.Has(expression) {
+        if !expression->shared && this.temporaries.Has(expression) {
             return this.temporaries[expression];
         } else {
             match expression->kind {
@@ -1090,7 +1113,7 @@ class MIRLowerer {
             _ => {
                 let alloca = this.builder.BuildAlloca("temporary".ToString(), this.LowerType(expression->_type));
                 this.LowerExpressionTo(expression, alloca);
-                this.temporaries[expression] = alloca;
+                this.Remember(expression, alloca);
                 alloca
             }
         }
@@ -1100,39 +1123,39 @@ class MIRLowerer {
         match expression->kind {
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Array => {
                 this.LowerArrayLiteral(expression as *HIRArrayLiteral, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Tuple => {
                 this.LowerTupleLiteral(expression as *HIRTupleLiteral, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Structure => {
                 this.LowerStructureLiteral(expression as *HIRStructureLiteral, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Literal if (expression as *HIRLiteral)->kind == HIRLiteralKind::Variant => {
                 this.LowerVariantLiteral(expression as *HIRVariantLiteral, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Slice => {
                 this.LowerSliceExpression(expression as *HIRSliceExpression, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Subslice => {
                 this.LowerSubsliceExpression(expression as *HIRSubsliceExpression, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Call => {
                 this.LowerCallExpression(expression as *HIRCallExpression, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Constructor => {
                 this.LowerConstructorExpression(expression as *HIRConstructorExpression, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
             },
             HIRExpressionKind::Block | HIRExpressionKind::If | HIRExpressionKind::While | HIRExpressionKind::Loop | HIRExpressionKind::For | HIRExpressionKind::Match | HIRExpressionKind::Return | HIRExpressionKind::Break | HIRExpressionKind::Continue => {
                 this.LowerControlExpression(expression, destination);
-                this.temporaries[expression] = destination;
+                this.Remember(expression, destination);
                 this.EnsureReachable();
             },
             _ => {
@@ -1194,20 +1217,7 @@ class MIRLowerer {
             HIRLiteralKind::Integer => this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type),
             HIRLiteralKind::Float => this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type),
             HIRLiteralKind::String => {
-                let value = (literal as *HIRStringLiteral)->value;
-                let mut _static: *MIRStaticDeclaration = null;
-
-                if this.strings.Has(value) {
-                    _static = this.strings[value];
-                } else {
-                    let name = "string." + String::FromInteger(this.strings.Length() as u64);
-                    let array_type = this.context.ArrayType(this.context.IntegerType(8), value.Length() + 1);
-                    let initializer = this.builder.ConstantString(value, array_type);
-                    _static = this.builder.BuildStatic(name, array_type, false, initializer, MIRDeclarationLinkage::Private);
-                    this.strings[value] = _static;
-                }
-
-                let reference = this.builder.ReferenceDeclaration(_static);
+                let reference = this.builder.ReferenceDeclaration(this.StringStatic((literal as *HIRStringLiteral)->value));
                 this.builder.BuildCast("string.cast".ToString(), MIRCastKind::Bitcast, reference, _type)
             },
             HIRLiteralKind::Null => this.builder.ConstantNull(_type),
@@ -1344,9 +1354,13 @@ class MIRLowerer {
 
     fn LowerCallExpression(&mut this, call: *HIRCallExpression, destination: *MIRValue) -> *MIRValue {
         let _return = call->callee->_type->Return();
-        let parameters = call->callee->_type->Parameters();
+        let mut parameters = Vector<*HIRType>(call->callee->_type->Parameters());
         let mut callee = this.LowerExpression(call->callee);
         if callee == null { return null; }
+
+        for i in parameters.Length()..call->arguments.Length() {
+            parameters.PushBack(call->arguments[i]->_type);
+        }
 
         let mut arguments = Vector<*MIRValue>();
         if this.IsIndirectAggregate(_return) { arguments.PushBack(destination); }
@@ -1438,7 +1452,7 @@ class MIRLowerer {
         }
 
         if this.runtime_functions.Has(name) { return this.runtime_functions[name]; }
-        let function = this.builder.BuildFunction(name, parameters, _return, MIRDeclarationLinkage::External);
+        let function = this.builder.BuildFunction(name, parameters, _return, MIRDeclarationLinkage::External, false);
         this.runtime_functions[name] = function;
         function
     }
@@ -2353,7 +2367,7 @@ class MIRLowerer {
                 parameters.PushBack(lowered_parameter);
             }
 
-            this.context.FunctionType(parameters, _return)
+            this.context.FunctionType(parameters, _return, _type->IsVariadic())
         } else {
             null
         }

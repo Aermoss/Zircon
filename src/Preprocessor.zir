@@ -145,7 +145,7 @@ class Preprocessor {
                 }
             }
 
-            let mut found = false;
+            let (mut found, mut missing_entry) = (false, false);
 
             for include_path in this.include_paths {
                 let mut path = JoinPath(include_path, token.value);
@@ -158,8 +158,8 @@ class Preprocessor {
                     path = JoinPath(path, String("Entry.zir"));
 
                     if !PathExists(path) {
-                        Logger::Log("Module '" + token.value + "' entry point not found.", token, LogSeverity::Error);
-                        return;
+                        missing_entry = true;
+                        continue;
                     }
                 }
 
@@ -197,7 +197,7 @@ class Preprocessor {
             }
 
             if !found {
-                Logger::Log("Module '" + token.value + "' not found.", token, LogSeverity::Error);
+                Logger::Log("Module '" + token.value + (if missing_entry { "' entry point not found." } else { "' not found." }), token, LogSeverity::Error);
                 return;
             }
 

@@ -194,7 +194,8 @@ class LLVMLowerer {
 
         let _return = this.LowerType(function->_return);
         if _return == null { return; }
-        let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, 0));
+        let var_arg = (function->_type as *MIRFunctionType)->var_arg as i32;
+        let value = LLVMAddFunction(this.module, function->name.Data(), LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, var_arg));
         this.declarations[function] = value;
 
         for parameter in function->parameters {
@@ -734,7 +735,7 @@ class LLVMLowerer {
 
         let _return = this.LowerType(function->_return);
         if _return == null { return null; }
-        LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, 0)
+        LLVMFunctionType(_return, parameters.Data(), parameters.Length() as u32, function->var_arg as i32)
     }
 
     fn LowerType(&mut this, _type: *MIRType) -> LLVMTypeRef {

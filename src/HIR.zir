@@ -540,6 +540,10 @@ class HIRType {
         (this as *HIRFunctionType)->parameters
     }
 
+    pub fn IsVariadic(&this) -> bool {
+        this.IsFunction() && (this as *HIRFunctionType)->var_arg
+    }
+
     pub fn Return(&this) -> &HIRType {
         if !this.IsFunction() {
             Logger::Log("HIRType", "Not a function!", LogSeverity::Fatal);
@@ -693,7 +697,7 @@ class HIRType {
         } else if this.IsFunction() && other.IsFunction() {
             let (left, right) = (this as *HIRFunctionType, other as *HIRFunctionType);
 
-            if left->parameters.Length() != right->parameters.Length() {
+            if left->parameters.Length() != right->parameters.Length() || left->var_arg != right->var_arg {
                 return false;
             }
 
@@ -886,10 +890,11 @@ class HIRTupleType : HIRType {
 
 class HIRFunctionType : HIRType {
     pub parameters: Vector<*HIRType>,
-    pub _return: *HIRType;
+    pub _return: *HIRType,
+    pub var_arg: bool;
 
-    HIRFunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) : HIRType(HIRTypeKind::Function) {
-        (this.parameters, this._return) = (parameters, _return);
+    HIRFunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType, var_arg: bool) : HIRType(HIRTypeKind::Function) {
+        (this.parameters, this._return, this.var_arg) = (parameters, _return, var_arg);
     }
 
     pub override fn ToString(&this) -> String {
@@ -898,6 +903,11 @@ class HIRFunctionType : HIRType {
         for i in 0..this.parameters.Length() {
             if i != 0 { result += ", "; }
             result += this.parameters[i]->ToString();
+        }
+
+        if this.var_arg {
+            if !this.parameters.Empty() { result += ", "; }
+            result += "...";
         } result += ')';
 
         if this._return->kind != HIRTypeKind::Void {
@@ -1217,7 +1227,8 @@ class HIRExpression {
     pub kind: HIRExpressionKind,
     pub _type: *HIRType,
     pub category: HIRExpressionCategory = ::HIRExpressionCategory::Value,
-    pub mutable: bool = true;
+    pub mutable: bool = true,
+    pub shared: bool = false;
 
     HIRExpression(&mut this, kind: HIRExpressionKind, _type: *HIRType) {
         (this.kind, this._type) = (kind, _type);
@@ -3541,8 +3552,8 @@ class HIRContext {
         this.TupleType(Vector<*HIRType>())
     }
 
-    pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType) -> *mut HIRFunctionType {
-        this.arena.New<HIRFunctionType>(parameters, _return)
+    pub fn FunctionType(&mut this, parameters: Vector<*HIRType>, _return: *HIRType, var_arg: bool) -> *mut HIRFunctionType {
+        this.arena.New<HIRFunctionType>(parameters, _return, var_arg)
     }
 
     pub fn ClassType(&mut this, declaration: *HIRClassDeclaration) -> *mut HIRClassType {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/std", "std/str", "std/res" : *]
+#[include "std/io", "std/std", "std/str", "std/vec", "std/res" : *]
 
 enum IOError {
     NotFound, PermissionDenied, AlreadyExists, InvalidInput, Other(i32);
@@ -130,6 +130,32 @@ fn _ReadFile(path: &String) -> Result<String, IOError> {
     delete[] buffer;
     CloseHandle(handle);
     Result<String, IOError>::Ok(content)
+}
+
+fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
+    let handle = CreateFileA(path.Data(), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
+    if handle == INVALID_HANDLE_VALUE { return Result<Vector<u8>, IOError>::Err(_LastError()); }
+    let size = GetFileSize(handle, null);
+
+    if size == INVALID_FILE_SIZE {
+        let error = _LastError();
+        CloseHandle(handle);
+        return Result<Vector<u8>, IOError>::Err(error);
+    }
+
+    let mut bytes = Vector<u8>();
+    bytes.Resize(size as usize);
+    let mut count: u32 = 0;
+
+    if size != 0 && ReadFile(handle, bytes.Data() as *mut i8, size, &mut count, null) == 0 {
+        let error = _LastError();
+        CloseHandle(handle);
+        return Result<Vector<u8>, IOError>::Err(error);
+    }
+
+    bytes.Resize(count as usize);
+    CloseHandle(handle);
+    Result<Vector<u8>, IOError>::Ok(bytes)
 }
 
 fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
@@ -412,6 +438,40 @@ fn _ReadFile(path: &String) -> Result<String, IOError> {
     delete[] buffer;
     close(fd);
     Result<String, IOError>::Ok(content)
+}
+
+fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
+    let fd = open(path.Data(), O_RDONLY, 0);
+    if fd < 0 { return Result<Vector<u8>, IOError>::Err(_LastError(fd as i64)); }
+    let size = lseek(fd, 0, SEEK_END);
+
+    if size < 0 {
+        let error = _LastError(size);
+        close(fd);
+        return Result<Vector<u8>, IOError>::Err(error);
+    }
+
+    lseek(fd, 0, SEEK_SET);
+    let mut bytes = Vector<u8>();
+    bytes.Resize(size as usize);
+    let mut length: usize = 0;
+
+    while length < size as usize {
+        let count = read(fd, (bytes.Data() as *mut i8) + length, size as usize - length);
+
+        if count < 0 {
+            let error = _LastError(count as i64);
+            close(fd);
+            return Result<Vector<u8>, IOError>::Err(error);
+        }
+
+        if count == 0 { break; }
+        length += count as usize;
+    }
+
+    bytes.Resize(length);
+    close(fd);
+    Result<Vector<u8>, IOError>::Ok(bytes)
 }
 
 fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {

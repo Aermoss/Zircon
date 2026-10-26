@@ -58,6 +58,187 @@ extern "C" {
     } #[endif]
 }
 
+fn _BigMultiplyAdd(value: &mut Vector<u32>, multiplier: u32, addend: u32) {
+    let mut carry = addend as u64;
+
+    for i in 0..value.Length() {
+        let product = value[i] as u64 * multiplier as u64 + carry;
+        value[i] = (product & 0xFFFFFFFF) as u32;
+        carry = product >> 32;
+    }
+
+    if carry != 0 { value.PushBack(carry as u32); }
+}
+
+fn _BigBitLength(value: &Vector<u32>) -> i64 {
+    let mut limb = value.Length();
+    while limb > 0 && value[limb - 1] == 0 { limb -= 1; }
+    if limb == 0 { return 0; }
+    let (mut top, mut bits) = (value[limb - 1], 0i64);
+
+    while top != 0 {
+        top >>= 1;
+        bits += 1;
+    }
+
+    (limb as i64 - 1) * 32 + bits
+}
+
+fn _BigBit(value: &Vector<u32>, index: i64) -> bool {
+    let limb = (index / 32) as usize;
+    index >= 0 && limb < value.Length() && ((value[limb] >> (index % 32) as u32) & 1) != 0
+}
+
+fn _BigShiftLeft(value: &Vector<u32>, bits: i64) -> Vector<u32> {
+    let mut result = Vector<u32>();
+    let offset = (bits % 32) as u32;
+    let mut carry = 0u32;
+
+    for i in 0..(bits / 32) {
+        result.PushBack(0);
+    }
+
+    for limb in value {
+        if offset == 0 {
+            result.PushBack(limb);
+        } else {
+            result.PushBack((limb << offset) | carry);
+            carry = limb >> (32 - offset);
+        }
+    }
+
+    if carry != 0 { result.PushBack(carry); }
+    result
+}
+
+fn _BigCompare(a: &Vector<u32>, b: &Vector<u32>) -> i32 {
+    let mut i = if a.Length() > b.Length() { a.Length() } else { b.Length() };
+
+    while i > 0 {
+        i -= 1;
+        let x = if i < a.Length() { a[i] } else { 0 };
+        let y = if i < b.Length() { b[i] } else { 0 };
+        if x != y { return if x > y { 1 } else { -1 }; }
+    }
+
+    0
+}
+
+fn _BigSubtract(a: &mut Vector<u32>, b: &Vector<u32>) {
+    let mut borrow = 0i64;
+
+    for i in 0..a.Length() {
+        let mut difference = a[i] as i64 - borrow - if i < b.Length() { b[i] as i64 } else { 0 };
+        borrow = 0;
+
+        if difference < 0 {
+            difference += 4294967296;
+            borrow = 1;
+        }
+
+        a[i] = difference as u32;
+    }
+}
+
+fn _BigToDouble(value: &Vector<u32>, exponent: i64, sticky: bool) -> f64 {
+    let length = _BigBitLength(value);
+    if length == 0 { return 0.0; }
+    let mut leading = length - 1 + exponent;
+    if leading > 1023 { return 1.0 / 0.0; }
+    let precision = if leading >= -1022 { 53 } else { leading + 1075 };
+    if precision < 0 { return 0.0; }
+
+    if precision == 0 {
+        let mut bits = 1u64;
+
+        if !sticky {
+            let mut half = true;
+
+            for i in 0..(length - 1) {
+                if _BigBit(value, i) {
+                    half = false;
+                    break;
+                }
+            }
+
+            if half { bits = 0; }
+        }
+
+        return *((&mut bits as *mut u64) as *mut f64);
+    }
+
+    let shift = length - precision;
+    let mut mantissa = 0u64;
+
+    for i in 0..precision {
+        if _BigBit(value, shift + precision - 1 - i) { mantissa |= 1u64 << (precision - 1 - i) as u64; }
+    }
+
+    if shift > 0 && _BigBit(value, shift - 1) {
+        let mut rest = sticky;
+
+        for i in 0..(shift - 1) {
+            if _BigBit(value, i) {
+                rest = true;
+                break;
+            }
+        }
+
+        if rest || (mantissa & 1) != 0 { mantissa += 1; }
+    }
+
+    let mut bits = mantissa;
+
+    if precision == 53 {
+        if mantissa == 1u64 << 53 {
+            mantissa >>= 1;
+            leading += 1;
+            if leading > 1023 { return 1.0 / 0.0; }
+        }
+
+        bits = ((leading + 1023) as u64 << 52) | (mantissa & 0xFFFFFFFFFFFFF);
+    }
+
+    *((&mut bits as *mut u64) as *mut f64)
+}
+
+fn _DecimalToDouble(digits: &Vector<u32>, significant: i64, exponent: i64) -> f64 {
+    if _BigBitLength(digits) == 0 { return 0.0; }
+    if significant - 1 + exponent > 310 { return 1.0 / 0.0; }
+    if significant + exponent < -330 { return 0.0; }
+
+    if exponent >= 0 {
+        let mut value = Vector<u32>(digits);
+        for i in 0..exponent { _BigMultiplyAdd(&mut value, 10, 0); }
+        return _BigToDouble(value, 0, false);
+    }
+
+    let mut divisor = Vector<u32>();
+    divisor.PushBack(1);
+    for i in 0..(-exponent) { _BigMultiplyAdd(&mut divisor, 10, 0); }
+    let scale = _BigBitLength(divisor) - _BigBitLength(digits) + 55;
+    let mut remainder = _BigShiftLeft(digits, if scale > 0 { scale } else { 0 });
+    if scale < 0 { divisor = _BigShiftLeft(divisor, -scale); }
+    let mut quotient = 0u64;
+    let mut bit = 57i64;
+
+    while bit >= 0 {
+        let shifted = _BigShiftLeft(divisor, bit);
+
+        if _BigCompare(remainder, shifted) >= 0 {
+            _BigSubtract(&mut remainder, shifted);
+            quotient |= 1u64 << bit as u64;
+        }
+
+        bit -= 1;
+    }
+
+    let mut result = Vector<u32>();
+    result.PushBack((quotient & 0xFFFFFFFF) as u32);
+    result.PushBack((quotient >> 32) as u32);
+    _BigToDouble(result, -scale, _BigBitLength(remainder) != 0)
+}
+
 class String {
     data: *mut i8 = null,
     length: usize = 0;
@@ -337,7 +518,8 @@ class String {
         if this == "nan" { return Option<f64>::Some(0.0 / 0.0); }
         if this == "inf" || this == "+inf" { return Option<f64>::Some(1.0 / 0.0); }
         if this == "-inf" { return Option<f64>::Some(-1.0 / 0.0); }
-        let (mut value, mut negative, mut digits) = (0.0, false, 0);
+        let (mut mantissa, mut negative, mut digits) = (Vector<u32>(), false, 0);
+        let (mut significant, mut fraction_digits, mut exponent) = (0i64, 0i64, 0i64);
         let mut i: usize = 0;
 
         if this.StartsWith('-') {
@@ -348,19 +530,18 @@ class String {
         }
 
         while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
-            value *= 10.0;
-            value += (this.data[i] - '0') as f64;
+            if significant > 0 || this.data[i] != '0' { significant += 1; }
+            _BigMultiplyAdd(&mut mantissa, 10, (this.data[i] - '0') as u32);
             (i, digits) = (i + 1, digits + 1);
         }
 
         if i < this.length && this.data[i] == '.' {
             i += 1;
-            let mut divisor = 10.0;
 
             while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
-                value += (this.data[i] - '0') as f64 / divisor;
-                divisor *= 10.0;
-                (i, digits) = (i + 1, digits + 1);
+                if significant > 0 || this.data[i] != '0' { significant += 1; }
+                _BigMultiplyAdd(&mut mantissa, 10, (this.data[i] - '0') as u32);
+                (i, digits, fraction_digits) = (i + 1, digits + 1, fraction_digits + 1);
             }
         }
 
@@ -370,22 +551,24 @@ class String {
 
         if i < this.length && (this.data[i] == 'e' || this.data[i] == 'E') {
             i += 1;
-            let mut negative = false;
+            let mut negative_exponent = false;
 
             if i < this.length {
                 if this.data[i] == '-' {
-                    negative = true;
+                    negative_exponent = true;
                     i += 1;
                 } else if this.data[i] == '+' {
                     i += 1;
                 }
             }
 
-            let (mut exponent, mut exponent_digits) = (0i64, 0);
+            let mut exponent_digits = 0;
 
             while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
-                exponent *= 10;
-                exponent += (this.data[i] - '0') as i64;
+                if exponent < 100000 {
+                    exponent = exponent * 10 + (this.data[i] - '0') as i64;
+                }
+
                 (i, exponent_digits) = (i + 1, exponent_digits + 1);
             }
 
@@ -393,16 +576,13 @@ class String {
                 return Option<f64>::None;
             }
 
-            while exponent > 0 {
-                if negative {
-                    value /= 10.0;
-                } else {
-                    value *= 10.0;
-                } exponent -= 1;
+            if negative_exponent {
+                exponent = -exponent;
             }
         }
 
         if i != this.length { return Option<f64>::None; }
+        let value = _DecimalToDouble(mantissa, significant, exponent - fraction_digits);
         Option<f64>::Some(if negative { -value } else { value })
     }
 
