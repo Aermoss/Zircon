@@ -82,7 +82,7 @@ enum aiShadingMode: i32 {
     aiShadingMode_Minnaert = 0x7,
     aiShadingMode_CookTorrance = 0x8,
     aiShadingMode_NoShading = 0x9,
-    aiShadingMode_Unlit = 9,
+    aiShadingMode_Unlit = aiShadingMode_NoShading,
     aiShadingMode_Fresnel = 0xa,
     aiShadingMode_PBR_BRDF = 0xb,
     _aiShadingMode_Force32Bit

@@ -275,7 +275,7 @@ enum JPH_AllowedDOFs: i32 {
     JPH_AllowedDOFs_RotationX = 0b001000,
     JPH_AllowedDOFs_RotationY = 0b010000,
     JPH_AllowedDOFs_RotationZ = 0b100000,
-    JPH_AllowedDOFs_Plane2D = 35,
+    JPH_AllowedDOFs_Plane2D = JPH_AllowedDOFs_TranslationX | JPH_AllowedDOFs_TranslationY | JPH_AllowedDOFs_RotationZ,
     _JPH_AllowedDOFs_Count,
     _JPH_AllowedDOFs_Force32 = 0x7FFFFFFF
 }
@@ -342,7 +342,7 @@ enum JPH_SixDOFConstraintAxis: i32 {
     JPH_SixDOFConstraintAxis_RotationY,
     JPH_SixDOFConstraintAxis_RotationZ,
     _JPH_SixDOFConstraintAxis_Num,
-    _JPH_SixDOFConstraintAxis_NumTranslation = 3,
+    _JPH_SixDOFConstraintAxis_NumTranslation = JPH_SixDOFConstraintAxis_TranslationZ as i32 + 1,
     _JPH_SixDOFConstraintAxis_Force32 = 0x7FFFFFFF
 }
 

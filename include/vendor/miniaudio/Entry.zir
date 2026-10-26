@@ -101,8 +101,8 @@ enum _ma_channel_position: i32 {
     MA_CHANNEL_AUX_30 = 50,
     MA_CHANNEL_AUX_31 = 51,
     MA_CHANNEL_POSITION_COUNT,
-    MA_CHANNEL_LEFT = 2,
-    MA_CHANNEL_RIGHT = 3
+    MA_CHANNEL_LEFT = MA_CHANNEL_FRONT_LEFT,
+    MA_CHANNEL_RIGHT = MA_CHANNEL_FRONT_RIGHT
 }
 
 enum ma_result: i32 {
@@ -219,8 +219,8 @@ enum ma_standard_sample_rate: i32 {
     ma_standard_sample_rate_8000 = 8000,
     ma_standard_sample_rate_352800 = 352800,
     ma_standard_sample_rate_384000 = 384000,
-    ma_standard_sample_rate_min = 8000,
-    ma_standard_sample_rate_max = 384000,
+    ma_standard_sample_rate_min = ma_standard_sample_rate_8000,
+    ma_standard_sample_rate_max = ma_standard_sample_rate_384000,
     ma_standard_sample_rate_count = 14
 }
 
@@ -228,7 +228,7 @@ enum ma_channel_mix_mode: i32 {
     ma_channel_mix_mode_rectangular = 0,
     ma_channel_mix_mode_simple,
     ma_channel_mix_mode_custom_weights,
-    ma_channel_mix_mode_default = 0
+    ma_channel_mix_mode_default = ma_channel_mix_mode_rectangular
 }
 
 enum ma_standard_channel_map: i32 {
@@ -239,8 +239,8 @@ enum ma_standard_channel_map: i32 {
     ma_standard_channel_map_vorbis,
     ma_standard_channel_map_sound4,
     ma_standard_channel_map_sndio,
-    ma_standard_channel_map_webaudio = 3,
-    ma_standard_channel_map_default = 0
+    ma_standard_channel_map_webaudio = ma_standard_channel_map_flac,
+    ma_standard_channel_map_default = ma_standard_channel_map_microsoft
 }
 
 enum ma_performance_profile: i32 {
@@ -772,7 +772,7 @@ enum ma_mono_expansion_mode: i32 {
     ma_mono_expansion_mode_duplicate = 0,
     ma_mono_expansion_mode_average,
     ma_mono_expansion_mode_stereo_only,
-    ma_mono_expansion_mode_default = 0
+    ma_mono_expansion_mode_default = ma_mono_expansion_mode_duplicate
 }
 
 struct ma_channel_converter_config {
@@ -1126,7 +1126,7 @@ type ma_stop_proc = fn(*mut ma_device);
 enum ma_device_type: i32 {
     ma_device_type_playback = 1,
     ma_device_type_capture = 2,
-    ma_device_type_duplex = 3,
+    ma_device_type_duplex = ma_device_type_playback | ma_device_type_capture,
     ma_device_type_loopback = 4
 }
 

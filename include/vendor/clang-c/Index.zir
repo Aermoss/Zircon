@@ -17,7 +17,7 @@ type CXClientData = *mut void;
 struct CXUnsavedFile {
     pub Filename: *i8,
     pub Contents: *i8,
-    pub Length: u64
+    pub Length: u32
 }
 
 enum CXAvailabilityKind: i32 {
@@ -63,10 +63,7 @@ struct CXIndexOptions {
     pub Size: u32,
     pub ThreadBackgroundPriorityForIndexing: u8,
     pub ThreadBackgroundPriorityForEditing: u8,
-    pub ExcludeDeclarationsFromPCH: u32,
-    pub DisplayDiagnostics: u32,
-    pub StorePreamblesInMemory: u32,
-    pub _0: u32,
+    pub _bitfield0: u32,
     pub PreambleStoragePath: *i8,
     pub InvocationEmissionPath: *i8
 }
@@ -129,7 +126,7 @@ enum CXTUResourceUsageKind: i32 {
 
 struct CXTUResourceUsageEntry {
     pub kind: CXTUResourceUsageKind,
-    pub amount: u64
+    pub amount: u32
 }
 
 struct CXTUResourceUsage {

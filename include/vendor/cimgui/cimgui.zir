@@ -121,9 +121,9 @@ enum ImGuiWindowFlags_: i32 {
     ImGuiWindowFlags_NoNavFocus = 1 << 17,
     ImGuiWindowFlags_UnsavedDocument = 1 << 18,
     ImGuiWindowFlags_NoDocking = 1 << 19,
-    ImGuiWindowFlags_NoNav = 196608,
-    ImGuiWindowFlags_NoDecoration = 43,
-    ImGuiWindowFlags_NoInputs = 197120,
+    ImGuiWindowFlags_NoNav = ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus,
+    ImGuiWindowFlags_NoDecoration = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse,
+    ImGuiWindowFlags_NoInputs = ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus,
     ImGuiWindowFlags_DockNodeHost = 1 << 23,
     ImGuiWindowFlags_ChildWindow = 1 << 24,
     ImGuiWindowFlags_Tooltip = 1 << 25,
@@ -156,7 +156,7 @@ enum ImGuiItemFlags_: i32 {
     ImGuiItemFlags_Disabled = 1 << 6,
     ImGuiItemFlags_LiveEditOnInputText = 1 << 7,
     ImGuiItemFlags_LiveEditOnInputScalar = 1 << 8,
-    ImGuiItemFlags_LiveEditOnInput = 384,
+    ImGuiItemFlags_LiveEditOnInput = ImGuiItemFlags_LiveEditOnInputText | ImGuiItemFlags_LiveEditOnInputScalar,
     ImGuiItemFlags_MixedValue = 1 << 9
 }
 
@@ -208,7 +208,7 @@ enum ImGuiTreeNodeFlags_: i32 {
     ImGuiTreeNodeFlags_SpanAllColumns = 1 << 14,
     ImGuiTreeNodeFlags_LabelSpanAllColumns = 1 << 15,
     ImGuiTreeNodeFlags_NavLeftJumpsToParent = 1 << 17,
-    ImGuiTreeNodeFlags_CollapsingHeader = 26,
+    ImGuiTreeNodeFlags_CollapsingHeader = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_NoAutoOpenOnLog,
     ImGuiTreeNodeFlags_DrawLinesNone = 1 << 18,
     ImGuiTreeNodeFlags_DrawLinesFull = 1 << 19,
     ImGuiTreeNodeFlags_DrawLinesToNodes = 1 << 20
@@ -224,7 +224,7 @@ enum ImGuiPopupFlags_: i32 {
     ImGuiPopupFlags_NoOpenOverItems = 1 << 8,
     ImGuiPopupFlags_AnyPopupId = 1 << 10,
     ImGuiPopupFlags_AnyPopupLevel = 1 << 11,
-    ImGuiPopupFlags_AnyPopup = 3072,
+    ImGuiPopupFlags_AnyPopup = ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel,
     ImGuiPopupFlags_MouseButtonShift_ = 2,
     ImGuiPopupFlags_MouseButtonMask_ = 0x0C,
     ImGuiPopupFlags_InvalidMask_ = 0x03
@@ -251,7 +251,7 @@ enum ImGuiComboFlags_: i32 {
     ImGuiComboFlags_NoArrowButton = 1 << 5,
     ImGuiComboFlags_NoPreview = 1 << 6,
     ImGuiComboFlags_WidthFitPreview = 1 << 7,
-    ImGuiComboFlags_HeightMask_ = 30
+    ImGuiComboFlags_HeightMask_ = ImGuiComboFlags_HeightSmall | ImGuiComboFlags_HeightRegular | ImGuiComboFlags_HeightLarge | ImGuiComboFlags_HeightLargest
 }
 
 enum ImGuiTabBarFlags_: i32 {
@@ -266,8 +266,8 @@ enum ImGuiTabBarFlags_: i32 {
     ImGuiTabBarFlags_FittingPolicyMixed = 1 << 7,
     ImGuiTabBarFlags_FittingPolicyShrink = 1 << 8,
     ImGuiTabBarFlags_FittingPolicyScroll = 1 << 9,
-    ImGuiTabBarFlags_FittingPolicyMask_ = 896,
-    ImGuiTabBarFlags_FittingPolicyDefault_ = 128
+    ImGuiTabBarFlags_FittingPolicyMask_ = ImGuiTabBarFlags_FittingPolicyMixed | ImGuiTabBarFlags_FittingPolicyShrink | ImGuiTabBarFlags_FittingPolicyScroll,
+    ImGuiTabBarFlags_FittingPolicyDefault_ = ImGuiTabBarFlags_FittingPolicyMixed
 }
 
 enum ImGuiTabItemFlags_: i32 {
@@ -290,7 +290,7 @@ enum ImGuiFocusedFlags_: i32 {
     ImGuiFocusedFlags_AnyWindow = 1 << 2,
     ImGuiFocusedFlags_NoPopupHierarchy = 1 << 3,
     ImGuiFocusedFlags_DockHierarchy = 1 << 4,
-    ImGuiFocusedFlags_RootAndChildWindows = 3
+    ImGuiFocusedFlags_RootAndChildWindows = ImGuiFocusedFlags_RootWindow | ImGuiFocusedFlags_ChildWindows
 }
 
 enum ImGuiHoveredFlags_: i32 {
@@ -306,9 +306,9 @@ enum ImGuiHoveredFlags_: i32 {
     ImGuiHoveredFlags_AllowWhenOverlappedByWindow = 1 << 9,
     ImGuiHoveredFlags_AllowWhenDisabled = 1 << 10,
     ImGuiHoveredFlags_NoNavOverride = 1 << 11,
-    ImGuiHoveredFlags_AllowWhenOverlapped = 768,
-    ImGuiHoveredFlags_RectOnly = 928,
-    ImGuiHoveredFlags_RootAndChildWindows = 3,
+    ImGuiHoveredFlags_AllowWhenOverlapped = ImGuiHoveredFlags_AllowWhenOverlappedByItem | ImGuiHoveredFlags_AllowWhenOverlappedByWindow,
+    ImGuiHoveredFlags_RectOnly = ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AllowWhenOverlapped,
+    ImGuiHoveredFlags_RootAndChildWindows = ImGuiHoveredFlags_RootWindow | ImGuiHoveredFlags_ChildWindows,
     ImGuiHoveredFlags_ForTooltip = 1 << 12,
     ImGuiHoveredFlags_Stationary = 1 << 13,
     ImGuiHoveredFlags_DelayNone = 1 << 14,
@@ -342,7 +342,7 @@ enum ImGuiDragDropFlags_: i32 {
     ImGuiDragDropFlags_AcceptNoDrawDefaultRect = 1 << 11,
     ImGuiDragDropFlags_AcceptNoPreviewTooltip = 1 << 12,
     ImGuiDragDropFlags_AcceptDrawAsHovered = 1 << 13,
-    ImGuiDragDropFlags_AcceptPeekOnly = 3072
+    ImGuiDragDropFlags_AcceptPeekOnly = ImGuiDragDropFlags_AcceptBeforeDelivery | ImGuiDragDropFlags_AcceptNoDrawDefaultRect
 }
 
 enum ImGuiDataType_: i32 {
@@ -535,7 +535,7 @@ enum ImGuiKey: i32 {
     ImGuiKey_ReservedForModAlt = 665,
     ImGuiKey_ReservedForModSuper = 666,
     ImGuiKey_NamedKey_END = 667,
-    ImGuiKey_NamedKey_COUNT = 155,
+    ImGuiKey_NamedKey_COUNT = ImGuiKey_NamedKey_END as i32 - ImGuiKey_NamedKey_BEGIN as i32,
     ImGuiMod_None = 0,
     ImGuiMod_Ctrl = 1 << 12,
     ImGuiMod_Shift = 1 << 13,
@@ -705,7 +705,7 @@ enum ImGuiButtonFlags_: i32 {
     ImGuiButtonFlags_MouseButtonLeft = 1 << 0,
     ImGuiButtonFlags_MouseButtonRight = 1 << 1,
     ImGuiButtonFlags_MouseButtonMiddle = 1 << 2,
-    ImGuiButtonFlags_MouseButtonMask_ = 7,
+    ImGuiButtonFlags_MouseButtonMask_ = ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle,
     ImGuiButtonFlags_EnableNav = 1 << 3,
     ImGuiButtonFlags_AllowOverlap = 1 << 12
 }
@@ -738,12 +738,12 @@ enum ImGuiColorEditFlags_: i32 {
     ImGuiColorEditFlags_PickerNoRotate = 1 << 27,
     ImGuiColorEditFlags_InputRGB = 1 << 28,
     ImGuiColorEditFlags_InputHSV = 1 << 29,
-    ImGuiColorEditFlags_DefaultOptions_ = 311427072,
-    ImGuiColorEditFlags_AlphaMask_ = 28674,
-    ImGuiColorEditFlags_DisplayMask_ = 7340032,
-    ImGuiColorEditFlags_DataTypeMask_ = 25165824,
-    ImGuiColorEditFlags_PickerMask_ = 100663296,
-    ImGuiColorEditFlags_InputMask_ = 805306368
+    ImGuiColorEditFlags_DefaultOptions_ = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_PickerHueBar,
+    ImGuiColorEditFlags_AlphaMask_ = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_AlphaOpaque | ImGuiColorEditFlags_AlphaNoBg | ImGuiColorEditFlags_AlphaPreviewHalf,
+    ImGuiColorEditFlags_DisplayMask_ = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_DisplayHex,
+    ImGuiColorEditFlags_DataTypeMask_ = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_Float,
+    ImGuiColorEditFlags_PickerMask_ = ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_PickerHueBar,
+    ImGuiColorEditFlags_InputMask_ = ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_InputHSV
 }
 
 enum ImGuiSliderFlags_: i32 {
@@ -756,7 +756,7 @@ enum ImGuiSliderFlags_: i32 {
     ImGuiSliderFlags_ClampZeroRange = 1 << 10,
     ImGuiSliderFlags_NoSpeedTweaks = 1 << 11,
     ImGuiSliderFlags_ColorMarkers = 1 << 12,
-    ImGuiSliderFlags_AlwaysClamp = 1536,
+    ImGuiSliderFlags_AlwaysClamp = ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_ClampZeroRange,
     ImGuiSliderFlags_InvalidMask_ = 0x7000000F
 }
 
@@ -811,11 +811,11 @@ enum ImGuiTableFlags_: i32 {
     ImGuiTableFlags_BordersOuterH = 1 << 8,
     ImGuiTableFlags_BordersInnerV = 1 << 9,
     ImGuiTableFlags_BordersOuterV = 1 << 10,
-    ImGuiTableFlags_BordersH = 384,
-    ImGuiTableFlags_BordersV = 1536,
-    ImGuiTableFlags_BordersInner = 640,
-    ImGuiTableFlags_BordersOuter = 1280,
-    ImGuiTableFlags_Borders = 1920,
+    ImGuiTableFlags_BordersH = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_BordersOuterH,
+    ImGuiTableFlags_BordersV = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersOuterV,
+    ImGuiTableFlags_BordersInner = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersInnerH,
+    ImGuiTableFlags_BordersOuter = ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_BordersOuterH,
+    ImGuiTableFlags_Borders = ImGuiTableFlags_BordersInner | ImGuiTableFlags_BordersOuter,
     ImGuiTableFlags_NoBordersInBody = 1 << 11,
     ImGuiTableFlags_NoBordersInBodyUntilResize = 1 << 12,
     ImGuiTableFlags_SizingFixedFit = 1 << 13,
@@ -835,7 +835,7 @@ enum ImGuiTableFlags_: i32 {
     ImGuiTableFlags_SortMulti = 1 << 26,
     ImGuiTableFlags_SortTristate = 1 << 27,
     ImGuiTableFlags_HighlightHoveredColumn = 1 << 28,
-    ImGuiTableFlags_SizingMask_ = 57344
+    ImGuiTableFlags_SizingMask_ = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_SizingFixedSame | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_SizingStretchSame
 }
 
 enum ImGuiTableColumnFlags_: i32 {
@@ -863,9 +863,9 @@ enum ImGuiTableColumnFlags_: i32 {
     ImGuiTableColumnFlags_IsVisible = 1 << 25,
     ImGuiTableColumnFlags_IsSorted = 1 << 26,
     ImGuiTableColumnFlags_IsHovered = 1 << 27,
-    ImGuiTableColumnFlags_WidthMask_ = 24,
-    ImGuiTableColumnFlags_IndentMask_ = 196608,
-    ImGuiTableColumnFlags_StatusMask_ = 251658240,
+    ImGuiTableColumnFlags_WidthMask_ = ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_WidthFixed,
+    ImGuiTableColumnFlags_IndentMask_ = ImGuiTableColumnFlags_IndentEnable | ImGuiTableColumnFlags_IndentDisable,
+    ImGuiTableColumnFlags_StatusMask_ = ImGuiTableColumnFlags_IsEnabled | ImGuiTableColumnFlags_IsVisible | ImGuiTableColumnFlags_IsSorted | ImGuiTableColumnFlags_IsHovered,
     ImGuiTableColumnFlags_NoDirectResize_ = 1 << 30
 }
 
@@ -1244,7 +1244,7 @@ enum ImGuiMultiSelectFlags_: i32 {
     ImGuiMultiSelectFlags_SelectOnClickRelease = 1 << 15,
     ImGuiMultiSelectFlags_NavWrapX = 1 << 16,
     ImGuiMultiSelectFlags_NoSelectOnRightClick = 1 << 17,
-    ImGuiMultiSelectFlags_SelectOnMask_ = 57344,
+    ImGuiMultiSelectFlags_SelectOnMask_ = ImGuiMultiSelectFlags_SelectOnAuto | ImGuiMultiSelectFlags_SelectOnClickAlways | ImGuiMultiSelectFlags_SelectOnClickRelease,
     ImGuiMultiSelectFlags_CheckboxMode_ = 1 << 20
 }
 
@@ -1354,11 +1354,11 @@ enum ImDrawFlags_: i32 {
     ImDrawFlags_RoundBottomLeft = 1 << 6,
     ImDrawFlags_RoundBottomRight = 1 << 7,
     ImDrawFlags_RoundNone = 1 << 8,
-    ImDrawFlags_RoundAll = 240,
-    ImDrawFlags_RoundTop = 48,
-    ImDrawFlags_RoundBottom = 192,
-    ImDrawFlags_RoundLeft = 80,
-    ImDrawFlags_RoundRight = 160,
+    ImDrawFlags_RoundAll = ImDrawFlags_RoundTopLeft | ImDrawFlags_RoundTopRight | ImDrawFlags_RoundBottomLeft | ImDrawFlags_RoundBottomRight,
+    ImDrawFlags_RoundTop = ImDrawFlags_RoundTopLeft | ImDrawFlags_RoundTopRight,
+    ImDrawFlags_RoundBottom = ImDrawFlags_RoundBottomLeft | ImDrawFlags_RoundBottomRight,
+    ImDrawFlags_RoundLeft = ImDrawFlags_RoundBottomLeft | ImDrawFlags_RoundTopLeft,
+    ImDrawFlags_RoundRight = ImDrawFlags_RoundBottomRight | ImDrawFlags_RoundTopRight,
     ImDrawFlags_Closed = 1 << 9,
     ImDrawFlags_JoinMiter = 1 << 10,
     ImDrawFlags_CapSquare = 1 << 11,
@@ -1374,9 +1374,9 @@ enum ImDrawFlags_: i32 {
     ImDrawFlags_UseTexForRoundCorners = 1 << 21,
     ImDrawFlags_UseVtxOffset = 1 << 22,
     ImDrawFlags_AllowTexForRoundCorners_ = 1 << 23,
-    ImDrawFlags_RoundMask_ = 496,
-    ImDrawFlags_AllowInPushScope_ = 8286704,
-    ImDrawFlags_AllowInFrameScope_ = 16675312,
+    ImDrawFlags_RoundMask_ = ImDrawFlags_RoundAll | ImDrawFlags_RoundNone,
+    ImDrawFlags_AllowInPushScope_ = ImDrawFlags_AAFill | ImDrawFlags_AALines | ImDrawFlags_AALineEnds | ImDrawFlags_StrokeLegacy | ImDrawFlags_TextNoPixelSnap | ImDrawFlags_UseTexForRoundCorners | ImDrawFlags_UseVtxOffset | ImDrawFlags_RoundMask_,
+    ImDrawFlags_AllowInFrameScope_ = ImDrawFlags_AllowInPushScope_ | ImDrawFlags_AllowTexForRoundCorners_,
     ImDrawFlags_StrokeMask_ = 0x07 << 17,
     ImDrawFlags_InvalidMask_ = -2147483633
 }
@@ -1958,7 +1958,7 @@ struct ImGuiDataTypeInfo {
 }
 
 enum ImGuiDataTypePrivate_: i32 {
-    ImGuiDataType_Pointer = 12,
+    ImGuiDataType_Pointer = ImGuiDataType_::ImGuiDataType_COUNT as i32,
     ImGuiDataType_ID
 }
 
@@ -1972,7 +1972,7 @@ enum ImGuiItemFlagsPrivate_: i32 {
     ImGuiItemFlags_Inputable = 1 << 20,
     ImGuiItemFlags_HasSelectionUserData = 1 << 21,
     ImGuiItemFlags_IsMultiSelect = 1 << 22,
-    ImGuiItemFlags_Default_ = 144
+    ImGuiItemFlags_Default_ = ImGuiItemFlags_::ImGuiItemFlags_AutoClosePopups as i32 | ImGuiItemFlags_::ImGuiItemFlags_LiveEditOnInputText as i32
 }
 
 enum ImGuiItemStatusFlags_: i32 {
@@ -1992,9 +1992,9 @@ enum ImGuiItemStatusFlags_: i32 {
 }
 
 enum ImGuiHoveredFlagsPrivate_: i32 {
-    ImGuiHoveredFlags_DelayMask_ = 245760,
-    ImGuiHoveredFlags_AllowedMaskForIsWindowHovered = 12479,
-    ImGuiHoveredFlags_AllowedMaskForIsItemHovered = 262048
+    ImGuiHoveredFlags_DelayMask_ = ImGuiHoveredFlags_::ImGuiHoveredFlags_DelayNone as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_DelayShort as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_DelayNormal as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_NoSharedDelay as i32,
+    ImGuiHoveredFlags_AllowedMaskForIsWindowHovered = ImGuiHoveredFlags_::ImGuiHoveredFlags_ChildWindows as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_RootWindow as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AnyWindow as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_NoPopupHierarchy as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_DockHierarchy as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenBlockedByPopup as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenBlockedByActiveItem as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_ForTooltip as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_Stationary as i32,
+    ImGuiHoveredFlags_AllowedMaskForIsItemHovered = ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenBlockedByPopup as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenBlockedByActiveItem as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenOverlapped as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_AllowWhenDisabled as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_NoNavOverride as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_ForTooltip as i32 | ImGuiHoveredFlags_::ImGuiHoveredFlags_Stationary as i32 | ImGuiHoveredFlags_DelayMask_ as i32
 }
 
 enum ImGuiInputTextFlagsPrivate_: i32 {
@@ -2019,8 +2019,8 @@ enum ImGuiButtonFlagsPrivate_: i32 {
     ImGuiButtonFlags_NoSetKeyOwner = 1 << 20,
     ImGuiButtonFlags_NoTestKeyOwner = 1 << 21,
     ImGuiButtonFlags_NoFocus = 1 << 22,
-    ImGuiButtonFlags_PressedOnMask_ = 1008,
-    ImGuiButtonFlags_PressedOnDefault_ = 32
+    ImGuiButtonFlags_PressedOnMask_ = ImGuiButtonFlags_PressedOnClick | ImGuiButtonFlags_PressedOnClickRelease | ImGuiButtonFlags_PressedOnClickReleaseAnywhere | ImGuiButtonFlags_PressedOnRelease | ImGuiButtonFlags_PressedOnDoubleClick | ImGuiButtonFlags_PressedOnDragDropHold,
+    ImGuiButtonFlags_PressedOnDefault_ = ImGuiButtonFlags_PressedOnClickRelease
 }
 
 enum ImGuiSliderFlagsPrivate_: i32 {
@@ -2042,8 +2042,8 @@ enum ImGuiTreeNodeFlagsPrivate_: i32 {
     ImGuiTreeNodeFlags_NoNavFocus = 1 << 27,
     ImGuiTreeNodeFlags_ClipLabelForTrailingButton = 1 << 28,
     ImGuiTreeNodeFlags_UpsideDownArrow = 1 << 29,
-    ImGuiTreeNodeFlags_OpenOnMask_ = 192,
-    ImGuiTreeNodeFlags_DrawLinesMask_ = 1835008
+    ImGuiTreeNodeFlags_OpenOnMask_ = ImGuiTreeNodeFlags_::ImGuiTreeNodeFlags_OpenOnDoubleClick as i32 | ImGuiTreeNodeFlags_::ImGuiTreeNodeFlags_OpenOnArrow as i32,
+    ImGuiTreeNodeFlags_DrawLinesMask_ = ImGuiTreeNodeFlags_::ImGuiTreeNodeFlags_DrawLinesNone as i32 | ImGuiTreeNodeFlags_::ImGuiTreeNodeFlags_DrawLinesFull as i32 | ImGuiTreeNodeFlags_::ImGuiTreeNodeFlags_DrawLinesToNodes as i32
 }
 
 enum ImGuiSeparatorFlags_: i32 {
@@ -2080,7 +2080,7 @@ enum ImGuiLogFlags_: i32 {
     ImGuiLogFlags_OutputFile = 1 << 1,
     ImGuiLogFlags_OutputBuffer = 1 << 2,
     ImGuiLogFlags_OutputClipboard = 1 << 3,
-    ImGuiLogFlags_OutputMask_ = 15
+    ImGuiLogFlags_OutputMask_ = ImGuiLogFlags_OutputTTY | ImGuiLogFlags_OutputFile | ImGuiLogFlags_OutputBuffer | ImGuiLogFlags_OutputClipboard
 }
 
 enum ImGuiAxis: i32 {
@@ -2446,19 +2446,19 @@ enum ImGuiInputFlagsPrivate_: i32 {
     ImGuiInputFlags_LockUntilRelease = 1 << 21,
     ImGuiInputFlags_CondHovered = 1 << 22,
     ImGuiInputFlags_CondActive = 1 << 23,
-    ImGuiInputFlags_CondDefault_ = 12582912,
-    ImGuiInputFlags_RepeatRateMask_ = 14,
-    ImGuiInputFlags_RepeatUntilMask_ = 240,
-    ImGuiInputFlags_RepeatMask_ = 255,
-    ImGuiInputFlags_CondMask_ = 12582912,
-    ImGuiInputFlags_RouteTypeMask_ = 15360,
-    ImGuiInputFlags_RouteOptionsMask_ = 245760,
-    ImGuiInputFlags_SupportedByIsKeyPressed = 255,
-    ImGuiInputFlags_SupportedByIsMouseClicked = 1,
-    ImGuiInputFlags_SupportedByShortcut = 261375,
-    ImGuiInputFlags_SupportedBySetNextItemShortcut = 523519,
-    ImGuiInputFlags_SupportedBySetKeyOwner = 3145728,
-    ImGuiInputFlags_SupportedBySetItemKeyOwner = 15728640
+    ImGuiInputFlags_CondDefault_ = ImGuiInputFlags_CondHovered | ImGuiInputFlags_CondActive,
+    ImGuiInputFlags_RepeatRateMask_ = ImGuiInputFlags_RepeatRateDefault | ImGuiInputFlags_RepeatRateNavMove | ImGuiInputFlags_RepeatRateNavTweak,
+    ImGuiInputFlags_RepeatUntilMask_ = ImGuiInputFlags_RepeatUntilRelease | ImGuiInputFlags_RepeatUntilKeyModsChange | ImGuiInputFlags_RepeatUntilKeyModsChangeFromNone | ImGuiInputFlags_RepeatUntilOtherKeyPress,
+    ImGuiInputFlags_RepeatMask_ = ImGuiInputFlags_::ImGuiInputFlags_Repeat as i32 | ImGuiInputFlags_RepeatRateMask_ as i32 | ImGuiInputFlags_RepeatUntilMask_ as i32,
+    ImGuiInputFlags_CondMask_ = ImGuiInputFlags_CondHovered | ImGuiInputFlags_CondActive,
+    ImGuiInputFlags_RouteTypeMask_ = ImGuiInputFlags_::ImGuiInputFlags_RouteActive as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteFocused as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteGlobal as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteAlways as i32,
+    ImGuiInputFlags_RouteOptionsMask_ = ImGuiInputFlags_::ImGuiInputFlags_RouteOverFocused as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteOverActive as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteUnlessBgFocused as i32 | ImGuiInputFlags_::ImGuiInputFlags_RouteFromRootWindow as i32,
+    ImGuiInputFlags_SupportedByIsKeyPressed = ImGuiInputFlags_RepeatMask_,
+    ImGuiInputFlags_SupportedByIsMouseClicked = ImGuiInputFlags_::ImGuiInputFlags_Repeat as i32,
+    ImGuiInputFlags_SupportedByShortcut = ImGuiInputFlags_RepeatMask_ | ImGuiInputFlags_RouteTypeMask_ | ImGuiInputFlags_RouteOptionsMask_,
+    ImGuiInputFlags_SupportedBySetNextItemShortcut = ImGuiInputFlags_RepeatMask_ as i32 | ImGuiInputFlags_RouteTypeMask_ as i32 | ImGuiInputFlags_RouteOptionsMask_ as i32 | ImGuiInputFlags_::ImGuiInputFlags_Tooltip as i32,
+    ImGuiInputFlags_SupportedBySetKeyOwner = ImGuiInputFlags_LockThisFrame | ImGuiInputFlags_LockUntilRelease,
+    ImGuiInputFlags_SupportedBySetItemKeyOwner = ImGuiInputFlags_SupportedBySetKeyOwner | ImGuiInputFlags_CondMask_
 }
 
 struct ImGuiListClipperRange {
@@ -2502,8 +2502,8 @@ enum ImGuiScrollFlags_: i32 {
     ImGuiScrollFlags_AlwaysCenterX = 1 << 4,
     ImGuiScrollFlags_AlwaysCenterY = 1 << 5,
     ImGuiScrollFlags_NoScrollParent = 1 << 6,
-    ImGuiScrollFlags_MaskX_ = 21,
-    ImGuiScrollFlags_MaskY_ = 42
+    ImGuiScrollFlags_MaskX_ = ImGuiScrollFlags_KeepVisibleEdgeX | ImGuiScrollFlags_KeepVisibleCenterX | ImGuiScrollFlags_AlwaysCenterX,
+    ImGuiScrollFlags_MaskY_ = ImGuiScrollFlags_KeepVisibleEdgeY | ImGuiScrollFlags_KeepVisibleCenterY | ImGuiScrollFlags_AlwaysCenterY
 }
 
 enum ImGuiNavRenderCursorFlags_: i32 {
@@ -2518,7 +2518,7 @@ enum ImGuiNavMoveFlags_: i32 {
     ImGuiNavMoveFlags_LoopY = 1 << 1,
     ImGuiNavMoveFlags_WrapX = 1 << 2,
     ImGuiNavMoveFlags_WrapY = 1 << 3,
-    ImGuiNavMoveFlags_WrapMask_ = 15,
+    ImGuiNavMoveFlags_WrapMask_ = ImGuiNavMoveFlags_LoopX | ImGuiNavMoveFlags_LoopY | ImGuiNavMoveFlags_WrapX | ImGuiNavMoveFlags_WrapY,
     ImGuiNavMoveFlags_AllowCurrentNavId = 1 << 4,
     ImGuiNavMoveFlags_AlsoScoreVisibleSet = 1 << 5,
     ImGuiNavMoveFlags_ScrollToEdgeY = 1 << 6,
@@ -2685,11 +2685,11 @@ enum ImGuiDockNodeFlagsPrivate_: i32 {
     ImGuiDockNodeFlags_NoDockingOverMe = 1 << 20,
     ImGuiDockNodeFlags_NoDockingOverOther = 1 << 21,
     ImGuiDockNodeFlags_NoDockingOverEmpty = 1 << 22,
-    ImGuiDockNodeFlags_NoDocking = 7864336,
+    ImGuiDockNodeFlags_NoDocking = ImGuiDockNodeFlags_NoDockingOverMe as i32 | ImGuiDockNodeFlags_NoDockingOverOther as i32 | ImGuiDockNodeFlags_NoDockingOverEmpty as i32 | ImGuiDockNodeFlags_::ImGuiDockNodeFlags_NoDockingSplit as i32 | ImGuiDockNodeFlags_NoDockingSplitOther as i32,
     ImGuiDockNodeFlags_SharedFlagsInheritMask_ = -1,
     ImGuiDockNodeFlags_NoResizeFlagsMask_,
     ImGuiDockNodeFlags_LocalFlagsTransferMask_,
-    ImGuiDockNodeFlags_SavedFlagsMask_ = 261152
+    ImGuiDockNodeFlags_SavedFlagsMask_ = ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton
 }
 
 enum ImGuiDataAuthority_: i32 {
@@ -2884,7 +2884,7 @@ enum ImGuiDebugLogFlags_: i32 {
     ImGuiDebugLogFlags_EventDocking = 1 << 10,
     ImGuiDebugLogFlags_EventViewport = 1 << 11,
     ImGuiDebugLogFlags_EventTable = 1 << 12,
-    ImGuiDebugLogFlags_EventMask_ = 8191,
+    ImGuiDebugLogFlags_EventMask_ = ImGuiDebugLogFlags_EventError | ImGuiDebugLogFlags_EventActiveId | ImGuiDebugLogFlags_EventFocus | ImGuiDebugLogFlags_EventPopup | ImGuiDebugLogFlags_EventNav | ImGuiDebugLogFlags_EventClipper | ImGuiDebugLogFlags_EventSelection | ImGuiDebugLogFlags_EventTable | ImGuiDebugLogFlags_EventIO | ImGuiDebugLogFlags_EventFont | ImGuiDebugLogFlags_EventInputRouting | ImGuiDebugLogFlags_EventDocking | ImGuiDebugLogFlags_EventViewport,
     ImGuiDebugLogFlags_OutputToTTY = 1 << 20,
     ImGuiDebugLogFlags_OutputToDebugger = 1 << 21,
     ImGuiDebugLogFlags_OutputToTestEngine = 1 << 22
@@ -3671,7 +3671,7 @@ enum ImGuiTabBarFlagsPrivate_: i32 {
 }
 
 enum ImGuiTabItemFlagsPrivate_: i32 {
-    ImGuiTabItemFlags_SectionMask_ = 192,
+    ImGuiTabItemFlags_SectionMask_ = ImGuiTabItemFlags_::ImGuiTabItemFlags_Leading as i32 | ImGuiTabItemFlags_::ImGuiTabItemFlags_Trailing as i32,
     ImGuiTabItemFlags_NoCloseButton = 1 << 20,
     ImGuiTabItemFlags_Button = 1 << 21,
     ImGuiTabItemFlags_Invisible = 1 << 22,
