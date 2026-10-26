@@ -1,0 +1,67 @@
+#[include "vendor/assimp/defs.zir", "vendor/assimp/vector2.zir", "vendor/assimp/vector3.zir", "vendor/assimp/color4.zir", "vendor/assimp/matrix3x3.zir", "vendor/assimp/matrix4x4.zir", "vendor/assimp/quaternion.zir" : *]
+
+const AI_MAXLEN: i32 = 1024;
+
+type ai_int32 = i32;
+type ai_uint32 = u32;
+
+struct aiPlane {
+    pub a: ai_real,
+    pub b: ai_real,
+    pub c: ai_real,
+    pub d: ai_real
+}
+
+struct aiRay {
+    pub pos: aiVector3D,
+    pub dir: aiVector3D
+}
+
+struct aiColor3D {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32
+}
+
+struct aiString {
+    pub length: ai_uint32,
+    pub data: [i8; 1024]
+}
+
+enum aiReturn: i32 {
+    aiReturn_SUCCESS = 0x0,
+    aiReturn_FAILURE = -1,
+    aiReturn_OUTOFMEMORY = -3,
+    _AI_ENFORCE_ENUM_SIZE = 0x7fffffff
+}
+
+enum aiOrigin: i32 {
+    aiOrigin_SET = 0x0,
+    aiOrigin_CUR = 0x1,
+    aiOrigin_END = 0x2,
+    _AI_ORIGIN_ENFORCE_ENUM_SIZE = 0x7fffffff
+}
+
+enum aiDefaultLogStream: i32 {
+    aiDefaultLogStream_FILE = 0x1,
+    aiDefaultLogStream_STDOUT = 0x2,
+    aiDefaultLogStream_STDERR = 0x4,
+    aiDefaultLogStream_DEBUGGER = 0x8,
+    _AI_DLS_ENFORCE_ENUM_SIZE = 0x7fffffff
+}
+
+struct aiMemoryInfo {
+    pub textures: u32,
+    pub materials: u32,
+    pub meshes: u32,
+    pub nodes: u32,
+    pub animations: u32,
+    pub cameras: u32,
+    pub lights: u32,
+    pub total: u32
+}
+
+struct aiBuffer {
+    pub data: *i8,
+    pub end: *i8
+}

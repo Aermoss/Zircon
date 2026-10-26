@@ -1,0 +1,26 @@
+#[include "vendor/assimp/types.zir" : *]
+
+enum aiImporterFlags: i32 {
+    aiImporterFlags_SupportTextFlavour = 0x1,
+    aiImporterFlags_SupportBinaryFlavour = 0x2,
+    aiImporterFlags_SupportCompressedFlavour = 0x4,
+    aiImporterFlags_LimitedSupport = 0x8,
+    aiImporterFlags_Experimental = 0x10
+}
+
+struct aiImporterDesc {
+    pub mName: *i8,
+    pub mAuthor: *i8,
+    pub mMaintainer: *i8,
+    pub mComments: *i8,
+    pub mFlags: u32,
+    pub mMinMajor: u32,
+    pub mMinMinor: u32,
+    pub mMaxMajor: u32,
+    pub mMaxMinor: u32,
+    pub mFileExtensions: *i8
+}
+
+extern "C" {
+    fn aiGetImporterDesc(extension: *i8) -> *aiImporterDesc;
+}

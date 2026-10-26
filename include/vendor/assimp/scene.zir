@@ -1,0 +1,41 @@
+#[include "vendor/assimp/types.zir", "vendor/assimp/texture.zir", "vendor/assimp/mesh.zir", "vendor/assimp/light.zir", "vendor/assimp/camera.zir", "vendor/assimp/material.zir", "vendor/assimp/anim.zir", "vendor/assimp/metadata.zir" : *]
+
+const AI_SCENE_FLAGS_INCOMPLETE: i32 = 0x1;
+const AI_SCENE_FLAGS_VALIDATED: i32 = 0x2;
+const AI_SCENE_FLAGS_VALIDATION_WARNING: i32 = 0x4;
+const AI_SCENE_FLAGS_NON_VERBOSE_FORMAT: i32 = 0x8;
+const AI_SCENE_FLAGS_TERRAIN: i32 = 0x10;
+const AI_SCENE_FLAGS_ALLOW_SHARED: i32 = 0x20;
+
+struct aiNode {
+    pub mName: aiString,
+    pub mTransformation: aiMatrix4x4,
+    pub mParent: *mut aiNode,
+    pub mNumChildren: u32,
+    pub mChildren: *mut *mut aiNode,
+    pub mNumMeshes: u32,
+    pub mMeshes: *mut u32,
+    pub mMetaData: *mut aiMetadata
+}
+
+struct aiScene {
+    pub mFlags: u32,
+    pub mRootNode: *mut aiNode,
+    pub mNumMeshes: u32,
+    pub mMeshes: *mut *mut aiMesh,
+    pub mNumMaterials: u32,
+    pub mMaterials: *mut *mut aiMaterial,
+    pub mNumAnimations: u32,
+    pub mAnimations: *mut *mut aiAnimation,
+    pub mNumTextures: u32,
+    pub mTextures: *mut *mut aiTexture,
+    pub mNumLights: u32,
+    pub mLights: *mut *mut aiLight,
+    pub mNumCameras: u32,
+    pub mCameras: *mut *mut aiCamera,
+    pub mMetaData: *mut aiMetadata,
+    pub mName: aiString,
+    pub mNumSkeletons: u32,
+    pub mSkeletons: *mut *mut aiSkeleton,
+    pub mPrivate: *mut i8
+}

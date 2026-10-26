@@ -20,8 +20,8 @@ class GLFWcursor {}
 
 type GLFWglproc = fn();
 
-type GLFWallocatefun = fn(size: u32, user: *mut void) -> *mut void;
-type GLFWreallocatefun = fn(block: *mut void, size: u32, user: *mut void) -> *mut void;
+type GLFWallocatefun = fn(size: usize, user: *mut void) -> *mut void;
+type GLFWreallocatefun = fn(block: *mut void, size: usize, user: *mut void) -> *mut void;
 type GLFWdeallocatefun = fn(block: *mut void, user: *mut void);
 
 type GLFWerrorfun = fn(error_code: i32, description: *i8);
@@ -42,7 +42,7 @@ type GLFWkeyfun = fn(window: *GLFWwindow, key: i32, scancode: i32, action: i32, 
 type GLFWcharfun = fn(window: *GLFWwindow, codepoint: u32);
 type GLFWcharmodsfun = fn(window: *GLFWwindow, codepoint: u32, mods: i32);
 type GLFWdropfun = fn(window: *GLFWwindow, path_count: i32, paths: **i8);
-type GLFWmonitorfun = fn(monitor: *GLFWcursor, event: i32);
+type GLFWmonitorfun = fn(monitor: *mut GLFWmonitor, event: i32);
 type GLFWjoystickfun = fn(jid: i32, event: i32);
 
 const GLFW_VERSION_MAJOR: i32 = 3;
@@ -457,27 +457,27 @@ extern "C" {
     fn glfwGetPlatform() -> i32;
     fn glfwPlatformSupported(platform: i32) -> i32;
 
-    fn glfwGetMonitors(count: *mut i32) -> *mut *GLFWcursor;
-    fn glfwGetPrimaryMonitor() -> *GLFWcursor;
-    fn glfwGetMonitorPos(monitor: *GLFWcursor, xpos: *mut i32, ypos: *mut i32);
-    fn glfwGetMonitorWorkarea(monitor: *GLFWcursor, xpos: *mut i32, ypos: *mut i32, width: *mut i32, height: *mut i32);
-    fn glfwGetMonitorPhysicalSize(monitor: *GLFWcursor, widthMM: *mut i32, heightMM: *mut i32);
-    fn glfwGetMonitorContentScale(monitor: *GLFWcursor, xscale: *mut f32, yscale: *mut f32);
-    fn glfwGetMonitorName(monitor: *GLFWcursor) -> *i8;
-    fn glfwSetMonitorUserPointer(monitor: *GLFWcursor, pointer: *mut void);
-    fn glfwGetMonitorUserPointer(monitor: *GLFWcursor) -> *mut void;
+    fn glfwGetMonitors(count: *mut i32) -> *mut *mut GLFWmonitor;
+    fn glfwGetPrimaryMonitor() -> *mut GLFWmonitor;
+    fn glfwGetMonitorPos(monitor: *mut GLFWmonitor, xpos: *mut i32, ypos: *mut i32);
+    fn glfwGetMonitorWorkarea(monitor: *mut GLFWmonitor, xpos: *mut i32, ypos: *mut i32, width: *mut i32, height: *mut i32);
+    fn glfwGetMonitorPhysicalSize(monitor: *mut GLFWmonitor, widthMM: *mut i32, heightMM: *mut i32);
+    fn glfwGetMonitorContentScale(monitor: *mut GLFWmonitor, xscale: *mut f32, yscale: *mut f32);
+    fn glfwGetMonitorName(monitor: *mut GLFWmonitor) -> *i8;
+    fn glfwSetMonitorUserPointer(monitor: *mut GLFWmonitor, pointer: *mut void);
+    fn glfwGetMonitorUserPointer(monitor: *mut GLFWmonitor) -> *mut void;
     fn glfwSetMonitorCallback(callback: GLFWmonitorfun) -> GLFWmonitorfun;
 
-    fn glfwGetVideoModes(monitor: *GLFWcursor, count: *mut i32) -> *GLFWvidmode;
-    fn glfwGetVideoMode(monitor: *GLFWcursor) -> *GLFWvidmode;
-    fn glfwSetGamma(monitor: *GLFWcursor, gamma: f32);
-    fn glfwGetGammaRamp(monitor: *GLFWcursor) -> *GLFWgammaramp;
-    fn glfwSetGammaRamp(monitor: *GLFWcursor, ramp: *GLFWgammaramp);
+    fn glfwGetVideoModes(monitor: *mut GLFWmonitor, count: *mut i32) -> *GLFWvidmode;
+    fn glfwGetVideoMode(monitor: *mut GLFWmonitor) -> *GLFWvidmode;
+    fn glfwSetGamma(monitor: *mut GLFWmonitor, gamma: f32);
+    fn glfwGetGammaRamp(monitor: *mut GLFWmonitor) -> *GLFWgammaramp;
+    fn glfwSetGammaRamp(monitor: *mut GLFWmonitor, ramp: *GLFWgammaramp);
 
     fn glfwDefaultWindowHints();
     fn glfwWindowHint(hint: i32, value: i32);
     fn glfwWindowHintString(hint: i32, value: *i8);
-    fn glfwCreateWindow(width: i32, height: i32, title: *i8, monitor: *GLFWcursor, share: *GLFWwindow) -> *mut GLFWwindow;
+    fn glfwCreateWindow(width: i32, height: i32, title: *i8, monitor: *mut GLFWmonitor, share: *GLFWwindow) -> *mut GLFWwindow;
     fn glfwDestroyWindow(window: *GLFWwindow);
     fn glfwWindowShouldClose(window: *GLFWwindow) -> i32;
     fn glfwSetWindowShouldClose(window: *GLFWwindow, value: i32);
@@ -502,8 +502,8 @@ extern "C" {
     fn glfwHideWindow(window: *GLFWwindow);
     fn glfwFocusWindow(window: *GLFWwindow);
     fn glfwRequestWindowAttention(window: *GLFWwindow);
-    fn glfwGetWindowMonitor(window: *GLFWwindow) -> *GLFWcursor;
-    fn glfwSetWindowMonitor(window: *GLFWwindow, monitor: *GLFWcursor, xpos: i32, ypos: i32, width: i32, height: i32, refreshRate: i32);
+    fn glfwGetWindowMonitor(window: *GLFWwindow) -> *mut GLFWmonitor;
+    fn glfwSetWindowMonitor(window: *GLFWwindow, monitor: *mut GLFWmonitor, xpos: i32, ypos: i32, width: i32, height: i32, refreshRate: i32);
     fn glfwGetWindowAttrib(window: *GLFWwindow, attrib: i32) -> i32;
     fn glfwSetWindowAttrib(window: *GLFWwindow, attrib: i32, value: i32);
     fn glfwSetWindowUserPointer(window: *GLFWwindow, pointer: *mut void);

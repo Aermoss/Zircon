@@ -1,0 +1,1 @@
+#[include "vendor/assimp/cimport.zir", "vendor/assimp/cexport.zir", "vendor/assimp/scene.zir", "vendor/assimp/postprocess.zir", "vendor/assimp/material.zir", "vendor/assimp/version.zir" : *]

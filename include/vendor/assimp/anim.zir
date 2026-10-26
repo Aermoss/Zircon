@@ -1,0 +1,77 @@
+#[include "vendor/assimp/quaternion.zir", "vendor/assimp/types.zir" : *]
+
+enum aiAnimInterpolation: i32 {
+    aiAnimInterpolation_Step,
+    aiAnimInterpolation_Linear,
+    aiAnimInterpolation_Spherical_Linear,
+    aiAnimInterpolation_Cubic_Spline,
+    _aiAnimInterpolation_Force32Bit
+}
+
+struct aiVectorKey {
+    pub mTime: f64,
+    pub mValue: aiVector3D,
+    pub mInterpolation: aiAnimInterpolation
+}
+
+struct aiQuatKey {
+    pub mTime: f64,
+    pub mValue: aiQuaternion,
+    pub mInterpolation: aiAnimInterpolation
+}
+
+struct aiMeshKey {
+    pub mTime: f64,
+    pub mValue: u32
+}
+
+struct aiMeshMorphKey {
+    pub mTime: f64,
+    pub mValues: *mut u32,
+    pub mWeights: *mut f64,
+    pub mNumValuesAndWeights: u32
+}
+
+enum aiAnimBehaviour: i32 {
+    aiAnimBehaviour_DEFAULT = 0x0,
+    aiAnimBehaviour_CONSTANT = 0x1,
+    aiAnimBehaviour_LINEAR = 0x2,
+    aiAnimBehaviour_REPEAT = 0x3,
+    _aiAnimBehaviour_Force32Bit
+}
+
+struct aiNodeAnim {
+    pub mNodeName: aiString,
+    pub mNumPositionKeys: u32,
+    pub mPositionKeys: *mut aiVectorKey,
+    pub mNumRotationKeys: u32,
+    pub mRotationKeys: *mut aiQuatKey,
+    pub mNumScalingKeys: u32,
+    pub mScalingKeys: *mut aiVectorKey,
+    pub mPreState: aiAnimBehaviour,
+    pub mPostState: aiAnimBehaviour
+}
+
+struct aiMeshAnim {
+    pub mName: aiString,
+    pub mNumKeys: u32,
+    pub mKeys: *mut aiMeshKey
+}
+
+struct aiMeshMorphAnim {
+    pub mName: aiString,
+    pub mNumKeys: u32,
+    pub mKeys: *mut aiMeshMorphKey
+}
+
+struct aiAnimation {
+    pub mName: aiString,
+    pub mDuration: f64,
+    pub mTicksPerSecond: f64,
+    pub mNumChannels: u32,
+    pub mChannels: *mut *mut aiNodeAnim,
+    pub mNumMeshChannels: u32,
+    pub mMeshChannels: *mut *mut aiMeshAnim,
+    pub mNumMorphMeshChannels: u32,
+    pub mMorphMeshChannels: *mut *mut aiMeshMorphAnim
+}

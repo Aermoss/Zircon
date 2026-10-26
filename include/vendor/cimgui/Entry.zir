@@ -1,0 +1,1 @@
+#[include "vendor/cimgui/cimgui.zir", "vendor/cimgui/cimgui_impl.zir", "vendor/cimgui/cimguizmo.zir" : *]

@@ -1,0 +1,39 @@
+#[include "vendor/glfw" : *]
+
+struct ImGui_ImplOpenGL3_RenderState {
+    pub UseBindSampler: bool,
+    pub UseTexParameterFilter: bool,
+    pub CurrentSampler: u32,
+    pub CurrentTexParameterFilter: u32
+}
+
+extern "C" {
+    fn ImGui_ImplGlfw_CharCallback(window: *mut GLFWwindow, c: u32);
+    fn ImGui_ImplGlfw_CursorEnterCallback(window: *mut GLFWwindow, entered: i32);
+    fn ImGui_ImplGlfw_CursorPosCallback(window: *mut GLFWwindow, x: f64, y: f64);
+    fn ImGui_ImplGlfw_GetContentScaleForMonitor(monitor: *mut GLFWmonitor) -> f32;
+    fn ImGui_ImplGlfw_GetContentScaleForWindow(window: *mut GLFWwindow) -> f32;
+    fn ImGui_ImplGlfw_InitForOpenGL(window: *mut GLFWwindow, install_callbacks: bool) -> bool;
+    fn ImGui_ImplGlfw_InitForOther(window: *mut GLFWwindow, install_callbacks: bool) -> bool;
+    fn ImGui_ImplGlfw_InitForVulkan(window: *mut GLFWwindow, install_callbacks: bool) -> bool;
+    fn ImGui_ImplGlfw_InstallCallbacks(window: *mut GLFWwindow);
+    fn ImGui_ImplGlfw_KeyCallback(window: *mut GLFWwindow, key: i32, scancode: i32, action: i32, mods: i32);
+    fn ImGui_ImplGlfw_MonitorCallback(monitor: *mut GLFWmonitor, event: i32);
+    fn ImGui_ImplGlfw_MouseButtonCallback(window: *mut GLFWwindow, button: i32, action: i32, mods: i32);
+    fn ImGui_ImplGlfw_NewFrame();
+    fn ImGui_ImplGlfw_RestoreCallbacks(window: *mut GLFWwindow);
+    fn ImGui_ImplGlfw_ScrollCallback(window: *mut GLFWwindow, xoffset: f64, yoffset: f64);
+    fn ImGui_ImplGlfw_SetCallbacksChainForAllWindows(chain_for_all_windows: bool);
+    fn ImGui_ImplGlfw_Shutdown();
+    fn ImGui_ImplGlfw_Sleep(milliseconds: i32);
+    fn ImGui_ImplGlfw_WindowFocusCallback(window: *mut GLFWwindow, focused: i32);
+    fn ImGui_ImplOpenGL3_CreateDeviceObjects() -> bool;
+    fn ImGui_ImplOpenGL3_DestroyDeviceObjects();
+    fn ImGui_ImplOpenGL3_GetRenderState() -> *mut ImGui_ImplOpenGL3_RenderState;
+    fn ImGui_ImplOpenGL3_Init(glsl_version: *i8) -> bool;
+    fn ImGui_ImplOpenGL3_NewFrame();
+    fn ImGui_ImplOpenGL3_RenderDrawData(draw_data: *mut ImDrawData);
+    fn ImGui_ImplOpenGL3_SetClipOrigin(gl_clip_origin: u32);
+    fn ImGui_ImplOpenGL3_Shutdown();
+    fn ImGui_ImplOpenGL3_UpdateTexture(tex: *mut ImTextureData);
+}

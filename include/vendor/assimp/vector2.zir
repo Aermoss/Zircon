@@ -1,0 +1,6 @@
+#[include "vendor/assimp/defs.zir" : *]
+
+struct aiVector2D {
+    pub x: ai_real,
+    pub y: ai_real
+}

@@ -1,0 +1,127 @@
+#[include "vendor/cimgui/cimgui.zir" : *]
+
+enum OPERATION: i32 {
+    TRANSLATE_X = (1 << 0),
+    TRANSLATE_Y = (1 << 1),
+    TRANSLATE_Z = (1 << 2),
+    ROTATE_X = (1 << 3),
+    ROTATE_Y = (1 << 4),
+    ROTATE_Z = (1 << 5),
+    ROTATE_SCREEN = (1 << 6),
+    SCALE_X = (1 << 7),
+    SCALE_Y = (1 << 8),
+    SCALE_Z = (1 << 9),
+    BOUNDS = (1 << 10),
+    SCALE_XU = (1 << 11),
+    SCALE_YU = (1 << 12),
+    SCALE_ZU = (1 << 13),
+    TRANSLATE = 7,
+    ROTATE = 120,
+    SCALE = 896,
+    SCALEU = 14336,
+    UNIVERSAL = 14463
+}
+
+enum MODE: i32 {
+    LOCAL,
+    WORLD
+}
+
+enum MOVETYPE: i32 {
+    MT_NONE,
+    MT_MOVE_X,
+    MT_MOVE_Y,
+    MT_MOVE_Z,
+    MT_MOVE_YZ,
+    MT_MOVE_ZX,
+    MT_MOVE_XY,
+    MT_MOVE_SCREEN,
+    MT_ROTATE_X,
+    MT_ROTATE_Y,
+    MT_ROTATE_Z,
+    MT_ROTATE_SCREEN,
+    MT_SCALE_X,
+    MT_SCALE_Y,
+    MT_SCALE_Z,
+    MT_SCALE_XYZ
+}
+
+enum COLOR: i32 {
+    DIRECTION_X,
+    DIRECTION_Y,
+    DIRECTION_Z,
+    PLANE_X,
+    PLANE_Y,
+    PLANE_Z,
+    SELECTION,
+    INACTIVE,
+    TRANSLATION_LINE,
+    SCALE_LINE,
+    ROTATION_USING_BORDER,
+    ROTATION_USING_FILL,
+    HATCHED_AXIS_LINES,
+    TEXT,
+    TEXT_SHADOW,
+    COUNT
+}
+
+struct Style {
+    pub TranslationLineThickness: f32,
+    pub TranslationLineArrowSize: f32,
+    pub RotationLineThickness: f32,
+    pub RotationOuterLineThickness: f32,
+    pub ScaleLineThickness: f32,
+    pub ScaleLineCircleSize: f32,
+    pub HatchedAxisLineThickness: f32,
+    pub CenterCircleSize: f32,
+    pub Colors: [ImVec4; 15]
+}
+
+extern "C" {
+    fn ImGuizmo_SetDrawlist(drawlist: *mut ImDrawList);
+    fn ImGuizmo_BeginFrame();
+    fn ImGuizmo_SetImGuiContext(ctx: *mut ImGuiContext);
+    fn ImGuizmo_IsOver_Nil() -> bool;
+    fn ImGuizmo_IsUsing() -> bool;
+    fn ImGuizmo_IsUsingViewManipulate() -> bool;
+    fn ImGuizmo_IsViewManipulateHovered() -> bool;
+    fn ImGuizmo_IsUsingAny() -> bool;
+    fn ImGuizmo_Enable(enable: bool);
+    fn ImGuizmo_DecomposeMatrixToComponents(matrix: *f32, translation: *mut f32, rotation: *mut f32, scale: *mut f32);
+    fn ImGuizmo_RecomposeMatrixFromComponents(translation: *f32, rotation: *f32, scale: *f32, matrix: *mut f32);
+    fn ImGuizmo_SetRect(x: f32, y: f32, width: f32, height: f32);
+    fn ImGuizmo_SetOrthographic(isOrthographic: bool);
+    fn ImGuizmo_DrawAxes(view: *f32, projection: *f32, matrices: *f32, matrixCount: i32);
+    fn ImGuizmo_DrawCubes(view: *f32, projection: *f32, matrices: *f32, matrixCount: i32);
+    fn ImGuizmo_DrawGrid(view: *f32, projection: *f32, matrix: *f32, gridSize: f32);
+    fn ImGuizmo_DrawGridCustom(view: *f32, projection: *f32, matrix: *f32, gridSize: f32, majorStep: f32, subdivision: u32);
+    fn ImGuizmo_DrawGridCustomColor(view: *f32, projection: *f32, matrix: *f32, gridSize: f32, majorStep: f32, subdivision: u32, majorCol: ImU32, minorCol: ImU32, centerCol: ImU32);
+    fn ImGuizmo_Manipulate(view: *f32, projection: *f32, operation: OPERATION, mode: MODE, matrix: *mut f32, deltaMatrix: *mut f32, snap: *f32, localBounds: *f32, boundsSnap: *f32) -> bool;
+    fn ImGuizmo_ViewManipulate_Float(view: *mut f32, length: f32, position: ImVec2_c, size: ImVec2_c, backgroundColor: ImU32);
+    fn ImGuizmo_ViewManipulate_FloatPtr(view: *mut f32, projection: *f32, operation: OPERATION, mode: MODE, matrix: *mut f32, length: f32, position: ImVec2_c, size: ImVec2_c, backgroundColor: ImU32);
+    fn ImGuizmo_SetAlternativeWindow(window: *mut ImGuiWindow);
+    fn ImGuizmo_SetID(id: i32);
+    fn ImGuizmo_PushID_Str(str_id: *i8);
+    fn ImGuizmo_PushID_StrStr(str_id_begin: *i8, str_id_end: *i8);
+    fn ImGuizmo_PushID_Ptr(ptr_id: *void);
+    fn ImGuizmo_PushID_Int(int_id: i32);
+    fn ImGuizmo_PopID();
+    fn ImGuizmo_GetID_Str(str_id: *i8) -> ImGuiID;
+    fn ImGuizmo_GetID_StrStr(str_id_begin: *i8, str_id_end: *i8) -> ImGuiID;
+    fn ImGuizmo_GetID_Ptr(ptr_id: *void) -> ImGuiID;
+    fn ImGuizmo_IsOver_OPERATION(op: OPERATION) -> bool;
+    fn ImGuizmo_SetGizmoSizeClipSpace(value: f32);
+    fn ImGuizmo_GetActiveHandleType() -> MOVETYPE;
+    fn ImGuizmo_GetHoveredHandleType() -> MOVETYPE;
+    fn ImGuizmo_GetActiveMoveType() -> MOVETYPE;
+    fn ImGuizmo_GetHoveredMoveType() -> MOVETYPE;
+    fn ImGuizmo_AllowAxisFlip(value: bool);
+    fn ImGuizmo_SetAxisLimit(value: f32);
+    fn ImGuizmo_SetAxisMask(x: bool, y: bool, z: bool);
+    fn ImGuizmo_SetPlaneLimit(value: f32);
+    fn ImGuizmo_IsOver_FloatPtr(position: *mut f32, pixelRadius: f32) -> bool;
+    fn ImGuizmo_ComputeMouseRay(view: *f32, projection: *f32, mousePosition: ImVec2_c, rectPosition: ImVec2_c, rectSize: ImVec2_c, rayOrigin: *mut f32, rayDirection: *mut f32);
+    fn Style_Style() -> *mut Style;
+    fn Style_destroy(self: *mut Style);
+    fn ImGuizmo_GetStyle() -> *mut Style;
+}

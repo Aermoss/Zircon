@@ -1,0 +1,7 @@
+#[include "vendor/assimp/config.zir" : *]
+
+const ASSIMP_AI_REAL_TEXT_PRECISION: i32 = 9;
+
+type ai_real = f32;
+type ai_int = i32;
+type ai_uint = u32;

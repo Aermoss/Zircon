@@ -1,0 +1,3183 @@
+const MA_VERSION_MAJOR: i32 = 0;
+const MA_VERSION_MINOR: i32 = 11;
+const MA_VERSION_REVISION: i32 = 25;
+const MA_SIZEOF_PTR: i32 = 8;
+const MA_TRUE: i32 = 1;
+const MA_FALSE: i32 = 0;
+const MA_SIZE_MAX: u32 = 0xFFFFFFFF;
+const MA_SIMD_ALIGNMENT: i32 = 32;
+const MA_MIN_CHANNELS: i32 = 1;
+const MA_MAX_CHANNELS: i32 = 254;
+const MA_MAX_FILTER_ORDER: i32 = 8;
+const MA_MAX_LOG_CALLBACKS: i32 = 4;
+const MA_CHANNEL_INDEX_NULL: i32 = 255;
+const MA_DATA_SOURCE_SELF_MANAGED_RANGE_AND_LOOP_POINT: i32 = 0x00000001;
+const MA_MAX_DEVICE_NAME_LENGTH: i32 = 255;
+const MA_RESOURCE_MANAGER_MAX_JOB_THREAD_COUNT: i32 = 64;
+const MA_MAX_NODE_BUS_COUNT: i32 = 254;
+const MA_MAX_NODE_LOCAL_BUS_COUNT: i32 = 2;
+const MA_NODE_BUS_COUNT_UNKNOWN: i32 = 255;
+const MA_ENGINE_MAX_LISTENERS: i32 = 4;
+const MA_SOUND_SOURCE_CHANNEL_COUNT: u32 = 0xFFFFFFFF;
+
+type ma_int8 = i8;
+type ma_uint8 = u8;
+type ma_int16 = i16;
+type ma_uint16 = u16;
+type ma_int32 = i32;
+type ma_uint32 = u32;
+type ma_int64 = i64;
+type ma_uint64 = u64;
+type ma_uintptr = ma_uint64;
+type ma_bool8 = ma_uint8;
+type ma_bool32 = ma_uint32;
+type ma_float = f32;
+type ma_double = f64;
+type ma_handle = *mut void;
+type ma_ptr = *mut void;
+type ma_proc = *mut void;
+type ma_wchar_win32 = u16;
+
+enum ma_log_level: i32 {
+    MA_LOG_LEVEL_DEBUG = 4,
+    MA_LOG_LEVEL_INFO = 3,
+    MA_LOG_LEVEL_WARNING = 2,
+    MA_LOG_LEVEL_ERROR = 1
+}
+
+type ma_channel = ma_uint8;
+
+enum _ma_channel_position: i32 {
+    MA_CHANNEL_NONE = 0,
+    MA_CHANNEL_MONO = 1,
+    MA_CHANNEL_FRONT_LEFT = 2,
+    MA_CHANNEL_FRONT_RIGHT = 3,
+    MA_CHANNEL_FRONT_CENTER = 4,
+    MA_CHANNEL_LFE = 5,
+    MA_CHANNEL_BACK_LEFT = 6,
+    MA_CHANNEL_BACK_RIGHT = 7,
+    MA_CHANNEL_FRONT_LEFT_CENTER = 8,
+    MA_CHANNEL_FRONT_RIGHT_CENTER = 9,
+    MA_CHANNEL_BACK_CENTER = 10,
+    MA_CHANNEL_SIDE_LEFT = 11,
+    MA_CHANNEL_SIDE_RIGHT = 12,
+    MA_CHANNEL_TOP_CENTER = 13,
+    MA_CHANNEL_TOP_FRONT_LEFT = 14,
+    MA_CHANNEL_TOP_FRONT_CENTER = 15,
+    MA_CHANNEL_TOP_FRONT_RIGHT = 16,
+    MA_CHANNEL_TOP_BACK_LEFT = 17,
+    MA_CHANNEL_TOP_BACK_CENTER = 18,
+    MA_CHANNEL_TOP_BACK_RIGHT = 19,
+    MA_CHANNEL_AUX_0 = 20,
+    MA_CHANNEL_AUX_1 = 21,
+    MA_CHANNEL_AUX_2 = 22,
+    MA_CHANNEL_AUX_3 = 23,
+    MA_CHANNEL_AUX_4 = 24,
+    MA_CHANNEL_AUX_5 = 25,
+    MA_CHANNEL_AUX_6 = 26,
+    MA_CHANNEL_AUX_7 = 27,
+    MA_CHANNEL_AUX_8 = 28,
+    MA_CHANNEL_AUX_9 = 29,
+    MA_CHANNEL_AUX_10 = 30,
+    MA_CHANNEL_AUX_11 = 31,
+    MA_CHANNEL_AUX_12 = 32,
+    MA_CHANNEL_AUX_13 = 33,
+    MA_CHANNEL_AUX_14 = 34,
+    MA_CHANNEL_AUX_15 = 35,
+    MA_CHANNEL_AUX_16 = 36,
+    MA_CHANNEL_AUX_17 = 37,
+    MA_CHANNEL_AUX_18 = 38,
+    MA_CHANNEL_AUX_19 = 39,
+    MA_CHANNEL_AUX_20 = 40,
+    MA_CHANNEL_AUX_21 = 41,
+    MA_CHANNEL_AUX_22 = 42,
+    MA_CHANNEL_AUX_23 = 43,
+    MA_CHANNEL_AUX_24 = 44,
+    MA_CHANNEL_AUX_25 = 45,
+    MA_CHANNEL_AUX_26 = 46,
+    MA_CHANNEL_AUX_27 = 47,
+    MA_CHANNEL_AUX_28 = 48,
+    MA_CHANNEL_AUX_29 = 49,
+    MA_CHANNEL_AUX_30 = 50,
+    MA_CHANNEL_AUX_31 = 51,
+    MA_CHANNEL_POSITION_COUNT,
+    MA_CHANNEL_LEFT = 2,
+    MA_CHANNEL_RIGHT = 3
+}
+
+enum ma_result: i32 {
+    MA_SUCCESS = 0,
+    MA_ERROR = -1,
+    MA_INVALID_ARGS = -2,
+    MA_INVALID_OPERATION = -3,
+    MA_OUT_OF_MEMORY = -4,
+    MA_OUT_OF_RANGE = -5,
+    MA_ACCESS_DENIED = -6,
+    MA_DOES_NOT_EXIST = -7,
+    MA_ALREADY_EXISTS = -8,
+    MA_TOO_MANY_OPEN_FILES = -9,
+    MA_INVALID_FILE = -10,
+    MA_TOO_BIG = -11,
+    MA_PATH_TOO_LONG = -12,
+    MA_NAME_TOO_LONG = -13,
+    MA_NOT_DIRECTORY = -14,
+    MA_IS_DIRECTORY = -15,
+    MA_DIRECTORY_NOT_EMPTY = -16,
+    MA_AT_END = -17,
+    MA_NO_SPACE = -18,
+    MA_BUSY = -19,
+    MA_IO_ERROR = -20,
+    MA_INTERRUPT = -21,
+    MA_UNAVAILABLE = -22,
+    MA_ALREADY_IN_USE = -23,
+    MA_BAD_ADDRESS = -24,
+    MA_BAD_SEEK = -25,
+    MA_BAD_PIPE = -26,
+    MA_DEADLOCK = -27,
+    MA_TOO_MANY_LINKS = -28,
+    MA_NOT_IMPLEMENTED = -29,
+    MA_NO_MESSAGE = -30,
+    MA_BAD_MESSAGE = -31,
+    MA_NO_DATA_AVAILABLE = -32,
+    MA_INVALID_DATA = -33,
+    MA_TIMEOUT = -34,
+    MA_NO_NETWORK = -35,
+    MA_NOT_UNIQUE = -36,
+    MA_NOT_SOCKET = -37,
+    MA_NO_ADDRESS = -38,
+    MA_BAD_PROTOCOL = -39,
+    MA_PROTOCOL_UNAVAILABLE = -40,
+    MA_PROTOCOL_NOT_SUPPORTED = -41,
+    MA_PROTOCOL_FAMILY_NOT_SUPPORTED = -42,
+    MA_ADDRESS_FAMILY_NOT_SUPPORTED = -43,
+    MA_SOCKET_NOT_SUPPORTED = -44,
+    MA_CONNECTION_RESET = -45,
+    MA_ALREADY_CONNECTED = -46,
+    MA_NOT_CONNECTED = -47,
+    MA_CONNECTION_REFUSED = -48,
+    MA_NO_HOST = -49,
+    MA_IN_PROGRESS = -50,
+    MA_CANCELLED = -51,
+    MA_MEMORY_ALREADY_MAPPED = -52,
+    MA_CRC_MISMATCH = -100,
+    MA_FORMAT_NOT_SUPPORTED = -200,
+    MA_DEVICE_TYPE_NOT_SUPPORTED = -201,
+    MA_SHARE_MODE_NOT_SUPPORTED = -202,
+    MA_NO_BACKEND = -203,
+    MA_NO_DEVICE = -204,
+    MA_API_NOT_FOUND = -205,
+    MA_INVALID_DEVICE_CONFIG = -206,
+    MA_LOOP = -207,
+    MA_BACKEND_NOT_ENABLED = -208,
+    MA_DEVICE_NOT_INITIALIZED = -300,
+    MA_DEVICE_ALREADY_INITIALIZED = -301,
+    MA_DEVICE_NOT_STARTED = -302,
+    MA_DEVICE_NOT_STOPPED = -303,
+    MA_FAILED_TO_INIT_BACKEND = -400,
+    MA_FAILED_TO_OPEN_BACKEND_DEVICE = -401,
+    MA_FAILED_TO_START_BACKEND_DEVICE = -402,
+    MA_FAILED_TO_STOP_BACKEND_DEVICE = -403
+}
+
+enum ma_stream_format: i32 {
+    ma_stream_format_pcm = 0
+}
+
+enum ma_stream_layout: i32 {
+    ma_stream_layout_interleaved = 0,
+    ma_stream_layout_deinterleaved
+}
+
+enum ma_dither_mode: i32 {
+    ma_dither_mode_none = 0,
+    ma_dither_mode_rectangle,
+    ma_dither_mode_triangle
+}
+
+enum ma_format: i32 {
+    ma_format_unknown = 0,
+    ma_format_u8 = 1,
+    ma_format_s16 = 2,
+    ma_format_s24 = 3,
+    ma_format_s32 = 4,
+    ma_format_f32 = 5,
+    ma_format_count
+}
+
+enum ma_standard_sample_rate: i32 {
+    ma_standard_sample_rate_48000 = 48000,
+    ma_standard_sample_rate_44100 = 44100,
+    ma_standard_sample_rate_32000 = 32000,
+    ma_standard_sample_rate_24000 = 24000,
+    ma_standard_sample_rate_22050 = 22050,
+    ma_standard_sample_rate_88200 = 88200,
+    ma_standard_sample_rate_96000 = 96000,
+    ma_standard_sample_rate_176400 = 176400,
+    ma_standard_sample_rate_192000 = 192000,
+    ma_standard_sample_rate_16000 = 16000,
+    ma_standard_sample_rate_11025 = 11025,
+    ma_standard_sample_rate_8000 = 8000,
+    ma_standard_sample_rate_352800 = 352800,
+    ma_standard_sample_rate_384000 = 384000,
+    ma_standard_sample_rate_min = 8000,
+    ma_standard_sample_rate_max = 384000,
+    ma_standard_sample_rate_count = 14
+}
+
+enum ma_channel_mix_mode: i32 {
+    ma_channel_mix_mode_rectangular = 0,
+    ma_channel_mix_mode_simple,
+    ma_channel_mix_mode_custom_weights,
+    ma_channel_mix_mode_default = 0
+}
+
+enum ma_standard_channel_map: i32 {
+    ma_standard_channel_map_microsoft,
+    ma_standard_channel_map_alsa,
+    ma_standard_channel_map_rfc3551,
+    ma_standard_channel_map_flac,
+    ma_standard_channel_map_vorbis,
+    ma_standard_channel_map_sound4,
+    ma_standard_channel_map_sndio,
+    ma_standard_channel_map_webaudio = 3,
+    ma_standard_channel_map_default = 0
+}
+
+enum ma_performance_profile: i32 {
+    ma_performance_profile_low_latency = 0,
+    ma_performance_profile_conservative
+}
+
+struct ma_allocation_callbacks {
+    pub pUserData: *mut void,
+    pub onMalloc: fn(usize, *mut void) -> *mut void,
+    pub onRealloc: fn(*mut void, usize, *mut void) -> *mut void,
+    pub onFree: fn(*mut void, *mut void)
+}
+
+struct ma_lcg {
+    pub state: ma_uint32
+}
+
+struct ma_atomic_uint32 {
+    pub value: ma_uint32
+}
+
+struct ma_atomic_int32 {
+    pub value: ma_int32
+}
+
+struct ma_atomic_uint64 {
+    pub value: ma_uint64
+}
+
+struct ma_atomic_float {
+    pub value: ma_float
+}
+
+struct ma_atomic_bool32 {
+    pub value: ma_bool32
+}
+
+type ma_spinlock = ma_uint32;
+
+enum ma_thread_priority: i32 {
+    ma_thread_priority_idle = -5,
+    ma_thread_priority_lowest = -4,
+    ma_thread_priority_low = -3,
+    ma_thread_priority_normal = -2,
+    ma_thread_priority_high = -1,
+    ma_thread_priority_highest = 0,
+    ma_thread_priority_realtime = 1,
+    ma_thread_priority_default = 0
+}
+
+type ma_thread = ma_handle;
+type ma_mutex = ma_handle;
+type ma_event = ma_handle;
+type ma_semaphore = ma_handle;
+type ma_log_callback_proc = fn(*mut void, ma_uint32, *i8);
+
+struct ma_log_callback {
+    pub onLog: ma_log_callback_proc,
+    pub pUserData: *mut void
+}
+
+struct ma_log {
+    pub callbacks: [ma_log_callback; 4],
+    pub callbackCount: ma_uint32,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub lock: ma_mutex
+}
+
+struct ma_biquad_coefficient {
+    pub _data: [u32; 1]
+}
+
+struct ma_biquad_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub b0: f64,
+    pub b1: f64,
+    pub b2: f64,
+    pub a0: f64,
+    pub a1: f64,
+    pub a2: f64
+}
+
+struct ma_biquad {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub b0: ma_biquad_coefficient,
+    pub b1: ma_biquad_coefficient,
+    pub b2: ma_biquad_coefficient,
+    pub a1: ma_biquad_coefficient,
+    pub a2: ma_biquad_coefficient,
+    pub pR1: *mut ma_biquad_coefficient,
+    pub pR2: *mut ma_biquad_coefficient,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_lpf1_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub q: f64
+}
+
+type ma_lpf2_config = ma_lpf1_config;
+
+struct ma_lpf1 {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub a: ma_biquad_coefficient,
+    pub pR1: *mut ma_biquad_coefficient,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_lpf2 {
+    pub bq: ma_biquad
+}
+
+struct ma_lpf_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub order: ma_uint32
+}
+
+struct ma_lpf {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub lpf1Count: ma_uint32,
+    pub lpf2Count: ma_uint32,
+    pub pLPF1: *mut ma_lpf1,
+    pub pLPF2: *mut ma_lpf2,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_hpf1_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub q: f64
+}
+
+type ma_hpf2_config = ma_hpf1_config;
+
+struct ma_hpf1 {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub a: ma_biquad_coefficient,
+    pub pR1: *mut ma_biquad_coefficient,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_hpf2 {
+    pub bq: ma_biquad
+}
+
+struct ma_hpf_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub order: ma_uint32
+}
+
+struct ma_hpf {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub hpf1Count: ma_uint32,
+    pub hpf2Count: ma_uint32,
+    pub pHPF1: *mut ma_hpf1,
+    pub pHPF2: *mut ma_hpf2,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_bpf2_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub q: f64
+}
+
+struct ma_bpf2 {
+    pub bq: ma_biquad
+}
+
+struct ma_bpf_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cutoffFrequency: f64,
+    pub order: ma_uint32
+}
+
+struct ma_bpf {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub bpf2Count: ma_uint32,
+    pub pBPF2: *mut ma_bpf2,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_notch2_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub q: f64,
+    pub frequency: f64
+}
+
+type ma_notch_config = ma_notch2_config;
+
+struct ma_notch2 {
+    pub bq: ma_biquad
+}
+
+struct ma_peak2_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub gainDB: f64,
+    pub q: f64,
+    pub frequency: f64
+}
+
+type ma_peak_config = ma_peak2_config;
+
+struct ma_peak2 {
+    pub bq: ma_biquad
+}
+
+struct ma_loshelf2_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub gainDB: f64,
+    pub shelfSlope: f64,
+    pub frequency: f64
+}
+
+type ma_loshelf_config = ma_loshelf2_config;
+
+struct ma_loshelf2 {
+    pub bq: ma_biquad
+}
+
+struct ma_hishelf2_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub gainDB: f64,
+    pub shelfSlope: f64,
+    pub frequency: f64
+}
+
+type ma_hishelf_config = ma_hishelf2_config;
+
+struct ma_hishelf2 {
+    pub bq: ma_biquad
+}
+
+struct ma_delay_config {
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub delayInFrames: ma_uint32,
+    pub delayStart: ma_bool32,
+    pub wet: f32,
+    pub dry: f32,
+    pub decay: f32
+}
+
+struct ma_delay {
+    pub config: ma_delay_config,
+    pub cursor: ma_uint32,
+    pub bufferSizeInFrames: ma_uint32,
+    pub pBuffer: *mut f32
+}
+
+struct ma_gainer_config {
+    pub channels: ma_uint32,
+    pub smoothTimeInFrames: ma_uint32
+}
+
+struct ma_gainer {
+    pub config: ma_gainer_config,
+    pub t: ma_uint32,
+    pub masterVolume: f32,
+    pub pOldGains: *mut f32,
+    pub pNewGains: *mut f32,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+enum ma_pan_mode: i32 {
+    ma_pan_mode_balance = 0,
+    ma_pan_mode_pan
+}
+
+struct ma_panner_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub mode: ma_pan_mode,
+    pub pan: f32
+}
+
+struct ma_panner {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub mode: ma_pan_mode,
+    pub pan: f32
+}
+
+struct ma_fader_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32
+}
+
+struct ma_fader {
+    pub config: ma_fader_config,
+    pub volumeBeg: f32,
+    pub volumeEnd: f32,
+    pub lengthInFrames: ma_uint64,
+    pub cursorInFrames: ma_int64
+}
+
+struct ma_vec3f {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32
+}
+
+struct ma_atomic_vec3f {
+    pub v: ma_vec3f,
+    pub lock: ma_spinlock
+}
+
+enum ma_attenuation_model: i32 {
+    ma_attenuation_model_none,
+    ma_attenuation_model_inverse,
+    ma_attenuation_model_linear,
+    ma_attenuation_model_exponential
+}
+
+enum ma_positioning: i32 {
+    ma_positioning_absolute,
+    ma_positioning_relative
+}
+
+enum ma_handedness: i32 {
+    ma_handedness_right,
+    ma_handedness_left
+}
+
+struct ma_spatializer_listener_config {
+    pub channelsOut: ma_uint32,
+    pub pChannelMapOut: *mut ma_channel,
+    pub handedness: ma_handedness,
+    pub coneInnerAngleInRadians: f32,
+    pub coneOuterAngleInRadians: f32,
+    pub coneOuterGain: f32,
+    pub speedOfSound: f32,
+    pub worldUp: ma_vec3f
+}
+
+struct ma_spatializer_listener {
+    pub config: ma_spatializer_listener_config,
+    pub position: ma_atomic_vec3f,
+    pub direction: ma_atomic_vec3f,
+    pub velocity: ma_atomic_vec3f,
+    pub isEnabled: ma_bool32,
+    pub _ownsHeap: ma_bool32,
+    pub _pHeap: *mut void
+}
+
+struct ma_spatializer_config {
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub pChannelMapIn: *mut ma_channel,
+    pub attenuationModel: ma_attenuation_model,
+    pub positioning: ma_positioning,
+    pub handedness: ma_handedness,
+    pub minGain: f32,
+    pub maxGain: f32,
+    pub minDistance: f32,
+    pub maxDistance: f32,
+    pub rolloff: f32,
+    pub coneInnerAngleInRadians: f32,
+    pub coneOuterAngleInRadians: f32,
+    pub coneOuterGain: f32,
+    pub dopplerFactor: f32,
+    pub directionalAttenuationFactor: f32,
+    pub minSpatializationChannelGain: f32,
+    pub gainSmoothTimeInFrames: ma_uint32
+}
+
+struct ma_spatializer {
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub pChannelMapIn: *mut ma_channel,
+    pub attenuationModel: ma_attenuation_model,
+    pub positioning: ma_positioning,
+    pub handedness: ma_handedness,
+    pub minGain: f32,
+    pub maxGain: f32,
+    pub minDistance: f32,
+    pub maxDistance: f32,
+    pub rolloff: f32,
+    pub coneInnerAngleInRadians: f32,
+    pub coneOuterAngleInRadians: f32,
+    pub coneOuterGain: f32,
+    pub dopplerFactor: f32,
+    pub directionalAttenuationFactor: f32,
+    pub gainSmoothTimeInFrames: ma_uint32,
+    pub position: ma_atomic_vec3f,
+    pub direction: ma_atomic_vec3f,
+    pub velocity: ma_atomic_vec3f,
+    pub dopplerPitch: f32,
+    pub minSpatializationChannelGain: f32,
+    pub gainer: ma_gainer,
+    pub pNewChannelGainsOut: *mut f32,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_linear_resampler_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRateIn: ma_uint32,
+    pub sampleRateOut: ma_uint32,
+    pub lpfOrder: ma_uint32,
+    pub lpfNyquistFactor: f64
+}
+
+struct ma_linear_resampler_x0 {
+    pub _data: [u64; 1]
+}
+
+struct ma_linear_resampler_x1 {
+    pub _data: [u64; 1]
+}
+
+struct ma_linear_resampler {
+    pub config: ma_linear_resampler_config,
+    pub inAdvanceInt: ma_uint32,
+    pub inAdvanceFrac: ma_uint32,
+    pub inTimeInt: ma_uint32,
+    pub inTimeFrac: ma_uint32,
+    pub x0: ma_linear_resampler_x0,
+    pub x1: ma_linear_resampler_x1,
+    pub lpf: ma_lpf,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+type ma_resampling_backend = void;
+
+struct ma_resampling_backend_vtable {
+    pub onGetHeapSize: fn(*mut void, *ma_resampler_config, *mut usize) -> ma_result,
+    pub onInit: fn(*mut void, *ma_resampler_config, *mut void, *mut *mut ma_resampling_backend) -> ma_result,
+    pub onUninit: fn(*mut void, *mut ma_resampling_backend, *ma_allocation_callbacks),
+    pub onProcess: fn(*mut void, *mut ma_resampling_backend, *void, *mut ma_uint64, *mut void, *mut ma_uint64) -> ma_result,
+    pub onSetRate: fn(*mut void, *mut ma_resampling_backend, ma_uint32, ma_uint32) -> ma_result,
+    pub onGetInputLatency: fn(*mut void, *ma_resampling_backend) -> ma_uint64,
+    pub onGetOutputLatency: fn(*mut void, *ma_resampling_backend) -> ma_uint64,
+    pub onGetRequiredInputFrameCount: fn(*mut void, *ma_resampling_backend, ma_uint64, *mut ma_uint64) -> ma_result,
+    pub onGetExpectedOutputFrameCount: fn(*mut void, *ma_resampling_backend, ma_uint64, *mut ma_uint64) -> ma_result,
+    pub onReset: fn(*mut void, *mut ma_resampling_backend) -> ma_result
+}
+
+enum ma_resample_algorithm: i32 {
+    ma_resample_algorithm_linear = 0,
+    ma_resample_algorithm_custom
+}
+
+struct ma_resampler_config_linear {
+    pub lpfOrder: ma_uint32
+}
+
+struct ma_resampler_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRateIn: ma_uint32,
+    pub sampleRateOut: ma_uint32,
+    pub algorithm: ma_resample_algorithm,
+    pub pBackendVTable: *mut ma_resampling_backend_vtable,
+    pub pBackendUserData: *mut void,
+    pub linear: ma_resampler_config_linear
+}
+
+struct ma_resampler_state {
+    pub _data: [u64; 17]
+}
+
+struct ma_resampler {
+    pub pBackend: *mut ma_resampling_backend,
+    pub pBackendVTable: *mut ma_resampling_backend_vtable,
+    pub pBackendUserData: *mut void,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRateIn: ma_uint32,
+    pub sampleRateOut: ma_uint32,
+    pub state: ma_resampler_state,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+enum ma_channel_conversion_path: i32 {
+    ma_channel_conversion_path_unknown,
+    ma_channel_conversion_path_passthrough,
+    ma_channel_conversion_path_mono_out,
+    ma_channel_conversion_path_mono_in,
+    ma_channel_conversion_path_shuffle,
+    ma_channel_conversion_path_weights
+}
+
+enum ma_mono_expansion_mode: i32 {
+    ma_mono_expansion_mode_duplicate = 0,
+    ma_mono_expansion_mode_average,
+    ma_mono_expansion_mode_stereo_only,
+    ma_mono_expansion_mode_default = 0
+}
+
+struct ma_channel_converter_config {
+    pub format: ma_format,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub pChannelMapIn: *ma_channel,
+    pub pChannelMapOut: *ma_channel,
+    pub mixingMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub ppWeights: *mut *mut f32
+}
+
+struct ma_channel_converter_weights {
+    pub _data: [u64; 1]
+}
+
+struct ma_channel_converter {
+    pub format: ma_format,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub mixingMode: ma_channel_mix_mode,
+    pub conversionPath: ma_channel_conversion_path,
+    pub pChannelMapIn: *mut ma_channel,
+    pub pChannelMapOut: *mut ma_channel,
+    pub pShuffleTable: *mut ma_uint8,
+    pub weights: ma_channel_converter_weights,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_data_converter_config {
+    pub formatIn: ma_format,
+    pub formatOut: ma_format,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub sampleRateIn: ma_uint32,
+    pub sampleRateOut: ma_uint32,
+    pub pChannelMapIn: *mut ma_channel,
+    pub pChannelMapOut: *mut ma_channel,
+    pub ditherMode: ma_dither_mode,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub ppChannelWeights: *mut *mut f32,
+    pub allowDynamicSampleRate: ma_bool32,
+    pub resampling: ma_resampler_config
+}
+
+enum ma_data_converter_execution_path: i32 {
+    ma_data_converter_execution_path_passthrough,
+    ma_data_converter_execution_path_format_only,
+    ma_data_converter_execution_path_channels_only,
+    ma_data_converter_execution_path_resample_only,
+    ma_data_converter_execution_path_resample_first,
+    ma_data_converter_execution_path_channels_first
+}
+
+struct ma_data_converter {
+    pub formatIn: ma_format,
+    pub formatOut: ma_format,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub sampleRateIn: ma_uint32,
+    pub sampleRateOut: ma_uint32,
+    pub ditherMode: ma_dither_mode,
+    pub executionPath: ma_data_converter_execution_path,
+    pub channelConverter: ma_channel_converter,
+    pub resampler: ma_resampler,
+    pub hasPreFormatConversion: ma_bool8,
+    pub hasPostFormatConversion: ma_bool8,
+    pub hasChannelConverter: ma_bool8,
+    pub hasResampler: ma_bool8,
+    pub isPassthrough: ma_bool8,
+    pub _ownsHeap: ma_bool8,
+    pub _pHeap: *mut void
+}
+
+type ma_data_source = void;
+
+struct ma_data_source_vtable {
+    pub onRead: fn(*mut ma_data_source, *mut void, ma_uint64, *mut ma_uint64) -> ma_result,
+    pub onSeek: fn(*mut ma_data_source, ma_uint64) -> ma_result,
+    pub onGetDataFormat: fn(*mut ma_data_source, *mut ma_format, *mut ma_uint32, *mut ma_uint32, *mut ma_channel, usize) -> ma_result,
+    pub onGetCursor: fn(*mut ma_data_source, *mut ma_uint64) -> ma_result,
+    pub onGetLength: fn(*mut ma_data_source, *mut ma_uint64) -> ma_result,
+    pub onSetLooping: fn(*mut ma_data_source, ma_bool32) -> ma_result,
+    pub flags: ma_uint32
+}
+
+type ma_data_source_get_next_proc = fn(*mut ma_data_source) -> *mut ma_data_source;
+
+struct ma_data_source_config {
+    pub vtable: *ma_data_source_vtable
+}
+
+struct ma_data_source_base {
+    pub vtable: *ma_data_source_vtable,
+    pub rangeBegInFrames: ma_uint64,
+    pub rangeEndInFrames: ma_uint64,
+    pub loopBegInFrames: ma_uint64,
+    pub loopEndInFrames: ma_uint64,
+    pub pCurrent: *mut ma_data_source,
+    pub pNext: *mut ma_data_source,
+    pub onGetNext: ma_data_source_get_next_proc,
+    pub isLooping: ma_bool32
+}
+
+struct ma_audio_buffer_ref {
+    pub ds: ma_data_source_base,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub cursor: ma_uint64,
+    pub sizeInFrames: ma_uint64,
+    pub pData: *void
+}
+
+struct ma_audio_buffer_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub sizeInFrames: ma_uint64,
+    pub pData: *void,
+    pub allocationCallbacks: ma_allocation_callbacks
+}
+
+struct ma_audio_buffer {
+    pub ref: ma_audio_buffer_ref,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub ownsData: ma_bool32,
+    pub _pExtraData: [ma_uint8; 1]
+}
+
+struct ma_paged_audio_buffer_page {
+    pub pNext: *mut ma_paged_audio_buffer_page,
+    pub sizeInFrames: ma_uint64,
+    pub pAudioData: [ma_uint8; 1]
+}
+
+struct ma_paged_audio_buffer_data {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub head: ma_paged_audio_buffer_page,
+    pub pTail: *mut ma_paged_audio_buffer_page
+}
+
+struct ma_paged_audio_buffer_config {
+    pub pData: *mut ma_paged_audio_buffer_data
+}
+
+struct ma_paged_audio_buffer {
+    pub ds: ma_data_source_base,
+    pub pData: *mut ma_paged_audio_buffer_data,
+    pub pCurrent: *mut ma_paged_audio_buffer_page,
+    pub relativeCursor: ma_uint64,
+    pub absoluteCursor: ma_uint64
+}
+
+struct ma_rb {
+    pub pBuffer: *mut void,
+    pub subbufferSizeInBytes: ma_uint32,
+    pub subbufferCount: ma_uint32,
+    pub subbufferStrideInBytes: ma_uint32,
+    pub encodedReadOffset: ma_uint32,
+    pub encodedWriteOffset: ma_uint32,
+    pub ownsBuffer: ma_bool8,
+    pub clearOnWriteAcquire: ma_bool8,
+    pub allocationCallbacks: ma_allocation_callbacks
+}
+
+struct ma_pcm_rb {
+    pub ds: ma_data_source_base,
+    pub rb: ma_rb,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32
+}
+
+struct ma_duplex_rb {
+    pub rb: ma_pcm_rb
+}
+
+fn ma_get_bytes_per_frame(format: ma_format, channels: ma_uint32) -> ma_uint32 {
+    return ma_get_bytes_per_sample(format) * channels;
+}
+
+struct ma_fence {
+    pub e: ma_event,
+    pub counter: ma_uint32
+}
+
+type ma_async_notification = void;
+
+struct ma_async_notification_callbacks {
+    pub onSignal: fn(*mut ma_async_notification)
+}
+
+struct ma_async_notification_poll {
+    pub cb: ma_async_notification_callbacks,
+    pub signalled: ma_bool32
+}
+
+struct ma_async_notification_event {
+    pub cb: ma_async_notification_callbacks,
+    pub e: ma_event
+}
+
+struct ma_slot_allocator_config {
+    pub capacity: ma_uint32
+}
+
+struct ma_slot_allocator_group {
+    pub bitfield: ma_uint32
+}
+
+struct ma_slot_allocator {
+    pub pGroups: *mut ma_slot_allocator_group,
+    pub pSlots: *mut ma_uint32,
+    pub count: ma_uint32,
+    pub capacity: ma_uint32,
+    pub _ownsHeap: ma_bool32,
+    pub _pHeap: *mut void
+}
+
+type ma_job_proc = fn(*mut ma_job) -> ma_result;
+
+enum ma_job_type: i32 {
+    MA_JOB_TYPE_QUIT = 0,
+    MA_JOB_TYPE_CUSTOM,
+    MA_JOB_TYPE_RESOURCE_MANAGER_LOAD_DATA_BUFFER_NODE,
+    MA_JOB_TYPE_RESOURCE_MANAGER_FREE_DATA_BUFFER_NODE,
+    MA_JOB_TYPE_RESOURCE_MANAGER_PAGE_DATA_BUFFER_NODE,
+    MA_JOB_TYPE_RESOURCE_MANAGER_LOAD_DATA_BUFFER,
+    MA_JOB_TYPE_RESOURCE_MANAGER_FREE_DATA_BUFFER,
+    MA_JOB_TYPE_RESOURCE_MANAGER_LOAD_DATA_STREAM,
+    MA_JOB_TYPE_RESOURCE_MANAGER_FREE_DATA_STREAM,
+    MA_JOB_TYPE_RESOURCE_MANAGER_PAGE_DATA_STREAM,
+    MA_JOB_TYPE_RESOURCE_MANAGER_SEEK_DATA_STREAM,
+    MA_JOB_TYPE_DEVICE_AAUDIO_REROUTE,
+    MA_JOB_TYPE_COUNT
+}
+
+struct ma_job_toc {
+    pub _data: [u64; 1]
+}
+
+struct ma_job_data {
+    pub _data: [u64; 10]
+}
+
+struct ma_job {
+    pub toc: ma_job_toc,
+    pub next: ma_uint64,
+    pub order: ma_uint32,
+    pub data: ma_job_data
+}
+
+enum ma_job_queue_flags: i32 {
+    MA_JOB_QUEUE_FLAG_NON_BLOCKING = 0x00000001
+}
+
+struct ma_job_queue_config {
+    pub flags: ma_uint32,
+    pub capacity: ma_uint32
+}
+
+struct ma_job_queue {
+    pub flags: ma_uint32,
+    pub capacity: ma_uint32,
+    pub head: ma_uint64,
+    pub tail: ma_uint64,
+    pub sem: ma_semaphore,
+    pub allocator: ma_slot_allocator,
+    pub pJobs: *mut ma_job,
+    pub lock: ma_spinlock,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+enum ma_device_state: i32 {
+    ma_device_state_uninitialized = 0,
+    ma_device_state_stopped = 1,
+    ma_device_state_started = 2,
+    ma_device_state_starting = 3,
+    ma_device_state_stopping = 4
+}
+
+struct ma_atomic_device_state {
+    pub value: ma_device_state
+}
+
+struct ma_IMMNotificationClient {
+    pub lpVtbl: *mut void,
+    pub counter: ma_uint32,
+    pub pDevice: *mut ma_device
+}
+
+enum ma_backend: i32 {
+    ma_backend_wasapi,
+    ma_backend_dsound,
+    ma_backend_winmm,
+    ma_backend_coreaudio,
+    ma_backend_sndio,
+    ma_backend_audio4,
+    ma_backend_oss,
+    ma_backend_pulseaudio,
+    ma_backend_alsa,
+    ma_backend_jack,
+    ma_backend_aaudio,
+    ma_backend_opensl,
+    ma_backend_webaudio,
+    ma_backend_custom,
+    ma_backend_null
+}
+
+struct ma_device_job_thread_config {
+    pub noThread: ma_bool32,
+    pub jobQueueCapacity: ma_uint32,
+    pub jobQueueFlags: ma_uint32
+}
+
+struct ma_device_job_thread {
+    pub thread: ma_thread,
+    pub jobQueue: ma_job_queue,
+    pub _hasThread: ma_bool32
+}
+
+enum ma_device_notification_type: i32 {
+    ma_device_notification_type_started,
+    ma_device_notification_type_stopped,
+    ma_device_notification_type_rerouted,
+    ma_device_notification_type_interruption_began,
+    ma_device_notification_type_interruption_ended,
+    ma_device_notification_type_unlocked
+}
+
+struct ma_device_notification_data {
+    pub _data: [u32; 1]
+}
+
+struct ma_device_notification {
+    pub pDevice: *mut ma_device,
+    pub _type: ma_device_notification_type,
+    pub data: ma_device_notification_data
+}
+
+type ma_device_notification_proc = fn(*ma_device_notification);
+type ma_device_data_proc = fn(*mut ma_device, *mut void, *void, ma_uint32);
+type ma_stop_proc = fn(*mut ma_device);
+
+enum ma_device_type: i32 {
+    ma_device_type_playback = 1,
+    ma_device_type_capture = 2,
+    ma_device_type_duplex = 3,
+    ma_device_type_loopback = 4
+}
+
+enum ma_share_mode: i32 {
+    ma_share_mode_shared = 0,
+    ma_share_mode_exclusive
+}
+
+enum ma_ios_session_category: i32 {
+    ma_ios_session_category_default = 0,
+    ma_ios_session_category_none,
+    ma_ios_session_category_ambient,
+    ma_ios_session_category_solo_ambient,
+    ma_ios_session_category_playback,
+    ma_ios_session_category_record,
+    ma_ios_session_category_play_and_record,
+    ma_ios_session_category_multi_route
+}
+
+enum ma_ios_session_category_option: i32 {
+    ma_ios_session_category_option_mix_with_others = 0x01,
+    ma_ios_session_category_option_duck_others = 0x02,
+    ma_ios_session_category_option_allow_bluetooth = 0x04,
+    ma_ios_session_category_option_default_to_speaker = 0x08,
+    ma_ios_session_category_option_interrupt_spoken_audio_and_mix_with_others = 0x11,
+    ma_ios_session_category_option_allow_bluetooth_a2dp = 0x20,
+    ma_ios_session_category_option_allow_air_play = 0x40
+}
+
+enum ma_opensl_stream_type: i32 {
+    ma_opensl_stream_type_default = 0,
+    ma_opensl_stream_type_voice,
+    ma_opensl_stream_type_system,
+    ma_opensl_stream_type_ring,
+    ma_opensl_stream_type_media,
+    ma_opensl_stream_type_alarm,
+    ma_opensl_stream_type_notification
+}
+
+enum ma_opensl_recording_preset: i32 {
+    ma_opensl_recording_preset_default = 0,
+    ma_opensl_recording_preset_generic,
+    ma_opensl_recording_preset_camcorder,
+    ma_opensl_recording_preset_voice_recognition,
+    ma_opensl_recording_preset_voice_communication,
+    ma_opensl_recording_preset_voice_unprocessed
+}
+
+enum ma_wasapi_usage: i32 {
+    ma_wasapi_usage_default = 0,
+    ma_wasapi_usage_games,
+    ma_wasapi_usage_pro_audio
+}
+
+enum ma_aaudio_usage: i32 {
+    ma_aaudio_usage_default = 0,
+    ma_aaudio_usage_media,
+    ma_aaudio_usage_voice_communication,
+    ma_aaudio_usage_voice_communication_signalling,
+    ma_aaudio_usage_alarm,
+    ma_aaudio_usage_notification,
+    ma_aaudio_usage_notification_ringtone,
+    ma_aaudio_usage_notification_event,
+    ma_aaudio_usage_assistance_accessibility,
+    ma_aaudio_usage_assistance_navigation_guidance,
+    ma_aaudio_usage_assistance_sonification,
+    ma_aaudio_usage_game,
+    ma_aaudio_usage_assitant,
+    ma_aaudio_usage_emergency,
+    ma_aaudio_usage_safety,
+    ma_aaudio_usage_vehicle_status,
+    ma_aaudio_usage_announcement
+}
+
+enum ma_aaudio_content_type: i32 {
+    ma_aaudio_content_type_default = 0,
+    ma_aaudio_content_type_speech,
+    ma_aaudio_content_type_music,
+    ma_aaudio_content_type_movie,
+    ma_aaudio_content_type_sonification
+}
+
+enum ma_aaudio_input_preset: i32 {
+    ma_aaudio_input_preset_default = 0,
+    ma_aaudio_input_preset_generic,
+    ma_aaudio_input_preset_camcorder,
+    ma_aaudio_input_preset_voice_recognition,
+    ma_aaudio_input_preset_voice_communication,
+    ma_aaudio_input_preset_unprocessed,
+    ma_aaudio_input_preset_voice_performance
+}
+
+enum ma_aaudio_allowed_capture_policy: i32 {
+    ma_aaudio_allow_capture_default = 0,
+    ma_aaudio_allow_capture_by_all,
+    ma_aaudio_allow_capture_by_system,
+    ma_aaudio_allow_capture_by_none
+}
+
+struct ma_timer {
+    pub _data: [u64; 1]
+}
+
+struct ma_device_id {
+    pub _data: [u64; 32]
+}
+
+struct ma_device_info_nativeDataFormats {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub flags: ma_uint32
+}
+
+struct ma_device_info {
+    pub id: ma_device_id,
+    pub name: [i8; 256],
+    pub isDefault: ma_bool32,
+    pub nativeDataFormatCount: ma_uint32,
+    pub nativeDataFormats: [ma_device_info_nativeDataFormats; 64]
+}
+
+struct ma_device_config_playback {
+    pub pDeviceID: *ma_device_id,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub pChannelMap: *mut ma_channel,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub shareMode: ma_share_mode
+}
+
+struct ma_device_config_capture {
+    pub pDeviceID: *ma_device_id,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub pChannelMap: *mut ma_channel,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub shareMode: ma_share_mode
+}
+
+struct ma_device_config_wasapi {
+    pub usage: ma_wasapi_usage,
+    pub noAutoConvertSRC: ma_bool8,
+    pub noDefaultQualitySRC: ma_bool8,
+    pub noAutoStreamRouting: ma_bool8,
+    pub noHardwareOffloading: ma_bool8,
+    pub loopbackProcessID: ma_uint32,
+    pub loopbackProcessExclude: ma_bool8
+}
+
+struct ma_device_config_alsa {
+    pub noMMap: ma_bool32,
+    pub noAutoFormat: ma_bool32,
+    pub noAutoChannels: ma_bool32,
+    pub noAutoResample: ma_bool32
+}
+
+struct ma_device_config_pulse {
+    pub pStreamNamePlayback: *i8,
+    pub pStreamNameCapture: *i8,
+    pub channelMap: i32
+}
+
+struct ma_device_config_coreaudio {
+    pub allowNominalSampleRateChange: ma_bool32
+}
+
+struct ma_device_config_opensl {
+    pub streamType: ma_opensl_stream_type,
+    pub recordingPreset: ma_opensl_recording_preset,
+    pub enableCompatibilityWorkarounds: ma_bool32
+}
+
+struct ma_device_config_aaudio {
+    pub usage: ma_aaudio_usage,
+    pub contentType: ma_aaudio_content_type,
+    pub inputPreset: ma_aaudio_input_preset,
+    pub allowedCapturePolicy: ma_aaudio_allowed_capture_policy,
+    pub noAutoStartAfterReroute: ma_bool32,
+    pub enableCompatibilityWorkarounds: ma_bool32,
+    pub allowSetBufferCapacity: ma_bool32
+}
+
+struct ma_device_config {
+    pub deviceType: ma_device_type,
+    pub sampleRate: ma_uint32,
+    pub periodSizeInFrames: ma_uint32,
+    pub periodSizeInMilliseconds: ma_uint32,
+    pub periods: ma_uint32,
+    pub performanceProfile: ma_performance_profile,
+    pub noPreSilencedOutputBuffer: ma_bool8,
+    pub noClip: ma_bool8,
+    pub noDisableDenormals: ma_bool8,
+    pub noFixedSizedCallback: ma_bool8,
+    pub dataCallback: ma_device_data_proc,
+    pub notificationCallback: ma_device_notification_proc,
+    pub stopCallback: ma_stop_proc,
+    pub pUserData: *mut void,
+    pub resampling: ma_resampler_config,
+    pub playback: ma_device_config_playback,
+    pub capture: ma_device_config_capture,
+    pub wasapi: ma_device_config_wasapi,
+    pub alsa: ma_device_config_alsa,
+    pub pulse: ma_device_config_pulse,
+    pub coreaudio: ma_device_config_coreaudio,
+    pub opensl: ma_device_config_opensl,
+    pub aaudio: ma_device_config_aaudio
+}
+
+type ma_enum_devices_callback_proc = fn(*mut ma_context, ma_device_type, *ma_device_info, *mut void) -> ma_bool32;
+
+struct ma_device_descriptor {
+    pub pDeviceID: *ma_device_id,
+    pub shareMode: ma_share_mode,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub channelMap: [ma_channel; 254],
+    pub periodSizeInFrames: ma_uint32,
+    pub periodSizeInMilliseconds: ma_uint32,
+    pub periodCount: ma_uint32
+}
+
+struct ma_backend_callbacks {
+    pub onContextInit: fn(*mut ma_context, *ma_context_config, *mut ma_backend_callbacks) -> ma_result,
+    pub onContextUninit: fn(*mut ma_context) -> ma_result,
+    pub onContextEnumerateDevices: fn(*mut ma_context, ma_enum_devices_callback_proc, *mut void) -> ma_result,
+    pub onContextGetDeviceInfo: fn(*mut ma_context, ma_device_type, *ma_device_id, *mut ma_device_info) -> ma_result,
+    pub onDeviceInit: fn(*mut ma_device, *ma_device_config, *mut ma_device_descriptor, *mut ma_device_descriptor) -> ma_result,
+    pub onDeviceUninit: fn(*mut ma_device) -> ma_result,
+    pub onDeviceStart: fn(*mut ma_device) -> ma_result,
+    pub onDeviceStop: fn(*mut ma_device) -> ma_result,
+    pub onDeviceRead: fn(*mut ma_device, *mut void, ma_uint32, *mut ma_uint32) -> ma_result,
+    pub onDeviceWrite: fn(*mut ma_device, *void, ma_uint32, *mut ma_uint32) -> ma_result,
+    pub onDeviceDataLoop: fn(*mut ma_device) -> ma_result,
+    pub onDeviceDataLoopWakeup: fn(*mut ma_device) -> ma_result,
+    pub onDeviceGetInfo: fn(*mut ma_device, ma_device_type, *mut ma_device_info) -> ma_result
+}
+
+struct ma_context_config_dsound {
+    pub hWnd: ma_handle
+}
+
+struct ma_context_config_alsa {
+    pub useVerboseDeviceEnumeration: ma_bool32
+}
+
+struct ma_context_config_pulse {
+    pub pApplicationName: *i8,
+    pub pServerName: *i8,
+    pub tryAutoSpawn: ma_bool32
+}
+
+struct ma_context_config_coreaudio {
+    pub sessionCategory: ma_ios_session_category,
+    pub sessionCategoryOptions: ma_uint32,
+    pub noAudioSessionActivate: ma_bool32,
+    pub noAudioSessionDeactivate: ma_bool32
+}
+
+struct ma_context_config_jack {
+    pub pClientName: *i8,
+    pub tryStartServer: ma_bool32
+}
+
+struct ma_context_config {
+    pub pLog: *mut ma_log,
+    pub threadPriority: ma_thread_priority,
+    pub threadStackSize: usize,
+    pub pUserData: *mut void,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub dsound: ma_context_config_dsound,
+    pub alsa: ma_context_config_alsa,
+    pub pulse: ma_context_config_pulse,
+    pub coreaudio: ma_context_config_coreaudio,
+    pub jack: ma_context_config_jack,
+    pub custom: ma_backend_callbacks
+}
+
+struct ma_context_command__wasapi_data {
+    pub _data: [u64; 4]
+}
+
+struct ma_context_command__wasapi {
+    pub code: i32,
+    pub pEvent: *mut ma_event,
+    pub data: ma_context_command__wasapi_data
+}
+
+struct ma_context_0 {
+    pub _data: [u64; 33]
+}
+
+struct ma_context_1 {
+    pub _data: [u64; 16]
+}
+
+struct ma_context {
+    pub callbacks: ma_backend_callbacks,
+    pub backend: ma_backend,
+    pub pLog: *mut ma_log,
+    pub log: ma_log,
+    pub threadPriority: ma_thread_priority,
+    pub threadStackSize: usize,
+    pub pUserData: *mut void,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub deviceEnumLock: ma_mutex,
+    pub deviceInfoLock: ma_mutex,
+    pub deviceInfoCapacity: ma_uint32,
+    pub playbackDeviceInfoCount: ma_uint32,
+    pub captureDeviceInfoCount: ma_uint32,
+    pub pDeviceInfos: *mut ma_device_info,
+    pub _0: ma_context_0,
+    pub _1: ma_context_1
+}
+
+struct ma_device_resampling_linear {
+    pub lpfOrder: ma_uint32
+}
+
+struct ma_device_resampling {
+    pub algorithm: ma_resample_algorithm,
+    pub pBackendVTable: *mut ma_resampling_backend_vtable,
+    pub pBackendUserData: *mut void,
+    pub linear: ma_device_resampling_linear
+}
+
+struct ma_device_playback {
+    pub pID: *mut ma_device_id,
+    pub id: ma_device_id,
+    pub name: [i8; 256],
+    pub shareMode: ma_share_mode,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub channelMap: [ma_channel; 254],
+    pub internalFormat: ma_format,
+    pub internalChannels: ma_uint32,
+    pub internalSampleRate: ma_uint32,
+    pub internalChannelMap: [ma_channel; 254],
+    pub internalPeriodSizeInFrames: ma_uint32,
+    pub internalPeriods: ma_uint32,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub converter: ma_data_converter,
+    pub pIntermediaryBuffer: *mut void,
+    pub intermediaryBufferCap: ma_uint32,
+    pub intermediaryBufferLen: ma_uint32,
+    pub pInputCache: *mut void,
+    pub inputCacheCap: ma_uint64,
+    pub inputCacheConsumed: ma_uint64,
+    pub inputCacheRemaining: ma_uint64
+}
+
+struct ma_device_capture {
+    pub pID: *mut ma_device_id,
+    pub id: ma_device_id,
+    pub name: [i8; 256],
+    pub shareMode: ma_share_mode,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub channelMap: [ma_channel; 254],
+    pub internalFormat: ma_format,
+    pub internalChannels: ma_uint32,
+    pub internalSampleRate: ma_uint32,
+    pub internalChannelMap: [ma_channel; 254],
+    pub internalPeriodSizeInFrames: ma_uint32,
+    pub internalPeriods: ma_uint32,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub calculateLFEFromSpatialChannels: ma_bool32,
+    pub converter: ma_data_converter,
+    pub pIntermediaryBuffer: *mut void,
+    pub intermediaryBufferCap: ma_uint32,
+    pub intermediaryBufferLen: ma_uint32
+}
+
+struct ma_device_0 {
+    pub _data: [u64; 23]
+}
+
+struct ma_device {
+    pub pContext: *mut ma_context,
+    pub _type: ma_device_type,
+    pub sampleRate: ma_uint32,
+    pub state: ma_atomic_device_state,
+    pub onData: ma_device_data_proc,
+    pub onNotification: ma_device_notification_proc,
+    pub onStop: ma_stop_proc,
+    pub pUserData: *mut void,
+    pub startStopLock: ma_mutex,
+    pub wakeupEvent: ma_event,
+    pub startEvent: ma_event,
+    pub stopEvent: ma_event,
+    pub thread: ma_thread,
+    pub workResult: ma_result,
+    pub isOwnerOfContext: ma_bool8,
+    pub noPreSilencedOutputBuffer: ma_bool8,
+    pub noClip: ma_bool8,
+    pub noDisableDenormals: ma_bool8,
+    pub noFixedSizedCallback: ma_bool8,
+    pub masterVolumeFactor: ma_atomic_float,
+    pub duplexRB: ma_duplex_rb,
+    pub resampling: ma_device_resampling,
+    pub playback: ma_device_playback,
+    pub capture: ma_device_capture,
+    pub _0: ma_device_0
+}
+
+type ma_vfs = void;
+type ma_vfs_file = ma_handle;
+
+enum ma_open_mode_flags: i32 {
+    MA_OPEN_MODE_READ = 0x00000001,
+    MA_OPEN_MODE_WRITE = 0x00000002
+}
+
+enum ma_seek_origin: i32 {
+    ma_seek_origin_start,
+    ma_seek_origin_current,
+    ma_seek_origin_end
+}
+
+struct ma_file_info {
+    pub sizeInBytes: ma_uint64
+}
+
+struct ma_vfs_callbacks {
+    pub onOpen: fn(*mut ma_vfs, *i8, ma_uint32, *mut ma_vfs_file) -> ma_result,
+    pub onOpenW: fn(*mut ma_vfs, *u16, ma_uint32, *mut ma_vfs_file) -> ma_result,
+    pub onClose: fn(*mut ma_vfs, ma_vfs_file) -> ma_result,
+    pub onRead: fn(*mut ma_vfs, ma_vfs_file, *mut void, usize, *mut usize) -> ma_result,
+    pub onWrite: fn(*mut ma_vfs, ma_vfs_file, *void, usize, *mut usize) -> ma_result,
+    pub onSeek: fn(*mut ma_vfs, ma_vfs_file, ma_int64, ma_seek_origin) -> ma_result,
+    pub onTell: fn(*mut ma_vfs, ma_vfs_file, *mut ma_int64) -> ma_result,
+    pub onInfo: fn(*mut ma_vfs, ma_vfs_file, *mut ma_file_info) -> ma_result
+}
+
+struct ma_default_vfs {
+    pub cb: ma_vfs_callbacks,
+    pub allocationCallbacks: ma_allocation_callbacks
+}
+
+type ma_read_proc = fn(*mut void, *mut void, usize, *mut usize) -> ma_result;
+type ma_seek_proc = fn(*mut void, ma_int64, ma_seek_origin) -> ma_result;
+type ma_tell_proc = fn(*mut void, *mut ma_int64) -> ma_result;
+
+enum ma_encoding_format: i32 {
+    ma_encoding_format_unknown = 0,
+    ma_encoding_format_wav,
+    ma_encoding_format_flac,
+    ma_encoding_format_mp3,
+    ma_encoding_format_vorbis
+}
+
+struct ma_decoding_backend_config {
+    pub preferredFormat: ma_format,
+    pub seekPointCount: ma_uint32
+}
+
+struct ma_decoding_backend_vtable {
+    pub onInit: fn(*mut void, ma_read_proc, ma_seek_proc, ma_tell_proc, *mut void, *ma_decoding_backend_config, *ma_allocation_callbacks, *mut *mut ma_data_source) -> ma_result,
+    pub onInitFile: fn(*mut void, *i8, *ma_decoding_backend_config, *ma_allocation_callbacks, *mut *mut ma_data_source) -> ma_result,
+    pub onInitFileW: fn(*mut void, *u16, *ma_decoding_backend_config, *ma_allocation_callbacks, *mut *mut ma_data_source) -> ma_result,
+    pub onInitMemory: fn(*mut void, *void, usize, *ma_decoding_backend_config, *ma_allocation_callbacks, *mut *mut ma_data_source) -> ma_result,
+    pub onUninit: fn(*mut void, *mut ma_data_source, *ma_allocation_callbacks)
+}
+
+type ma_decoder_read_proc = fn(*mut ma_decoder, *mut void, usize, *mut usize) -> ma_result;
+type ma_decoder_seek_proc = fn(*mut ma_decoder, ma_int64, ma_seek_origin) -> ma_result;
+type ma_decoder_tell_proc = fn(*mut ma_decoder, *mut ma_int64) -> ma_result;
+
+struct ma_decoder_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub pChannelMap: *mut ma_channel,
+    pub channelMixMode: ma_channel_mix_mode,
+    pub ditherMode: ma_dither_mode,
+    pub resampling: ma_resampler_config,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub encodingFormat: ma_encoding_format,
+    pub seekPointCount: ma_uint32,
+    pub ppCustomBackendVTables: *mut *mut ma_decoding_backend_vtable,
+    pub customBackendCount: ma_uint32,
+    pub pCustomBackendUserData: *mut void
+}
+
+struct ma_decoder_data {
+    pub _data: [u64; 3]
+}
+
+struct ma_decoder {
+    pub ds: ma_data_source_base,
+    pub pBackend: *mut ma_data_source,
+    pub pBackendVTable: *ma_decoding_backend_vtable,
+    pub pBackendUserData: *mut void,
+    pub onRead: ma_decoder_read_proc,
+    pub onSeek: ma_decoder_seek_proc,
+    pub onTell: ma_decoder_tell_proc,
+    pub pUserData: *mut void,
+    pub readPointerInPCMFrames: ma_uint64,
+    pub outputFormat: ma_format,
+    pub outputChannels: ma_uint32,
+    pub outputSampleRate: ma_uint32,
+    pub converter: ma_data_converter,
+    pub pInputCache: *mut void,
+    pub inputCacheCap: ma_uint64,
+    pub inputCacheConsumed: ma_uint64,
+    pub inputCacheRemaining: ma_uint64,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub data: ma_decoder_data
+}
+
+type ma_encoder_write_proc = fn(*mut ma_encoder, *void, usize, *mut usize) -> ma_result;
+type ma_encoder_seek_proc = fn(*mut ma_encoder, ma_int64, ma_seek_origin) -> ma_result;
+type ma_encoder_init_proc = fn(*mut ma_encoder) -> ma_result;
+type ma_encoder_uninit_proc = fn(*mut ma_encoder);
+type ma_encoder_write_pcm_frames_proc = fn(*mut ma_encoder, *void, ma_uint64, *mut ma_uint64) -> ma_result;
+
+struct ma_encoder_config {
+    pub encodingFormat: ma_encoding_format,
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub allocationCallbacks: ma_allocation_callbacks
+}
+
+struct ma_encoder_data {
+    pub _data: [u64; 2]
+}
+
+struct ma_encoder {
+    pub config: ma_encoder_config,
+    pub onWrite: ma_encoder_write_proc,
+    pub onSeek: ma_encoder_seek_proc,
+    pub onInit: ma_encoder_init_proc,
+    pub onUninit: ma_encoder_uninit_proc,
+    pub onWritePCMFrames: ma_encoder_write_pcm_frames_proc,
+    pub pUserData: *mut void,
+    pub pInternalEncoder: *mut void,
+    pub data: ma_encoder_data
+}
+
+enum ma_waveform_type: i32 {
+    ma_waveform_type_sine,
+    ma_waveform_type_square,
+    ma_waveform_type_triangle,
+    ma_waveform_type_sawtooth
+}
+
+struct ma_waveform_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub _type: ma_waveform_type,
+    pub amplitude: f64,
+    pub frequency: f64
+}
+
+struct ma_waveform {
+    pub ds: ma_data_source_base,
+    pub config: ma_waveform_config,
+    pub advance: f64,
+    pub time: f64
+}
+
+struct ma_pulsewave_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub dutyCycle: f64,
+    pub amplitude: f64,
+    pub frequency: f64
+}
+
+struct ma_pulsewave {
+    pub waveform: ma_waveform,
+    pub config: ma_pulsewave_config
+}
+
+enum ma_noise_type: i32 {
+    ma_noise_type_white,
+    ma_noise_type_pink,
+    ma_noise_type_brownian
+}
+
+struct ma_noise_config {
+    pub format: ma_format,
+    pub channels: ma_uint32,
+    pub _type: ma_noise_type,
+    pub seed: ma_int32,
+    pub amplitude: f64,
+    pub duplicateChannels: ma_bool32
+}
+
+struct ma_noise_state {
+    pub _data: [u64; 3]
+}
+
+struct ma_noise {
+    pub ds: ma_data_source_base,
+    pub config: ma_noise_config,
+    pub lcg: ma_lcg,
+    pub state: ma_noise_state,
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+enum ma_resource_manager_data_source_flags: i32 {
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_STREAM = 0x00000001,
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE = 0x00000002,
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_ASYNC = 0x00000004,
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_WAIT_INIT = 0x00000008,
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_UNKNOWN_LENGTH = 0x00000010,
+    MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_LOOPING = 0x00000020
+}
+
+struct ma_resource_manager_pipeline_stage_notification {
+    pub pNotification: *mut ma_async_notification,
+    pub pFence: *mut ma_fence
+}
+
+struct ma_resource_manager_pipeline_notifications {
+    pub init: ma_resource_manager_pipeline_stage_notification,
+    pub done: ma_resource_manager_pipeline_stage_notification
+}
+
+enum ma_resource_manager_flags: i32 {
+    MA_RESOURCE_MANAGER_FLAG_NON_BLOCKING = 0x00000001,
+    MA_RESOURCE_MANAGER_FLAG_NO_THREADING = 0x00000002
+}
+
+struct ma_resource_manager_data_source_config {
+    pub pFilePath: *i8,
+    pub pFilePathW: *u16,
+    pub pNotifications: *ma_resource_manager_pipeline_notifications,
+    pub initialSeekPointInPCMFrames: ma_uint64,
+    pub rangeBegInPCMFrames: ma_uint64,
+    pub rangeEndInPCMFrames: ma_uint64,
+    pub loopPointBegInPCMFrames: ma_uint64,
+    pub loopPointEndInPCMFrames: ma_uint64,
+    pub flags: ma_uint32,
+    pub isLooping: ma_bool32
+}
+
+enum ma_resource_manager_data_supply_type: i32 {
+    ma_resource_manager_data_supply_type_unknown = 0,
+    ma_resource_manager_data_supply_type_encoded,
+    ma_resource_manager_data_supply_type_decoded,
+    ma_resource_manager_data_supply_type_decoded_paged
+}
+
+struct ma_resource_manager_data_supply_backend {
+    pub _data: [u64; 7]
+}
+
+struct ma_resource_manager_data_supply {
+    pub _type: ma_resource_manager_data_supply_type,
+    pub backend: ma_resource_manager_data_supply_backend
+}
+
+struct ma_resource_manager_data_buffer_node {
+    pub hashedName32: ma_uint32,
+    pub refCount: ma_uint32,
+    pub result: ma_result,
+    pub executionCounter: ma_uint32,
+    pub executionPointer: ma_uint32,
+    pub isDataOwnedByResourceManager: ma_bool32,
+    pub data: ma_resource_manager_data_supply,
+    pub pParent: *mut ma_resource_manager_data_buffer_node,
+    pub pChildLo: *mut ma_resource_manager_data_buffer_node,
+    pub pChildHi: *mut ma_resource_manager_data_buffer_node
+}
+
+struct ma_resource_manager_data_buffer_connector {
+    pub _data: [u64; 69]
+}
+
+struct ma_resource_manager_data_buffer {
+    pub ds: ma_data_source_base,
+    pub pResourceManager: *mut ma_resource_manager,
+    pub pNode: *mut ma_resource_manager_data_buffer_node,
+    pub flags: ma_uint32,
+    pub executionCounter: ma_uint32,
+    pub executionPointer: ma_uint32,
+    pub seekTargetInPCMFrames: ma_uint64,
+    pub seekToCursorOnNextRead: ma_bool32,
+    pub result: ma_result,
+    pub isLooping: ma_bool32,
+    pub isConnectorInitialized: ma_atomic_bool32,
+    pub connector: ma_resource_manager_data_buffer_connector
+}
+
+struct ma_resource_manager_data_stream {
+    pub ds: ma_data_source_base,
+    pub pResourceManager: *mut ma_resource_manager,
+    pub flags: ma_uint32,
+    pub decoder: ma_decoder,
+    pub isDecoderInitialized: ma_bool32,
+    pub totalLengthInPCMFrames: ma_uint64,
+    pub relativeCursor: ma_uint32,
+    pub absoluteCursor: ma_uint64,
+    pub currentPageIndex: ma_uint32,
+    pub executionCounter: ma_uint32,
+    pub executionPointer: ma_uint32,
+    pub isLooping: ma_bool32,
+    pub pPageData: *mut void,
+    pub pageFrameCount: [ma_uint32; 2],
+    pub result: ma_result,
+    pub isDecoderAtEnd: ma_bool32,
+    pub isPageValid: [ma_bool32; 2],
+    pub seekCounter: ma_bool32
+}
+
+struct ma_resource_manager_data_source_backend {
+    pub _data: [u64; 91]
+}
+
+struct ma_resource_manager_data_source {
+    pub backend: ma_resource_manager_data_source_backend,
+    pub flags: ma_uint32,
+    pub executionCounter: ma_uint32,
+    pub executionPointer: ma_uint32
+}
+
+struct ma_resource_manager_config {
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub pLog: *mut ma_log,
+    pub decodedFormat: ma_format,
+    pub decodedChannels: ma_uint32,
+    pub decodedSampleRate: ma_uint32,
+    pub jobThreadCount: ma_uint32,
+    pub jobThreadStackSize: usize,
+    pub jobQueueCapacity: ma_uint32,
+    pub flags: ma_uint32,
+    pub pVFS: *mut ma_vfs,
+    pub ppCustomDecodingBackendVTables: *mut *mut ma_decoding_backend_vtable,
+    pub customDecodingBackendCount: ma_uint32,
+    pub pCustomDecodingBackendUserData: *mut void,
+    pub resampling: ma_resampler_config
+}
+
+struct ma_resource_manager {
+    pub config: ma_resource_manager_config,
+    pub pRootDataBufferNode: *mut ma_resource_manager_data_buffer_node,
+    pub dataBufferBSTLock: ma_mutex,
+    pub jobThreads: [ma_thread; 64],
+    pub jobQueue: ma_job_queue,
+    pub defaultVFS: ma_default_vfs,
+    pub log: ma_log
+}
+
+struct ma_stack {
+    pub offset: usize,
+    pub sizeInBytes: usize,
+    pub _data: [u8; 1]
+}
+
+type ma_node = void;
+
+enum ma_node_flags: i32 {
+    MA_NODE_FLAG_PASSTHROUGH = 0x00000001,
+    MA_NODE_FLAG_CONTINUOUS_PROCESSING = 0x00000002,
+    MA_NODE_FLAG_ALLOW_NULL_INPUT = 0x00000004,
+    MA_NODE_FLAG_DIFFERENT_PROCESSING_RATES = 0x00000008,
+    MA_NODE_FLAG_SILENT_OUTPUT = 0x00000010
+}
+
+enum ma_node_state: i32 {
+    ma_node_state_started = 0,
+    ma_node_state_stopped = 1
+}
+
+struct ma_node_vtable {
+    pub onProcess: fn(*mut ma_node, *mut *f32, *mut ma_uint32, *mut *mut f32, *mut ma_uint32),
+    pub onGetRequiredInputFrameCount: fn(*mut ma_node, ma_uint32, *mut ma_uint32) -> ma_result,
+    pub inputBusCount: ma_uint8,
+    pub outputBusCount: ma_uint8,
+    pub flags: ma_uint32
+}
+
+struct ma_node_config {
+    pub vtable: *ma_node_vtable,
+    pub initialState: ma_node_state,
+    pub inputBusCount: ma_uint32,
+    pub outputBusCount: ma_uint32,
+    pub pInputChannels: *ma_uint32,
+    pub pOutputChannels: *ma_uint32
+}
+
+struct ma_node_output_bus {
+    pub pNode: *mut ma_node,
+    pub outputBusIndex: ma_uint8,
+    pub channels: ma_uint8,
+    pub inputNodeInputBusIndex: ma_uint8,
+    pub flags: ma_uint32,
+    pub refCount: ma_uint32,
+    pub isAttached: ma_bool32,
+    pub lock: ma_spinlock,
+    pub volume: f32,
+    pub pNext: *mut ma_node_output_bus,
+    pub pPrev: *mut ma_node_output_bus,
+    pub pInputNode: *mut ma_node
+}
+
+struct ma_node_input_bus {
+    pub head: ma_node_output_bus,
+    pub nextCounter: ma_uint32,
+    pub lock: ma_spinlock,
+    pub channels: ma_uint8
+}
+
+struct ma_node_base {
+    pub pNodeGraph: *mut ma_node_graph,
+    pub vtable: *ma_node_vtable,
+    pub inputBusCount: ma_uint32,
+    pub outputBusCount: ma_uint32,
+    pub pInputBuses: *mut ma_node_input_bus,
+    pub pOutputBuses: *mut ma_node_output_bus,
+    pub pCachedData: *mut f32,
+    pub cachedDataCapInFramesPerBus: ma_uint16,
+    pub cachedFrameCountOut: ma_uint16,
+    pub cachedFrameCountIn: ma_uint16,
+    pub consumedFrameCountIn: ma_uint16,
+    pub state: ma_node_state,
+    pub stateTimes: [ma_uint64; 2],
+    pub localTime: ma_uint64,
+    pub _inputBuses: [ma_node_input_bus; 2],
+    pub _outputBuses: [ma_node_output_bus; 2],
+    pub _pHeap: *mut void,
+    pub _ownsHeap: ma_bool32
+}
+
+struct ma_node_graph_config {
+    pub channels: ma_uint32,
+    pub processingSizeInFrames: ma_uint32,
+    pub preMixStackSizeInBytes: usize
+}
+
+struct ma_node_graph {
+    pub base: ma_node_base,
+    pub endpoint: ma_node_base,
+    pub pProcessingCache: *mut f32,
+    pub processingCacheFramesRemaining: ma_uint32,
+    pub processingSizeInFrames: ma_uint32,
+    pub isReading: ma_bool32,
+    pub pPreMixStack: *mut ma_stack
+}
+
+struct ma_data_source_node_config {
+    pub nodeConfig: ma_node_config,
+    pub pDataSource: *mut ma_data_source
+}
+
+struct ma_data_source_node {
+    pub base: ma_node_base,
+    pub pDataSource: *mut ma_data_source
+}
+
+struct ma_splitter_node_config {
+    pub nodeConfig: ma_node_config,
+    pub channels: ma_uint32,
+    pub outputBusCount: ma_uint32
+}
+
+struct ma_splitter_node {
+    pub base: ma_node_base
+}
+
+struct ma_biquad_node_config {
+    pub nodeConfig: ma_node_config,
+    pub biquad: ma_biquad_config
+}
+
+struct ma_biquad_node {
+    pub baseNode: ma_node_base,
+    pub biquad: ma_biquad
+}
+
+struct ma_lpf_node_config {
+    pub nodeConfig: ma_node_config,
+    pub lpf: ma_lpf_config
+}
+
+struct ma_lpf_node {
+    pub baseNode: ma_node_base,
+    pub lpf: ma_lpf
+}
+
+struct ma_hpf_node_config {
+    pub nodeConfig: ma_node_config,
+    pub hpf: ma_hpf_config
+}
+
+struct ma_hpf_node {
+    pub baseNode: ma_node_base,
+    pub hpf: ma_hpf
+}
+
+struct ma_bpf_node_config {
+    pub nodeConfig: ma_node_config,
+    pub bpf: ma_bpf_config
+}
+
+struct ma_bpf_node {
+    pub baseNode: ma_node_base,
+    pub bpf: ma_bpf
+}
+
+struct ma_notch_node_config {
+    pub nodeConfig: ma_node_config,
+    pub notch: ma_notch_config
+}
+
+struct ma_notch_node {
+    pub baseNode: ma_node_base,
+    pub notch: ma_notch2
+}
+
+struct ma_peak_node_config {
+    pub nodeConfig: ma_node_config,
+    pub peak: ma_peak_config
+}
+
+struct ma_peak_node {
+    pub baseNode: ma_node_base,
+    pub peak: ma_peak2
+}
+
+struct ma_loshelf_node_config {
+    pub nodeConfig: ma_node_config,
+    pub loshelf: ma_loshelf_config
+}
+
+struct ma_loshelf_node {
+    pub baseNode: ma_node_base,
+    pub loshelf: ma_loshelf2
+}
+
+struct ma_hishelf_node_config {
+    pub nodeConfig: ma_node_config,
+    pub hishelf: ma_hishelf_config
+}
+
+struct ma_hishelf_node {
+    pub baseNode: ma_node_base,
+    pub hishelf: ma_hishelf2
+}
+
+struct ma_delay_node_config {
+    pub nodeConfig: ma_node_config,
+    pub delay: ma_delay_config
+}
+
+struct ma_delay_node {
+    pub baseNode: ma_node_base,
+    pub delay: ma_delay
+}
+
+enum ma_sound_flags: i32 {
+    MA_SOUND_FLAG_STREAM = 0x00000001,
+    MA_SOUND_FLAG_DECODE = 0x00000002,
+    MA_SOUND_FLAG_ASYNC = 0x00000004,
+    MA_SOUND_FLAG_WAIT_INIT = 0x00000008,
+    MA_SOUND_FLAG_UNKNOWN_LENGTH = 0x00000010,
+    MA_SOUND_FLAG_LOOPING = 0x00000020,
+    MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT = 0x00001000,
+    MA_SOUND_FLAG_NO_PITCH = 0x00002000,
+    MA_SOUND_FLAG_NO_SPATIALIZATION = 0x00004000
+}
+
+enum ma_engine_node_type: i32 {
+    ma_engine_node_type_sound,
+    ma_engine_node_type_group
+}
+
+struct ma_engine_node_config {
+    pub pEngine: *mut ma_engine,
+    pub _type: ma_engine_node_type,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub volumeSmoothTimeInPCMFrames: ma_uint32,
+    pub monoExpansionMode: ma_mono_expansion_mode,
+    pub isPitchDisabled: ma_bool8,
+    pub isSpatializationDisabled: ma_bool8,
+    pub pinnedListenerIndex: ma_uint8,
+    pub resampling: ma_resampler_config
+}
+
+struct ma_engine_node_fadeSettings {
+    pub volumeBeg: ma_atomic_float,
+    pub volumeEnd: ma_atomic_float,
+    pub fadeLengthInFrames: ma_atomic_uint64,
+    pub absoluteGlobalTimeInFrames: ma_atomic_uint64
+}
+
+struct ma_engine_node {
+    pub baseNode: ma_node_base,
+    pub pEngine: *mut ma_engine,
+    pub sampleRate: ma_uint32,
+    pub volumeSmoothTimeInPCMFrames: ma_uint32,
+    pub monoExpansionMode: ma_mono_expansion_mode,
+    pub fader: ma_fader,
+    pub resampler: ma_resampler,
+    pub spatializer: ma_spatializer,
+    pub panner: ma_panner,
+    pub volumeGainer: ma_gainer,
+    pub volume: ma_atomic_float,
+    pub pitch: f32,
+    pub oldPitch: f32,
+    pub oldDopplerPitch: f32,
+    pub isPitchDisabled: ma_bool32,
+    pub isSpatializationDisabled: ma_bool32,
+    pub pinnedListenerIndex: ma_uint32,
+    pub fadeSettings: ma_engine_node_fadeSettings,
+    pub _ownsHeap: ma_bool8,
+    pub _pHeap: *mut void
+}
+
+type ma_sound_end_proc = fn(*mut void, *mut ma_sound);
+
+struct ma_sound_config {
+    pub pFilePath: *i8,
+    pub pFilePathW: *u16,
+    pub pDataSource: *mut ma_data_source,
+    pub pInitialAttachment: *mut ma_node,
+    pub initialAttachmentInputBusIndex: ma_uint32,
+    pub channelsIn: ma_uint32,
+    pub channelsOut: ma_uint32,
+    pub monoExpansionMode: ma_mono_expansion_mode,
+    pub flags: ma_uint32,
+    pub volumeSmoothTimeInPCMFrames: ma_uint32,
+    pub initialSeekPointInPCMFrames: ma_uint64,
+    pub rangeBegInPCMFrames: ma_uint64,
+    pub rangeEndInPCMFrames: ma_uint64,
+    pub loopPointBegInPCMFrames: ma_uint64,
+    pub loopPointEndInPCMFrames: ma_uint64,
+    pub endCallback: ma_sound_end_proc,
+    pub pEndCallbackUserData: *mut void,
+    pub pitchResampling: ma_resampler_config,
+    pub initNotifications: ma_resource_manager_pipeline_notifications,
+    pub pDoneFence: *mut ma_fence,
+    pub isLooping: ma_bool32
+}
+
+struct ma_sound {
+    pub engineNode: ma_engine_node,
+    pub pDataSource: *mut ma_data_source,
+    pub seekTarget: ma_uint64,
+    pub atEnd: ma_bool32,
+    pub endCallback: ma_sound_end_proc,
+    pub pEndCallbackUserData: *mut void,
+    pub pProcessingCache: *mut f32,
+    pub processingCacheFramesRemaining: ma_uint32,
+    pub processingCacheCap: ma_uint32,
+    pub ownsDataSource: ma_bool8,
+    pub pResourceManagerDataSource: *mut ma_resource_manager_data_source
+}
+
+struct ma_sound_inlined {
+    pub sound: ma_sound,
+    pub pNext: *mut ma_sound_inlined,
+    pub pPrev: *mut ma_sound_inlined
+}
+
+type ma_sound_group_config = ma_sound_config;
+type ma_sound_group = ma_sound;
+type ma_engine_process_proc = fn(*mut void, *mut f32, ma_uint64);
+
+struct ma_engine_config {
+    pub pResourceManager: *mut ma_resource_manager,
+    pub pContext: *mut ma_context,
+    pub pDevice: *mut ma_device,
+    pub pPlaybackDeviceID: *mut ma_device_id,
+    pub dataCallback: ma_device_data_proc,
+    pub notificationCallback: ma_device_notification_proc,
+    pub pLog: *mut ma_log,
+    pub listenerCount: ma_uint32,
+    pub channels: ma_uint32,
+    pub sampleRate: ma_uint32,
+    pub periodSizeInFrames: ma_uint32,
+    pub periodSizeInMilliseconds: ma_uint32,
+    pub gainSmoothTimeInFrames: ma_uint32,
+    pub gainSmoothTimeInMilliseconds: ma_uint32,
+    pub defaultVolumeSmoothTimeInPCMFrames: ma_uint32,
+    pub preMixStackSizeInBytes: ma_uint32,
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub noAutoStart: ma_bool32,
+    pub noDevice: ma_bool32,
+    pub monoExpansionMode: ma_mono_expansion_mode,
+    pub pResourceManagerVFS: *mut ma_vfs,
+    pub onProcess: ma_engine_process_proc,
+    pub pProcessUserData: *mut void,
+    pub resourceManagerResampling: ma_resampler_config,
+    pub pitchResampling: ma_resampler_config
+}
+
+struct ma_engine {
+    pub nodeGraph: ma_node_graph,
+    pub pResourceManager: *mut ma_resource_manager,
+    pub pDevice: *mut ma_device,
+    pub pLog: *mut ma_log,
+    pub sampleRate: ma_uint32,
+    pub listenerCount: ma_uint32,
+    pub listeners: [ma_spatializer_listener; 4],
+    pub allocationCallbacks: ma_allocation_callbacks,
+    pub ownsResourceManager: ma_bool8,
+    pub ownsDevice: ma_bool8,
+    pub inlinedSoundLock: ma_spinlock,
+    pub pInlinedSoundHead: *mut ma_sound_inlined,
+    pub inlinedSoundCount: ma_uint32,
+    pub gainSmoothTimeInFrames: ma_uint32,
+    pub defaultVolumeSmoothTimeInPCMFrames: ma_uint32,
+    pub monoExpansionMode: ma_mono_expansion_mode,
+    pub onProcess: ma_engine_process_proc,
+    pub pProcessUserData: *mut void,
+    pub pitchResamplingConfig: ma_resampler_config
+}
+
+extern "C" {
+    fn ma_version(pMajor: *mut ma_uint32, pMinor: *mut ma_uint32, pRevision: *mut ma_uint32);
+    fn ma_version_string() -> *i8;
+    fn ma_log_callback_init(onLog: ma_log_callback_proc, pUserData: *mut void) -> ma_log_callback;
+    fn ma_log_init(pAllocationCallbacks: *ma_allocation_callbacks, pLog: *mut ma_log) -> ma_result;
+    fn ma_log_uninit(pLog: *mut ma_log);
+    fn ma_log_register_callback(pLog: *mut ma_log, callback: ma_log_callback) -> ma_result;
+    fn ma_log_unregister_callback(pLog: *mut ma_log, callback: ma_log_callback) -> ma_result;
+    fn ma_log_post(pLog: *mut ma_log, level: ma_uint32, pMessage: *i8) -> ma_result;
+    fn ma_log_postv(pLog: *mut ma_log, level: ma_uint32, pFormat: *i8, args: *mut i8) -> ma_result;
+    fn ma_log_postf(pLog: *mut ma_log, level: ma_uint32, pFormat: *i8, ...) -> ma_result;
+    fn ma_biquad_config_init(format: ma_format, channels: ma_uint32, b0: f64, b1: f64, b2: f64, a0: f64, a1: f64, a2: f64) -> ma_biquad_config;
+    fn ma_biquad_get_heap_size(pConfig: *ma_biquad_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_biquad_init_preallocated(pConfig: *ma_biquad_config, pHeap: *mut void, pBQ: *mut ma_biquad) -> ma_result;
+    fn ma_biquad_init(pConfig: *ma_biquad_config, pAllocationCallbacks: *ma_allocation_callbacks, pBQ: *mut ma_biquad) -> ma_result;
+    fn ma_biquad_uninit(pBQ: *mut ma_biquad, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_biquad_reinit(pConfig: *ma_biquad_config, pBQ: *mut ma_biquad) -> ma_result;
+    fn ma_biquad_clear_cache(pBQ: *mut ma_biquad) -> ma_result;
+    fn ma_biquad_process_pcm_frames(pBQ: *mut ma_biquad, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_biquad_get_latency(pBQ: *ma_biquad) -> ma_uint32;
+    fn ma_lpf1_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64) -> ma_lpf1_config;
+    fn ma_lpf2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, q: f64) -> ma_lpf2_config;
+    fn ma_lpf1_get_heap_size(pConfig: *ma_lpf1_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_lpf1_init_preallocated(pConfig: *ma_lpf1_config, pHeap: *mut void, pLPF: *mut ma_lpf1) -> ma_result;
+    fn ma_lpf1_init(pConfig: *ma_lpf1_config, pAllocationCallbacks: *ma_allocation_callbacks, pLPF: *mut ma_lpf1) -> ma_result;
+    fn ma_lpf1_uninit(pLPF: *mut ma_lpf1, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_lpf1_reinit(pConfig: *ma_lpf1_config, pLPF: *mut ma_lpf1) -> ma_result;
+    fn ma_lpf1_clear_cache(pLPF: *mut ma_lpf1) -> ma_result;
+    fn ma_lpf1_process_pcm_frames(pLPF: *mut ma_lpf1, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_lpf1_get_latency(pLPF: *ma_lpf1) -> ma_uint32;
+    fn ma_lpf2_get_heap_size(pConfig: *ma_lpf2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_lpf2_init_preallocated(pConfig: *ma_lpf2_config, pHeap: *mut void, pHPF: *mut ma_lpf2) -> ma_result;
+    fn ma_lpf2_init(pConfig: *ma_lpf2_config, pAllocationCallbacks: *ma_allocation_callbacks, pLPF: *mut ma_lpf2) -> ma_result;
+    fn ma_lpf2_uninit(pLPF: *mut ma_lpf2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_lpf2_reinit(pConfig: *ma_lpf2_config, pLPF: *mut ma_lpf2) -> ma_result;
+    fn ma_lpf2_clear_cache(pLPF: *mut ma_lpf2) -> ma_result;
+    fn ma_lpf2_process_pcm_frames(pLPF: *mut ma_lpf2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_lpf2_get_latency(pLPF: *ma_lpf2) -> ma_uint32;
+    fn ma_lpf_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_lpf_config;
+    fn ma_lpf_get_heap_size(pConfig: *ma_lpf_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_lpf_init_preallocated(pConfig: *ma_lpf_config, pHeap: *mut void, pLPF: *mut ma_lpf) -> ma_result;
+    fn ma_lpf_init(pConfig: *ma_lpf_config, pAllocationCallbacks: *ma_allocation_callbacks, pLPF: *mut ma_lpf) -> ma_result;
+    fn ma_lpf_uninit(pLPF: *mut ma_lpf, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_lpf_reinit(pConfig: *ma_lpf_config, pLPF: *mut ma_lpf) -> ma_result;
+    fn ma_lpf_clear_cache(pLPF: *mut ma_lpf) -> ma_result;
+    fn ma_lpf_process_pcm_frames(pLPF: *mut ma_lpf, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_lpf_get_latency(pLPF: *ma_lpf) -> ma_uint32;
+    fn ma_hpf1_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64) -> ma_hpf1_config;
+    fn ma_hpf2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, q: f64) -> ma_hpf2_config;
+    fn ma_hpf1_get_heap_size(pConfig: *ma_hpf1_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_hpf1_init_preallocated(pConfig: *ma_hpf1_config, pHeap: *mut void, pLPF: *mut ma_hpf1) -> ma_result;
+    fn ma_hpf1_init(pConfig: *ma_hpf1_config, pAllocationCallbacks: *ma_allocation_callbacks, pHPF: *mut ma_hpf1) -> ma_result;
+    fn ma_hpf1_uninit(pHPF: *mut ma_hpf1, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hpf1_reinit(pConfig: *ma_hpf1_config, pHPF: *mut ma_hpf1) -> ma_result;
+    fn ma_hpf1_process_pcm_frames(pHPF: *mut ma_hpf1, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_hpf1_get_latency(pHPF: *ma_hpf1) -> ma_uint32;
+    fn ma_hpf2_get_heap_size(pConfig: *ma_hpf2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_hpf2_init_preallocated(pConfig: *ma_hpf2_config, pHeap: *mut void, pHPF: *mut ma_hpf2) -> ma_result;
+    fn ma_hpf2_init(pConfig: *ma_hpf2_config, pAllocationCallbacks: *ma_allocation_callbacks, pHPF: *mut ma_hpf2) -> ma_result;
+    fn ma_hpf2_uninit(pHPF: *mut ma_hpf2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hpf2_reinit(pConfig: *ma_hpf2_config, pHPF: *mut ma_hpf2) -> ma_result;
+    fn ma_hpf2_process_pcm_frames(pHPF: *mut ma_hpf2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_hpf2_get_latency(pHPF: *ma_hpf2) -> ma_uint32;
+    fn ma_hpf_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_hpf_config;
+    fn ma_hpf_get_heap_size(pConfig: *ma_hpf_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_hpf_init_preallocated(pConfig: *ma_hpf_config, pHeap: *mut void, pLPF: *mut ma_hpf) -> ma_result;
+    fn ma_hpf_init(pConfig: *ma_hpf_config, pAllocationCallbacks: *ma_allocation_callbacks, pHPF: *mut ma_hpf) -> ma_result;
+    fn ma_hpf_uninit(pHPF: *mut ma_hpf, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hpf_reinit(pConfig: *ma_hpf_config, pHPF: *mut ma_hpf) -> ma_result;
+    fn ma_hpf_process_pcm_frames(pHPF: *mut ma_hpf, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_hpf_get_latency(pHPF: *ma_hpf) -> ma_uint32;
+    fn ma_bpf2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, q: f64) -> ma_bpf2_config;
+    fn ma_bpf2_get_heap_size(pConfig: *ma_bpf2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_bpf2_init_preallocated(pConfig: *ma_bpf2_config, pHeap: *mut void, pBPF: *mut ma_bpf2) -> ma_result;
+    fn ma_bpf2_init(pConfig: *ma_bpf2_config, pAllocationCallbacks: *ma_allocation_callbacks, pBPF: *mut ma_bpf2) -> ma_result;
+    fn ma_bpf2_uninit(pBPF: *mut ma_bpf2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_bpf2_reinit(pConfig: *ma_bpf2_config, pBPF: *mut ma_bpf2) -> ma_result;
+    fn ma_bpf2_process_pcm_frames(pBPF: *mut ma_bpf2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_bpf2_get_latency(pBPF: *ma_bpf2) -> ma_uint32;
+    fn ma_bpf_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_bpf_config;
+    fn ma_bpf_get_heap_size(pConfig: *ma_bpf_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_bpf_init_preallocated(pConfig: *ma_bpf_config, pHeap: *mut void, pBPF: *mut ma_bpf) -> ma_result;
+    fn ma_bpf_init(pConfig: *ma_bpf_config, pAllocationCallbacks: *ma_allocation_callbacks, pBPF: *mut ma_bpf) -> ma_result;
+    fn ma_bpf_uninit(pBPF: *mut ma_bpf, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_bpf_reinit(pConfig: *ma_bpf_config, pBPF: *mut ma_bpf) -> ma_result;
+    fn ma_bpf_process_pcm_frames(pBPF: *mut ma_bpf, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_bpf_get_latency(pBPF: *ma_bpf) -> ma_uint32;
+    fn ma_notch2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, q: f64, frequency: f64) -> ma_notch2_config;
+    fn ma_notch2_get_heap_size(pConfig: *ma_notch2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_notch2_init_preallocated(pConfig: *ma_notch2_config, pHeap: *mut void, pFilter: *mut ma_notch2) -> ma_result;
+    fn ma_notch2_init(pConfig: *ma_notch2_config, pAllocationCallbacks: *ma_allocation_callbacks, pFilter: *mut ma_notch2) -> ma_result;
+    fn ma_notch2_uninit(pFilter: *mut ma_notch2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_notch2_reinit(pConfig: *ma_notch2_config, pFilter: *mut ma_notch2) -> ma_result;
+    fn ma_notch2_process_pcm_frames(pFilter: *mut ma_notch2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_notch2_get_latency(pFilter: *ma_notch2) -> ma_uint32;
+    fn ma_peak2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, q: f64, frequency: f64) -> ma_peak2_config;
+    fn ma_peak2_get_heap_size(pConfig: *ma_peak2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_peak2_init_preallocated(pConfig: *ma_peak2_config, pHeap: *mut void, pFilter: *mut ma_peak2) -> ma_result;
+    fn ma_peak2_init(pConfig: *ma_peak2_config, pAllocationCallbacks: *ma_allocation_callbacks, pFilter: *mut ma_peak2) -> ma_result;
+    fn ma_peak2_uninit(pFilter: *mut ma_peak2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_peak2_reinit(pConfig: *ma_peak2_config, pFilter: *mut ma_peak2) -> ma_result;
+    fn ma_peak2_process_pcm_frames(pFilter: *mut ma_peak2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_peak2_get_latency(pFilter: *ma_peak2) -> ma_uint32;
+    fn ma_loshelf2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, shelfSlope: f64, frequency: f64) -> ma_loshelf2_config;
+    fn ma_loshelf2_get_heap_size(pConfig: *ma_loshelf2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_loshelf2_init_preallocated(pConfig: *ma_loshelf2_config, pHeap: *mut void, pFilter: *mut ma_loshelf2) -> ma_result;
+    fn ma_loshelf2_init(pConfig: *ma_loshelf2_config, pAllocationCallbacks: *ma_allocation_callbacks, pFilter: *mut ma_loshelf2) -> ma_result;
+    fn ma_loshelf2_uninit(pFilter: *mut ma_loshelf2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_loshelf2_reinit(pConfig: *ma_loshelf2_config, pFilter: *mut ma_loshelf2) -> ma_result;
+    fn ma_loshelf2_process_pcm_frames(pFilter: *mut ma_loshelf2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_loshelf2_get_latency(pFilter: *ma_loshelf2) -> ma_uint32;
+    fn ma_hishelf2_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, shelfSlope: f64, frequency: f64) -> ma_hishelf2_config;
+    fn ma_hishelf2_get_heap_size(pConfig: *ma_hishelf2_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_hishelf2_init_preallocated(pConfig: *ma_hishelf2_config, pHeap: *mut void, pFilter: *mut ma_hishelf2) -> ma_result;
+    fn ma_hishelf2_init(pConfig: *ma_hishelf2_config, pAllocationCallbacks: *ma_allocation_callbacks, pFilter: *mut ma_hishelf2) -> ma_result;
+    fn ma_hishelf2_uninit(pFilter: *mut ma_hishelf2, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hishelf2_reinit(pConfig: *ma_hishelf2_config, pFilter: *mut ma_hishelf2) -> ma_result;
+    fn ma_hishelf2_process_pcm_frames(pFilter: *mut ma_hishelf2, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_hishelf2_get_latency(pFilter: *ma_hishelf2) -> ma_uint32;
+    fn ma_delay_config_init(channels: ma_uint32, sampleRate: ma_uint32, delayInFrames: ma_uint32, decay: f32) -> ma_delay_config;
+    fn ma_delay_init(pConfig: *ma_delay_config, pAllocationCallbacks: *ma_allocation_callbacks, pDelay: *mut ma_delay) -> ma_result;
+    fn ma_delay_uninit(pDelay: *mut ma_delay, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_delay_process_pcm_frames(pDelay: *mut ma_delay, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint32) -> ma_result;
+    fn ma_delay_set_wet(pDelay: *mut ma_delay, value: f32);
+    fn ma_delay_get_wet(pDelay: *ma_delay) -> f32;
+    fn ma_delay_set_dry(pDelay: *mut ma_delay, value: f32);
+    fn ma_delay_get_dry(pDelay: *ma_delay) -> f32;
+    fn ma_delay_set_decay(pDelay: *mut ma_delay, value: f32);
+    fn ma_delay_get_decay(pDelay: *ma_delay) -> f32;
+    fn ma_gainer_config_init(channels: ma_uint32, smoothTimeInFrames: ma_uint32) -> ma_gainer_config;
+    fn ma_gainer_get_heap_size(pConfig: *ma_gainer_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_gainer_init_preallocated(pConfig: *ma_gainer_config, pHeap: *mut void, pGainer: *mut ma_gainer) -> ma_result;
+    fn ma_gainer_init(pConfig: *ma_gainer_config, pAllocationCallbacks: *ma_allocation_callbacks, pGainer: *mut ma_gainer) -> ma_result;
+    fn ma_gainer_uninit(pGainer: *mut ma_gainer, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_gainer_process_pcm_frames(pGainer: *mut ma_gainer, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_gainer_set_gain(pGainer: *mut ma_gainer, newGain: f32) -> ma_result;
+    fn ma_gainer_set_gains(pGainer: *mut ma_gainer, pNewGains: *mut f32) -> ma_result;
+    fn ma_gainer_set_master_volume(pGainer: *mut ma_gainer, volume: f32) -> ma_result;
+    fn ma_gainer_get_master_volume(pGainer: *ma_gainer, pVolume: *mut f32) -> ma_result;
+    fn ma_panner_config_init(format: ma_format, channels: ma_uint32) -> ma_panner_config;
+    fn ma_panner_init(pConfig: *ma_panner_config, pPanner: *mut ma_panner) -> ma_result;
+    fn ma_panner_process_pcm_frames(pPanner: *mut ma_panner, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_panner_set_mode(pPanner: *mut ma_panner, mode: ma_pan_mode);
+    fn ma_panner_get_mode(pPanner: *ma_panner) -> ma_pan_mode;
+    fn ma_panner_set_pan(pPanner: *mut ma_panner, pan: f32);
+    fn ma_panner_get_pan(pPanner: *ma_panner) -> f32;
+    fn ma_fader_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32) -> ma_fader_config;
+    fn ma_fader_init(pConfig: *ma_fader_config, pFader: *mut ma_fader) -> ma_result;
+    fn ma_fader_process_pcm_frames(pFader: *mut ma_fader, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_fader_get_data_format(pFader: *ma_fader, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32);
+    fn ma_fader_set_fade(pFader: *mut ma_fader, volumeBeg: f32, volumeEnd: f32, lengthInFrames: ma_uint64);
+    fn ma_fader_set_fade_ex(pFader: *mut ma_fader, volumeBeg: f32, volumeEnd: f32, lengthInFrames: ma_uint64, startOffsetInFrames: ma_int64);
+    fn ma_fader_get_current_volume(pFader: *ma_fader) -> f32;
+    fn ma_spatializer_listener_config_init(channelsOut: ma_uint32) -> ma_spatializer_listener_config;
+    fn ma_spatializer_listener_get_heap_size(pConfig: *ma_spatializer_listener_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_spatializer_listener_init_preallocated(pConfig: *ma_spatializer_listener_config, pHeap: *mut void, pListener: *mut ma_spatializer_listener) -> ma_result;
+    fn ma_spatializer_listener_init(pConfig: *ma_spatializer_listener_config, pAllocationCallbacks: *ma_allocation_callbacks, pListener: *mut ma_spatializer_listener) -> ma_result;
+    fn ma_spatializer_listener_uninit(pListener: *mut ma_spatializer_listener, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_spatializer_listener_get_channel_map(pListener: *mut ma_spatializer_listener) -> *mut ma_channel;
+    fn ma_spatializer_listener_set_cone(pListener: *mut ma_spatializer_listener, innerAngleInRadians: f32, outerAngleInRadians: f32, outerGain: f32);
+    fn ma_spatializer_listener_get_cone(pListener: *ma_spatializer_listener, pInnerAngleInRadians: *mut f32, pOuterAngleInRadians: *mut f32, pOuterGain: *mut f32);
+    fn ma_spatializer_listener_set_position(pListener: *mut ma_spatializer_listener, x: f32, y: f32, z: f32);
+    fn ma_spatializer_listener_get_position(pListener: *ma_spatializer_listener) -> ma_vec3f;
+    fn ma_spatializer_listener_set_direction(pListener: *mut ma_spatializer_listener, x: f32, y: f32, z: f32);
+    fn ma_spatializer_listener_get_direction(pListener: *ma_spatializer_listener) -> ma_vec3f;
+    fn ma_spatializer_listener_set_velocity(pListener: *mut ma_spatializer_listener, x: f32, y: f32, z: f32);
+    fn ma_spatializer_listener_get_velocity(pListener: *ma_spatializer_listener) -> ma_vec3f;
+    fn ma_spatializer_listener_set_speed_of_sound(pListener: *mut ma_spatializer_listener, speedOfSound: f32);
+    fn ma_spatializer_listener_get_speed_of_sound(pListener: *ma_spatializer_listener) -> f32;
+    fn ma_spatializer_listener_set_world_up(pListener: *mut ma_spatializer_listener, x: f32, y: f32, z: f32);
+    fn ma_spatializer_listener_get_world_up(pListener: *ma_spatializer_listener) -> ma_vec3f;
+    fn ma_spatializer_listener_set_enabled(pListener: *mut ma_spatializer_listener, isEnabled: ma_bool32);
+    fn ma_spatializer_listener_is_enabled(pListener: *ma_spatializer_listener) -> ma_bool32;
+    fn ma_spatializer_config_init(channelsIn: ma_uint32, channelsOut: ma_uint32) -> ma_spatializer_config;
+    fn ma_spatializer_get_heap_size(pConfig: *ma_spatializer_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_spatializer_init_preallocated(pConfig: *ma_spatializer_config, pHeap: *mut void, pSpatializer: *mut ma_spatializer) -> ma_result;
+    fn ma_spatializer_init(pConfig: *ma_spatializer_config, pAllocationCallbacks: *ma_allocation_callbacks, pSpatializer: *mut ma_spatializer) -> ma_result;
+    fn ma_spatializer_uninit(pSpatializer: *mut ma_spatializer, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_spatializer_process_pcm_frames(pSpatializer: *mut ma_spatializer, pListener: *mut ma_spatializer_listener, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_spatializer_set_master_volume(pSpatializer: *mut ma_spatializer, volume: f32) -> ma_result;
+    fn ma_spatializer_get_master_volume(pSpatializer: *ma_spatializer, pVolume: *mut f32) -> ma_result;
+    fn ma_spatializer_get_input_channels(pSpatializer: *ma_spatializer) -> ma_uint32;
+    fn ma_spatializer_get_output_channels(pSpatializer: *ma_spatializer) -> ma_uint32;
+    fn ma_spatializer_set_attenuation_model(pSpatializer: *mut ma_spatializer, attenuationModel: ma_attenuation_model);
+    fn ma_spatializer_get_attenuation_model(pSpatializer: *ma_spatializer) -> ma_attenuation_model;
+    fn ma_spatializer_set_positioning(pSpatializer: *mut ma_spatializer, positioning: ma_positioning);
+    fn ma_spatializer_get_positioning(pSpatializer: *ma_spatializer) -> ma_positioning;
+    fn ma_spatializer_set_rolloff(pSpatializer: *mut ma_spatializer, rolloff: f32);
+    fn ma_spatializer_get_rolloff(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_min_gain(pSpatializer: *mut ma_spatializer, minGain: f32);
+    fn ma_spatializer_get_min_gain(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_max_gain(pSpatializer: *mut ma_spatializer, maxGain: f32);
+    fn ma_spatializer_get_max_gain(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_min_distance(pSpatializer: *mut ma_spatializer, minDistance: f32);
+    fn ma_spatializer_get_min_distance(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_max_distance(pSpatializer: *mut ma_spatializer, maxDistance: f32);
+    fn ma_spatializer_get_max_distance(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_cone(pSpatializer: *mut ma_spatializer, innerAngleInRadians: f32, outerAngleInRadians: f32, outerGain: f32);
+    fn ma_spatializer_get_cone(pSpatializer: *ma_spatializer, pInnerAngleInRadians: *mut f32, pOuterAngleInRadians: *mut f32, pOuterGain: *mut f32);
+    fn ma_spatializer_set_doppler_factor(pSpatializer: *mut ma_spatializer, dopplerFactor: f32);
+    fn ma_spatializer_get_doppler_factor(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_directional_attenuation_factor(pSpatializer: *mut ma_spatializer, directionalAttenuationFactor: f32);
+    fn ma_spatializer_get_directional_attenuation_factor(pSpatializer: *ma_spatializer) -> f32;
+    fn ma_spatializer_set_position(pSpatializer: *mut ma_spatializer, x: f32, y: f32, z: f32);
+    fn ma_spatializer_get_position(pSpatializer: *ma_spatializer) -> ma_vec3f;
+    fn ma_spatializer_set_direction(pSpatializer: *mut ma_spatializer, x: f32, y: f32, z: f32);
+    fn ma_spatializer_get_direction(pSpatializer: *ma_spatializer) -> ma_vec3f;
+    fn ma_spatializer_set_velocity(pSpatializer: *mut ma_spatializer, x: f32, y: f32, z: f32);
+    fn ma_spatializer_get_velocity(pSpatializer: *ma_spatializer) -> ma_vec3f;
+    fn ma_spatializer_get_relative_position_and_direction(pSpatializer: *ma_spatializer, pListener: *ma_spatializer_listener, pRelativePos: *mut ma_vec3f, pRelativeDir: *mut ma_vec3f);
+    fn ma_linear_resampler_config_init(format: ma_format, channels: ma_uint32, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32) -> ma_linear_resampler_config;
+    fn ma_linear_resampler_get_heap_size(pConfig: *ma_linear_resampler_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_linear_resampler_init_preallocated(pConfig: *ma_linear_resampler_config, pHeap: *mut void, pResampler: *mut ma_linear_resampler) -> ma_result;
+    fn ma_linear_resampler_init(pConfig: *ma_linear_resampler_config, pAllocationCallbacks: *ma_allocation_callbacks, pResampler: *mut ma_linear_resampler) -> ma_result;
+    fn ma_linear_resampler_uninit(pResampler: *mut ma_linear_resampler, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_linear_resampler_process_pcm_frames(pResampler: *mut ma_linear_resampler, pFramesIn: *void, pFrameCountIn: *mut ma_uint64, pFramesOut: *mut void, pFrameCountOut: *mut ma_uint64) -> ma_result;
+    fn ma_linear_resampler_set_rate(pResampler: *mut ma_linear_resampler, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32) -> ma_result;
+    fn ma_linear_resampler_set_rate_ratio(pResampler: *mut ma_linear_resampler, ratioInOut: f32) -> ma_result;
+    fn ma_linear_resampler_get_input_latency(pResampler: *ma_linear_resampler) -> ma_uint64;
+    fn ma_linear_resampler_get_output_latency(pResampler: *ma_linear_resampler) -> ma_uint64;
+    fn ma_linear_resampler_get_required_input_frame_count(pResampler: *ma_linear_resampler, outputFrameCount: ma_uint64, pInputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_linear_resampler_get_expected_output_frame_count(pResampler: *ma_linear_resampler, inputFrameCount: ma_uint64, pOutputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_linear_resampler_reset(pResampler: *mut ma_linear_resampler) -> ma_result;
+    fn ma_resampler_config_init(format: ma_format, channels: ma_uint32, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32, algorithm: ma_resample_algorithm) -> ma_resampler_config;
+    fn ma_resampler_get_heap_size(pConfig: *ma_resampler_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_resampler_init_preallocated(pConfig: *ma_resampler_config, pHeap: *mut void, pResampler: *mut ma_resampler) -> ma_result;
+    fn ma_resampler_init(pConfig: *ma_resampler_config, pAllocationCallbacks: *ma_allocation_callbacks, pResampler: *mut ma_resampler) -> ma_result;
+    fn ma_resampler_uninit(pResampler: *mut ma_resampler, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_resampler_process_pcm_frames(pResampler: *mut ma_resampler, pFramesIn: *void, pFrameCountIn: *mut ma_uint64, pFramesOut: *mut void, pFrameCountOut: *mut ma_uint64) -> ma_result;
+    fn ma_resampler_set_rate(pResampler: *mut ma_resampler, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32) -> ma_result;
+    fn ma_resampler_set_rate_ratio(pResampler: *mut ma_resampler, ratio: f32) -> ma_result;
+    fn ma_resampler_get_input_latency(pResampler: *ma_resampler) -> ma_uint64;
+    fn ma_resampler_get_output_latency(pResampler: *ma_resampler) -> ma_uint64;
+    fn ma_resampler_get_required_input_frame_count(pResampler: *ma_resampler, outputFrameCount: ma_uint64, pInputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_resampler_get_expected_output_frame_count(pResampler: *ma_resampler, inputFrameCount: ma_uint64, pOutputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_resampler_reset(pResampler: *mut ma_resampler) -> ma_result;
+    fn ma_channel_converter_config_init(format: ma_format, channelsIn: ma_uint32, pChannelMapIn: *ma_channel, channelsOut: ma_uint32, pChannelMapOut: *ma_channel, mixingMode: ma_channel_mix_mode) -> ma_channel_converter_config;
+    fn ma_channel_converter_get_heap_size(pConfig: *ma_channel_converter_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_channel_converter_init_preallocated(pConfig: *ma_channel_converter_config, pHeap: *mut void, pConverter: *mut ma_channel_converter) -> ma_result;
+    fn ma_channel_converter_init(pConfig: *ma_channel_converter_config, pAllocationCallbacks: *ma_allocation_callbacks, pConverter: *mut ma_channel_converter) -> ma_result;
+    fn ma_channel_converter_uninit(pConverter: *mut ma_channel_converter, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_channel_converter_process_pcm_frames(pConverter: *mut ma_channel_converter, pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64) -> ma_result;
+    fn ma_channel_converter_get_input_channel_map(pConverter: *ma_channel_converter, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_channel_converter_get_output_channel_map(pConverter: *ma_channel_converter, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_data_converter_config_init_default() -> ma_data_converter_config;
+    fn ma_data_converter_config_init(formatIn: ma_format, formatOut: ma_format, channelsIn: ma_uint32, channelsOut: ma_uint32, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32) -> ma_data_converter_config;
+    fn ma_data_converter_get_heap_size(pConfig: *ma_data_converter_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_data_converter_init_preallocated(pConfig: *ma_data_converter_config, pHeap: *mut void, pConverter: *mut ma_data_converter) -> ma_result;
+    fn ma_data_converter_init(pConfig: *ma_data_converter_config, pAllocationCallbacks: *ma_allocation_callbacks, pConverter: *mut ma_data_converter) -> ma_result;
+    fn ma_data_converter_uninit(pConverter: *mut ma_data_converter, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_data_converter_process_pcm_frames(pConverter: *mut ma_data_converter, pFramesIn: *void, pFrameCountIn: *mut ma_uint64, pFramesOut: *mut void, pFrameCountOut: *mut ma_uint64) -> ma_result;
+    fn ma_data_converter_set_rate(pConverter: *mut ma_data_converter, sampleRateIn: ma_uint32, sampleRateOut: ma_uint32) -> ma_result;
+    fn ma_data_converter_set_rate_ratio(pConverter: *mut ma_data_converter, ratioInOut: f32) -> ma_result;
+    fn ma_data_converter_get_input_latency(pConverter: *ma_data_converter) -> ma_uint64;
+    fn ma_data_converter_get_output_latency(pConverter: *ma_data_converter) -> ma_uint64;
+    fn ma_data_converter_get_required_input_frame_count(pConverter: *ma_data_converter, outputFrameCount: ma_uint64, pInputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_data_converter_get_expected_output_frame_count(pConverter: *ma_data_converter, inputFrameCount: ma_uint64, pOutputFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_data_converter_get_input_channel_map(pConverter: *ma_data_converter, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_data_converter_get_output_channel_map(pConverter: *ma_data_converter, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_data_converter_reset(pConverter: *mut ma_data_converter) -> ma_result;
+    fn ma_pcm_u8_to_s16(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_u8_to_s24(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_u8_to_s32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_u8_to_f32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s16_to_u8(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s16_to_s24(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s16_to_s32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s16_to_f32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s24_to_u8(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s24_to_s16(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s24_to_s32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s24_to_f32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s32_to_u8(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s32_to_s16(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s32_to_s24(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_s32_to_f32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_f32_to_u8(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_f32_to_s16(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_f32_to_s24(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_f32_to_s32(pOut: *mut void, pIn: *void, count: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_pcm_convert(pOut: *mut void, formatOut: ma_format, pIn: *void, formatIn: ma_format, sampleCount: ma_uint64, ditherMode: ma_dither_mode);
+    fn ma_convert_pcm_frames_format(pOut: *mut void, formatOut: ma_format, pIn: *void, formatIn: ma_format, frameCount: ma_uint64, channels: ma_uint32, ditherMode: ma_dither_mode);
+    fn ma_deinterleave_pcm_frames(format: ma_format, channels: ma_uint32, frameCount: ma_uint64, pInterleavedPCMFrames: *void, ppDeinterleavedPCMFrames: *mut *mut void);
+    fn ma_interleave_pcm_frames(format: ma_format, channels: ma_uint32, frameCount: ma_uint64, ppDeinterleavedPCMFrames: *mut *void, pInterleavedPCMFrames: *mut void);
+    fn ma_channel_map_get_channel(pChannelMap: *ma_channel, channelCount: ma_uint32, channelIndex: ma_uint32) -> ma_channel;
+    fn ma_channel_map_init_blank(pChannelMap: *mut ma_channel, channels: ma_uint32);
+    fn ma_channel_map_init_standard(standardChannelMap: ma_standard_channel_map, pChannelMap: *mut ma_channel, channelMapCap: usize, channels: ma_uint32);
+    fn ma_channel_map_copy(pOut: *mut ma_channel, pIn: *ma_channel, channels: ma_uint32);
+    fn ma_channel_map_copy_or_default(pOut: *mut ma_channel, channelMapCapOut: usize, pIn: *ma_channel, channels: ma_uint32);
+    fn ma_channel_map_is_valid(pChannelMap: *ma_channel, channels: ma_uint32) -> ma_bool32;
+    fn ma_channel_map_is_equal(pChannelMapA: *ma_channel, pChannelMapB: *ma_channel, channels: ma_uint32) -> ma_bool32;
+    fn ma_channel_map_is_blank(pChannelMap: *ma_channel, channels: ma_uint32) -> ma_bool32;
+    fn ma_channel_map_contains_channel_position(channels: ma_uint32, pChannelMap: *ma_channel, channelPosition: ma_channel) -> ma_bool32;
+    fn ma_channel_map_find_channel_position(channels: ma_uint32, pChannelMap: *ma_channel, channelPosition: ma_channel, pChannelIndex: *mut ma_uint32) -> ma_bool32;
+    fn ma_channel_map_to_string(pChannelMap: *ma_channel, channels: ma_uint32, pBufferOut: *mut i8, bufferCap: usize) -> usize;
+    fn ma_channel_position_to_string(channel: ma_channel) -> *i8;
+    fn ma_convert_frames(pOut: *mut void, frameCountOut: ma_uint64, formatOut: ma_format, channelsOut: ma_uint32, sampleRateOut: ma_uint32, pIn: *void, frameCountIn: ma_uint64, formatIn: ma_format, channelsIn: ma_uint32, sampleRateIn: ma_uint32) -> ma_uint64;
+    fn ma_convert_frames_ex(pOut: *mut void, frameCountOut: ma_uint64, pIn: *void, frameCountIn: ma_uint64, pConfig: *ma_data_converter_config) -> ma_uint64;
+    fn ma_data_source_config_init() -> ma_data_source_config;
+    fn ma_data_source_init(pConfig: *ma_data_source_config, pDataSource: *mut ma_data_source) -> ma_result;
+    fn ma_data_source_uninit(pDataSource: *mut ma_data_source);
+    fn ma_data_source_read_pcm_frames(pDataSource: *mut ma_data_source, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_data_source_seek_pcm_frames(pDataSource: *mut ma_data_source, frameCount: ma_uint64, pFramesSeeked: *mut ma_uint64) -> ma_result;
+    fn ma_data_source_seek_to_pcm_frame(pDataSource: *mut ma_data_source, frameIndex: ma_uint64) -> ma_result;
+    fn ma_data_source_seek_seconds(pDataSource: *mut ma_data_source, secondCount: f32, pSecondsSeeked: *mut f32) -> ma_result;
+    fn ma_data_source_seek_to_second(pDataSource: *mut ma_data_source, seekPointInSeconds: f32) -> ma_result;
+    fn ma_data_source_get_data_format(pDataSource: *mut ma_data_source, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_data_source_get_cursor_in_pcm_frames(pDataSource: *mut ma_data_source, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_data_source_get_length_in_pcm_frames(pDataSource: *mut ma_data_source, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_data_source_get_cursor_in_seconds(pDataSource: *mut ma_data_source, pCursor: *mut f32) -> ma_result;
+    fn ma_data_source_get_length_in_seconds(pDataSource: *mut ma_data_source, pLength: *mut f32) -> ma_result;
+    fn ma_data_source_set_looping(pDataSource: *mut ma_data_source, isLooping: ma_bool32) -> ma_result;
+    fn ma_data_source_is_looping(pDataSource: *ma_data_source) -> ma_bool32;
+    fn ma_data_source_set_range_in_pcm_frames(pDataSource: *mut ma_data_source, rangeBegInFrames: ma_uint64, rangeEndInFrames: ma_uint64) -> ma_result;
+    fn ma_data_source_get_range_in_pcm_frames(pDataSource: *ma_data_source, pRangeBegInFrames: *mut ma_uint64, pRangeEndInFrames: *mut ma_uint64);
+    fn ma_data_source_set_loop_point_in_pcm_frames(pDataSource: *mut ma_data_source, loopBegInFrames: ma_uint64, loopEndInFrames: ma_uint64) -> ma_result;
+    fn ma_data_source_get_loop_point_in_pcm_frames(pDataSource: *ma_data_source, pLoopBegInFrames: *mut ma_uint64, pLoopEndInFrames: *mut ma_uint64);
+    fn ma_data_source_set_current(pDataSource: *mut ma_data_source, pCurrentDataSource: *mut ma_data_source) -> ma_result;
+    fn ma_data_source_get_current(pDataSource: *ma_data_source) -> *mut ma_data_source;
+    fn ma_data_source_set_next(pDataSource: *mut ma_data_source, pNextDataSource: *mut ma_data_source) -> ma_result;
+    fn ma_data_source_get_next(pDataSource: *ma_data_source) -> *mut ma_data_source;
+    fn ma_data_source_set_next_callback(pDataSource: *mut ma_data_source, onGetNext: ma_data_source_get_next_proc) -> ma_result;
+    fn ma_data_source_get_next_callback(pDataSource: *ma_data_source) -> ma_data_source_get_next_proc;
+    fn ma_audio_buffer_ref_init(format: ma_format, channels: ma_uint32, pData: *void, sizeInFrames: ma_uint64, pAudioBufferRef: *mut ma_audio_buffer_ref) -> ma_result;
+    fn ma_audio_buffer_ref_uninit(pAudioBufferRef: *mut ma_audio_buffer_ref);
+    fn ma_audio_buffer_ref_set_data(pAudioBufferRef: *mut ma_audio_buffer_ref, pData: *void, sizeInFrames: ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_read_pcm_frames(pAudioBufferRef: *mut ma_audio_buffer_ref, pFramesOut: *mut void, frameCount: ma_uint64, _loop: ma_bool32) -> ma_uint64;
+    fn ma_audio_buffer_ref_seek_to_pcm_frame(pAudioBufferRef: *mut ma_audio_buffer_ref, frameIndex: ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_map(pAudioBufferRef: *mut ma_audio_buffer_ref, ppFramesOut: *mut *mut void, pFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_unmap(pAudioBufferRef: *mut ma_audio_buffer_ref, frameCount: ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_at_end(pAudioBufferRef: *ma_audio_buffer_ref) -> ma_bool32;
+    fn ma_audio_buffer_ref_get_cursor_in_pcm_frames(pAudioBufferRef: *ma_audio_buffer_ref, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_get_length_in_pcm_frames(pAudioBufferRef: *ma_audio_buffer_ref, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_ref_get_available_frames(pAudioBufferRef: *ma_audio_buffer_ref, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_config_init(format: ma_format, channels: ma_uint32, sizeInFrames: ma_uint64, pData: *void, pAllocationCallbacks: *ma_allocation_callbacks) -> ma_audio_buffer_config;
+    fn ma_audio_buffer_init(pConfig: *ma_audio_buffer_config, pAudioBuffer: *mut ma_audio_buffer) -> ma_result;
+    fn ma_audio_buffer_init_copy(pConfig: *ma_audio_buffer_config, pAudioBuffer: *mut ma_audio_buffer) -> ma_result;
+    fn ma_audio_buffer_alloc_and_init(pConfig: *ma_audio_buffer_config, ppAudioBuffer: *mut *mut ma_audio_buffer) -> ma_result;
+    fn ma_audio_buffer_uninit(pAudioBuffer: *mut ma_audio_buffer);
+    fn ma_audio_buffer_uninit_and_free(pAudioBuffer: *mut ma_audio_buffer);
+    fn ma_audio_buffer_read_pcm_frames(pAudioBuffer: *mut ma_audio_buffer, pFramesOut: *mut void, frameCount: ma_uint64, _loop: ma_bool32) -> ma_uint64;
+    fn ma_audio_buffer_seek_to_pcm_frame(pAudioBuffer: *mut ma_audio_buffer, frameIndex: ma_uint64) -> ma_result;
+    fn ma_audio_buffer_map(pAudioBuffer: *mut ma_audio_buffer, ppFramesOut: *mut *mut void, pFrameCount: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_unmap(pAudioBuffer: *mut ma_audio_buffer, frameCount: ma_uint64) -> ma_result;
+    fn ma_audio_buffer_at_end(pAudioBuffer: *ma_audio_buffer) -> ma_bool32;
+    fn ma_audio_buffer_get_cursor_in_pcm_frames(pAudioBuffer: *ma_audio_buffer, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_get_length_in_pcm_frames(pAudioBuffer: *ma_audio_buffer, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_audio_buffer_get_available_frames(pAudioBuffer: *ma_audio_buffer, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_paged_audio_buffer_data_init(format: ma_format, channels: ma_uint32, pData: *mut ma_paged_audio_buffer_data) -> ma_result;
+    fn ma_paged_audio_buffer_data_uninit(pData: *mut ma_paged_audio_buffer_data, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_paged_audio_buffer_data_get_head(pData: *mut ma_paged_audio_buffer_data) -> *mut ma_paged_audio_buffer_page;
+    fn ma_paged_audio_buffer_data_get_tail(pData: *mut ma_paged_audio_buffer_data) -> *mut ma_paged_audio_buffer_page;
+    fn ma_paged_audio_buffer_data_get_length_in_pcm_frames(pData: *mut ma_paged_audio_buffer_data, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_paged_audio_buffer_data_allocate_page(pData: *mut ma_paged_audio_buffer_data, pageSizeInFrames: ma_uint64, pInitialData: *void, pAllocationCallbacks: *ma_allocation_callbacks, ppPage: *mut *mut ma_paged_audio_buffer_page) -> ma_result;
+    fn ma_paged_audio_buffer_data_free_page(pData: *mut ma_paged_audio_buffer_data, pPage: *mut ma_paged_audio_buffer_page, pAllocationCallbacks: *ma_allocation_callbacks) -> ma_result;
+    fn ma_paged_audio_buffer_data_append_page(pData: *mut ma_paged_audio_buffer_data, pPage: *mut ma_paged_audio_buffer_page) -> ma_result;
+    fn ma_paged_audio_buffer_data_allocate_and_append_page(pData: *mut ma_paged_audio_buffer_data, pageSizeInFrames: ma_uint32, pInitialData: *void, pAllocationCallbacks: *ma_allocation_callbacks) -> ma_result;
+    fn ma_paged_audio_buffer_config_init(pData: *mut ma_paged_audio_buffer_data) -> ma_paged_audio_buffer_config;
+    fn ma_paged_audio_buffer_init(pConfig: *ma_paged_audio_buffer_config, pPagedAudioBuffer: *mut ma_paged_audio_buffer) -> ma_result;
+    fn ma_paged_audio_buffer_uninit(pPagedAudioBuffer: *mut ma_paged_audio_buffer);
+    fn ma_paged_audio_buffer_read_pcm_frames(pPagedAudioBuffer: *mut ma_paged_audio_buffer, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_paged_audio_buffer_seek_to_pcm_frame(pPagedAudioBuffer: *mut ma_paged_audio_buffer, frameIndex: ma_uint64) -> ma_result;
+    fn ma_paged_audio_buffer_get_cursor_in_pcm_frames(pPagedAudioBuffer: *mut ma_paged_audio_buffer, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_paged_audio_buffer_get_length_in_pcm_frames(pPagedAudioBuffer: *mut ma_paged_audio_buffer, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_rb_init_ex(subbufferSizeInBytes: usize, subbufferCount: usize, subbufferStrideInBytes: usize, pOptionalPreallocatedBuffer: *mut void, pAllocationCallbacks: *ma_allocation_callbacks, pRB: *mut ma_rb) -> ma_result;
+    fn ma_rb_init(bufferSizeInBytes: usize, pOptionalPreallocatedBuffer: *mut void, pAllocationCallbacks: *ma_allocation_callbacks, pRB: *mut ma_rb) -> ma_result;
+    fn ma_rb_uninit(pRB: *mut ma_rb);
+    fn ma_rb_reset(pRB: *mut ma_rb);
+    fn ma_rb_acquire_read(pRB: *mut ma_rb, pSizeInBytes: *mut usize, ppBufferOut: *mut *mut void) -> ma_result;
+    fn ma_rb_commit_read(pRB: *mut ma_rb, sizeInBytes: usize) -> ma_result;
+    fn ma_rb_acquire_write(pRB: *mut ma_rb, pSizeInBytes: *mut usize, ppBufferOut: *mut *mut void) -> ma_result;
+    fn ma_rb_commit_write(pRB: *mut ma_rb, sizeInBytes: usize) -> ma_result;
+    fn ma_rb_seek_read(pRB: *mut ma_rb, offsetInBytes: usize) -> ma_result;
+    fn ma_rb_seek_write(pRB: *mut ma_rb, offsetInBytes: usize) -> ma_result;
+    fn ma_rb_pointer_distance(pRB: *mut ma_rb) -> ma_int32;
+    fn ma_rb_available_read(pRB: *mut ma_rb) -> ma_uint32;
+    fn ma_rb_available_write(pRB: *mut ma_rb) -> ma_uint32;
+    fn ma_rb_get_subbuffer_size(pRB: *mut ma_rb) -> usize;
+    fn ma_rb_get_subbuffer_stride(pRB: *mut ma_rb) -> usize;
+    fn ma_rb_get_subbuffer_offset(pRB: *mut ma_rb, subbufferIndex: usize) -> usize;
+    fn ma_rb_get_subbuffer_ptr(pRB: *mut ma_rb, subbufferIndex: usize, pBuffer: *mut void) -> *mut void;
+    fn ma_pcm_rb_init_ex(format: ma_format, channels: ma_uint32, subbufferSizeInFrames: ma_uint32, subbufferCount: ma_uint32, subbufferStrideInFrames: ma_uint32, pOptionalPreallocatedBuffer: *mut void, pAllocationCallbacks: *ma_allocation_callbacks, pRB: *mut ma_pcm_rb) -> ma_result;
+    fn ma_pcm_rb_init(format: ma_format, channels: ma_uint32, bufferSizeInFrames: ma_uint32, pOptionalPreallocatedBuffer: *mut void, pAllocationCallbacks: *ma_allocation_callbacks, pRB: *mut ma_pcm_rb) -> ma_result;
+    fn ma_pcm_rb_uninit(pRB: *mut ma_pcm_rb);
+    fn ma_pcm_rb_reset(pRB: *mut ma_pcm_rb);
+    fn ma_pcm_rb_acquire_read(pRB: *mut ma_pcm_rb, pSizeInFrames: *mut ma_uint32, ppBufferOut: *mut *mut void) -> ma_result;
+    fn ma_pcm_rb_commit_read(pRB: *mut ma_pcm_rb, sizeInFrames: ma_uint32) -> ma_result;
+    fn ma_pcm_rb_acquire_write(pRB: *mut ma_pcm_rb, pSizeInFrames: *mut ma_uint32, ppBufferOut: *mut *mut void) -> ma_result;
+    fn ma_pcm_rb_commit_write(pRB: *mut ma_pcm_rb, sizeInFrames: ma_uint32) -> ma_result;
+    fn ma_pcm_rb_seek_read(pRB: *mut ma_pcm_rb, offsetInFrames: ma_uint32) -> ma_result;
+    fn ma_pcm_rb_seek_write(pRB: *mut ma_pcm_rb, offsetInFrames: ma_uint32) -> ma_result;
+    fn ma_pcm_rb_pointer_distance(pRB: *mut ma_pcm_rb) -> ma_int32;
+    fn ma_pcm_rb_available_read(pRB: *mut ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_available_write(pRB: *mut ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_get_subbuffer_size(pRB: *mut ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_get_subbuffer_stride(pRB: *mut ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_get_subbuffer_offset(pRB: *mut ma_pcm_rb, subbufferIndex: ma_uint32) -> ma_uint32;
+    fn ma_pcm_rb_get_subbuffer_ptr(pRB: *mut ma_pcm_rb, subbufferIndex: ma_uint32, pBuffer: *mut void) -> *mut void;
+    fn ma_pcm_rb_get_format(pRB: *ma_pcm_rb) -> ma_format;
+    fn ma_pcm_rb_get_channels(pRB: *ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_get_sample_rate(pRB: *ma_pcm_rb) -> ma_uint32;
+    fn ma_pcm_rb_set_sample_rate(pRB: *mut ma_pcm_rb, sampleRate: ma_uint32);
+    fn ma_duplex_rb_init(captureFormat: ma_format, captureChannels: ma_uint32, sampleRate: ma_uint32, captureInternalSampleRate: ma_uint32, captureInternalPeriodSizeInFrames: ma_uint32, pAllocationCallbacks: *ma_allocation_callbacks, pRB: *mut ma_duplex_rb) -> ma_result;
+    fn ma_duplex_rb_uninit(pRB: *mut ma_duplex_rb) -> ma_result;
+    fn ma_result_description(result: ma_result) -> *i8;
+    fn ma_malloc(sz: usize, pAllocationCallbacks: *ma_allocation_callbacks) -> *mut void;
+    fn ma_calloc(sz: usize, pAllocationCallbacks: *ma_allocation_callbacks) -> *mut void;
+    fn ma_realloc(p: *mut void, sz: usize, pAllocationCallbacks: *ma_allocation_callbacks) -> *mut void;
+    fn ma_free(p: *mut void, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_aligned_malloc(sz: usize, alignment: usize, pAllocationCallbacks: *ma_allocation_callbacks) -> *mut void;
+    fn ma_aligned_free(p: *mut void, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_get_format_name(format: ma_format) -> *i8;
+    fn ma_blend_f32(pOut: *mut f32, pInA: *mut f32, pInB: *mut f32, factor: f32, channels: ma_uint32);
+    fn ma_get_bytes_per_sample(format: ma_format) -> ma_uint32;
+    fn ma_log_level_to_string(logLevel: ma_uint32) -> *i8;
+    fn ma_spinlock_lock(pSpinlock: *mut ma_spinlock) -> ma_result;
+    fn ma_spinlock_lock_noyield(pSpinlock: *mut ma_spinlock) -> ma_result;
+    fn ma_spinlock_unlock(pSpinlock: *mut ma_spinlock) -> ma_result;
+    fn ma_mutex_init(pMutex: *mut ma_mutex) -> ma_result;
+    fn ma_mutex_uninit(pMutex: *mut ma_mutex);
+    fn ma_mutex_lock(pMutex: *mut ma_mutex);
+    fn ma_mutex_unlock(pMutex: *mut ma_mutex);
+    fn ma_event_init(pEvent: *mut ma_event) -> ma_result;
+    fn ma_event_uninit(pEvent: *mut ma_event);
+    fn ma_event_wait(pEvent: *mut ma_event) -> ma_result;
+    fn ma_event_signal(pEvent: *mut ma_event) -> ma_result;
+    fn ma_semaphore_init(initialValue: i32, pSemaphore: *mut ma_semaphore) -> ma_result;
+    fn ma_semaphore_uninit(pSemaphore: *mut ma_semaphore);
+    fn ma_semaphore_wait(pSemaphore: *mut ma_semaphore) -> ma_result;
+    fn ma_semaphore_release(pSemaphore: *mut ma_semaphore) -> ma_result;
+    fn ma_fence_init(pFence: *mut ma_fence) -> ma_result;
+    fn ma_fence_uninit(pFence: *mut ma_fence);
+    fn ma_fence_acquire(pFence: *mut ma_fence) -> ma_result;
+    fn ma_fence_release(pFence: *mut ma_fence) -> ma_result;
+    fn ma_fence_wait(pFence: *mut ma_fence) -> ma_result;
+    fn ma_async_notification_signal(pNotification: *mut ma_async_notification) -> ma_result;
+    fn ma_async_notification_poll_init(pNotificationPoll: *mut ma_async_notification_poll) -> ma_result;
+    fn ma_async_notification_poll_is_signalled(pNotificationPoll: *ma_async_notification_poll) -> ma_bool32;
+    fn ma_async_notification_event_init(pNotificationEvent: *mut ma_async_notification_event) -> ma_result;
+    fn ma_async_notification_event_uninit(pNotificationEvent: *mut ma_async_notification_event) -> ma_result;
+    fn ma_async_notification_event_wait(pNotificationEvent: *mut ma_async_notification_event) -> ma_result;
+    fn ma_async_notification_event_signal(pNotificationEvent: *mut ma_async_notification_event) -> ma_result;
+    fn ma_slot_allocator_config_init(capacity: ma_uint32) -> ma_slot_allocator_config;
+    fn ma_slot_allocator_get_heap_size(pConfig: *ma_slot_allocator_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_slot_allocator_init_preallocated(pConfig: *ma_slot_allocator_config, pHeap: *mut void, pAllocator: *mut ma_slot_allocator) -> ma_result;
+    fn ma_slot_allocator_init(pConfig: *ma_slot_allocator_config, pAllocationCallbacks: *ma_allocation_callbacks, pAllocator: *mut ma_slot_allocator) -> ma_result;
+    fn ma_slot_allocator_uninit(pAllocator: *mut ma_slot_allocator, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_slot_allocator_alloc(pAllocator: *mut ma_slot_allocator, pSlot: *mut ma_uint64) -> ma_result;
+    fn ma_slot_allocator_free(pAllocator: *mut ma_slot_allocator, slot: ma_uint64) -> ma_result;
+    fn ma_job_init(code: ma_uint16) -> ma_job;
+    fn ma_job_process(pJob: *mut ma_job) -> ma_result;
+    fn ma_job_queue_config_init(flags: ma_uint32, capacity: ma_uint32) -> ma_job_queue_config;
+    fn ma_job_queue_get_heap_size(pConfig: *ma_job_queue_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_job_queue_init_preallocated(pConfig: *ma_job_queue_config, pHeap: *mut void, pQueue: *mut ma_job_queue) -> ma_result;
+    fn ma_job_queue_init(pConfig: *ma_job_queue_config, pAllocationCallbacks: *ma_allocation_callbacks, pQueue: *mut ma_job_queue) -> ma_result;
+    fn ma_job_queue_uninit(pQueue: *mut ma_job_queue, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_job_queue_post(pQueue: *mut ma_job_queue, pJob: *ma_job) -> ma_result;
+    fn ma_job_queue_next(pQueue: *mut ma_job_queue, pJob: *mut ma_job) -> ma_result;
+    fn ma_device_job_thread_config_init() -> ma_device_job_thread_config;
+    fn ma_device_job_thread_init(pConfig: *ma_device_job_thread_config, pAllocationCallbacks: *ma_allocation_callbacks, pJobThread: *mut ma_device_job_thread) -> ma_result;
+    fn ma_device_job_thread_uninit(pJobThread: *mut ma_device_job_thread, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_device_job_thread_post(pJobThread: *mut ma_device_job_thread, pJob: *ma_job) -> ma_result;
+    fn ma_device_job_thread_next(pJobThread: *mut ma_device_job_thread, pJob: *mut ma_job) -> ma_result;
+    fn ma_device_id_equal(pA: *ma_device_id, pB: *ma_device_id) -> ma_bool32;
+    fn ma_context_config_init() -> ma_context_config;
+    fn ma_context_init(backends: *mut ma_backend, backendCount: ma_uint32, pConfig: *ma_context_config, pContext: *mut ma_context) -> ma_result;
+    fn ma_context_uninit(pContext: *mut ma_context) -> ma_result;
+    fn ma_context_sizeof() -> usize;
+    fn ma_context_get_log(pContext: *mut ma_context) -> *mut ma_log;
+    fn ma_context_enumerate_devices(pContext: *mut ma_context, callback: ma_enum_devices_callback_proc, pUserData: *mut void) -> ma_result;
+    fn ma_context_get_devices(pContext: *mut ma_context, ppPlaybackDeviceInfos: *mut *mut ma_device_info, pPlaybackDeviceCount: *mut ma_uint32, ppCaptureDeviceInfos: *mut *mut ma_device_info, pCaptureDeviceCount: *mut ma_uint32) -> ma_result;
+    fn ma_context_get_device_info(pContext: *mut ma_context, deviceType: ma_device_type, pDeviceID: *ma_device_id, pDeviceInfo: *mut ma_device_info) -> ma_result;
+    fn ma_context_is_loopback_supported(pContext: *mut ma_context) -> ma_bool32;
+    fn ma_device_config_init(deviceType: ma_device_type) -> ma_device_config;
+    fn ma_device_init(pContext: *mut ma_context, pConfig: *ma_device_config, pDevice: *mut ma_device) -> ma_result;
+    fn ma_device_init_ex(backends: *mut ma_backend, backendCount: ma_uint32, pContextConfig: *ma_context_config, pConfig: *ma_device_config, pDevice: *mut ma_device) -> ma_result;
+    fn ma_device_uninit(pDevice: *mut ma_device);
+    fn ma_device_get_context(pDevice: *mut ma_device) -> *mut ma_context;
+    fn ma_device_get_log(pDevice: *mut ma_device) -> *mut ma_log;
+    fn ma_device_get_info(pDevice: *mut ma_device, _type: ma_device_type, pDeviceInfo: *mut ma_device_info) -> ma_result;
+    fn ma_device_get_name(pDevice: *mut ma_device, _type: ma_device_type, pName: *mut i8, nameCap: usize, pLengthNotIncludingNullTerminator: *mut usize) -> ma_result;
+    fn ma_device_start(pDevice: *mut ma_device) -> ma_result;
+    fn ma_device_stop(pDevice: *mut ma_device) -> ma_result;
+    fn ma_device_is_started(pDevice: *ma_device) -> ma_bool32;
+    fn ma_device_get_state(pDevice: *ma_device) -> ma_device_state;
+    fn ma_device_post_init(pDevice: *mut ma_device, deviceType: ma_device_type, pPlaybackDescriptor: *ma_device_descriptor, pCaptureDescriptor: *ma_device_descriptor) -> ma_result;
+    fn ma_device_set_master_volume(pDevice: *mut ma_device, volume: f32) -> ma_result;
+    fn ma_device_get_master_volume(pDevice: *mut ma_device, pVolume: *mut f32) -> ma_result;
+    fn ma_device_set_master_volume_db(pDevice: *mut ma_device, gainDB: f32) -> ma_result;
+    fn ma_device_get_master_volume_db(pDevice: *mut ma_device, pGainDB: *mut f32) -> ma_result;
+    fn ma_device_handle_backend_data_callback(pDevice: *mut ma_device, pOutput: *mut void, pInput: *void, frameCount: ma_uint32) -> ma_result;
+    fn ma_calculate_buffer_size_in_frames_from_descriptor(pDescriptor: *ma_device_descriptor, nativeSampleRate: ma_uint32, performanceProfile: ma_performance_profile) -> ma_uint32;
+    fn ma_get_backend_name(backend: ma_backend) -> *i8;
+    fn ma_get_backend_from_name(pBackendName: *i8, pBackend: *mut ma_backend) -> ma_result;
+    fn ma_is_backend_enabled(backend: ma_backend) -> ma_bool32;
+    fn ma_get_enabled_backends(pBackends: *mut ma_backend, backendCap: usize, pBackendCount: *mut usize) -> ma_result;
+    fn ma_is_loopback_supported(backend: ma_backend) -> ma_bool32;
+    fn ma_calculate_buffer_size_in_milliseconds_from_frames(bufferSizeInFrames: ma_uint32, sampleRate: ma_uint32) -> ma_uint32;
+    fn ma_calculate_buffer_size_in_frames_from_milliseconds(bufferSizeInMilliseconds: ma_uint32, sampleRate: ma_uint32) -> ma_uint32;
+    fn ma_copy_pcm_frames(dst: *mut void, src: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32);
+    fn ma_silence_pcm_frames(p: *mut void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32);
+    fn ma_offset_pcm_frames_ptr(p: *mut void, offsetInFrames: ma_uint64, format: ma_format, channels: ma_uint32) -> *mut void;
+    fn ma_offset_pcm_frames_const_ptr(p: *void, offsetInFrames: ma_uint64, format: ma_format, channels: ma_uint32) -> *void;
+    fn ma_clip_samples_u8(pDst: *mut ma_uint8, pSrc: *ma_int16, count: ma_uint64);
+    fn ma_clip_samples_s16(pDst: *mut ma_int16, pSrc: *ma_int32, count: ma_uint64);
+    fn ma_clip_samples_s24(pDst: *mut ma_uint8, pSrc: *ma_int64, count: ma_uint64);
+    fn ma_clip_samples_s32(pDst: *mut ma_int32, pSrc: *ma_int64, count: ma_uint64);
+    fn ma_clip_samples_f32(pDst: *mut f32, pSrc: *f32, count: ma_uint64);
+    fn ma_clip_pcm_frames(pDst: *mut void, pSrc: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32);
+    fn ma_copy_and_apply_volume_factor_u8(pSamplesOut: *mut ma_uint8, pSamplesIn: *ma_uint8, sampleCount: ma_uint64, factor: f32);
+    fn ma_copy_and_apply_volume_factor_s16(pSamplesOut: *mut ma_int16, pSamplesIn: *ma_int16, sampleCount: ma_uint64, factor: f32);
+    fn ma_copy_and_apply_volume_factor_s24(pSamplesOut: *mut void, pSamplesIn: *void, sampleCount: ma_uint64, factor: f32);
+    fn ma_copy_and_apply_volume_factor_s32(pSamplesOut: *mut ma_int32, pSamplesIn: *ma_int32, sampleCount: ma_uint64, factor: f32);
+    fn ma_copy_and_apply_volume_factor_f32(pSamplesOut: *mut f32, pSamplesIn: *f32, sampleCount: ma_uint64, factor: f32);
+    fn ma_apply_volume_factor_u8(pSamples: *mut ma_uint8, sampleCount: ma_uint64, factor: f32);
+    fn ma_apply_volume_factor_s16(pSamples: *mut ma_int16, sampleCount: ma_uint64, factor: f32);
+    fn ma_apply_volume_factor_s24(pSamples: *mut void, sampleCount: ma_uint64, factor: f32);
+    fn ma_apply_volume_factor_s32(pSamples: *mut ma_int32, sampleCount: ma_uint64, factor: f32);
+    fn ma_apply_volume_factor_f32(pSamples: *mut f32, sampleCount: ma_uint64, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames_u8(pFramesOut: *mut ma_uint8, pFramesIn: *ma_uint8, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames_s16(pFramesOut: *mut ma_int16, pFramesIn: *ma_int16, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames_s24(pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames_s32(pFramesOut: *mut ma_int32, pFramesIn: *ma_int32, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames_f32(pFramesOut: *mut f32, pFramesIn: *f32, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_pcm_frames(pFramesOut: *mut void, pFramesIn: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames_u8(pFrames: *mut ma_uint8, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames_s16(pFrames: *mut ma_int16, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames_s24(pFrames: *mut void, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames_s32(pFrames: *mut ma_int32, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames_f32(pFrames: *mut f32, frameCount: ma_uint64, channels: ma_uint32, factor: f32);
+    fn ma_apply_volume_factor_pcm_frames(pFrames: *mut void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32, factor: f32);
+    fn ma_copy_and_apply_volume_factor_per_channel_f32(pFramesOut: *mut f32, pFramesIn: *f32, frameCount: ma_uint64, channels: ma_uint32, pChannelGains: *mut f32);
+    fn ma_copy_and_apply_volume_and_clip_samples_u8(pDst: *mut ma_uint8, pSrc: *ma_int16, count: ma_uint64, volume: f32);
+    fn ma_copy_and_apply_volume_and_clip_samples_s16(pDst: *mut ma_int16, pSrc: *ma_int32, count: ma_uint64, volume: f32);
+    fn ma_copy_and_apply_volume_and_clip_samples_s24(pDst: *mut ma_uint8, pSrc: *ma_int64, count: ma_uint64, volume: f32);
+    fn ma_copy_and_apply_volume_and_clip_samples_s32(pDst: *mut ma_int32, pSrc: *ma_int64, count: ma_uint64, volume: f32);
+    fn ma_copy_and_apply_volume_and_clip_samples_f32(pDst: *mut f32, pSrc: *f32, count: ma_uint64, volume: f32);
+    fn ma_copy_and_apply_volume_and_clip_pcm_frames(pDst: *mut void, pSrc: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32, volume: f32);
+    fn ma_volume_linear_to_db(factor: f32) -> f32;
+    fn ma_volume_db_to_linear(gain: f32) -> f32;
+    fn ma_mix_pcm_frames_f32(pDst: *mut f32, pSrc: *f32, frameCount: ma_uint64, channels: ma_uint32, volume: f32) -> ma_result;
+    fn ma_vfs_open(pVFS: *mut ma_vfs, pFilePath: *i8, openMode: ma_uint32, pFile: *mut ma_vfs_file) -> ma_result;
+    fn ma_vfs_open_w(pVFS: *mut ma_vfs, pFilePath: *u16, openMode: ma_uint32, pFile: *mut ma_vfs_file) -> ma_result;
+    fn ma_vfs_close(pVFS: *mut ma_vfs, file: ma_vfs_file) -> ma_result;
+    fn ma_vfs_read(pVFS: *mut ma_vfs, file: ma_vfs_file, pDst: *mut void, sizeInBytes: usize, pBytesRead: *mut usize) -> ma_result;
+    fn ma_vfs_write(pVFS: *mut ma_vfs, file: ma_vfs_file, pSrc: *void, sizeInBytes: usize, pBytesWritten: *mut usize) -> ma_result;
+    fn ma_vfs_seek(pVFS: *mut ma_vfs, file: ma_vfs_file, offset: ma_int64, origin: ma_seek_origin) -> ma_result;
+    fn ma_vfs_tell(pVFS: *mut ma_vfs, file: ma_vfs_file, pCursor: *mut ma_int64) -> ma_result;
+    fn ma_vfs_info(pVFS: *mut ma_vfs, file: ma_vfs_file, pInfo: *mut ma_file_info) -> ma_result;
+    fn ma_vfs_open_and_read_file(pVFS: *mut ma_vfs, pFilePath: *i8, ppData: *mut *mut void, pSize: *mut usize, pAllocationCallbacks: *ma_allocation_callbacks) -> ma_result;
+    fn ma_default_vfs_init(pVFS: *mut ma_default_vfs, pAllocationCallbacks: *ma_allocation_callbacks) -> ma_result;
+    fn ma_decoding_backend_config_init(preferredFormat: ma_format, seekPointCount: ma_uint32) -> ma_decoding_backend_config;
+    fn ma_decoder_config_init(outputFormat: ma_format, outputChannels: ma_uint32, outputSampleRate: ma_uint32) -> ma_decoder_config;
+    fn ma_decoder_config_init_default() -> ma_decoder_config;
+    fn ma_decoder_init(onRead: ma_decoder_read_proc, onSeek: ma_decoder_seek_proc, pUserData: *mut void, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_init_memory(pData: *void, dataSize: usize, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_init_vfs(pVFS: *mut ma_vfs, pFilePath: *i8, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_init_vfs_w(pVFS: *mut ma_vfs, pFilePath: *u16, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_init_file(pFilePath: *i8, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_init_file_w(pFilePath: *u16, pConfig: *ma_decoder_config, pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_uninit(pDecoder: *mut ma_decoder) -> ma_result;
+    fn ma_decoder_read_pcm_frames(pDecoder: *mut ma_decoder, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_decoder_seek_to_pcm_frame(pDecoder: *mut ma_decoder, frameIndex: ma_uint64) -> ma_result;
+    fn ma_decoder_get_data_format(pDecoder: *mut ma_decoder, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_decoder_get_cursor_in_pcm_frames(pDecoder: *mut ma_decoder, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_decoder_get_length_in_pcm_frames(pDecoder: *mut ma_decoder, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_decoder_get_available_frames(pDecoder: *mut ma_decoder, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_decode_from_vfs(pVFS: *mut ma_vfs, pFilePath: *i8, pConfig: *mut ma_decoder_config, pFrameCountOut: *mut ma_uint64, ppPCMFramesOut: *mut *mut void) -> ma_result;
+    fn ma_decode_file(pFilePath: *i8, pConfig: *mut ma_decoder_config, pFrameCountOut: *mut ma_uint64, ppPCMFramesOut: *mut *mut void) -> ma_result;
+    fn ma_decode_memory(pData: *void, dataSize: usize, pConfig: *mut ma_decoder_config, pFrameCountOut: *mut ma_uint64, ppPCMFramesOut: *mut *mut void) -> ma_result;
+    fn ma_encoder_config_init(encodingFormat: ma_encoding_format, format: ma_format, channels: ma_uint32, sampleRate: ma_uint32) -> ma_encoder_config;
+    fn ma_encoder_init(onWrite: ma_encoder_write_proc, onSeek: ma_encoder_seek_proc, pUserData: *mut void, pConfig: *ma_encoder_config, pEncoder: *mut ma_encoder) -> ma_result;
+    fn ma_encoder_init_vfs(pVFS: *mut ma_vfs, pFilePath: *i8, pConfig: *ma_encoder_config, pEncoder: *mut ma_encoder) -> ma_result;
+    fn ma_encoder_init_vfs_w(pVFS: *mut ma_vfs, pFilePath: *u16, pConfig: *ma_encoder_config, pEncoder: *mut ma_encoder) -> ma_result;
+    fn ma_encoder_init_file(pFilePath: *i8, pConfig: *ma_encoder_config, pEncoder: *mut ma_encoder) -> ma_result;
+    fn ma_encoder_init_file_w(pFilePath: *u16, pConfig: *ma_encoder_config, pEncoder: *mut ma_encoder) -> ma_result;
+    fn ma_encoder_uninit(pEncoder: *mut ma_encoder);
+    fn ma_encoder_write_pcm_frames(pEncoder: *mut ma_encoder, pFramesIn: *void, frameCount: ma_uint64, pFramesWritten: *mut ma_uint64) -> ma_result;
+    fn ma_waveform_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, _type: ma_waveform_type, amplitude: f64, frequency: f64) -> ma_waveform_config;
+    fn ma_waveform_init(pConfig: *ma_waveform_config, pWaveform: *mut ma_waveform) -> ma_result;
+    fn ma_waveform_uninit(pWaveform: *mut ma_waveform);
+    fn ma_waveform_read_pcm_frames(pWaveform: *mut ma_waveform, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_waveform_seek_to_pcm_frame(pWaveform: *mut ma_waveform, frameIndex: ma_uint64) -> ma_result;
+    fn ma_waveform_set_amplitude(pWaveform: *mut ma_waveform, amplitude: f64) -> ma_result;
+    fn ma_waveform_set_frequency(pWaveform: *mut ma_waveform, frequency: f64) -> ma_result;
+    fn ma_waveform_set_type(pWaveform: *mut ma_waveform, _type: ma_waveform_type) -> ma_result;
+    fn ma_waveform_set_sample_rate(pWaveform: *mut ma_waveform, sampleRate: ma_uint32) -> ma_result;
+    fn ma_pulsewave_config_init(format: ma_format, channels: ma_uint32, sampleRate: ma_uint32, dutyCycle: f64, amplitude: f64, frequency: f64) -> ma_pulsewave_config;
+    fn ma_pulsewave_init(pConfig: *ma_pulsewave_config, pWaveform: *mut ma_pulsewave) -> ma_result;
+    fn ma_pulsewave_uninit(pWaveform: *mut ma_pulsewave);
+    fn ma_pulsewave_read_pcm_frames(pWaveform: *mut ma_pulsewave, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_pulsewave_seek_to_pcm_frame(pWaveform: *mut ma_pulsewave, frameIndex: ma_uint64) -> ma_result;
+    fn ma_pulsewave_set_amplitude(pWaveform: *mut ma_pulsewave, amplitude: f64) -> ma_result;
+    fn ma_pulsewave_set_frequency(pWaveform: *mut ma_pulsewave, frequency: f64) -> ma_result;
+    fn ma_pulsewave_set_sample_rate(pWaveform: *mut ma_pulsewave, sampleRate: ma_uint32) -> ma_result;
+    fn ma_pulsewave_set_duty_cycle(pWaveform: *mut ma_pulsewave, dutyCycle: f64) -> ma_result;
+    fn ma_noise_config_init(format: ma_format, channels: ma_uint32, _type: ma_noise_type, seed: ma_int32, amplitude: f64) -> ma_noise_config;
+    fn ma_noise_get_heap_size(pConfig: *ma_noise_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_noise_init_preallocated(pConfig: *ma_noise_config, pHeap: *mut void, pNoise: *mut ma_noise) -> ma_result;
+    fn ma_noise_init(pConfig: *ma_noise_config, pAllocationCallbacks: *ma_allocation_callbacks, pNoise: *mut ma_noise) -> ma_result;
+    fn ma_noise_uninit(pNoise: *mut ma_noise, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_noise_read_pcm_frames(pNoise: *mut ma_noise, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_noise_set_amplitude(pNoise: *mut ma_noise, amplitude: f64) -> ma_result;
+    fn ma_noise_set_seed(pNoise: *mut ma_noise, seed: ma_int32) -> ma_result;
+    fn ma_noise_set_type(pNoise: *mut ma_noise, _type: ma_noise_type) -> ma_result;
+    fn ma_resource_manager_pipeline_notifications_init() -> ma_resource_manager_pipeline_notifications;
+    fn ma_resource_manager_data_source_config_init() -> ma_resource_manager_data_source_config;
+    fn ma_resource_manager_config_init() -> ma_resource_manager_config;
+    fn ma_resource_manager_init(pConfig: *ma_resource_manager_config, pResourceManager: *mut ma_resource_manager) -> ma_result;
+    fn ma_resource_manager_uninit(pResourceManager: *mut ma_resource_manager);
+    fn ma_resource_manager_get_log(pResourceManager: *mut ma_resource_manager) -> *mut ma_log;
+    fn ma_resource_manager_register_file(pResourceManager: *mut ma_resource_manager, pFilePath: *i8, flags: ma_uint32) -> ma_result;
+    fn ma_resource_manager_register_file_w(pResourceManager: *mut ma_resource_manager, pFilePath: *u16, flags: ma_uint32) -> ma_result;
+    fn ma_resource_manager_register_decoded_data(pResourceManager: *mut ma_resource_manager, pName: *i8, pData: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32, sampleRate: ma_uint32) -> ma_result;
+    fn ma_resource_manager_register_decoded_data_w(pResourceManager: *mut ma_resource_manager, pName: *u16, pData: *void, frameCount: ma_uint64, format: ma_format, channels: ma_uint32, sampleRate: ma_uint32) -> ma_result;
+    fn ma_resource_manager_register_encoded_data(pResourceManager: *mut ma_resource_manager, pName: *i8, pData: *void, sizeInBytes: usize) -> ma_result;
+    fn ma_resource_manager_register_encoded_data_w(pResourceManager: *mut ma_resource_manager, pName: *u16, pData: *void, sizeInBytes: usize) -> ma_result;
+    fn ma_resource_manager_unregister_file(pResourceManager: *mut ma_resource_manager, pFilePath: *i8) -> ma_result;
+    fn ma_resource_manager_unregister_file_w(pResourceManager: *mut ma_resource_manager, pFilePath: *u16) -> ma_result;
+    fn ma_resource_manager_unregister_data(pResourceManager: *mut ma_resource_manager, pName: *i8) -> ma_result;
+    fn ma_resource_manager_unregister_data_w(pResourceManager: *mut ma_resource_manager, pName: *u16) -> ma_result;
+    fn ma_resource_manager_data_buffer_init_ex(pResourceManager: *mut ma_resource_manager, pConfig: *ma_resource_manager_data_source_config, pDataBuffer: *mut ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_init(pResourceManager: *mut ma_resource_manager, pFilePath: *i8, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataBuffer: *mut ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_init_w(pResourceManager: *mut ma_resource_manager, pFilePath: *u16, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataBuffer: *mut ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_init_copy(pResourceManager: *mut ma_resource_manager, pExistingDataBuffer: *ma_resource_manager_data_buffer, pDataBuffer: *mut ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_uninit(pDataBuffer: *mut ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_read_pcm_frames(pDataBuffer: *mut ma_resource_manager_data_buffer, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_buffer_seek_to_pcm_frame(pDataBuffer: *mut ma_resource_manager_data_buffer, frameIndex: ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_buffer_get_data_format(pDataBuffer: *mut ma_resource_manager_data_buffer, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_resource_manager_data_buffer_get_cursor_in_pcm_frames(pDataBuffer: *mut ma_resource_manager_data_buffer, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_buffer_get_length_in_pcm_frames(pDataBuffer: *mut ma_resource_manager_data_buffer, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_buffer_result(pDataBuffer: *ma_resource_manager_data_buffer) -> ma_result;
+    fn ma_resource_manager_data_buffer_set_looping(pDataBuffer: *mut ma_resource_manager_data_buffer, isLooping: ma_bool32) -> ma_result;
+    fn ma_resource_manager_data_buffer_is_looping(pDataBuffer: *ma_resource_manager_data_buffer) -> ma_bool32;
+    fn ma_resource_manager_data_buffer_get_available_frames(pDataBuffer: *mut ma_resource_manager_data_buffer, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_stream_init_ex(pResourceManager: *mut ma_resource_manager, pConfig: *ma_resource_manager_data_source_config, pDataStream: *mut ma_resource_manager_data_stream) -> ma_result;
+    fn ma_resource_manager_data_stream_init(pResourceManager: *mut ma_resource_manager, pFilePath: *i8, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataStream: *mut ma_resource_manager_data_stream) -> ma_result;
+    fn ma_resource_manager_data_stream_init_w(pResourceManager: *mut ma_resource_manager, pFilePath: *u16, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataStream: *mut ma_resource_manager_data_stream) -> ma_result;
+    fn ma_resource_manager_data_stream_uninit(pDataStream: *mut ma_resource_manager_data_stream) -> ma_result;
+    fn ma_resource_manager_data_stream_read_pcm_frames(pDataStream: *mut ma_resource_manager_data_stream, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_stream_seek_to_pcm_frame(pDataStream: *mut ma_resource_manager_data_stream, frameIndex: ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_stream_get_data_format(pDataStream: *mut ma_resource_manager_data_stream, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_resource_manager_data_stream_get_cursor_in_pcm_frames(pDataStream: *mut ma_resource_manager_data_stream, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_stream_get_length_in_pcm_frames(pDataStream: *mut ma_resource_manager_data_stream, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_stream_result(pDataStream: *ma_resource_manager_data_stream) -> ma_result;
+    fn ma_resource_manager_data_stream_set_looping(pDataStream: *mut ma_resource_manager_data_stream, isLooping: ma_bool32) -> ma_result;
+    fn ma_resource_manager_data_stream_is_looping(pDataStream: *ma_resource_manager_data_stream) -> ma_bool32;
+    fn ma_resource_manager_data_stream_get_available_frames(pDataStream: *mut ma_resource_manager_data_stream, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_source_init_ex(pResourceManager: *mut ma_resource_manager, pConfig: *ma_resource_manager_data_source_config, pDataSource: *mut ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_init(pResourceManager: *mut ma_resource_manager, pName: *i8, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataSource: *mut ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_init_w(pResourceManager: *mut ma_resource_manager, pName: *u16, flags: ma_uint32, pNotifications: *ma_resource_manager_pipeline_notifications, pDataSource: *mut ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_init_copy(pResourceManager: *mut ma_resource_manager, pExistingDataSource: *ma_resource_manager_data_source, pDataSource: *mut ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_uninit(pDataSource: *mut ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_read_pcm_frames(pDataSource: *mut ma_resource_manager_data_source, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_source_seek_to_pcm_frame(pDataSource: *mut ma_resource_manager_data_source, frameIndex: ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_source_get_data_format(pDataSource: *mut ma_resource_manager_data_source, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_resource_manager_data_source_get_cursor_in_pcm_frames(pDataSource: *mut ma_resource_manager_data_source, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_source_get_length_in_pcm_frames(pDataSource: *mut ma_resource_manager_data_source, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_data_source_result(pDataSource: *ma_resource_manager_data_source) -> ma_result;
+    fn ma_resource_manager_data_source_set_looping(pDataSource: *mut ma_resource_manager_data_source, isLooping: ma_bool32) -> ma_result;
+    fn ma_resource_manager_data_source_is_looping(pDataSource: *ma_resource_manager_data_source) -> ma_bool32;
+    fn ma_resource_manager_data_source_get_available_frames(pDataSource: *mut ma_resource_manager_data_source, pAvailableFrames: *mut ma_uint64) -> ma_result;
+    fn ma_resource_manager_post_job(pResourceManager: *mut ma_resource_manager, pJob: *ma_job) -> ma_result;
+    fn ma_resource_manager_post_job_quit(pResourceManager: *mut ma_resource_manager) -> ma_result;
+    fn ma_resource_manager_next_job(pResourceManager: *mut ma_resource_manager, pJob: *mut ma_job) -> ma_result;
+    fn ma_resource_manager_process_job(pResourceManager: *mut ma_resource_manager, pJob: *mut ma_job) -> ma_result;
+    fn ma_resource_manager_process_next_job(pResourceManager: *mut ma_resource_manager) -> ma_result;
+    fn ma_node_config_init() -> ma_node_config;
+    fn ma_node_get_heap_size(pNodeGraph: *mut ma_node_graph, pConfig: *ma_node_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_node_init_preallocated(pNodeGraph: *mut ma_node_graph, pConfig: *ma_node_config, pHeap: *mut void, pNode: *mut ma_node) -> ma_result;
+    fn ma_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_node) -> ma_result;
+    fn ma_node_uninit(pNode: *mut ma_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_node_get_node_graph(pNode: *ma_node) -> *mut ma_node_graph;
+    fn ma_node_get_input_bus_count(pNode: *ma_node) -> ma_uint32;
+    fn ma_node_get_output_bus_count(pNode: *ma_node) -> ma_uint32;
+    fn ma_node_get_input_channels(pNode: *ma_node, inputBusIndex: ma_uint32) -> ma_uint32;
+    fn ma_node_get_output_channels(pNode: *ma_node, outputBusIndex: ma_uint32) -> ma_uint32;
+    fn ma_node_attach_output_bus(pNode: *mut ma_node, outputBusIndex: ma_uint32, pOtherNode: *mut ma_node, otherNodeInputBusIndex: ma_uint32) -> ma_result;
+    fn ma_node_detach_output_bus(pNode: *mut ma_node, outputBusIndex: ma_uint32) -> ma_result;
+    fn ma_node_detach_all_output_buses(pNode: *mut ma_node) -> ma_result;
+    fn ma_node_set_output_bus_volume(pNode: *mut ma_node, outputBusIndex: ma_uint32, volume: f32) -> ma_result;
+    fn ma_node_get_output_bus_volume(pNode: *ma_node, outputBusIndex: ma_uint32) -> f32;
+    fn ma_node_set_state(pNode: *mut ma_node, state: ma_node_state) -> ma_result;
+    fn ma_node_get_state(pNode: *ma_node) -> ma_node_state;
+    fn ma_node_set_state_time(pNode: *mut ma_node, state: ma_node_state, globalTime: ma_uint64) -> ma_result;
+    fn ma_node_get_state_time(pNode: *ma_node, state: ma_node_state) -> ma_uint64;
+    fn ma_node_get_state_by_time(pNode: *ma_node, globalTime: ma_uint64) -> ma_node_state;
+    fn ma_node_get_state_by_time_range(pNode: *ma_node, globalTimeBeg: ma_uint64, globalTimeEnd: ma_uint64) -> ma_node_state;
+    fn ma_node_get_time(pNode: *ma_node) -> ma_uint64;
+    fn ma_node_set_time(pNode: *mut ma_node, localTime: ma_uint64) -> ma_result;
+    fn ma_node_graph_config_init(channels: ma_uint32) -> ma_node_graph_config;
+    fn ma_node_graph_init(pConfig: *ma_node_graph_config, pAllocationCallbacks: *ma_allocation_callbacks, pNodeGraph: *mut ma_node_graph) -> ma_result;
+    fn ma_node_graph_uninit(pNodeGraph: *mut ma_node_graph, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_node_graph_get_endpoint(pNodeGraph: *mut ma_node_graph) -> *mut ma_node;
+    fn ma_node_graph_read_pcm_frames(pNodeGraph: *mut ma_node_graph, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_node_graph_get_channels(pNodeGraph: *ma_node_graph) -> ma_uint32;
+    fn ma_node_graph_get_time(pNodeGraph: *ma_node_graph) -> ma_uint64;
+    fn ma_node_graph_set_time(pNodeGraph: *mut ma_node_graph, globalTime: ma_uint64) -> ma_result;
+    fn ma_node_graph_get_processing_size_in_frames(pNodeGraph: *ma_node_graph) -> ma_uint32;
+    fn ma_data_source_node_config_init(pDataSource: *mut ma_data_source) -> ma_data_source_node_config;
+    fn ma_data_source_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_data_source_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pDataSourceNode: *mut ma_data_source_node) -> ma_result;
+    fn ma_data_source_node_uninit(pDataSourceNode: *mut ma_data_source_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_data_source_node_set_looping(pDataSourceNode: *mut ma_data_source_node, isLooping: ma_bool32) -> ma_result;
+    fn ma_data_source_node_is_looping(pDataSourceNode: *mut ma_data_source_node) -> ma_bool32;
+    fn ma_splitter_node_config_init(channels: ma_uint32) -> ma_splitter_node_config;
+    fn ma_splitter_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_splitter_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pSplitterNode: *mut ma_splitter_node) -> ma_result;
+    fn ma_splitter_node_uninit(pSplitterNode: *mut ma_splitter_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_biquad_node_config_init(channels: ma_uint32, b0: f32, b1: f32, b2: f32, a0: f32, a1: f32, a2: f32) -> ma_biquad_node_config;
+    fn ma_biquad_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_biquad_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_biquad_node) -> ma_result;
+    fn ma_biquad_node_reinit(pConfig: *ma_biquad_config, pNode: *mut ma_biquad_node) -> ma_result;
+    fn ma_biquad_node_uninit(pNode: *mut ma_biquad_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_lpf_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_lpf_node_config;
+    fn ma_lpf_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_lpf_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_lpf_node) -> ma_result;
+    fn ma_lpf_node_reinit(pConfig: *ma_lpf_config, pNode: *mut ma_lpf_node) -> ma_result;
+    fn ma_lpf_node_uninit(pNode: *mut ma_lpf_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hpf_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_hpf_node_config;
+    fn ma_hpf_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_hpf_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_hpf_node) -> ma_result;
+    fn ma_hpf_node_reinit(pConfig: *ma_hpf_config, pNode: *mut ma_hpf_node) -> ma_result;
+    fn ma_hpf_node_uninit(pNode: *mut ma_hpf_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_bpf_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, cutoffFrequency: f64, order: ma_uint32) -> ma_bpf_node_config;
+    fn ma_bpf_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_bpf_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_bpf_node) -> ma_result;
+    fn ma_bpf_node_reinit(pConfig: *ma_bpf_config, pNode: *mut ma_bpf_node) -> ma_result;
+    fn ma_bpf_node_uninit(pNode: *mut ma_bpf_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_notch_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, q: f64, frequency: f64) -> ma_notch_node_config;
+    fn ma_notch_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_notch_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_notch_node) -> ma_result;
+    fn ma_notch_node_reinit(pConfig: *ma_notch_config, pNode: *mut ma_notch_node) -> ma_result;
+    fn ma_notch_node_uninit(pNode: *mut ma_notch_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_peak_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, q: f64, frequency: f64) -> ma_peak_node_config;
+    fn ma_peak_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_peak_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_peak_node) -> ma_result;
+    fn ma_peak_node_reinit(pConfig: *ma_peak_config, pNode: *mut ma_peak_node) -> ma_result;
+    fn ma_peak_node_uninit(pNode: *mut ma_peak_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_loshelf_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, q: f64, frequency: f64) -> ma_loshelf_node_config;
+    fn ma_loshelf_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_loshelf_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_loshelf_node) -> ma_result;
+    fn ma_loshelf_node_reinit(pConfig: *ma_loshelf_config, pNode: *mut ma_loshelf_node) -> ma_result;
+    fn ma_loshelf_node_uninit(pNode: *mut ma_loshelf_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_hishelf_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, gainDB: f64, q: f64, frequency: f64) -> ma_hishelf_node_config;
+    fn ma_hishelf_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_hishelf_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pNode: *mut ma_hishelf_node) -> ma_result;
+    fn ma_hishelf_node_reinit(pConfig: *ma_hishelf_config, pNode: *mut ma_hishelf_node) -> ma_result;
+    fn ma_hishelf_node_uninit(pNode: *mut ma_hishelf_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_delay_node_config_init(channels: ma_uint32, sampleRate: ma_uint32, delayInFrames: ma_uint32, decay: f32) -> ma_delay_node_config;
+    fn ma_delay_node_init(pNodeGraph: *mut ma_node_graph, pConfig: *ma_delay_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pDelayNode: *mut ma_delay_node) -> ma_result;
+    fn ma_delay_node_uninit(pDelayNode: *mut ma_delay_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_delay_node_set_wet(pDelayNode: *mut ma_delay_node, value: f32);
+    fn ma_delay_node_get_wet(pDelayNode: *ma_delay_node) -> f32;
+    fn ma_delay_node_set_dry(pDelayNode: *mut ma_delay_node, value: f32);
+    fn ma_delay_node_get_dry(pDelayNode: *ma_delay_node) -> f32;
+    fn ma_delay_node_set_decay(pDelayNode: *mut ma_delay_node, value: f32);
+    fn ma_delay_node_get_decay(pDelayNode: *ma_delay_node) -> f32;
+    fn ma_engine_node_config_init(pEngine: *mut ma_engine, _type: ma_engine_node_type, flags: ma_uint32) -> ma_engine_node_config;
+    fn ma_engine_node_get_heap_size(pConfig: *ma_engine_node_config, pHeapSizeInBytes: *mut usize) -> ma_result;
+    fn ma_engine_node_init_preallocated(pConfig: *ma_engine_node_config, pHeap: *mut void, pEngineNode: *mut ma_engine_node) -> ma_result;
+    fn ma_engine_node_init(pConfig: *ma_engine_node_config, pAllocationCallbacks: *ma_allocation_callbacks, pEngineNode: *mut ma_engine_node) -> ma_result;
+    fn ma_engine_node_uninit(pEngineNode: *mut ma_engine_node, pAllocationCallbacks: *ma_allocation_callbacks);
+    fn ma_sound_config_init() -> ma_sound_config;
+    fn ma_sound_config_init_2(pEngine: *mut ma_engine) -> ma_sound_config;
+    fn ma_sound_group_config_init() -> ma_sound_group_config;
+    fn ma_sound_group_config_init_2(pEngine: *mut ma_engine) -> ma_sound_group_config;
+    fn ma_engine_config_init() -> ma_engine_config;
+    fn ma_engine_init(pConfig: *ma_engine_config, pEngine: *mut ma_engine) -> ma_result;
+    fn ma_engine_uninit(pEngine: *mut ma_engine);
+    fn ma_engine_read_pcm_frames(pEngine: *mut ma_engine, pFramesOut: *mut void, frameCount: ma_uint64, pFramesRead: *mut ma_uint64) -> ma_result;
+    fn ma_engine_get_node_graph(pEngine: *mut ma_engine) -> *mut ma_node_graph;
+    fn ma_engine_get_resource_manager(pEngine: *mut ma_engine) -> *mut ma_resource_manager;
+    fn ma_engine_get_device(pEngine: *mut ma_engine) -> *mut ma_device;
+    fn ma_engine_get_log(pEngine: *mut ma_engine) -> *mut ma_log;
+    fn ma_engine_get_endpoint(pEngine: *mut ma_engine) -> *mut ma_node;
+    fn ma_engine_get_time_in_pcm_frames(pEngine: *ma_engine) -> ma_uint64;
+    fn ma_engine_get_time_in_milliseconds(pEngine: *ma_engine) -> ma_uint64;
+    fn ma_engine_set_time_in_pcm_frames(pEngine: *mut ma_engine, globalTime: ma_uint64) -> ma_result;
+    fn ma_engine_set_time_in_milliseconds(pEngine: *mut ma_engine, globalTime: ma_uint64) -> ma_result;
+    fn ma_engine_get_time(pEngine: *ma_engine) -> ma_uint64;
+    fn ma_engine_set_time(pEngine: *mut ma_engine, globalTime: ma_uint64) -> ma_result;
+    fn ma_engine_get_channels(pEngine: *ma_engine) -> ma_uint32;
+    fn ma_engine_get_sample_rate(pEngine: *ma_engine) -> ma_uint32;
+    fn ma_engine_start(pEngine: *mut ma_engine) -> ma_result;
+    fn ma_engine_stop(pEngine: *mut ma_engine) -> ma_result;
+    fn ma_engine_set_volume(pEngine: *mut ma_engine, volume: f32) -> ma_result;
+    fn ma_engine_get_volume(pEngine: *mut ma_engine) -> f32;
+    fn ma_engine_set_gain_db(pEngine: *mut ma_engine, gainDB: f32) -> ma_result;
+    fn ma_engine_get_gain_db(pEngine: *mut ma_engine) -> f32;
+    fn ma_engine_get_listener_count(pEngine: *ma_engine) -> ma_uint32;
+    fn ma_engine_find_closest_listener(pEngine: *ma_engine, absolutePosX: f32, absolutePosY: f32, absolutePosZ: f32) -> ma_uint32;
+    fn ma_engine_listener_set_position(pEngine: *mut ma_engine, listenerIndex: ma_uint32, x: f32, y: f32, z: f32);
+    fn ma_engine_listener_get_position(pEngine: *ma_engine, listenerIndex: ma_uint32) -> ma_vec3f;
+    fn ma_engine_listener_set_direction(pEngine: *mut ma_engine, listenerIndex: ma_uint32, x: f32, y: f32, z: f32);
+    fn ma_engine_listener_get_direction(pEngine: *ma_engine, listenerIndex: ma_uint32) -> ma_vec3f;
+    fn ma_engine_listener_set_velocity(pEngine: *mut ma_engine, listenerIndex: ma_uint32, x: f32, y: f32, z: f32);
+    fn ma_engine_listener_get_velocity(pEngine: *ma_engine, listenerIndex: ma_uint32) -> ma_vec3f;
+    fn ma_engine_listener_set_cone(pEngine: *mut ma_engine, listenerIndex: ma_uint32, innerAngleInRadians: f32, outerAngleInRadians: f32, outerGain: f32);
+    fn ma_engine_listener_get_cone(pEngine: *ma_engine, listenerIndex: ma_uint32, pInnerAngleInRadians: *mut f32, pOuterAngleInRadians: *mut f32, pOuterGain: *mut f32);
+    fn ma_engine_listener_set_world_up(pEngine: *mut ma_engine, listenerIndex: ma_uint32, x: f32, y: f32, z: f32);
+    fn ma_engine_listener_get_world_up(pEngine: *ma_engine, listenerIndex: ma_uint32) -> ma_vec3f;
+    fn ma_engine_listener_set_enabled(pEngine: *mut ma_engine, listenerIndex: ma_uint32, isEnabled: ma_bool32);
+    fn ma_engine_listener_is_enabled(pEngine: *ma_engine, listenerIndex: ma_uint32) -> ma_bool32;
+    fn ma_engine_play_sound_ex(pEngine: *mut ma_engine, pFilePath: *i8, pNode: *mut ma_node, nodeInputBusIndex: ma_uint32) -> ma_result;
+    fn ma_engine_play_sound(pEngine: *mut ma_engine, pFilePath: *i8, pGroup: *mut ma_sound_group) -> ma_result;
+    fn ma_sound_init_from_file(pEngine: *mut ma_engine, pFilePath: *i8, flags: ma_uint32, pGroup: *mut ma_sound_group, pDoneFence: *mut ma_fence, pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_init_from_file_w(pEngine: *mut ma_engine, pFilePath: *u16, flags: ma_uint32, pGroup: *mut ma_sound_group, pDoneFence: *mut ma_fence, pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_init_copy(pEngine: *mut ma_engine, pExistingSound: *ma_sound, flags: ma_uint32, pGroup: *mut ma_sound_group, pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_init_from_data_source(pEngine: *mut ma_engine, pDataSource: *mut ma_data_source, flags: ma_uint32, pGroup: *mut ma_sound_group, pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_init_ex(pEngine: *mut ma_engine, pConfig: *ma_sound_config, pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_uninit(pSound: *mut ma_sound);
+    fn ma_sound_get_engine(pSound: *ma_sound) -> *mut ma_engine;
+    fn ma_sound_get_data_source(pSound: *ma_sound) -> *mut ma_data_source;
+    fn ma_sound_start(pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_stop(pSound: *mut ma_sound) -> ma_result;
+    fn ma_sound_stop_with_fade_in_pcm_frames(pSound: *mut ma_sound, fadeLengthInFrames: ma_uint64) -> ma_result;
+    fn ma_sound_stop_with_fade_in_milliseconds(pSound: *mut ma_sound, fadeLengthInFrames: ma_uint64) -> ma_result;
+    fn ma_sound_reset_start_time(pSound: *mut ma_sound);
+    fn ma_sound_reset_stop_time(pSound: *mut ma_sound);
+    fn ma_sound_reset_fade(pSound: *mut ma_sound);
+    fn ma_sound_reset_stop_time_and_fade(pSound: *mut ma_sound);
+    fn ma_sound_set_volume(pSound: *mut ma_sound, volume: f32);
+    fn ma_sound_get_volume(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_pan(pSound: *mut ma_sound, pan: f32);
+    fn ma_sound_get_pan(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_pan_mode(pSound: *mut ma_sound, panMode: ma_pan_mode);
+    fn ma_sound_get_pan_mode(pSound: *ma_sound) -> ma_pan_mode;
+    fn ma_sound_set_pitch(pSound: *mut ma_sound, pitch: f32);
+    fn ma_sound_get_pitch(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_spatialization_enabled(pSound: *mut ma_sound, enabled: ma_bool32);
+    fn ma_sound_is_spatialization_enabled(pSound: *ma_sound) -> ma_bool32;
+    fn ma_sound_set_pinned_listener_index(pSound: *mut ma_sound, listenerIndex: ma_uint32);
+    fn ma_sound_get_pinned_listener_index(pSound: *ma_sound) -> ma_uint32;
+    fn ma_sound_get_listener_index(pSound: *ma_sound) -> ma_uint32;
+    fn ma_sound_get_direction_to_listener(pSound: *ma_sound) -> ma_vec3f;
+    fn ma_sound_set_position(pSound: *mut ma_sound, x: f32, y: f32, z: f32);
+    fn ma_sound_get_position(pSound: *ma_sound) -> ma_vec3f;
+    fn ma_sound_set_direction(pSound: *mut ma_sound, x: f32, y: f32, z: f32);
+    fn ma_sound_get_direction(pSound: *ma_sound) -> ma_vec3f;
+    fn ma_sound_set_velocity(pSound: *mut ma_sound, x: f32, y: f32, z: f32);
+    fn ma_sound_get_velocity(pSound: *ma_sound) -> ma_vec3f;
+    fn ma_sound_set_attenuation_model(pSound: *mut ma_sound, attenuationModel: ma_attenuation_model);
+    fn ma_sound_get_attenuation_model(pSound: *ma_sound) -> ma_attenuation_model;
+    fn ma_sound_set_positioning(pSound: *mut ma_sound, positioning: ma_positioning);
+    fn ma_sound_get_positioning(pSound: *ma_sound) -> ma_positioning;
+    fn ma_sound_set_rolloff(pSound: *mut ma_sound, rolloff: f32);
+    fn ma_sound_get_rolloff(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_min_gain(pSound: *mut ma_sound, minGain: f32);
+    fn ma_sound_get_min_gain(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_max_gain(pSound: *mut ma_sound, maxGain: f32);
+    fn ma_sound_get_max_gain(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_min_distance(pSound: *mut ma_sound, minDistance: f32);
+    fn ma_sound_get_min_distance(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_max_distance(pSound: *mut ma_sound, maxDistance: f32);
+    fn ma_sound_get_max_distance(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_cone(pSound: *mut ma_sound, innerAngleInRadians: f32, outerAngleInRadians: f32, outerGain: f32);
+    fn ma_sound_get_cone(pSound: *ma_sound, pInnerAngleInRadians: *mut f32, pOuterAngleInRadians: *mut f32, pOuterGain: *mut f32);
+    fn ma_sound_set_doppler_factor(pSound: *mut ma_sound, dopplerFactor: f32);
+    fn ma_sound_get_doppler_factor(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_directional_attenuation_factor(pSound: *mut ma_sound, directionalAttenuationFactor: f32);
+    fn ma_sound_get_directional_attenuation_factor(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_fade_in_pcm_frames(pSound: *mut ma_sound, volumeBeg: f32, volumeEnd: f32, fadeLengthInFrames: ma_uint64);
+    fn ma_sound_set_fade_in_milliseconds(pSound: *mut ma_sound, volumeBeg: f32, volumeEnd: f32, fadeLengthInMilliseconds: ma_uint64);
+    fn ma_sound_set_fade_start_in_pcm_frames(pSound: *mut ma_sound, volumeBeg: f32, volumeEnd: f32, fadeLengthInFrames: ma_uint64, absoluteGlobalTimeInFrames: ma_uint64);
+    fn ma_sound_set_fade_start_in_milliseconds(pSound: *mut ma_sound, volumeBeg: f32, volumeEnd: f32, fadeLengthInMilliseconds: ma_uint64, absoluteGlobalTimeInMilliseconds: ma_uint64);
+    fn ma_sound_get_current_fade_volume(pSound: *ma_sound) -> f32;
+    fn ma_sound_set_start_time_in_pcm_frames(pSound: *mut ma_sound, absoluteGlobalTimeInFrames: ma_uint64);
+    fn ma_sound_set_start_time_in_milliseconds(pSound: *mut ma_sound, absoluteGlobalTimeInMilliseconds: ma_uint64);
+    fn ma_sound_set_stop_time_in_pcm_frames(pSound: *mut ma_sound, absoluteGlobalTimeInFrames: ma_uint64);
+    fn ma_sound_set_stop_time_in_milliseconds(pSound: *mut ma_sound, absoluteGlobalTimeInMilliseconds: ma_uint64);
+    fn ma_sound_set_stop_time_with_fade_in_pcm_frames(pSound: *mut ma_sound, stopAbsoluteGlobalTimeInFrames: ma_uint64, fadeLengthInFrames: ma_uint64);
+    fn ma_sound_set_stop_time_with_fade_in_milliseconds(pSound: *mut ma_sound, stopAbsoluteGlobalTimeInMilliseconds: ma_uint64, fadeLengthInMilliseconds: ma_uint64);
+    fn ma_sound_is_playing(pSound: *ma_sound) -> ma_bool32;
+    fn ma_sound_get_time_in_pcm_frames(pSound: *ma_sound) -> ma_uint64;
+    fn ma_sound_get_time_in_milliseconds(pSound: *ma_sound) -> ma_uint64;
+    fn ma_sound_set_looping(pSound: *mut ma_sound, isLooping: ma_bool32);
+    fn ma_sound_is_looping(pSound: *ma_sound) -> ma_bool32;
+    fn ma_sound_at_end(pSound: *ma_sound) -> ma_bool32;
+    fn ma_sound_seek_to_pcm_frame(pSound: *mut ma_sound, frameIndex: ma_uint64) -> ma_result;
+    fn ma_sound_seek_to_second(pSound: *mut ma_sound, seekPointInSeconds: f32) -> ma_result;
+    fn ma_sound_get_data_format(pSound: *ma_sound, pFormat: *mut ma_format, pChannels: *mut ma_uint32, pSampleRate: *mut ma_uint32, pChannelMap: *mut ma_channel, channelMapCap: usize) -> ma_result;
+    fn ma_sound_get_cursor_in_pcm_frames(pSound: *ma_sound, pCursor: *mut ma_uint64) -> ma_result;
+    fn ma_sound_get_length_in_pcm_frames(pSound: *ma_sound, pLength: *mut ma_uint64) -> ma_result;
+    fn ma_sound_get_cursor_in_seconds(pSound: *ma_sound, pCursor: *mut f32) -> ma_result;
+    fn ma_sound_get_length_in_seconds(pSound: *ma_sound, pLength: *mut f32) -> ma_result;
+    fn ma_sound_set_end_callback(pSound: *mut ma_sound, callback: ma_sound_end_proc, pUserData: *mut void) -> ma_result;
+    fn ma_sound_group_init(pEngine: *mut ma_engine, flags: ma_uint32, pParentGroup: *mut ma_sound_group, pGroup: *mut ma_sound_group) -> ma_result;
+    fn ma_sound_group_init_ex(pEngine: *mut ma_engine, pConfig: *ma_sound_group_config, pGroup: *mut ma_sound_group) -> ma_result;
+    fn ma_sound_group_uninit(pGroup: *mut ma_sound_group);
+    fn ma_sound_group_get_engine(pGroup: *ma_sound_group) -> *mut ma_engine;
+    fn ma_sound_group_start(pGroup: *mut ma_sound_group) -> ma_result;
+    fn ma_sound_group_stop(pGroup: *mut ma_sound_group) -> ma_result;
+    fn ma_sound_group_set_volume(pGroup: *mut ma_sound_group, volume: f32);
+    fn ma_sound_group_get_volume(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_pan(pGroup: *mut ma_sound_group, pan: f32);
+    fn ma_sound_group_get_pan(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_pan_mode(pGroup: *mut ma_sound_group, panMode: ma_pan_mode);
+    fn ma_sound_group_get_pan_mode(pGroup: *ma_sound_group) -> ma_pan_mode;
+    fn ma_sound_group_set_pitch(pGroup: *mut ma_sound_group, pitch: f32);
+    fn ma_sound_group_get_pitch(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_spatialization_enabled(pGroup: *mut ma_sound_group, enabled: ma_bool32);
+    fn ma_sound_group_is_spatialization_enabled(pGroup: *ma_sound_group) -> ma_bool32;
+    fn ma_sound_group_set_pinned_listener_index(pGroup: *mut ma_sound_group, listenerIndex: ma_uint32);
+    fn ma_sound_group_get_pinned_listener_index(pGroup: *ma_sound_group) -> ma_uint32;
+    fn ma_sound_group_get_listener_index(pGroup: *ma_sound_group) -> ma_uint32;
+    fn ma_sound_group_get_direction_to_listener(pGroup: *ma_sound_group) -> ma_vec3f;
+    fn ma_sound_group_set_position(pGroup: *mut ma_sound_group, x: f32, y: f32, z: f32);
+    fn ma_sound_group_get_position(pGroup: *ma_sound_group) -> ma_vec3f;
+    fn ma_sound_group_set_direction(pGroup: *mut ma_sound_group, x: f32, y: f32, z: f32);
+    fn ma_sound_group_get_direction(pGroup: *ma_sound_group) -> ma_vec3f;
+    fn ma_sound_group_set_velocity(pGroup: *mut ma_sound_group, x: f32, y: f32, z: f32);
+    fn ma_sound_group_get_velocity(pGroup: *ma_sound_group) -> ma_vec3f;
+    fn ma_sound_group_set_attenuation_model(pGroup: *mut ma_sound_group, attenuationModel: ma_attenuation_model);
+    fn ma_sound_group_get_attenuation_model(pGroup: *ma_sound_group) -> ma_attenuation_model;
+    fn ma_sound_group_set_positioning(pGroup: *mut ma_sound_group, positioning: ma_positioning);
+    fn ma_sound_group_get_positioning(pGroup: *ma_sound_group) -> ma_positioning;
+    fn ma_sound_group_set_rolloff(pGroup: *mut ma_sound_group, rolloff: f32);
+    fn ma_sound_group_get_rolloff(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_min_gain(pGroup: *mut ma_sound_group, minGain: f32);
+    fn ma_sound_group_get_min_gain(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_max_gain(pGroup: *mut ma_sound_group, maxGain: f32);
+    fn ma_sound_group_get_max_gain(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_min_distance(pGroup: *mut ma_sound_group, minDistance: f32);
+    fn ma_sound_group_get_min_distance(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_max_distance(pGroup: *mut ma_sound_group, maxDistance: f32);
+    fn ma_sound_group_get_max_distance(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_cone(pGroup: *mut ma_sound_group, innerAngleInRadians: f32, outerAngleInRadians: f32, outerGain: f32);
+    fn ma_sound_group_get_cone(pGroup: *ma_sound_group, pInnerAngleInRadians: *mut f32, pOuterAngleInRadians: *mut f32, pOuterGain: *mut f32);
+    fn ma_sound_group_set_doppler_factor(pGroup: *mut ma_sound_group, dopplerFactor: f32);
+    fn ma_sound_group_get_doppler_factor(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_directional_attenuation_factor(pGroup: *mut ma_sound_group, directionalAttenuationFactor: f32);
+    fn ma_sound_group_get_directional_attenuation_factor(pGroup: *ma_sound_group) -> f32;
+    fn ma_sound_group_set_fade_in_pcm_frames(pGroup: *mut ma_sound_group, volumeBeg: f32, volumeEnd: f32, fadeLengthInFrames: ma_uint64);
+    fn ma_sound_group_set_fade_in_milliseconds(pGroup: *mut ma_sound_group, volumeBeg: f32, volumeEnd: f32, fadeLengthInMilliseconds: ma_uint64);
+    fn ma_sound_group_get_current_fade_volume(pGroup: *mut ma_sound_group) -> f32;
+    fn ma_sound_group_set_start_time_in_pcm_frames(pGroup: *mut ma_sound_group, absoluteGlobalTimeInFrames: ma_uint64);
+    fn ma_sound_group_set_start_time_in_milliseconds(pGroup: *mut ma_sound_group, absoluteGlobalTimeInMilliseconds: ma_uint64);
+    fn ma_sound_group_set_stop_time_in_pcm_frames(pGroup: *mut ma_sound_group, absoluteGlobalTimeInFrames: ma_uint64);
+    fn ma_sound_group_set_stop_time_in_milliseconds(pGroup: *mut ma_sound_group, absoluteGlobalTimeInMilliseconds: ma_uint64);
+    fn ma_sound_group_is_playing(pGroup: *ma_sound_group) -> ma_bool32;
+    fn ma_sound_group_get_time_in_pcm_frames(pGroup: *ma_sound_group) -> ma_uint64;
+}

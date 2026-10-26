@@ -1,0 +1,28 @@
+#[include "vendor/assimp/types.zir" : *]
+
+enum aiLightSourceType: i32 {
+    aiLightSource_UNDEFINED = 0x0,
+    aiLightSource_DIRECTIONAL = 0x1,
+    aiLightSource_POINT = 0x2,
+    aiLightSource_SPOT = 0x3,
+    aiLightSource_AMBIENT = 0x4,
+    aiLightSource_AREA = 0x5,
+    _aiLightSource_Force32Bit
+}
+
+struct aiLight {
+    pub mName: aiString,
+    pub mType: aiLightSourceType,
+    pub mPosition: aiVector3D,
+    pub mDirection: aiVector3D,
+    pub mUp: aiVector3D,
+    pub mAttenuationConstant: f32,
+    pub mAttenuationLinear: f32,
+    pub mAttenuationQuadratic: f32,
+    pub mColorDiffuse: aiColor3D,
+    pub mColorSpecular: aiColor3D,
+    pub mColorAmbient: aiColor3D,
+    pub mAngleInnerCone: f32,
+    pub mAngleOuterCone: f32,
+    pub mSize: aiVector2D
+}

@@ -100,3 +100,21 @@ extern "C" {
     fn stbi_zlib_decode_noheader_malloc(buffer: *i8, len: i32, outlen: *mut i32) -> *mut i8;
     fn stbi_zlib_decode_noheader_buffer(obuffer: *mut i8, olen: i32, ibuffer: *i8, ilen: i32) -> i32;
 }
+
+type stbi_write_func = fn(context: *mut void, data: *mut void, size: i32);
+
+extern "C" {
+    fn stbi_write_png(filename: *i8, w: i32, h: i32, comp: i32, data: *void, stride_in_bytes: i32) -> i32;
+    fn stbi_write_bmp(filename: *i8, w: i32, h: i32, comp: i32, data: *void) -> i32;
+    fn stbi_write_tga(filename: *i8, w: i32, h: i32, comp: i32, data: *void) -> i32;
+    fn stbi_write_hdr(filename: *i8, w: i32, h: i32, comp: i32, data: *f32) -> i32;
+    fn stbi_write_jpg(filename: *i8, x: i32, y: i32, comp: i32, data: *void, quality: i32) -> i32;
+
+    fn stbi_write_png_to_func(func: stbi_write_func, context: *mut void, w: i32, h: i32, comp: i32, data: *void, stride_in_bytes: i32) -> i32;
+    fn stbi_write_bmp_to_func(func: stbi_write_func, context: *mut void, w: i32, h: i32, comp: i32, data: *void) -> i32;
+    fn stbi_write_tga_to_func(func: stbi_write_func, context: *mut void, w: i32, h: i32, comp: i32, data: *void) -> i32;
+    fn stbi_write_hdr_to_func(func: stbi_write_func, context: *mut void, w: i32, h: i32, comp: i32, data: *f32) -> i32;
+    fn stbi_write_jpg_to_func(func: stbi_write_func, context: *mut void, x: i32, y: i32, comp: i32, data: *void, quality: i32) -> i32;
+
+    fn stbi_flip_vertically_on_write(flip_boolean: i32);
+}

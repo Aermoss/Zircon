@@ -1,0 +1,18 @@
+#[include "vendor/assimp/defs.zir" : *]
+
+const ASSIMP_CFLAGS_SHARED: i32 = 0x1;
+const ASSIMP_CFLAGS_STLPORT: i32 = 0x2;
+const ASSIMP_CFLAGS_DEBUG: i32 = 0x4;
+const ASSIMP_CFLAGS_NOBOOST: i32 = 0x8;
+const ASSIMP_CFLAGS_SINGLETHREADED: i32 = 0x10;
+const ASSIMP_CFLAGS_DOUBLE_SUPPORT: i32 = 0x20;
+
+extern "C" {
+    fn aiGetLegalString() -> *i8;
+    fn aiGetVersionPatch() -> u32;
+    fn aiGetVersionMinor() -> u32;
+    fn aiGetVersionMajor() -> u32;
+    fn aiGetVersionRevision() -> u32;
+    fn aiGetBranchName() -> *i8;
+    fn aiGetCompileFlags() -> u32;
+}

@@ -1,0 +1,26 @@
+#[include "vendor/assimp/types.zir" : *]
+
+struct aiExportFormatDesc {
+    pub id: *i8,
+    pub description: *i8,
+    pub fileExtension: *i8
+}
+
+struct aiExportDataBlob {
+    pub size: usize,
+    pub data: *mut void,
+    pub name: aiString,
+    pub next: *mut aiExportDataBlob
+}
+
+extern "C" {
+    fn aiGetExportFormatCount() -> usize;
+    fn aiGetExportFormatDescription(pIndex: usize) -> *aiExportFormatDesc;
+    fn aiReleaseExportFormatDescription(desc: *aiExportFormatDesc);
+    fn aiCopyScene(pIn: *aiScene, pOut: *mut *mut aiScene);
+    fn aiFreeScene(pIn: *aiScene);
+    fn aiExportScene(pScene: *aiScene, pFormatId: *i8, pFileName: *i8, pPreprocessing: u32) -> aiReturn;
+    fn aiExportSceneEx(pScene: *aiScene, pFormatId: *i8, pFileName: *i8, pIO: *mut aiFileIO, pPreprocessing: u32) -> aiReturn;
+    fn aiExportSceneToBlob(pScene: *aiScene, pFormatId: *i8, pPreprocessing: u32) -> *aiExportDataBlob;
+    fn aiReleaseExportBlob(pData: *aiExportDataBlob);
+}

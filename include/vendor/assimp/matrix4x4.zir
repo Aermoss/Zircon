@@ -1,0 +1,20 @@
+#[include "vendor/assimp/vector3.zir", "vendor/assimp/defs.zir", "vendor/assimp/config.zir" : *]
+
+struct aiMatrix4x4 {
+    pub a1: ai_real,
+    pub a2: ai_real,
+    pub a3: ai_real,
+    pub a4: ai_real,
+    pub b1: ai_real,
+    pub b2: ai_real,
+    pub b3: ai_real,
+    pub b4: ai_real,
+    pub c1: ai_real,
+    pub c2: ai_real,
+    pub c3: ai_real,
+    pub c4: ai_real,
+    pub d1: ai_real,
+    pub d2: ai_real,
+    pub d3: ai_real,
+    pub d4: ai_real
+}

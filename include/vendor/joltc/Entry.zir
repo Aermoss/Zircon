@@ -1,0 +1,2429 @@
+const JOLT_C_H_: i32 = 1;
+
+type JPH_Bool = u32;
+type JPH_BodyID = u32;
+type JPH_SubShapeID = u32;
+type JPH_ObjectLayer = u32;
+type JPH_BroadPhaseLayer = u8;
+type JPH_CollisionGroupID = u32;
+type JPH_CollisionSubGroupID = u32;
+type JPH_CharacterID = u32;
+
+struct JPH_BroadPhaseLayerInterface {}
+
+struct JPH_ObjectVsBroadPhaseLayerFilter {}
+
+struct JPH_ObjectLayerPairFilter {}
+
+struct JPH_BroadPhaseLayerFilter {}
+
+struct JPH_ObjectLayerFilter {}
+
+struct JPH_BodyFilter {}
+
+struct JPH_ShapeFilter {}
+
+struct JPH_SimShapeFilter {}
+
+struct JPH_PhysicsStepListener {}
+
+struct JPH_PhysicsSystem {}
+
+struct JPH_PhysicsMaterial {}
+
+struct JPH_LinearCurve {}
+
+struct JPH_ShapeSettings {}
+
+struct JPH_ConvexShapeSettings {}
+
+struct JPH_SphereShapeSettings {}
+
+struct JPH_BoxShapeSettings {}
+
+struct JPH_PlaneShapeSettings {}
+
+struct JPH_TriangleShapeSettings {}
+
+struct JPH_CapsuleShapeSettings {}
+
+struct JPH_TaperedCapsuleShapeSettings {}
+
+struct JPH_CylinderShapeSettings {}
+
+struct JPH_TaperedCylinderShapeSettings {}
+
+struct JPH_ConvexHullShapeSettings {}
+
+struct JPH_CompoundShapeSettings {}
+
+struct JPH_StaticCompoundShapeSettings {}
+
+struct JPH_MutableCompoundShapeSettings {}
+
+struct JPH_MeshShapeSettings {}
+
+struct JPH_HeightFieldShapeSettings {}
+
+struct JPH_RotatedTranslatedShapeSettings {}
+
+struct JPH_ScaledShapeSettings {}
+
+struct JPH_OffsetCenterOfMassShapeSettings {}
+
+struct JPH_EmptyShapeSettings {}
+
+struct JPH_Shape {}
+
+struct JPH_ConvexShape {}
+
+struct JPH_SphereShape {}
+
+struct JPH_BoxShape {}
+
+struct JPH_PlaneShape {}
+
+struct JPH_CapsuleShape {}
+
+struct JPH_CylinderShape {}
+
+struct JPH_TaperedCylinderShape {}
+
+struct JPH_TriangleShape {}
+
+struct JPH_TaperedCapsuleShape {}
+
+struct JPH_ConvexHullShape {}
+
+struct JPH_CompoundShape {}
+
+struct JPH_StaticCompoundShape {}
+
+struct JPH_MutableCompoundShape {}
+
+struct JPH_MeshShape {}
+
+struct JPH_HeightFieldShape {}
+
+struct JPH_DecoratedShape {}
+
+struct JPH_RotatedTranslatedShape {}
+
+struct JPH_ScaledShape {}
+
+struct JPH_OffsetCenterOfMassShape {}
+
+struct JPH_EmptyShape {}
+
+struct JPH_BodyCreationSettings {}
+
+struct JPH_SoftBodyCreationSettings {}
+
+struct JPH_SoftBodySharedSettings {}
+
+struct JPH_BodyInterface {}
+
+struct JPH_BodyLockInterface {}
+
+struct JPH_BroadPhaseQuery {}
+
+struct JPH_NarrowPhaseQuery {}
+
+struct JPH_MotionProperties {}
+
+struct JPH_Body {}
+
+struct JPH_ContactListener {}
+
+struct JPH_ContactManifold {}
+
+struct JPH_GroupFilter {}
+
+struct JPH_GroupFilterTable {}
+
+enum JPH_PhysicsUpdateError: i32 {
+    JPH_PhysicsUpdateError_None = 0,
+    JPH_PhysicsUpdateError_ManifoldCacheFull = 1 << 0,
+    JPH_PhysicsUpdateError_BodyPairCacheFull = 1 << 1,
+    JPH_PhysicsUpdateError_ContactConstraintsFull = 1 << 2,
+    _JPH_PhysicsUpdateError_Count,
+    _JPH_PhysicsUpdateError_Force32 = 0x7fffffff
+}
+
+enum JPH_BodyType: i32 {
+    JPH_BodyType_Rigid = 0,
+    JPH_BodyType_Soft = 1,
+    _JPH_BodyType_Count,
+    _JPH_BodyType_Force32 = 0x7fffffff
+}
+
+enum JPH_MotionType: i32 {
+    JPH_MotionType_Static = 0,
+    JPH_MotionType_Kinematic = 1,
+    JPH_MotionType_Dynamic = 2,
+    _JPH_MotionType_Count,
+    _JPH_MotionType_Force32 = 0x7fffffff
+}
+
+enum JPH_Activation: i32 {
+    JPH_Activation_Activate = 0,
+    JPH_Activation_DontActivate = 1,
+    _JPH_Activation_Count,
+    _JPH_Activation_Force32 = 0x7fffffff
+}
+
+enum JPH_ValidateResult: i32 {
+    JPH_ValidateResult_AcceptAllContactsForThisBodyPair = 0,
+    JPH_ValidateResult_AcceptContact = 1,
+    JPH_ValidateResult_RejectContact = 2,
+    JPH_ValidateResult_RejectAllContactsForThisBodyPair = 3,
+    _JPH_ValidateResult_Count,
+    _JPH_ValidateResult_Force32 = 0x7fffffff
+}
+
+enum JPH_ShapeType: i32 {
+    JPH_ShapeType_Convex = 0,
+    JPH_ShapeType_Compound = 1,
+    JPH_ShapeType_Decorated = 2,
+    JPH_ShapeType_Mesh = 3,
+    JPH_ShapeType_HeightField = 4,
+    JPH_ShapeType_SoftBody = 5,
+    JPH_ShapeType_User1 = 6,
+    JPH_ShapeType_User2 = 7,
+    JPH_ShapeType_User3 = 8,
+    JPH_ShapeType_User4 = 9,
+    _JPH_ShapeType_Count,
+    _JPH_ShapeType_Force32 = 0x7fffffff
+}
+
+enum JPH_ShapeSubType: i32 {
+    JPH_ShapeSubType_Sphere = 0,
+    JPH_ShapeSubType_Box = 1,
+    JPH_ShapeSubType_Triangle = 2,
+    JPH_ShapeSubType_Capsule = 3,
+    JPH_ShapeSubType_TaperedCapsule = 4,
+    JPH_ShapeSubType_Cylinder = 5,
+    JPH_ShapeSubType_ConvexHull = 6,
+    JPH_ShapeSubType_StaticCompound = 7,
+    JPH_ShapeSubType_MutableCompound = 8,
+    JPH_ShapeSubType_RotatedTranslated = 9,
+    JPH_ShapeSubType_Scaled = 10,
+    JPH_ShapeSubType_OffsetCenterOfMass = 11,
+    JPH_ShapeSubType_Mesh = 12,
+    JPH_ShapeSubType_HeightField = 13,
+    JPH_ShapeSubType_SoftBody = 14,
+    _JPH_ShapeSubType_Count,
+    _JPH_ShapeSubType_Force32 = 0x7fffffff
+}
+
+enum JPH_ConstraintType: i32 {
+    JPH_ConstraintType_Constraint = 0,
+    JPH_ConstraintType_TwoBodyConstraint = 1,
+    _JPH_ConstraintType_Count,
+    _JPH_ConstraintType_Force32 = 0x7fffffff
+}
+
+enum JPH_ConstraintSubType: i32 {
+    JPH_ConstraintSubType_Fixed = 0,
+    JPH_ConstraintSubType_Point = 1,
+    JPH_ConstraintSubType_Hinge = 2,
+    JPH_ConstraintSubType_Slider = 3,
+    JPH_ConstraintSubType_Distance = 4,
+    JPH_ConstraintSubType_Cone = 5,
+    JPH_ConstraintSubType_SwingTwist = 6,
+    JPH_ConstraintSubType_SixDOF = 7,
+    JPH_ConstraintSubType_Path = 8,
+    JPH_ConstraintSubType_Vehicle = 9,
+    JPH_ConstraintSubType_RackAndPinion = 10,
+    JPH_ConstraintSubType_Gear = 11,
+    JPH_ConstraintSubType_Pulley = 12,
+    JPH_ConstraintSubType_User1 = 13,
+    JPH_ConstraintSubType_User2 = 14,
+    JPH_ConstraintSubType_User3 = 15,
+    JPH_ConstraintSubType_User4 = 16,
+    _JPH_ConstraintSubType_Count,
+    _JPH_ConstraintSubType_Force32 = 0x7fffffff
+}
+
+enum JPH_ConstraintSpace: i32 {
+    JPH_ConstraintSpace_LocalToBodyCOM = 0,
+    JPH_ConstraintSpace_WorldSpace = 1,
+    _JPH_ConstraintSpace_Count,
+    _JPH_ConstraintSpace_Force32 = 0x7fffffff
+}
+
+enum JPH_MotionQuality: i32 {
+    JPH_MotionQuality_Discrete = 0,
+    JPH_MotionQuality_LinearCast = 1,
+    _JPH_MotionQuality_Count,
+    _JPH_MotionQuality_Force32 = 0x7fffffff
+}
+
+enum JPH_OverrideMassProperties: i32 {
+    JPH_OverrideMassProperties_CalculateMassAndInertia,
+    JPH_OverrideMassProperties_CalculateInertia,
+    JPH_OverrideMassProperties_MassAndInertiaProvided,
+    _JPH_JPH_OverrideMassProperties_Count,
+    _JPH_JPH_OverrideMassProperties_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_AllowedDOFs: i32 {
+    JPH_AllowedDOFs_All = 0b111111,
+    JPH_AllowedDOFs_TranslationX = 0b000001,
+    JPH_AllowedDOFs_TranslationY = 0b000010,
+    JPH_AllowedDOFs_TranslationZ = 0b000100,
+    JPH_AllowedDOFs_RotationX = 0b001000,
+    JPH_AllowedDOFs_RotationY = 0b010000,
+    JPH_AllowedDOFs_RotationZ = 0b100000,
+    JPH_AllowedDOFs_Plane2D = 35,
+    _JPH_AllowedDOFs_Count,
+    _JPH_AllowedDOFs_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_GroundState: i32 {
+    JPH_GroundState_OnGround = 0,
+    JPH_GroundState_OnSteepGround = 1,
+    JPH_GroundState_NotSupported = 2,
+    JPH_GroundState_InAir = 3,
+    _JPH_GroundState_Count,
+    _JPH_GroundState_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_BackFaceMode: i32 {
+    JPH_BackFaceMode_IgnoreBackFaces,
+    JPH_BackFaceMode_CollideWithBackFaces,
+    _JPH_BackFaceMode_Count,
+    _JPH_BackFaceMode_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_ActiveEdgeMode: i32 {
+    JPH_ActiveEdgeMode_CollideOnlyWithActive,
+    JPH_ActiveEdgeMode_CollideWithAll,
+    _JPH_ActiveEdgeMode_Count,
+    _JPH_ActiveEdgeMode_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_CollectFacesMode: i32 {
+    JPH_CollectFacesMode_CollectFaces,
+    JPH_CollectFacesMode_NoFaces,
+    _JPH_CollectFacesMode_Count,
+    _JPH_CollectFacesMode_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_MotorState: i32 {
+    JPH_MotorState_Off = 0,
+    JPH_MotorState_Velocity = 1,
+    JPH_MotorState_Position = 2,
+    _JPH_MotorState_Count,
+    _JPH_MotorState_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_CollisionCollectorType: i32 {
+    JPH_CollisionCollectorType_AllHit = 0,
+    JPH_CollisionCollectorType_AllHitSorted = 1,
+    JPH_CollisionCollectorType_ClosestHit = 2,
+    JPH_CollisionCollectorType_AnyHit = 3,
+    _JPH_CollisionCollectorType_Count,
+    _JPH_CollisionCollectorType_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_SwingType: i32 {
+    JPH_SwingType_Cone,
+    JPH_SwingType_Pyramid,
+    _JPH_SwingType_Count,
+    _JPH_SwingType_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_SixDOFConstraintAxis: i32 {
+    JPH_SixDOFConstraintAxis_TranslationX,
+    JPH_SixDOFConstraintAxis_TranslationY,
+    JPH_SixDOFConstraintAxis_TranslationZ,
+    JPH_SixDOFConstraintAxis_RotationX,
+    JPH_SixDOFConstraintAxis_RotationY,
+    JPH_SixDOFConstraintAxis_RotationZ,
+    _JPH_SixDOFConstraintAxis_Num,
+    _JPH_SixDOFConstraintAxis_NumTranslation = 3,
+    _JPH_SixDOFConstraintAxis_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_SpringMode: i32 {
+    JPH_SpringMode_FrequencyAndDamping = 0,
+    JPH_SpringMode_StiffnessAndDamping = 1,
+    _JPH_SpringMode_Count,
+    _JPH_SpringMode_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_SoftBodyConstraintColor: i32 {
+    JPH_SoftBodyConstraintColor_ConstraintType,
+    JPH_SoftBodyConstraintColor_ConstraintGroup,
+    JPH_SoftBodyConstraintColor_ConstraintOrder,
+    _JPH_SoftBodyConstraintColor_Count,
+    _JPH_SoftBodyConstraintColor_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_SoftBodyBendType: i32 {
+    JPH_SoftBodyBendType_None,
+    JPH_SoftBodyBendType_Distance,
+    JPH_SoftBodyBendType_Dihedral
+}
+
+enum JPH_BodyManager_ShapeColor: i32 {
+    JPH_BodyManager_ShapeColor_InstanceColor,
+    JPH_BodyManager_ShapeColor_ShapeTypeColor,
+    JPH_BodyManager_ShapeColor_MotionTypeColor,
+    JPH_BodyManager_ShapeColor_SleepColor,
+    JPH_BodyManager_ShapeColor_IslandColor,
+    JPH_BodyManager_ShapeColor_MaterialColor,
+    _JPH_BodyManager_ShapeColor_Count,
+    _JPH_BodyManager_ShapeColor_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_DebugRenderer_CastShadow: i32 {
+    JPH_DebugRenderer_CastShadow_On = 0,
+    JPH_DebugRenderer_CastShadow_Off = 1,
+    _JPH_DebugRenderer_CastShadow_Count,
+    _JPH_DebugRenderer_CastShadow_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_DebugRenderer_DrawMode: i32 {
+    JPH_DebugRenderer_DrawMode_Solid = 0,
+    JPH_DebugRenderer_DrawMode_Wireframe = 1,
+    _JPH_DebugRenderer_DrawMode_Count,
+    _JPH_DebugRenderer_DrawMode_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_Mesh_Shape_BuildQuality: i32 {
+    JPH_Mesh_Shape_BuildQuality_FavorRuntimePerformance = 0,
+    JPH_Mesh_Shape_BuildQuality_FavorBuildSpeed = 1,
+    _JPH_Mesh_Shape_BuildQuality_Count,
+    _JPH_Mesh_Shape_BuildQuality_Force32 = 0x7FFFFFFF
+}
+
+enum JPH_TransmissionMode: i32 {
+    JPH_TransmissionMode_Auto = 0,
+    JPH_TransmissionMode_Manual = 1,
+    _JPH_TransmissionMode_Count,
+    _JPH_TransmissionMode_Force32 = 0x7FFFFFFF
+}
+
+struct JPH_Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32
+}
+
+struct JPH_Vec4 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32
+}
+
+struct JPH_Quat {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32
+}
+
+struct JPH_Plane {
+    pub normal: JPH_Vec3,
+    pub distance: f32
+}
+
+struct JPH_Mat4 {
+    pub column: [JPH_Vec4; 4]
+}
+
+struct JPH_Point {
+    pub x: f32,
+    pub y: f32
+}
+
+type JPH_RVec3 = JPH_Vec3;
+type JPH_RMat4 = JPH_Mat4;
+type JPH_Color = u32;
+
+struct JPH_AABox {
+    pub min: JPH_Vec3,
+    pub max: JPH_Vec3
+}
+
+struct JPH_Triangle {
+    pub v1: JPH_Vec3,
+    pub v2: JPH_Vec3,
+    pub v3: JPH_Vec3,
+    pub materialIndex: u32
+}
+
+struct JPH_IndexedTriangleNoMaterial {
+    pub i1: u32,
+    pub i2: u32,
+    pub i3: u32
+}
+
+struct JPH_IndexedTriangle {
+    pub i1: u32,
+    pub i2: u32,
+    pub i3: u32,
+    pub materialIndex: u32,
+    pub userData: u32
+}
+
+struct JPH_MassProperties {
+    pub mass: f32,
+    pub inertia: JPH_Mat4
+}
+
+struct JPH_SoftVertex {
+    pub position: JPH_Vec3,
+    pub velocity: JPH_Vec3,
+    pub invMass: f32
+}
+
+struct JPH_SoftFace {
+    pub vertex1: u32,
+    pub vertex2: u32,
+    pub vertex3: u32,
+    pub materialIndex: u32
+}
+
+struct JPH_ContactSettings {
+    pub combinedFriction: f32,
+    pub combinedRestitution: f32,
+    pub invMassScale1: f32,
+    pub invInertiaScale1: f32,
+    pub invMassScale2: f32,
+    pub invInertiaScale2: f32,
+    pub isSensor: JPH_Bool,
+    pub relativeLinearSurfaceVelocity: JPH_Vec3,
+    pub relativeAngularSurfaceVelocity: JPH_Vec3
+}
+
+struct JPH_CollideSettingsBase {
+    pub activeEdgeMode: JPH_ActiveEdgeMode,
+    pub collectFacesMode: JPH_CollectFacesMode,
+    pub collisionTolerance: f32,
+    pub penetrationTolerance: f32,
+    pub activeEdgeMovementDirection: JPH_Vec3
+}
+
+struct JPH_CollideShapeSettings {
+    pub base: JPH_CollideSettingsBase,
+    pub maxSeparationDistance: f32,
+    pub backFaceMode: JPH_BackFaceMode
+}
+
+struct JPH_ShapeCastSettings {
+    pub base: JPH_CollideSettingsBase,
+    pub backFaceModeTriangles: JPH_BackFaceMode,
+    pub backFaceModeConvex: JPH_BackFaceMode,
+    pub useShrunkenShapeAndConvexRadius: bool,
+    pub returnDeepestPoint: bool
+}
+
+struct JPH_RayCastSettings {
+    pub backFaceModeTriangles: JPH_BackFaceMode,
+    pub backFaceModeConvex: JPH_BackFaceMode,
+    pub treatConvexAsSolid: bool
+}
+
+struct JPH_SpringSettings {
+    pub mode: JPH_SpringMode,
+    pub frequencyOrStiffness: f32,
+    pub damping: f32
+}
+
+struct JPH_MotorSettings {
+    pub springSettings: JPH_SpringSettings,
+    pub minForceLimit: f32,
+    pub maxForceLimit: f32,
+    pub minTorqueLimit: f32,
+    pub maxTorqueLimit: f32
+}
+
+struct JPH_SubShapeIDPair {
+    pub Body1ID: JPH_BodyID,
+    pub subShapeID1: JPH_SubShapeID,
+    pub Body2ID: JPH_BodyID,
+    pub subShapeID2: JPH_SubShapeID
+}
+
+struct JPH_BroadPhaseCastResult {
+    pub bodyID: JPH_BodyID,
+    pub fraction: f32
+}
+
+struct JPH_RayCastResult {
+    pub bodyID: JPH_BodyID,
+    pub fraction: f32,
+    pub subShapeID2: JPH_SubShapeID
+}
+
+struct JPH_CollidePointResult {
+    pub bodyID: JPH_BodyID,
+    pub subShapeID2: JPH_SubShapeID
+}
+
+struct JPH_CollideShapeResult {
+    pub contactPointOn1: JPH_Vec3,
+    pub contactPointOn2: JPH_Vec3,
+    pub penetrationAxis: JPH_Vec3,
+    pub penetrationDepth: f32,
+    pub subShapeID1: JPH_SubShapeID,
+    pub subShapeID2: JPH_SubShapeID,
+    pub bodyID2: JPH_BodyID,
+    pub shape1FaceCount: u32,
+    pub shape1Faces: *mut JPH_Vec3,
+    pub shape2FaceCount: u32,
+    pub shape2Faces: *mut JPH_Vec3
+}
+
+struct JPH_ShapeCastResult {
+    pub contactPointOn1: JPH_Vec3,
+    pub contactPointOn2: JPH_Vec3,
+    pub penetrationAxis: JPH_Vec3,
+    pub penetrationDepth: f32,
+    pub subShapeID1: JPH_SubShapeID,
+    pub subShapeID2: JPH_SubShapeID,
+    pub bodyID2: JPH_BodyID,
+    pub fraction: f32,
+    pub isBackFaceHit: bool
+}
+
+struct JPH_DrawSettings {
+    pub drawGetSupportFunction: bool,
+    pub drawSupportDirection: bool,
+    pub drawGetSupportingFace: bool,
+    pub drawShape: bool,
+    pub drawShapeWireframe: bool,
+    pub drawShapeColor: JPH_BodyManager_ShapeColor,
+    pub drawBoundingBox: bool,
+    pub drawCenterOfMassTransform: bool,
+    pub drawWorldTransform: bool,
+    pub drawVelocity: bool,
+    pub drawMassAndInertia: bool,
+    pub drawSleepStats: bool,
+    pub drawSoftBodyVertices: bool,
+    pub drawSoftBodyVertexVelocities: bool,
+    pub drawSoftBodyEdgeConstraints: bool,
+    pub drawSoftBodyBendConstraints: bool,
+    pub drawSoftBodyVolumeConstraints: bool,
+    pub drawSoftBodySkinConstraints: bool,
+    pub drawSoftBodyLRAConstraints: bool,
+    pub drawSoftBodyPredictedBounds: bool,
+    pub drawSoftBodyConstraintColor: JPH_SoftBodyConstraintColor
+}
+
+struct JPH_SupportingFace {
+    pub count: u32,
+    pub vertices: [JPH_Vec3; 32]
+}
+
+struct JPH_CollisionGroup {
+    pub groupFilter: *JPH_GroupFilter,
+    pub groupID: JPH_CollisionGroupID,
+    pub subGroupID: JPH_CollisionSubGroupID
+}
+
+type JPH_CastRayResultCallback = fn(*mut void, *JPH_RayCastResult);
+type JPH_RayCastBodyResultCallback = fn(*mut void, *JPH_BroadPhaseCastResult);
+type JPH_CollideShapeBodyResultCallback = fn(*mut void, JPH_BodyID);
+type JPH_CollidePointResultCallback = fn(*mut void, *JPH_CollidePointResult);
+type JPH_CollideShapeResultCallback = fn(*mut void, *JPH_CollideShapeResult);
+type JPH_CastShapeResultCallback = fn(*mut void, *JPH_ShapeCastResult);
+type JPH_CastRayCollectorCallback = fn(*mut void, *JPH_RayCastResult) -> f32;
+type JPH_RayCastBodyCollectorCallback = fn(*mut void, *JPH_BroadPhaseCastResult) -> f32;
+type JPH_CollideShapeBodyCollectorCallback = fn(*mut void, JPH_BodyID) -> f32;
+type JPH_CollidePointCollectorCallback = fn(*mut void, *JPH_CollidePointResult) -> f32;
+type JPH_CollideShapeCollectorCallback = fn(*mut void, *JPH_CollideShapeResult) -> f32;
+type JPH_CastShapeCollectorCallback = fn(*mut void, *JPH_ShapeCastResult) -> f32;
+
+struct JPH_CollisionEstimationResult {
+    pub linearVelocity1: JPH_Vec3,
+    pub angularVelocity1: JPH_Vec3,
+    pub linearVelocity2: JPH_Vec3,
+    pub angularVelocity2: JPH_Vec3,
+    pub frictionPoint: JPH_Vec3,
+    pub tangent1: JPH_Vec3,
+    pub tangent2: JPH_Vec3,
+    pub frictionImpulse1: f32,
+    pub frictionImpulse2: f32,
+    pub angularFrictionImpulse: f32,
+    pub contactImpulseCount: u32,
+    pub contactImpulses: *mut f32
+}
+
+struct JPH_BodyActivationListener {}
+
+struct JPH_BodyDrawFilter {}
+
+struct JPH_SharedMutex {}
+
+struct JPH_DebugRenderer {}
+
+struct JPH_Constraint {}
+
+struct JPH_TwoBodyConstraint {}
+
+struct JPH_FixedConstraint {}
+
+struct JPH_DistanceConstraint {}
+
+struct JPH_PointConstraint {}
+
+struct JPH_HingeConstraint {}
+
+struct JPH_SliderConstraint {}
+
+struct JPH_ConeConstraint {}
+
+struct JPH_SwingTwistConstraint {}
+
+struct JPH_SixDOFConstraint {}
+
+struct JPH_GearConstraint {}
+
+struct JPH_CharacterBase {}
+
+struct JPH_Character {}
+
+struct JPH_CharacterVirtual {}
+
+struct JPH_CharacterContactListener {}
+
+struct JPH_CharacterVsCharacterCollision {}
+
+struct JPH_Skeleton {}
+
+struct JPH_SkeletonPose {}
+
+struct JPH_SkeletalAnimation {}
+
+struct JPH_SkeletonMapper {}
+
+struct JPH_RagdollSettings {}
+
+struct JPH_Ragdoll {}
+
+struct JPH_ConstraintSettings {
+    pub enabled: bool,
+    pub constraintPriority: u32,
+    pub numVelocityStepsOverride: u32,
+    pub numPositionStepsOverride: u32,
+    pub drawConstraintSize: f32,
+    pub userData: u64
+}
+
+struct JPH_FixedConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub autoDetectPoint: bool,
+    pub point1: JPH_RVec3,
+    pub axisX1: JPH_Vec3,
+    pub axisY1: JPH_Vec3,
+    pub point2: JPH_RVec3,
+    pub axisX2: JPH_Vec3,
+    pub axisY2: JPH_Vec3
+}
+
+struct JPH_DistanceConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub point1: JPH_RVec3,
+    pub point2: JPH_RVec3,
+    pub minDistance: f32,
+    pub maxDistance: f32,
+    pub limitsSpringSettings: JPH_SpringSettings
+}
+
+struct JPH_PointConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub point1: JPH_RVec3,
+    pub point2: JPH_RVec3
+}
+
+struct JPH_HingeConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub point1: JPH_RVec3,
+    pub hingeAxis1: JPH_Vec3,
+    pub normalAxis1: JPH_Vec3,
+    pub point2: JPH_RVec3,
+    pub hingeAxis2: JPH_Vec3,
+    pub normalAxis2: JPH_Vec3,
+    pub limitsMin: f32,
+    pub limitsMax: f32,
+    pub limitsSpringSettings: JPH_SpringSettings,
+    pub maxFrictionTorque: f32,
+    pub motorSettings: JPH_MotorSettings
+}
+
+struct JPH_SliderConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub autoDetectPoint: bool,
+    pub point1: JPH_RVec3,
+    pub sliderAxis1: JPH_Vec3,
+    pub normalAxis1: JPH_Vec3,
+    pub point2: JPH_RVec3,
+    pub sliderAxis2: JPH_Vec3,
+    pub normalAxis2: JPH_Vec3,
+    pub limitsMin: f32,
+    pub limitsMax: f32,
+    pub limitsSpringSettings: JPH_SpringSettings,
+    pub maxFrictionForce: f32,
+    pub motorSettings: JPH_MotorSettings
+}
+
+struct JPH_ConeConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub point1: JPH_RVec3,
+    pub twistAxis1: JPH_Vec3,
+    pub point2: JPH_RVec3,
+    pub twistAxis2: JPH_Vec3,
+    pub halfConeAngle: f32
+}
+
+struct JPH_SwingTwistConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub position1: JPH_RVec3,
+    pub twistAxis1: JPH_Vec3,
+    pub planeAxis1: JPH_Vec3,
+    pub position2: JPH_RVec3,
+    pub twistAxis2: JPH_Vec3,
+    pub planeAxis2: JPH_Vec3,
+    pub swingType: JPH_SwingType,
+    pub normalHalfConeAngle: f32,
+    pub planeHalfConeAngle: f32,
+    pub twistMinAngle: f32,
+    pub twistMaxAngle: f32,
+    pub maxFrictionTorque: f32,
+    pub swingMotorSettings: JPH_MotorSettings,
+    pub twistMotorSettings: JPH_MotorSettings
+}
+
+struct JPH_SixDOFConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub position1: JPH_RVec3,
+    pub axisX1: JPH_Vec3,
+    pub axisY1: JPH_Vec3,
+    pub position2: JPH_RVec3,
+    pub axisX2: JPH_Vec3,
+    pub axisY2: JPH_Vec3,
+    pub maxFriction: [f32; 6],
+    pub swingType: JPH_SwingType,
+    pub limitMin: [f32; 6],
+    pub limitMax: [f32; 6],
+    pub limitsSpringSettings: [JPH_SpringSettings; 3],
+    pub motorSettings: [JPH_MotorSettings; 6]
+}
+
+struct JPH_GearConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub space: JPH_ConstraintSpace,
+    pub hingeAxis1: JPH_Vec3,
+    pub hingeAxis2: JPH_Vec3,
+    pub ratio: f32
+}
+
+struct JPH_BodyLockRead {
+    pub lockInterface: *JPH_BodyLockInterface,
+    pub mutex: *mut JPH_SharedMutex,
+    pub body: *JPH_Body
+}
+
+struct JPH_BodyLockWrite {
+    pub lockInterface: *JPH_BodyLockInterface,
+    pub mutex: *mut JPH_SharedMutex,
+    pub body: *mut JPH_Body
+}
+
+struct JPH_BodyLockMultiRead {}
+
+struct JPH_BodyLockMultiWrite {}
+
+struct JPH_ExtendedUpdateSettings {
+    pub stickToFloorStepDown: JPH_Vec3,
+    pub walkStairsStepUp: JPH_Vec3,
+    pub walkStairsMinStepForward: f32,
+    pub walkStairsStepForwardTest: f32,
+    pub walkStairsCosAngleForwardContact: f32,
+    pub walkStairsStepDownExtra: JPH_Vec3
+}
+
+struct JPH_CharacterBaseSettings {
+    pub up: JPH_Vec3,
+    pub supportingVolume: JPH_Plane,
+    pub maxSlopeAngle: f32,
+    pub enhancedInternalEdgeRemoval: bool,
+    pub shape: *JPH_Shape
+}
+
+struct JPH_CharacterSettings {
+    pub base: JPH_CharacterBaseSettings,
+    pub layer: JPH_ObjectLayer,
+    pub mass: f32,
+    pub friction: f32,
+    pub gravityFactor: f32,
+    pub allowedDOFs: JPH_AllowedDOFs
+}
+
+struct JPH_CharacterVirtualSettings {
+    pub base: JPH_CharacterBaseSettings,
+    pub ID: JPH_CharacterID,
+    pub mass: f32,
+    pub maxStrength: f32,
+    pub shapeOffset: JPH_Vec3,
+    pub backFaceMode: JPH_BackFaceMode,
+    pub predictiveContactDistance: f32,
+    pub maxCollisionIterations: u32,
+    pub maxConstraintIterations: u32,
+    pub minTimeRemaining: f32,
+    pub collisionTolerance: f32,
+    pub characterPadding: f32,
+    pub maxNumHits: u32,
+    pub hitReductionCosMaxAngle: f32,
+    pub penetrationRecoverySpeed: f32,
+    pub innerBodyShape: *JPH_Shape,
+    pub innerBodyIDOverride: JPH_BodyID,
+    pub innerBodyLayer: JPH_ObjectLayer
+}
+
+struct JPH_CharacterContactSettings {
+    pub canPushCharacter: bool,
+    pub canReceiveImpulses: bool
+}
+
+struct JPH_CharacterContact {
+    pub hash: u64,
+    pub bodyB: JPH_BodyID,
+    pub characterIDB: JPH_CharacterID,
+    pub subShapeIDB: JPH_SubShapeID,
+    pub position: JPH_RVec3,
+    pub linearVelocity: JPH_Vec3,
+    pub contactNormal: JPH_Vec3,
+    pub surfaceNormal: JPH_Vec3,
+    pub distance: f32,
+    pub fraction: f32,
+    pub motionTypeB: JPH_MotionType,
+    pub isSensorB: bool,
+    pub characterB: *JPH_CharacterVirtual,
+    pub userData: u64,
+    pub material: *JPH_PhysicsMaterial,
+    pub hadCollision: bool,
+    pub wasDiscarded: bool,
+    pub canPushCharacter: bool,
+    pub isBackFacingContact: bool
+}
+
+type JPH_TraceFunc = fn(*i8);
+type JPH_AssertFailureFunc = fn(*i8, *i8, *i8, u32) -> bool;
+type JPH_JobFunction = fn(*mut void);
+type JPH_QueueJobCallback = fn(*mut void, JPH_JobFunction, *mut void);
+type JPH_QueueJobsCallback = fn(*mut void, JPH_JobFunction, *mut *mut void, u32);
+
+struct JobSystemThreadPoolConfig {
+    pub maxJobs: u32,
+    pub maxBarriers: u32,
+    pub numThreads: i32
+}
+
+struct JPH_JobSystemConfig {
+    pub context: *mut void,
+    pub queueJob: JPH_QueueJobCallback,
+    pub queueJobs: JPH_QueueJobsCallback,
+    pub maxConcurrency: u32,
+    pub maxBarriers: u32
+}
+
+struct JPH_JobSystem {}
+
+type JPH_TireMaxImpulseCallback = fn(*mut void, u32, *mut f32, *mut f32, f32, f32, f32, f32, f32, f32);
+
+struct JPH_PhysicsSystemSettings {
+    pub maxBodies: u32,
+    pub numBodyMutexes: u32,
+    pub maxBodyPairs: u32,
+    pub maxContactConstraints: u32,
+    pub _padding: u32,
+    pub broadPhaseLayerInterface: *mut JPH_BroadPhaseLayerInterface,
+    pub objectLayerPairFilter: *mut JPH_ObjectLayerPairFilter,
+    pub objectVsBroadPhaseLayerFilter: *mut JPH_ObjectVsBroadPhaseLayerFilter
+}
+
+struct JPH_PhysicsSettings {
+    pub maxInFlightBodyPairs: i32,
+    pub stepListenersBatchSize: i32,
+    pub stepListenerBatchesPerJob: i32,
+    pub baumgarte: f32,
+    pub speculativeContactDistance: f32,
+    pub penetrationSlop: f32,
+    pub linearCastThreshold: f32,
+    pub linearCastMaxPenetration: f32,
+    pub manifoldTolerance: f32,
+    pub maxPenetrationDistance: f32,
+    pub bodyPairCacheMaxDeltaPositionSq: f32,
+    pub bodyPairCacheCosMaxDeltaRotationDiv2: f32,
+    pub contactNormalCosMaxDeltaRotation: f32,
+    pub contactPointPreserveLambdaMaxDistSq: f32,
+    pub numVelocitySteps: u32,
+    pub numPositionSteps: u32,
+    pub minVelocityForRestitution: f32,
+    pub timeBeforeSleep: f32,
+    pub pointVelocitySleepThreshold: f32,
+    pub deterministicSimulation: bool,
+    pub constraintWarmStart: bool,
+    pub useBodyPairContactCache: bool,
+    pub useManifoldReduction: bool,
+    pub useLargeIslandSplitter: bool,
+    pub allowSleeping: bool,
+    pub checkActiveEdges: bool
+}
+
+struct JPH_PhysicsStepListenerContext {
+    pub deltaTime: f32,
+    pub isFirstStep: JPH_Bool,
+    pub isLastStep: JPH_Bool,
+    pub physicsSystem: *mut JPH_PhysicsSystem
+}
+
+struct JPH_PhysicsStepListener_Procs {
+    pub OnStep: fn(*mut void, *JPH_PhysicsStepListenerContext)
+}
+
+struct JPH_BroadPhaseLayerFilter_Procs {
+    pub ShouldCollide: fn(*mut void, JPH_BroadPhaseLayer) -> bool
+}
+
+struct JPH_ObjectLayerFilter_Procs {
+    pub ShouldCollide: fn(*mut void, JPH_ObjectLayer) -> bool
+}
+
+struct JPH_BodyFilter_Procs {
+    pub ShouldCollide: fn(*mut void, JPH_BodyID) -> bool,
+    pub ShouldCollideLocked: fn(*mut void, *JPH_Body) -> bool
+}
+
+struct JPH_ShapeFilter_Procs {
+    pub ShouldCollide: fn(*mut void, *JPH_Shape, *JPH_SubShapeID) -> bool,
+    pub ShouldCollide2: fn(*mut void, *JPH_Shape, *JPH_SubShapeID, *JPH_Shape, *JPH_SubShapeID) -> bool
+}
+
+struct JPH_SimShapeFilter_Procs {
+    pub ShouldCollide: fn(*mut void, *JPH_Body, *JPH_Shape, *JPH_SubShapeID, *JPH_Body, *JPH_Shape, *JPH_SubShapeID) -> bool
+}
+
+struct JPH_ContactListener_Procs {
+    pub OnContactValidate: fn(*mut void, *JPH_Body, *JPH_Body, *JPH_RVec3, *JPH_CollideShapeResult) -> JPH_ValidateResult,
+    pub OnContactAdded: fn(*mut void, *JPH_Body, *JPH_Body, *JPH_ContactManifold, *mut JPH_ContactSettings),
+    pub OnContactPersisted: fn(*mut void, *JPH_Body, *JPH_Body, *JPH_ContactManifold, *mut JPH_ContactSettings),
+    pub OnContactRemoved: fn(*mut void, *JPH_SubShapeIDPair)
+}
+
+struct JPH_BodyActivationListener_Procs {
+    pub OnBodyActivated: fn(*mut void, JPH_BodyID, u64),
+    pub OnBodyDeactivated: fn(*mut void, JPH_BodyID, u64)
+}
+
+struct JPH_BodyDrawFilter_Procs {
+    pub ShouldDraw: fn(*mut void, *JPH_Body) -> bool
+}
+
+struct JPH_CharacterContactListener_Procs {
+    pub OnAdjustBodyVelocity: fn(*mut void, *JPH_CharacterVirtual, *JPH_Body, *mut JPH_Vec3, *mut JPH_Vec3),
+    pub OnContactValidate: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact) -> bool,
+    pub OnCharacterContactValidate: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact) -> bool,
+    pub OnContactAdded: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact, *mut JPH_CharacterContactSettings),
+    pub OnContactPersisted: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact, *mut JPH_CharacterContactSettings),
+    pub OnContactRemoved: fn(*mut void, *JPH_CharacterVirtual, JPH_BodyID, JPH_SubShapeID),
+    pub OnCharacterContactAdded: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact, *mut JPH_CharacterContactSettings),
+    pub OnCharacterContactPersisted: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterContact, *mut JPH_CharacterContactSettings),
+    pub OnCharacterContactRemoved: fn(*mut void, *JPH_CharacterVirtual, JPH_CharacterID, JPH_SubShapeID),
+    pub OnContactSolve: fn(*mut void, *JPH_CharacterVirtual, JPH_BodyID, JPH_SubShapeID, *JPH_RVec3, *JPH_Vec3, *JPH_Vec3, *JPH_PhysicsMaterial, *JPH_Vec3, *mut JPH_Vec3),
+    pub OnCharacterContactSolve: fn(*mut void, *JPH_CharacterVirtual, *JPH_CharacterVirtual, JPH_SubShapeID, *JPH_RVec3, *JPH_Vec3, *JPH_Vec3, *JPH_PhysicsMaterial, *JPH_Vec3, *mut JPH_Vec3)
+}
+
+struct JPH_CharacterVsCharacterCollision_Procs {
+    pub CollideCharacter: fn(*mut void, *JPH_CharacterVirtual, *JPH_RMat4, *JPH_CollideShapeSettings, *JPH_RVec3),
+    pub CastCharacter: fn(*mut void, *JPH_CharacterVirtual, *JPH_RMat4, *JPH_Vec3, *JPH_ShapeCastSettings, *JPH_RVec3)
+}
+
+struct JPH_DebugRenderer_Procs {
+    pub DrawLine: fn(*mut void, *JPH_RVec3, *JPH_RVec3, JPH_Color),
+    pub DrawTriangle: fn(*mut void, *JPH_RVec3, *JPH_RVec3, *JPH_RVec3, JPH_Color, JPH_DebugRenderer_CastShadow),
+    pub DrawText3D: fn(*mut void, *JPH_RVec3, *i8, JPH_Color, f32)
+}
+
+struct JPH_SkeletonJoint {
+    pub name: *i8,
+    pub parentName: *i8,
+    pub parentJointIndex: i32
+}
+
+struct JPH_WheelSettings {}
+
+struct JPH_WheelSettingsWV {}
+
+struct JPH_WheelSettingsTV {}
+
+struct JPH_Wheel {}
+
+struct JPH_WheelWV {}
+
+struct JPH_WheelTV {}
+
+struct JPH_VehicleEngine {}
+
+struct JPH_VehicleTransmission {}
+
+struct JPH_VehicleTransmissionSettings {}
+
+struct JPH_VehicleCollisionTester {}
+
+struct JPH_VehicleCollisionTesterRay {}
+
+struct JPH_VehicleCollisionTesterCastSphere {}
+
+struct JPH_VehicleCollisionTesterCastCylinder {}
+
+struct JPH_VehicleConstraint {}
+
+struct JPH_VehicleControllerSettings {}
+
+struct JPH_WheeledVehicleControllerSettings {}
+
+struct JPH_MotorcycleControllerSettings {}
+
+struct JPH_TrackedVehicleControllerSettings {}
+
+struct JPH_WheeledVehicleController {}
+
+struct JPH_MotorcycleController {}
+
+struct JPH_TrackedVehicleController {}
+
+struct JPH_VehicleController {}
+
+struct JPH_VehicleAntiRollBar {
+    pub leftWheel: i32,
+    pub rightWheel: i32,
+    pub stiffness: f32
+}
+
+struct JPH_VehicleConstraintSettings {
+    pub base: JPH_ConstraintSettings,
+    pub up: JPH_Vec3,
+    pub forward: JPH_Vec3,
+    pub maxPitchRollAngle: f32,
+    pub wheelsCount: u32,
+    pub wheels: *mut *mut JPH_WheelSettings,
+    pub antiRollBarsCount: u32,
+    pub antiRollBars: *JPH_VehicleAntiRollBar,
+    pub controller: *mut JPH_VehicleControllerSettings
+}
+
+struct JPH_VehicleEngineSettings {
+    pub maxTorque: f32,
+    pub minRPM: f32,
+    pub maxRPM: f32,
+    pub normalizedTorque: *JPH_LinearCurve,
+    pub inertia: f32,
+    pub angularDamping: f32
+}
+
+struct JPH_VehicleDifferentialSettings {
+    pub leftWheel: i32,
+    pub rightWheel: i32,
+    pub differentialRatio: f32,
+    pub leftRightSplit: f32,
+    pub limitedSlipRatio: f32,
+    pub engineTorqueRatio: f32
+}
+
+struct JPH_VehicleTrack {}
+
+enum JPH_TrackSide: i32 {
+    JPH_TrackSide_Left = 0,
+    JPH_TrackSide_Right = 1
+}
+
+struct JPH_VehicleTrackSettings {
+    pub drivenWheel: u32,
+    pub wheels: *u32,
+    pub wheelsCount: u32,
+    pub inertia: f32,
+    pub angularDamping: f32,
+    pub maxBrakeTorque: f32,
+    pub differentialRatio: f32
+}
+
+struct JPH_TempAllocator {}
+
+extern "C" {
+    fn JPH_JobSystemThreadPool_Create(config: *JobSystemThreadPoolConfig) -> *mut JPH_JobSystem;
+    fn JPH_JobSystemCallback_Create(config: *JPH_JobSystemConfig) -> *mut JPH_JobSystem;
+    fn JPH_JobSystem_Destroy(jobSystem: *mut JPH_JobSystem);
+    fn JPH_Init() -> bool;
+    fn JPH_Shutdown();
+    fn JPH_SetTraceHandler(handler: JPH_TraceFunc);
+    fn JPH_SetAssertFailureHandler(handler: JPH_AssertFailureFunc);
+    fn JPH_CollideShapeResult_FreeMembers(result: *mut JPH_CollideShapeResult);
+    fn JPH_CollisionEstimationResult_FreeMembers(result: *mut JPH_CollisionEstimationResult);
+    fn JPH_BroadPhaseLayerInterface_Destroy(bpInterface: *mut JPH_BroadPhaseLayerInterface);
+    fn JPH_BroadPhaseLayerInterfaceMask_Create(numBroadPhaseLayers: u32) -> *mut JPH_BroadPhaseLayerInterface;
+    fn JPH_BroadPhaseLayerInterfaceMask_ConfigureLayer(bpInterface: *mut JPH_BroadPhaseLayerInterface, broadPhaseLayer: JPH_BroadPhaseLayer, groupsToInclude: u32, groupsToExclude: u32);
+    fn JPH_BroadPhaseLayerInterfaceTable_Create(numObjectLayers: u32, numBroadPhaseLayers: u32) -> *mut JPH_BroadPhaseLayerInterface;
+    fn JPH_BroadPhaseLayerInterfaceTable_MapObjectToBroadPhaseLayer(bpInterface: *mut JPH_BroadPhaseLayerInterface, objectLayer: JPH_ObjectLayer, broadPhaseLayer: JPH_BroadPhaseLayer);
+    fn JPH_ObjectLayerPairFilter_Destroy(filter: *mut JPH_ObjectLayerPairFilter);
+    fn JPH_ObjectLayerPairFilterMask_Create() -> *mut JPH_ObjectLayerPairFilter;
+    fn JPH_ObjectLayerPairFilterMask_GetObjectLayer(group: u32, mask: u32) -> JPH_ObjectLayer;
+    fn JPH_ObjectLayerPairFilterMask_GetGroup(layer: JPH_ObjectLayer) -> u32;
+    fn JPH_ObjectLayerPairFilterMask_GetMask(layer: JPH_ObjectLayer) -> u32;
+    fn JPH_ObjectLayerPairFilterTable_Create(numObjectLayers: u32) -> *mut JPH_ObjectLayerPairFilter;
+    fn JPH_ObjectLayerPairFilterTable_DisableCollision(objectFilter: *mut JPH_ObjectLayerPairFilter, layer1: JPH_ObjectLayer, layer2: JPH_ObjectLayer);
+    fn JPH_ObjectLayerPairFilterTable_EnableCollision(objectFilter: *mut JPH_ObjectLayerPairFilter, layer1: JPH_ObjectLayer, layer2: JPH_ObjectLayer);
+    fn JPH_ObjectLayerPairFilterTable_ShouldCollide(objectFilter: *mut JPH_ObjectLayerPairFilter, layer1: JPH_ObjectLayer, layer2: JPH_ObjectLayer) -> bool;
+    fn JPH_ObjectVsBroadPhaseLayerFilter_Destroy(filter: *mut JPH_ObjectVsBroadPhaseLayerFilter);
+    fn JPH_ObjectVsBroadPhaseLayerFilterMask_Create(broadPhaseLayerInterface: *JPH_BroadPhaseLayerInterface) -> *mut JPH_ObjectVsBroadPhaseLayerFilter;
+    fn JPH_ObjectVsBroadPhaseLayerFilterTable_Create(broadPhaseLayerInterface: *mut JPH_BroadPhaseLayerInterface, numBroadPhaseLayers: u32, objectLayerPairFilter: *mut JPH_ObjectLayerPairFilter, numObjectLayers: u32) -> *mut JPH_ObjectVsBroadPhaseLayerFilter;
+    fn JPH_DrawSettings_InitDefault(settings: *mut JPH_DrawSettings);
+    fn JPH_PhysicsSystem_Create(settings: *JPH_PhysicsSystemSettings) -> *mut JPH_PhysicsSystem;
+    fn JPH_PhysicsSystem_Destroy(system: *mut JPH_PhysicsSystem);
+    fn JPH_PhysicsSystem_SetPhysicsSettings(system: *mut JPH_PhysicsSystem, settings: *mut JPH_PhysicsSettings);
+    fn JPH_PhysicsSystem_GetPhysicsSettings(system: *mut JPH_PhysicsSystem, result: *mut JPH_PhysicsSettings);
+    fn JPH_PhysicsSystem_OptimizeBroadPhase(system: *mut JPH_PhysicsSystem);
+    fn JPH_PhysicsSystem_Update(system: *mut JPH_PhysicsSystem, deltaTime: f32, collisionSteps: i32, jobSystem: *mut JPH_JobSystem) -> JPH_PhysicsUpdateError;
+    fn JPH_PhysicsSystem_GetBodyInterface(system: *mut JPH_PhysicsSystem) -> *mut JPH_BodyInterface;
+    fn JPH_PhysicsSystem_GetBodyInterfaceNoLock(system: *mut JPH_PhysicsSystem) -> *mut JPH_BodyInterface;
+    fn JPH_PhysicsSystem_GetBodyLockInterface(system: *JPH_PhysicsSystem) -> *JPH_BodyLockInterface;
+    fn JPH_PhysicsSystem_GetBodyLockInterfaceNoLock(system: *JPH_PhysicsSystem) -> *JPH_BodyLockInterface;
+    fn JPH_PhysicsSystem_GetBroadPhaseQuery(system: *JPH_PhysicsSystem) -> *JPH_BroadPhaseQuery;
+    fn JPH_PhysicsSystem_GetNarrowPhaseQuery(system: *JPH_PhysicsSystem) -> *JPH_NarrowPhaseQuery;
+    fn JPH_PhysicsSystem_GetNarrowPhaseQueryNoLock(system: *JPH_PhysicsSystem) -> *JPH_NarrowPhaseQuery;
+    fn JPH_PhysicsSystem_SetContactListener(system: *mut JPH_PhysicsSystem, listener: *mut JPH_ContactListener);
+    fn JPH_PhysicsSystem_SetBodyActivationListener(system: *mut JPH_PhysicsSystem, listener: *mut JPH_BodyActivationListener);
+    fn JPH_PhysicsSystem_SetSimShapeFilter(system: *mut JPH_PhysicsSystem, filter: *JPH_SimShapeFilter);
+    fn JPH_PhysicsSystem_WereBodiesInContact(system: *JPH_PhysicsSystem, body1: JPH_BodyID, body2: JPH_BodyID) -> bool;
+    fn JPH_PhysicsSystem_GetNumBodies(system: *JPH_PhysicsSystem) -> u32;
+    fn JPH_PhysicsSystem_GetNumActiveBodies(system: *JPH_PhysicsSystem, _type: JPH_BodyType) -> u32;
+    fn JPH_PhysicsSystem_GetMaxBodies(system: *JPH_PhysicsSystem) -> u32;
+    fn JPH_PhysicsSystem_GetNumConstraints(system: *JPH_PhysicsSystem) -> u32;
+    fn JPH_PhysicsSystem_SetGravity(system: *mut JPH_PhysicsSystem, value: *JPH_Vec3);
+    fn JPH_PhysicsSystem_GetGravity(system: *mut JPH_PhysicsSystem, result: *mut JPH_Vec3);
+    fn JPH_PhysicsSystem_AddConstraint(system: *mut JPH_PhysicsSystem, constraint: *mut JPH_Constraint);
+    fn JPH_PhysicsSystem_RemoveConstraint(system: *mut JPH_PhysicsSystem, constraint: *mut JPH_Constraint);
+    fn JPH_PhysicsSystem_AddConstraints(system: *mut JPH_PhysicsSystem, constraints: *mut *mut JPH_Constraint, count: u32);
+    fn JPH_PhysicsSystem_RemoveConstraints(system: *mut JPH_PhysicsSystem, constraints: *mut *mut JPH_Constraint, count: u32);
+    fn JPH_PhysicsSystem_AddStepListener(system: *mut JPH_PhysicsSystem, listener: *mut JPH_PhysicsStepListener);
+    fn JPH_PhysicsSystem_RemoveStepListener(system: *mut JPH_PhysicsSystem, listener: *mut JPH_PhysicsStepListener);
+    fn JPH_PhysicsSystem_GetBodies(system: *JPH_PhysicsSystem, ids: *mut JPH_BodyID, count: u32);
+    fn JPH_PhysicsSystem_GetActiveBodies(system: *JPH_PhysicsSystem, _type: JPH_BodyType, ids: *mut JPH_BodyID, count: u32);
+    fn JPH_PhysicsSystem_GetActiveBodiesUnsafe(system: *JPH_PhysicsSystem, _type: JPH_BodyType) -> *JPH_BodyID;
+    fn JPH_PhysicsSystem_GetConstraints(system: *JPH_PhysicsSystem, constraints: *mut *JPH_Constraint, count: u32);
+    fn JPH_PhysicsSystem_ActivateBodiesInAABox(system: *mut JPH_PhysicsSystem, box: *JPH_AABox, layer: JPH_ObjectLayer);
+    fn JPH_PhysicsSystem_DrawBodies(system: *mut JPH_PhysicsSystem, settings: *JPH_DrawSettings, renderer: *mut JPH_DebugRenderer, bodyFilter: *JPH_BodyDrawFilter);
+    fn JPH_PhysicsSystem_DrawConstraints(system: *mut JPH_PhysicsSystem, renderer: *mut JPH_DebugRenderer);
+    fn JPH_PhysicsSystem_DrawConstraintLimits(system: *mut JPH_PhysicsSystem, renderer: *mut JPH_DebugRenderer);
+    fn JPH_PhysicsSystem_DrawConstraintReferenceFrame(system: *mut JPH_PhysicsSystem, renderer: *mut JPH_DebugRenderer);
+    fn JPH_PhysicsStepListener_SetProcs(procs: *JPH_PhysicsStepListener_Procs);
+    fn JPH_PhysicsStepListener_Create(userData: *mut void) -> *mut JPH_PhysicsStepListener;
+    fn JPH_PhysicsStepListener_Destroy(listener: *mut JPH_PhysicsStepListener);
+    fn JPH_Math_Sin(value: f32) -> f32;
+    fn JPH_Math_Cos(value: f32) -> f32;
+    fn JPH_Quat_FromTo(from: *JPH_Vec3, to: *JPH_Vec3, quat: *mut JPH_Quat);
+    fn JPH_Quat_GetAxisAngle(quat: *JPH_Quat, outAxis: *mut JPH_Vec3, outAngle: *mut f32);
+    fn JPH_Quat_GetEulerAngles(quat: *JPH_Quat, result: *mut JPH_Vec3);
+    fn JPH_Quat_RotateAxisX(quat: *JPH_Quat, result: *mut JPH_Vec3);
+    fn JPH_Quat_RotateAxisY(quat: *JPH_Quat, result: *mut JPH_Vec3);
+    fn JPH_Quat_RotateAxisZ(quat: *JPH_Quat, result: *mut JPH_Vec3);
+    fn JPH_Quat_Inversed(quat: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_GetPerpendicular(quat: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_GetRotationAngle(quat: *JPH_Quat, axis: *JPH_Vec3) -> f32;
+    fn JPH_Quat_FromEulerAngles(angles: *JPH_Vec3, result: *mut JPH_Quat);
+    fn JPH_Quat_Add(q1: *JPH_Quat, q2: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_Subtract(q1: *JPH_Quat, q2: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_Multiply(q1: *JPH_Quat, q2: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_MultiplyScalar(q: *JPH_Quat, scalar: f32, result: *mut JPH_Quat);
+    fn JPH_Quat_DivideScalar(q: *JPH_Quat, scalar: f32, result: *mut JPH_Quat);
+    fn JPH_Quat_Dot(q1: *JPH_Quat, q2: *JPH_Quat, result: *mut f32);
+    fn JPH_Quat_Conjugated(quat: *JPH_Quat, result: *mut JPH_Quat);
+    fn JPH_Quat_GetTwist(quat: *JPH_Quat, axis: *JPH_Vec3, result: *mut JPH_Quat);
+    fn JPH_Quat_GetSwingTwist(quat: *JPH_Quat, outSwing: *mut JPH_Quat, outTwist: *mut JPH_Quat);
+    fn JPH_Quat_Lerp(from: *JPH_Quat, to: *JPH_Quat, fraction: f32, result: *mut JPH_Quat);
+    fn JPH_Quat_Slerp(from: *JPH_Quat, to: *JPH_Quat, fraction: f32, result: *mut JPH_Quat);
+    fn JPH_Quat_Rotate(quat: *JPH_Quat, vec: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Quat_InverseRotate(quat: *JPH_Quat, vec: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_AxisX(result: *mut JPH_Vec3);
+    fn JPH_Vec3_AxisY(result: *mut JPH_Vec3);
+    fn JPH_Vec3_AxisZ(result: *mut JPH_Vec3);
+    fn JPH_Vec3_IsClose(v1: *JPH_Vec3, v2: *JPH_Vec3, maxDistSq: f32) -> bool;
+    fn JPH_Vec3_IsNearZero(v: *JPH_Vec3, maxDistSq: f32) -> bool;
+    fn JPH_Vec3_IsNormalized(v: *JPH_Vec3, tolerance: f32) -> bool;
+    fn JPH_Vec3_IsNaN(v: *JPH_Vec3) -> bool;
+    fn JPH_Vec3_Negate(v: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Normalized(v: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Cross(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Abs(v: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Length(v: *JPH_Vec3) -> f32;
+    fn JPH_Vec3_LengthSquared(v: *JPH_Vec3) -> f32;
+    fn JPH_Vec3_DotProduct(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut f32);
+    fn JPH_Vec3_Normalize(v: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Add(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Subtract(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Multiply(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_MultiplyScalar(v: *JPH_Vec3, scalar: f32, result: *mut JPH_Vec3);
+    fn JPH_Vec3_MultiplyMatrix(left: *JPH_Mat4, right: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_Divide(v1: *JPH_Vec3, v2: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Vec3_DivideScalar(v: *JPH_Vec3, scalar: f32, result: *mut JPH_Vec3);
+    fn JPH_Vec3_GetNormalizedPerpendicular(v: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Mat4_Add(m1: *JPH_Mat4, m2: *JPH_Mat4, result: *mut JPH_Mat4);
+    fn JPH_Mat4_Subtract(m1: *JPH_Mat4, m2: *JPH_Mat4, result: *mut JPH_Mat4);
+    fn JPH_Mat4_Multiply(m1: *JPH_Mat4, m2: *JPH_Mat4, result: *mut JPH_Mat4);
+    fn JPH_Mat4_MultiplyScalar(m: *JPH_Mat4, scalar: f32, result: *mut JPH_Mat4);
+    fn JPH_Mat4_Zero(result: *mut JPH_Mat4);
+    fn JPH_Mat4_Identity(result: *mut JPH_Mat4);
+    fn JPH_Mat4_Rotation(result: *mut JPH_Mat4, rotation: *JPH_Quat);
+    fn JPH_Mat4_Rotation2(result: *mut JPH_Mat4, axis: *JPH_Vec3, angle: f32);
+    fn JPH_Mat4_Translation(result: *mut JPH_Mat4, translation: *JPH_Vec3);
+    fn JPH_Mat4_RotationTranslation(result: *mut JPH_Mat4, rotation: *JPH_Quat, translation: *JPH_Vec3);
+    fn JPH_Mat4_InverseRotationTranslation(result: *mut JPH_Mat4, rotation: *JPH_Quat, translation: *JPH_Vec3);
+    fn JPH_Mat4_Scale(result: *mut JPH_Mat4, scale: *JPH_Vec3);
+    fn JPH_Mat4_Transposed(m: *JPH_Mat4, result: *mut JPH_Mat4);
+    fn JPH_Mat4_Inversed(matrix: *JPH_Mat4, result: *mut JPH_Mat4);
+    fn JPH_Mat4_GetAxisX(matrix: *JPH_Mat4, result: *mut JPH_Vec3);
+    fn JPH_Mat4_GetAxisY(matrix: *JPH_Mat4, result: *mut JPH_Vec3);
+    fn JPH_Mat4_GetAxisZ(matrix: *JPH_Mat4, result: *mut JPH_Vec3);
+    fn JPH_Mat4_GetTranslation(matrix: *JPH_Mat4, result: *mut JPH_Vec3);
+    fn JPH_Mat4_GetQuaternion(matrix: *JPH_Mat4, result: *mut JPH_Quat);
+    fn JPH_PhysicsMaterial_Create(name: *i8, color: u32) -> *mut JPH_PhysicsMaterial;
+    fn JPH_PhysicsMaterial_Destroy(material: *mut JPH_PhysicsMaterial);
+    fn JPH_PhysicsMaterial_GetDebugName(material: *JPH_PhysicsMaterial) -> *i8;
+    fn JPH_PhysicsMaterial_GetDebugColor(material: *JPH_PhysicsMaterial) -> u32;
+    fn JPH_GroupFilter_Destroy(groupFilter: *mut JPH_GroupFilter);
+    fn JPH_GroupFilter_CanCollide(groupFilter: *mut JPH_GroupFilter, group1: *JPH_CollisionGroup, group2: *JPH_CollisionGroup) -> bool;
+    fn JPH_GroupFilterTable_Create(numSubGroups: u32) -> *mut JPH_GroupFilterTable;
+    fn JPH_GroupFilterTable_DisableCollision(table: *mut JPH_GroupFilterTable, subGroup1: JPH_CollisionSubGroupID, subGroup2: JPH_CollisionSubGroupID);
+    fn JPH_GroupFilterTable_EnableCollision(table: *mut JPH_GroupFilterTable, subGroup1: JPH_CollisionSubGroupID, subGroup2: JPH_CollisionSubGroupID);
+    fn JPH_GroupFilterTable_IsCollisionEnabled(table: *mut JPH_GroupFilterTable, subGroup1: JPH_CollisionSubGroupID, subGroup2: JPH_CollisionSubGroupID) -> bool;
+    fn JPH_ShapeSettings_Destroy(settings: *mut JPH_ShapeSettings);
+    fn JPH_ShapeSettings_GetUserData(settings: *JPH_ShapeSettings) -> u64;
+    fn JPH_ShapeSettings_SetUserData(settings: *mut JPH_ShapeSettings, userData: u64);
+    fn JPH_Shape_Draw(shape: *JPH_Shape, renderer: *mut JPH_DebugRenderer, centerOfMassTransform: *JPH_RMat4, scale: *JPH_Vec3, color: JPH_Color, useMaterialColors: bool, drawWireframe: bool);
+    fn JPH_Shape_Destroy(shape: *mut JPH_Shape);
+    fn JPH_Shape_GetType(shape: *JPH_Shape) -> JPH_ShapeType;
+    fn JPH_Shape_GetSubType(shape: *JPH_Shape) -> JPH_ShapeSubType;
+    fn JPH_Shape_GetUserData(shape: *JPH_Shape) -> u64;
+    fn JPH_Shape_SetUserData(shape: *mut JPH_Shape, userData: u64);
+    fn JPH_Shape_MustBeStatic(shape: *JPH_Shape) -> bool;
+    fn JPH_Shape_GetCenterOfMass(shape: *JPH_Shape, result: *mut JPH_Vec3);
+    fn JPH_Shape_GetLocalBounds(shape: *JPH_Shape, result: *mut JPH_AABox);
+    fn JPH_Shape_GetSubShapeIDBitsRecursive(shape: *JPH_Shape) -> u32;
+    fn JPH_Shape_GetWorldSpaceBounds(shape: *JPH_Shape, centerOfMassTransform: *mut JPH_RMat4, scale: *mut JPH_Vec3, result: *mut JPH_AABox);
+    fn JPH_Shape_GetInnerRadius(shape: *JPH_Shape) -> f32;
+    fn JPH_Shape_GetMassProperties(shape: *JPH_Shape, result: *mut JPH_MassProperties);
+    fn JPH_Shape_GetLeafShape(shape: *JPH_Shape, subShapeID: JPH_SubShapeID, remainder: *mut JPH_SubShapeID) -> *JPH_Shape;
+    fn JPH_Shape_GetMaterial(shape: *JPH_Shape, subShapeID: JPH_SubShapeID) -> *JPH_PhysicsMaterial;
+    fn JPH_Shape_GetSurfaceNormal(shape: *JPH_Shape, subShapeID: JPH_SubShapeID, localPosition: *mut JPH_Vec3, normal: *mut JPH_Vec3);
+    fn JPH_Shape_GetSupportingFace(shape: *JPH_Shape, subShapeID: JPH_SubShapeID, direction: *JPH_Vec3, scale: *JPH_Vec3, centerOfMassTransform: *JPH_Mat4, outVertices: *mut JPH_SupportingFace);
+    fn JPH_Shape_GetVolume(shape: *JPH_Shape) -> f32;
+    fn JPH_Shape_IsValidScale(shape: *JPH_Shape, scale: *JPH_Vec3) -> bool;
+    fn JPH_Shape_MakeScaleValid(shape: *JPH_Shape, scale: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_Shape_ScaleShape(shape: *JPH_Shape, scale: *JPH_Vec3) -> *mut JPH_Shape;
+    fn JPH_Shape_CastRay(shape: *JPH_Shape, origin: *JPH_Vec3, direction: *JPH_Vec3, hit: *mut JPH_RayCastResult) -> bool;
+    fn JPH_Shape_CastRay2(shape: *JPH_Shape, origin: *JPH_Vec3, direction: *JPH_Vec3, rayCastSettings: *JPH_RayCastSettings, collectorType: JPH_CollisionCollectorType, callback: JPH_CastRayResultCallback, userData: *mut void, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_Shape_CollidePoint(shape: *JPH_Shape, point: *JPH_Vec3, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_Shape_CollidePoint2(shape: *JPH_Shape, point: *JPH_Vec3, collectorType: JPH_CollisionCollectorType, callback: JPH_CollidePointResultCallback, userData: *mut void, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_ConvexShapeSettings_GetDensity(shape: *JPH_ConvexShapeSettings) -> f32;
+    fn JPH_ConvexShapeSettings_SetDensity(shape: *mut JPH_ConvexShapeSettings, value: f32);
+    fn JPH_ConvexShape_GetDensity(shape: *JPH_ConvexShape) -> f32;
+    fn JPH_ConvexShape_SetDensity(shape: *mut JPH_ConvexShape, inDensity: f32);
+    fn JPH_BoxShapeSettings_Create(halfExtent: *JPH_Vec3, convexRadius: f32) -> *mut JPH_BoxShapeSettings;
+    fn JPH_BoxShapeSettings_CreateShape(settings: *JPH_BoxShapeSettings) -> *mut JPH_BoxShape;
+    fn JPH_BoxShape_Create(halfExtent: *JPH_Vec3, convexRadius: f32) -> *mut JPH_BoxShape;
+    fn JPH_BoxShape_GetHalfExtent(shape: *JPH_BoxShape, halfExtent: *mut JPH_Vec3);
+    fn JPH_BoxShape_GetConvexRadius(shape: *JPH_BoxShape) -> f32;
+    fn JPH_SphereShapeSettings_Create(radius: f32) -> *mut JPH_SphereShapeSettings;
+    fn JPH_SphereShapeSettings_CreateShape(settings: *JPH_SphereShapeSettings) -> *mut JPH_SphereShape;
+    fn JPH_SphereShapeSettings_GetRadius(settings: *JPH_SphereShapeSettings) -> f32;
+    fn JPH_SphereShapeSettings_SetRadius(settings: *mut JPH_SphereShapeSettings, radius: f32);
+    fn JPH_SphereShape_Create(radius: f32) -> *mut JPH_SphereShape;
+    fn JPH_SphereShape_GetRadius(shape: *JPH_SphereShape) -> f32;
+    fn JPH_PlaneShapeSettings_Create(plane: *JPH_Plane, material: *JPH_PhysicsMaterial, halfExtent: f32) -> *mut JPH_PlaneShapeSettings;
+    fn JPH_PlaneShapeSettings_CreateShape(settings: *JPH_PlaneShapeSettings) -> *mut JPH_PlaneShape;
+    fn JPH_PlaneShape_Create(plane: *JPH_Plane, material: *JPH_PhysicsMaterial, halfExtent: f32) -> *mut JPH_PlaneShape;
+    fn JPH_PlaneShape_GetPlane(shape: *JPH_PlaneShape, result: *mut JPH_Plane);
+    fn JPH_PlaneShape_GetHalfExtent(shape: *JPH_PlaneShape) -> f32;
+    fn JPH_TriangleShapeSettings_Create(v1: *JPH_Vec3, v2: *JPH_Vec3, v3: *JPH_Vec3, convexRadius: f32) -> *mut JPH_TriangleShapeSettings;
+    fn JPH_TriangleShapeSettings_CreateShape(settings: *JPH_TriangleShapeSettings) -> *mut JPH_TriangleShape;
+    fn JPH_TriangleShape_Create(v1: *JPH_Vec3, v2: *JPH_Vec3, v3: *JPH_Vec3, convexRadius: f32) -> *mut JPH_TriangleShape;
+    fn JPH_TriangleShape_GetConvexRadius(shape: *JPH_TriangleShape) -> f32;
+    fn JPH_TriangleShape_GetVertex1(shape: *JPH_TriangleShape, result: *mut JPH_Vec3);
+    fn JPH_TriangleShape_GetVertex2(shape: *JPH_TriangleShape, result: *mut JPH_Vec3);
+    fn JPH_TriangleShape_GetVertex3(shape: *JPH_TriangleShape, result: *mut JPH_Vec3);
+    fn JPH_CapsuleShapeSettings_Create(halfHeightOfCylinder: f32, radius: f32) -> *mut JPH_CapsuleShapeSettings;
+    fn JPH_CapsuleShapeSettings_CreateShape(settings: *JPH_CapsuleShapeSettings) -> *mut JPH_CapsuleShape;
+    fn JPH_CapsuleShape_Create(halfHeightOfCylinder: f32, radius: f32) -> *mut JPH_CapsuleShape;
+    fn JPH_CapsuleShape_GetRadius(shape: *JPH_CapsuleShape) -> f32;
+    fn JPH_CapsuleShape_GetHalfHeightOfCylinder(shape: *JPH_CapsuleShape) -> f32;
+    fn JPH_CylinderShapeSettings_Create(halfHeight: f32, radius: f32, convexRadius: f32) -> *mut JPH_CylinderShapeSettings;
+    fn JPH_CylinderShapeSettings_CreateShape(settings: *JPH_CylinderShapeSettings) -> *mut JPH_CylinderShape;
+    fn JPH_CylinderShape_Create(halfHeight: f32, radius: f32) -> *mut JPH_CylinderShape;
+    fn JPH_CylinderShape_GetRadius(shape: *JPH_CylinderShape) -> f32;
+    fn JPH_CylinderShape_GetHalfHeight(shape: *JPH_CylinderShape) -> f32;
+    fn JPH_TaperedCylinderShapeSettings_Create(halfHeightOfTaperedCylinder: f32, topRadius: f32, bottomRadius: f32, convexRadius: f32, material: *JPH_PhysicsMaterial) -> *mut JPH_TaperedCylinderShapeSettings;
+    fn JPH_TaperedCylinderShapeSettings_CreateShape(settings: *JPH_TaperedCylinderShapeSettings) -> *mut JPH_TaperedCylinderShape;
+    fn JPH_TaperedCylinderShape_GetTopRadius(shape: *JPH_TaperedCylinderShape) -> f32;
+    fn JPH_TaperedCylinderShape_GetBottomRadius(shape: *JPH_TaperedCylinderShape) -> f32;
+    fn JPH_TaperedCylinderShape_GetConvexRadius(shape: *JPH_TaperedCylinderShape) -> f32;
+    fn JPH_TaperedCylinderShape_GetHalfHeight(shape: *JPH_TaperedCylinderShape) -> f32;
+    fn JPH_ConvexHullShapeSettings_Create(points: *JPH_Vec3, pointsCount: u32, maxConvexRadius: f32) -> *mut JPH_ConvexHullShapeSettings;
+    fn JPH_ConvexHullShapeSettings_CreateShape(settings: *JPH_ConvexHullShapeSettings) -> *mut JPH_ConvexHullShape;
+    fn JPH_ConvexHullShape_GetNumPoints(shape: *JPH_ConvexHullShape) -> u32;
+    fn JPH_ConvexHullShape_GetPoint(shape: *JPH_ConvexHullShape, index: u32, result: *mut JPH_Vec3);
+    fn JPH_ConvexHullShape_GetNumFaces(shape: *JPH_ConvexHullShape) -> u32;
+    fn JPH_ConvexHullShape_GetNumVerticesInFace(shape: *JPH_ConvexHullShape, faceIndex: u32) -> u32;
+    fn JPH_ConvexHullShape_GetFaceVertices(shape: *JPH_ConvexHullShape, faceIndex: u32, maxVertices: u32, vertices: *mut u32) -> u32;
+    fn JPH_MeshShapeSettings_Create(triangles: *JPH_Triangle, triangleCount: u32) -> *mut JPH_MeshShapeSettings;
+    fn JPH_MeshShapeSettings_Create2(vertices: *JPH_Vec3, verticesCount: u32, triangles: *JPH_IndexedTriangle, triangleCount: u32) -> *mut JPH_MeshShapeSettings;
+    fn JPH_MeshShapeSettings_GetMaxTrianglesPerLeaf(settings: *JPH_MeshShapeSettings) -> u32;
+    fn JPH_MeshShapeSettings_SetMaxTrianglesPerLeaf(settings: *mut JPH_MeshShapeSettings, value: u32);
+    fn JPH_MeshShapeSettings_GetActiveEdgeCosThresholdAngle(settings: *JPH_MeshShapeSettings) -> f32;
+    fn JPH_MeshShapeSettings_SetActiveEdgeCosThresholdAngle(settings: *mut JPH_MeshShapeSettings, value: f32);
+    fn JPH_MeshShapeSettings_GetPerTriangleUserData(settings: *JPH_MeshShapeSettings) -> bool;
+    fn JPH_MeshShapeSettings_SetPerTriangleUserData(settings: *mut JPH_MeshShapeSettings, value: bool);
+    fn JPH_MeshShapeSettings_GetBuildQuality(settings: *JPH_MeshShapeSettings) -> JPH_Mesh_Shape_BuildQuality;
+    fn JPH_MeshShapeSettings_SetBuildQuality(settings: *mut JPH_MeshShapeSettings, value: JPH_Mesh_Shape_BuildQuality);
+    fn JPH_MeshShapeSettings_Sanitize(settings: *mut JPH_MeshShapeSettings);
+    fn JPH_MeshShapeSettings_CreateShape(settings: *JPH_MeshShapeSettings) -> *mut JPH_MeshShape;
+    fn JPH_MeshShape_GetTriangleUserData(shape: *JPH_MeshShape, id: JPH_SubShapeID) -> u32;
+    fn JPH_HeightFieldShapeSettings_Create(samples: *f32, offset: *JPH_Vec3, scale: *JPH_Vec3, sampleCount: u32, materialIndices: *u8) -> *mut JPH_HeightFieldShapeSettings;
+    fn JPH_HeightFieldShapeSettings_DetermineMinAndMaxSample(settings: *JPH_HeightFieldShapeSettings, pOutMinValue: *mut f32, pOutMaxValue: *mut f32, pOutQuantizationScale: *mut f32);
+    fn JPH_HeightFieldShapeSettings_CalculateBitsPerSampleForError(settings: *JPH_HeightFieldShapeSettings, maxError: f32) -> u32;
+    fn JPH_HeightFieldShapeSettings_GetOffset(shape: *JPH_HeightFieldShapeSettings, result: *mut JPH_Vec3);
+    fn JPH_HeightFieldShapeSettings_SetOffset(settings: *mut JPH_HeightFieldShapeSettings, value: *JPH_Vec3);
+    fn JPH_HeightFieldShapeSettings_GetScale(shape: *JPH_HeightFieldShapeSettings, result: *mut JPH_Vec3);
+    fn JPH_HeightFieldShapeSettings_SetScale(settings: *mut JPH_HeightFieldShapeSettings, value: *JPH_Vec3);
+    fn JPH_HeightFieldShapeSettings_GetSampleCount(settings: *JPH_HeightFieldShapeSettings) -> u32;
+    fn JPH_HeightFieldShapeSettings_SetSampleCount(settings: *mut JPH_HeightFieldShapeSettings, value: u32);
+    fn JPH_HeightFieldShapeSettings_GetMinHeightValue(settings: *JPH_HeightFieldShapeSettings) -> f32;
+    fn JPH_HeightFieldShapeSettings_SetMinHeightValue(settings: *mut JPH_HeightFieldShapeSettings, value: f32);
+    fn JPH_HeightFieldShapeSettings_GetMaxHeightValue(settings: *JPH_HeightFieldShapeSettings) -> f32;
+    fn JPH_HeightFieldShapeSettings_SetMaxHeightValue(settings: *mut JPH_HeightFieldShapeSettings, value: f32);
+    fn JPH_HeightFieldShapeSettings_GetBlockSize(settings: *JPH_HeightFieldShapeSettings) -> u32;
+    fn JPH_HeightFieldShapeSettings_SetBlockSize(settings: *mut JPH_HeightFieldShapeSettings, value: u32);
+    fn JPH_HeightFieldShapeSettings_GetBitsPerSample(settings: *JPH_HeightFieldShapeSettings) -> u32;
+    fn JPH_HeightFieldShapeSettings_SetBitsPerSample(settings: *mut JPH_HeightFieldShapeSettings, value: u32);
+    fn JPH_HeightFieldShapeSettings_GetActiveEdgeCosThresholdAngle(settings: *JPH_HeightFieldShapeSettings) -> f32;
+    fn JPH_HeightFieldShapeSettings_SetActiveEdgeCosThresholdAngle(settings: *mut JPH_HeightFieldShapeSettings, value: f32);
+    fn JPH_HeightFieldShapeSettings_CreateShape(settings: *mut JPH_HeightFieldShapeSettings) -> *mut JPH_HeightFieldShape;
+    fn JPH_HeightFieldShape_GetSampleCount(shape: *JPH_HeightFieldShape) -> u32;
+    fn JPH_HeightFieldShape_GetBlockSize(shape: *JPH_HeightFieldShape) -> u32;
+    fn JPH_HeightFieldShape_GetMaterial(shape: *JPH_HeightFieldShape, x: u32, y: u32) -> *JPH_PhysicsMaterial;
+    fn JPH_HeightFieldShape_GetPosition(shape: *JPH_HeightFieldShape, x: u32, y: u32, result: *mut JPH_Vec3);
+    fn JPH_HeightFieldShape_IsNoCollision(shape: *JPH_HeightFieldShape, x: u32, y: u32) -> bool;
+    fn JPH_HeightFieldShape_ProjectOntoSurface(shape: *JPH_HeightFieldShape, localPosition: *JPH_Vec3, outSurfacePosition: *mut JPH_Vec3, outSubShapeID: *mut JPH_SubShapeID) -> bool;
+    fn JPH_HeightFieldShape_GetMinHeightValue(shape: *JPH_HeightFieldShape) -> f32;
+    fn JPH_HeightFieldShape_GetMaxHeightValue(shape: *JPH_HeightFieldShape) -> f32;
+    fn JPH_TaperedCapsuleShapeSettings_Create(halfHeightOfTaperedCylinder: f32, topRadius: f32, bottomRadius: f32) -> *mut JPH_TaperedCapsuleShapeSettings;
+    fn JPH_TaperedCapsuleShapeSettings_CreateShape(settings: *mut JPH_TaperedCapsuleShapeSettings) -> *mut JPH_TaperedCapsuleShape;
+    fn JPH_TaperedCapsuleShape_GetTopRadius(shape: *JPH_TaperedCapsuleShape) -> f32;
+    fn JPH_TaperedCapsuleShape_GetBottomRadius(shape: *JPH_TaperedCapsuleShape) -> f32;
+    fn JPH_TaperedCapsuleShape_GetHalfHeight(shape: *JPH_TaperedCapsuleShape) -> f32;
+    fn JPH_CompoundShapeSettings_AddShape(settings: *mut JPH_CompoundShapeSettings, position: *JPH_Vec3, rotation: *JPH_Quat, shapeSettings: *JPH_ShapeSettings, userData: u32);
+    fn JPH_CompoundShapeSettings_AddShape2(settings: *mut JPH_CompoundShapeSettings, position: *JPH_Vec3, rotation: *JPH_Quat, shape: *JPH_Shape, userData: u32);
+    fn JPH_CompoundShape_GetNumSubShapes(shape: *JPH_CompoundShape) -> u32;
+    fn JPH_CompoundShape_GetSubShape(shape: *JPH_CompoundShape, index: u32, subShape: *mut *JPH_Shape, positionCOM: *mut JPH_Vec3, rotation: *mut JPH_Quat, userData: *mut u32);
+    fn JPH_CompoundShape_GetSubShapeIndexFromID(shape: *JPH_CompoundShape, id: JPH_SubShapeID, remainder: *mut JPH_SubShapeID) -> u32;
+    fn JPH_StaticCompoundShapeSettings_Create() -> *mut JPH_StaticCompoundShapeSettings;
+    fn JPH_StaticCompoundShape_Create(settings: *JPH_StaticCompoundShapeSettings) -> *mut JPH_StaticCompoundShape;
+    fn JPH_MutableCompoundShapeSettings_Create() -> *mut JPH_MutableCompoundShapeSettings;
+    fn JPH_MutableCompoundShape_Create(settings: *JPH_MutableCompoundShapeSettings) -> *mut JPH_MutableCompoundShape;
+    fn JPH_MutableCompoundShape_AddShape(shape: *mut JPH_MutableCompoundShape, position: *JPH_Vec3, rotation: *JPH_Quat, child: *JPH_Shape, userData: u32, index: u32) -> u32;
+    fn JPH_MutableCompoundShape_RemoveShape(shape: *mut JPH_MutableCompoundShape, index: u32);
+    fn JPH_MutableCompoundShape_ModifyShape(shape: *mut JPH_MutableCompoundShape, index: u32, position: *JPH_Vec3, rotation: *JPH_Quat);
+    fn JPH_MutableCompoundShape_ModifyShape2(shape: *mut JPH_MutableCompoundShape, index: u32, position: *JPH_Vec3, rotation: *JPH_Quat, newShape: *JPH_Shape);
+    fn JPH_MutableCompoundShape_AdjustCenterOfMass(shape: *mut JPH_MutableCompoundShape);
+    fn JPH_DecoratedShape_GetInnerShape(shape: *JPH_DecoratedShape) -> *JPH_Shape;
+    fn JPH_RotatedTranslatedShapeSettings_Create(position: *JPH_Vec3, rotation: *JPH_Quat, shapeSettings: *JPH_ShapeSettings) -> *mut JPH_RotatedTranslatedShapeSettings;
+    fn JPH_RotatedTranslatedShapeSettings_Create2(position: *JPH_Vec3, rotation: *JPH_Quat, shape: *JPH_Shape) -> *mut JPH_RotatedTranslatedShapeSettings;
+    fn JPH_RotatedTranslatedShapeSettings_CreateShape(settings: *JPH_RotatedTranslatedShapeSettings) -> *mut JPH_RotatedTranslatedShape;
+    fn JPH_RotatedTranslatedShape_Create(position: *JPH_Vec3, rotation: *JPH_Quat, shape: *JPH_Shape) -> *mut JPH_RotatedTranslatedShape;
+    fn JPH_RotatedTranslatedShape_GetPosition(shape: *JPH_RotatedTranslatedShape, position: *mut JPH_Vec3);
+    fn JPH_RotatedTranslatedShape_GetRotation(shape: *JPH_RotatedTranslatedShape, rotation: *mut JPH_Quat);
+    fn JPH_ScaledShapeSettings_Create(shapeSettings: *JPH_ShapeSettings, scale: *JPH_Vec3) -> *mut JPH_ScaledShapeSettings;
+    fn JPH_ScaledShapeSettings_Create2(shape: *JPH_Shape, scale: *JPH_Vec3) -> *mut JPH_ScaledShapeSettings;
+    fn JPH_ScaledShapeSettings_CreateShape(settings: *JPH_ScaledShapeSettings) -> *mut JPH_ScaledShape;
+    fn JPH_ScaledShape_Create(shape: *JPH_Shape, scale: *JPH_Vec3) -> *mut JPH_ScaledShape;
+    fn JPH_ScaledShape_GetScale(shape: *JPH_ScaledShape, result: *mut JPH_Vec3);
+    fn JPH_OffsetCenterOfMassShapeSettings_Create(offset: *JPH_Vec3, shapeSettings: *JPH_ShapeSettings) -> *mut JPH_OffsetCenterOfMassShapeSettings;
+    fn JPH_OffsetCenterOfMassShapeSettings_Create2(offset: *JPH_Vec3, shape: *JPH_Shape) -> *mut JPH_OffsetCenterOfMassShapeSettings;
+    fn JPH_OffsetCenterOfMassShapeSettings_CreateShape(settings: *JPH_OffsetCenterOfMassShapeSettings) -> *mut JPH_OffsetCenterOfMassShape;
+    fn JPH_OffsetCenterOfMassShape_Create(offset: *JPH_Vec3, shape: *JPH_Shape) -> *mut JPH_OffsetCenterOfMassShape;
+    fn JPH_OffsetCenterOfMassShape_GetOffset(shape: *JPH_OffsetCenterOfMassShape, result: *mut JPH_Vec3);
+    fn JPH_EmptyShapeSettings_Create(centerOfMass: *JPH_Vec3) -> *mut JPH_EmptyShapeSettings;
+    fn JPH_EmptyShapeSettings_CreateShape(settings: *JPH_EmptyShapeSettings) -> *mut JPH_EmptyShape;
+    fn JPH_BodyCreationSettings_Create() -> *mut JPH_BodyCreationSettings;
+    fn JPH_BodyCreationSettings_Create2(settings: *JPH_ShapeSettings, position: *JPH_RVec3, rotation: *JPH_Quat, motionType: JPH_MotionType, objectLayer: JPH_ObjectLayer) -> *mut JPH_BodyCreationSettings;
+    fn JPH_BodyCreationSettings_Create3(shape: *JPH_Shape, position: *JPH_RVec3, rotation: *JPH_Quat, motionType: JPH_MotionType, objectLayer: JPH_ObjectLayer) -> *mut JPH_BodyCreationSettings;
+    fn JPH_BodyCreationSettings_Destroy(settings: *mut JPH_BodyCreationSettings);
+    fn JPH_BodyCreationSettings_GetPosition(settings: *mut JPH_BodyCreationSettings, result: *mut JPH_RVec3);
+    fn JPH_BodyCreationSettings_SetPosition(settings: *mut JPH_BodyCreationSettings, value: *JPH_RVec3);
+    fn JPH_BodyCreationSettings_GetRotation(settings: *mut JPH_BodyCreationSettings, result: *mut JPH_Quat);
+    fn JPH_BodyCreationSettings_SetRotation(settings: *mut JPH_BodyCreationSettings, value: *JPH_Quat);
+    fn JPH_BodyCreationSettings_GetLinearVelocity(settings: *mut JPH_BodyCreationSettings, velocity: *mut JPH_Vec3);
+    fn JPH_BodyCreationSettings_SetLinearVelocity(settings: *mut JPH_BodyCreationSettings, velocity: *JPH_Vec3);
+    fn JPH_BodyCreationSettings_GetAngularVelocity(settings: *mut JPH_BodyCreationSettings, velocity: *mut JPH_Vec3);
+    fn JPH_BodyCreationSettings_SetAngularVelocity(settings: *mut JPH_BodyCreationSettings, velocity: *JPH_Vec3);
+    fn JPH_BodyCreationSettings_GetUserData(settings: *JPH_BodyCreationSettings) -> u64;
+    fn JPH_BodyCreationSettings_SetUserData(settings: *mut JPH_BodyCreationSettings, value: u64);
+    fn JPH_BodyCreationSettings_GetObjectLayer(settings: *JPH_BodyCreationSettings) -> JPH_ObjectLayer;
+    fn JPH_BodyCreationSettings_SetObjectLayer(settings: *mut JPH_BodyCreationSettings, value: JPH_ObjectLayer);
+    fn JPH_BodyCreationSettings_GetCollisionGroup(settings: *JPH_BodyCreationSettings, result: *mut JPH_CollisionGroup);
+    fn JPH_BodyCreationSettings_SetCollisionGroup(settings: *mut JPH_BodyCreationSettings, value: *JPH_CollisionGroup);
+    fn JPH_BodyCreationSettings_GetMotionType(settings: *JPH_BodyCreationSettings) -> JPH_MotionType;
+    fn JPH_BodyCreationSettings_SetMotionType(settings: *mut JPH_BodyCreationSettings, value: JPH_MotionType);
+    fn JPH_BodyCreationSettings_GetAllowedDOFs(settings: *JPH_BodyCreationSettings) -> JPH_AllowedDOFs;
+    fn JPH_BodyCreationSettings_SetAllowedDOFs(settings: *mut JPH_BodyCreationSettings, value: JPH_AllowedDOFs);
+    fn JPH_BodyCreationSettings_GetAllowDynamicOrKinematic(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetAllowDynamicOrKinematic(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetIsSensor(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetIsSensor(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetCollideKinematicVsNonDynamic(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetCollideKinematicVsNonDynamic(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetUseManifoldReduction(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetUseManifoldReduction(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetApplyGyroscopicForce(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetApplyGyroscopicForce(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetMotionQuality(settings: *JPH_BodyCreationSettings) -> JPH_MotionQuality;
+    fn JPH_BodyCreationSettings_SetMotionQuality(settings: *mut JPH_BodyCreationSettings, value: JPH_MotionQuality);
+    fn JPH_BodyCreationSettings_GetEnhancedInternalEdgeRemoval(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetEnhancedInternalEdgeRemoval(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetAllowSleeping(settings: *JPH_BodyCreationSettings) -> bool;
+    fn JPH_BodyCreationSettings_SetAllowSleeping(settings: *mut JPH_BodyCreationSettings, value: bool);
+    fn JPH_BodyCreationSettings_GetFriction(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetFriction(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetRestitution(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetRestitution(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetLinearDamping(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetLinearDamping(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetAngularDamping(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetAngularDamping(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetMaxLinearVelocity(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetMaxLinearVelocity(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetMaxAngularVelocity(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetMaxAngularVelocity(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetGravityFactor(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetGravityFactor(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetNumVelocityStepsOverride(settings: *JPH_BodyCreationSettings) -> u32;
+    fn JPH_BodyCreationSettings_SetNumVelocityStepsOverride(settings: *mut JPH_BodyCreationSettings, value: u32);
+    fn JPH_BodyCreationSettings_GetNumPositionStepsOverride(settings: *JPH_BodyCreationSettings) -> u32;
+    fn JPH_BodyCreationSettings_SetNumPositionStepsOverride(settings: *mut JPH_BodyCreationSettings, value: u32);
+    fn JPH_BodyCreationSettings_GetOverrideMassProperties(settings: *JPH_BodyCreationSettings) -> JPH_OverrideMassProperties;
+    fn JPH_BodyCreationSettings_SetOverrideMassProperties(settings: *mut JPH_BodyCreationSettings, value: JPH_OverrideMassProperties);
+    fn JPH_BodyCreationSettings_GetInertiaMultiplier(settings: *JPH_BodyCreationSettings) -> f32;
+    fn JPH_BodyCreationSettings_SetInertiaMultiplier(settings: *mut JPH_BodyCreationSettings, value: f32);
+    fn JPH_BodyCreationSettings_GetMassPropertiesOverride(settings: *JPH_BodyCreationSettings, result: *mut JPH_MassProperties);
+    fn JPH_BodyCreationSettings_SetMassPropertiesOverride(settings: *mut JPH_BodyCreationSettings, massProperties: *JPH_MassProperties);
+    fn JPH_SoftBodySharedSettings_Create() -> *mut JPH_SoftBodySharedSettings;
+    fn JPH_SoftBodySharedSettings_Destroy(settings: *mut JPH_SoftBodySharedSettings);
+    fn JPH_SoftBodySharedSettings_AddVertex(settings: *mut JPH_SoftBodySharedSettings, vertex: *JPH_SoftVertex);
+    fn JPH_SoftBodySharedSettings_AddVertices(settings: *mut JPH_SoftBodySharedSettings, vertices: *JPH_SoftVertex, count: u32);
+    fn JPH_SoftBodySharedSettings_RemoveVertex(settings: *mut JPH_SoftBodySharedSettings, index: u32) -> bool;
+    fn JPH_SoftBodySharedSettings_GetVertexCount(settings: *JPH_SoftBodySharedSettings) -> u32;
+    fn JPH_SoftBodySharedSettings_GetVertex(settings: *JPH_SoftBodySharedSettings, index: u32, outVertex: *mut JPH_SoftVertex) -> bool;
+    fn JPH_SoftBodySharedSettings_AddFace(settings: *mut JPH_SoftBodySharedSettings, face: *JPH_SoftFace);
+    fn JPH_SoftBodySharedSettings_AddFaces(settings: *mut JPH_SoftBodySharedSettings, faces: *JPH_SoftFace, count: u32);
+    fn JPH_SoftBodySharedSettings_RemoveFace(settings: *mut JPH_SoftBodySharedSettings, index: u32) -> bool;
+    fn JPH_SoftBodySharedSettings_GetFaceCount(settings: *JPH_SoftBodySharedSettings) -> u32;
+    fn JPH_SoftBodySharedSettings_GetFace(settings: *JPH_SoftBodySharedSettings, index: u32, outFace: *mut JPH_SoftFace) -> bool;
+    fn JPH_SoftBodySharedSettings_CreateConstraints(settings: *mut JPH_SoftBodySharedSettings, compliance: f32, bendType: JPH_SoftBodyBendType);
+    fn JPH_SoftBodySharedSettings_Optimize(settings: *mut JPH_SoftBodySharedSettings);
+    fn JPH_SoftBodyCreationSettings_Create() -> *mut JPH_SoftBodyCreationSettings;
+    fn JPH_SoftBodyCreationSettings_Create2(settings: *JPH_SoftBodySharedSettings, position: *JPH_RVec3, rotation: *JPH_Quat, objectLayer: JPH_ObjectLayer) -> *mut JPH_SoftBodyCreationSettings;
+    fn JPH_SoftBodyCreationSettings_Destroy(settings: *mut JPH_SoftBodyCreationSettings);
+    fn JPH_SoftBodyCreationSettings_GetSettings(settings: *JPH_SoftBodyCreationSettings) -> *JPH_SoftBodySharedSettings;
+    fn JPH_SoftBodyCreationSettings_SetSettings(settings: *mut JPH_SoftBodyCreationSettings, sharedSettings: *JPH_SoftBodySharedSettings);
+    fn JPH_SoftBodyCreationSettings_GetPosition(settings: *mut JPH_SoftBodyCreationSettings, result: *mut JPH_RVec3);
+    fn JPH_SoftBodyCreationSettings_SetPosition(settings: *mut JPH_SoftBodyCreationSettings, value: *JPH_RVec3);
+    fn JPH_SoftBodyCreationSettings_GetRotation(settings: *mut JPH_SoftBodyCreationSettings, result: *mut JPH_Quat);
+    fn JPH_SoftBodyCreationSettings_SetRotation(settings: *mut JPH_SoftBodyCreationSettings, value: *JPH_Quat);
+    fn JPH_SoftBodyCreationSettings_GetUserData(settings: *JPH_SoftBodyCreationSettings) -> u64;
+    fn JPH_SoftBodyCreationSettings_SetUserData(settings: *mut JPH_SoftBodyCreationSettings, userData: u64);
+    fn JPH_SoftBodyCreationSettings_GetObjectLayer(settings: *JPH_SoftBodyCreationSettings) -> JPH_ObjectLayer;
+    fn JPH_SoftBodyCreationSettings_SetObjectLayer(settings: *mut JPH_SoftBodyCreationSettings, value: JPH_ObjectLayer);
+    fn JPH_SoftBodyCreationSettings_GetCollisionGroup(settings: *JPH_SoftBodyCreationSettings, result: *mut JPH_CollisionGroup);
+    fn JPH_SoftBodyCreationSettings_SetCollisionGroup(settings: *mut JPH_SoftBodyCreationSettings, group: *JPH_CollisionGroup);
+    fn JPH_SoftBodyCreationSettings_GetNumIterations(settings: *JPH_SoftBodyCreationSettings) -> u32;
+    fn JPH_SoftBodyCreationSettings_SetNumIterations(settings: *mut JPH_SoftBodyCreationSettings, iterations: u32);
+    fn JPH_SoftBodyCreationSettings_GetLinearDamping(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetLinearDamping(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetMaxLinearVelocity(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetMaxLinearVelocity(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetRestitution(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetRestitution(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetFriction(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetFriction(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetPressure(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetPressure(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetGravityFactor(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetGravityFactor(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetVertexRadius(settings: *JPH_SoftBodyCreationSettings) -> f32;
+    fn JPH_SoftBodyCreationSettings_SetVertexRadius(settings: *mut JPH_SoftBodyCreationSettings, value: f32);
+    fn JPH_SoftBodyCreationSettings_GetUpdatePosition(settings: *JPH_SoftBodyCreationSettings) -> bool;
+    fn JPH_SoftBodyCreationSettings_SetUpdatePosition(settings: *mut JPH_SoftBodyCreationSettings, value: bool);
+    fn JPH_SoftBodyCreationSettings_GetMakeRotationIdentity(settings: *JPH_SoftBodyCreationSettings) -> bool;
+    fn JPH_SoftBodyCreationSettings_SetMakeRotationIdentity(settings: *mut JPH_SoftBodyCreationSettings, value: bool);
+    fn JPH_SoftBodyCreationSettings_GetAllowSleeping(settings: *JPH_SoftBodyCreationSettings) -> bool;
+    fn JPH_SoftBodyCreationSettings_SetAllowSleeping(settings: *mut JPH_SoftBodyCreationSettings, value: bool);
+    fn JPH_SoftBodyCreationSettings_GetFacesDoubleSided(settings: *JPH_SoftBodyCreationSettings) -> bool;
+    fn JPH_SoftBodyCreationSettings_SetFacesDoubleSided(settings: *mut JPH_SoftBodyCreationSettings, value: bool);
+    fn JPH_Constraint_Destroy(constraint: *mut JPH_Constraint);
+    fn JPH_Constraint_GetType(constraint: *JPH_Constraint) -> JPH_ConstraintType;
+    fn JPH_Constraint_GetSubType(constraint: *JPH_Constraint) -> JPH_ConstraintSubType;
+    fn JPH_Constraint_GetConstraintPriority(constraint: *JPH_Constraint) -> u32;
+    fn JPH_Constraint_SetConstraintPriority(constraint: *mut JPH_Constraint, priority: u32);
+    fn JPH_Constraint_GetNumVelocityStepsOverride(constraint: *JPH_Constraint) -> u32;
+    fn JPH_Constraint_SetNumVelocityStepsOverride(constraint: *mut JPH_Constraint, value: u32);
+    fn JPH_Constraint_GetNumPositionStepsOverride(constraint: *JPH_Constraint) -> u32;
+    fn JPH_Constraint_SetNumPositionStepsOverride(constraint: *mut JPH_Constraint, value: u32);
+    fn JPH_Constraint_GetEnabled(constraint: *JPH_Constraint) -> bool;
+    fn JPH_Constraint_SetEnabled(constraint: *mut JPH_Constraint, enabled: bool);
+    fn JPH_Constraint_GetUserData(constraint: *JPH_Constraint) -> u64;
+    fn JPH_Constraint_SetUserData(constraint: *mut JPH_Constraint, userData: u64);
+    fn JPH_Constraint_NotifyShapeChanged(constraint: *mut JPH_Constraint, bodyID: JPH_BodyID, deltaCOM: *mut JPH_Vec3);
+    fn JPH_Constraint_ResetWarmStart(constraint: *mut JPH_Constraint);
+    fn JPH_Constraint_IsActive(constraint: *JPH_Constraint) -> bool;
+    fn JPH_Constraint_SetupVelocityConstraint(constraint: *mut JPH_Constraint, deltaTime: f32);
+    fn JPH_Constraint_WarmStartVelocityConstraint(constraint: *mut JPH_Constraint, warmStartImpulseRatio: f32);
+    fn JPH_Constraint_SolveVelocityConstraint(constraint: *mut JPH_Constraint, deltaTime: f32) -> bool;
+    fn JPH_Constraint_SolvePositionConstraint(constraint: *mut JPH_Constraint, deltaTime: f32, baumgarte: f32) -> bool;
+    fn JPH_TwoBodyConstraint_GetBody1(constraint: *JPH_TwoBodyConstraint) -> *mut JPH_Body;
+    fn JPH_TwoBodyConstraint_GetBody2(constraint: *JPH_TwoBodyConstraint) -> *mut JPH_Body;
+    fn JPH_TwoBodyConstraint_GetConstraintToBody1Matrix(constraint: *JPH_TwoBodyConstraint, result: *mut JPH_Mat4);
+    fn JPH_TwoBodyConstraint_GetConstraintToBody2Matrix(constraint: *JPH_TwoBodyConstraint, result: *mut JPH_Mat4);
+    fn JPH_FixedConstraintSettings_Init(settings: *mut JPH_FixedConstraintSettings);
+    fn JPH_FixedConstraint_Create(settings: *JPH_FixedConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_FixedConstraint;
+    fn JPH_FixedConstraint_GetSettings(constraint: *JPH_FixedConstraint, settings: *mut JPH_FixedConstraintSettings);
+    fn JPH_FixedConstraint_GetTotalLambdaPosition(constraint: *JPH_FixedConstraint, result: *mut JPH_Vec3);
+    fn JPH_FixedConstraint_GetTotalLambdaRotation(constraint: *JPH_FixedConstraint, result: *mut JPH_Vec3);
+    fn JPH_DistanceConstraintSettings_Init(settings: *mut JPH_DistanceConstraintSettings);
+    fn JPH_DistanceConstraint_Create(settings: *JPH_DistanceConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_DistanceConstraint;
+    fn JPH_DistanceConstraint_GetSettings(constraint: *JPH_DistanceConstraint, settings: *mut JPH_DistanceConstraintSettings);
+    fn JPH_DistanceConstraint_SetDistance(constraint: *mut JPH_DistanceConstraint, minDistance: f32, maxDistance: f32);
+    fn JPH_DistanceConstraint_GetMinDistance(constraint: *mut JPH_DistanceConstraint) -> f32;
+    fn JPH_DistanceConstraint_GetMaxDistance(constraint: *mut JPH_DistanceConstraint) -> f32;
+    fn JPH_DistanceConstraint_GetLimitsSpringSettings(constraint: *mut JPH_DistanceConstraint, result: *mut JPH_SpringSettings);
+    fn JPH_DistanceConstraint_SetLimitsSpringSettings(constraint: *mut JPH_DistanceConstraint, settings: *mut JPH_SpringSettings);
+    fn JPH_DistanceConstraint_GetTotalLambdaPosition(constraint: *JPH_DistanceConstraint) -> f32;
+    fn JPH_PointConstraintSettings_Init(settings: *mut JPH_PointConstraintSettings);
+    fn JPH_PointConstraint_Create(settings: *JPH_PointConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_PointConstraint;
+    fn JPH_PointConstraint_GetSettings(constraint: *JPH_PointConstraint, settings: *mut JPH_PointConstraintSettings);
+    fn JPH_PointConstraint_SetPoint1(constraint: *mut JPH_PointConstraint, space: JPH_ConstraintSpace, value: *mut JPH_RVec3);
+    fn JPH_PointConstraint_SetPoint2(constraint: *mut JPH_PointConstraint, space: JPH_ConstraintSpace, value: *mut JPH_RVec3);
+    fn JPH_PointConstraint_GetLocalSpacePoint1(constraint: *JPH_PointConstraint, result: *mut JPH_Vec3);
+    fn JPH_PointConstraint_GetLocalSpacePoint2(constraint: *JPH_PointConstraint, result: *mut JPH_Vec3);
+    fn JPH_PointConstraint_GetTotalLambdaPosition(constraint: *JPH_PointConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraintSettings_Init(settings: *mut JPH_HingeConstraintSettings);
+    fn JPH_HingeConstraint_Create(settings: *JPH_HingeConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_HingeConstraint;
+    fn JPH_HingeConstraint_GetSettings(constraint: *mut JPH_HingeConstraint, settings: *mut JPH_HingeConstraintSettings);
+    fn JPH_HingeConstraint_GetLocalSpacePoint1(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetLocalSpacePoint2(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetLocalSpaceHingeAxis1(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetLocalSpaceHingeAxis2(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetLocalSpaceNormalAxis1(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetLocalSpaceNormalAxis2(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetCurrentAngle(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_SetMaxFrictionTorque(constraint: *mut JPH_HingeConstraint, frictionTorque: f32);
+    fn JPH_HingeConstraint_GetMaxFrictionTorque(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_SetMotorSettings(constraint: *mut JPH_HingeConstraint, settings: *mut JPH_MotorSettings);
+    fn JPH_HingeConstraint_GetMotorSettings(constraint: *mut JPH_HingeConstraint, result: *mut JPH_MotorSettings);
+    fn JPH_HingeConstraint_SetMotorState(constraint: *mut JPH_HingeConstraint, state: JPH_MotorState);
+    fn JPH_HingeConstraint_GetMotorState(constraint: *mut JPH_HingeConstraint) -> JPH_MotorState;
+    fn JPH_HingeConstraint_SetTargetAngularVelocity(constraint: *mut JPH_HingeConstraint, angularVelocity: f32);
+    fn JPH_HingeConstraint_GetTargetAngularVelocity(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_SetTargetAngle(constraint: *mut JPH_HingeConstraint, angle: f32);
+    fn JPH_HingeConstraint_GetTargetAngle(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_SetLimits(constraint: *mut JPH_HingeConstraint, inLimitsMin: f32, inLimitsMax: f32);
+    fn JPH_HingeConstraint_GetLimitsMin(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_GetLimitsMax(constraint: *mut JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_HasLimits(constraint: *mut JPH_HingeConstraint) -> bool;
+    fn JPH_HingeConstraint_GetLimitsSpringSettings(constraint: *mut JPH_HingeConstraint, result: *mut JPH_SpringSettings);
+    fn JPH_HingeConstraint_SetLimitsSpringSettings(constraint: *mut JPH_HingeConstraint, settings: *mut JPH_SpringSettings);
+    fn JPH_HingeConstraint_GetTotalLambdaPosition(constraint: *JPH_HingeConstraint, result: *mut JPH_Vec3);
+    fn JPH_HingeConstraint_GetTotalLambdaRotation(constraint: *JPH_HingeConstraint, rotation: *mut f32);
+    fn JPH_HingeConstraint_GetTotalLambdaRotationLimits(constraint: *JPH_HingeConstraint) -> f32;
+    fn JPH_HingeConstraint_GetTotalLambdaMotor(constraint: *JPH_HingeConstraint) -> f32;
+    fn JPH_SliderConstraintSettings_Init(settings: *mut JPH_SliderConstraintSettings);
+    fn JPH_SliderConstraintSettings_SetSliderAxis(settings: *mut JPH_SliderConstraintSettings, axis: *JPH_Vec3);
+    fn JPH_SliderConstraint_Create(settings: *JPH_SliderConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_SliderConstraint;
+    fn JPH_SliderConstraint_GetSettings(constraint: *mut JPH_SliderConstraint, settings: *mut JPH_SliderConstraintSettings);
+    fn JPH_SliderConstraint_GetCurrentPosition(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_SetMaxFrictionForce(constraint: *mut JPH_SliderConstraint, frictionForce: f32);
+    fn JPH_SliderConstraint_GetMaxFrictionForce(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_SetMotorSettings(constraint: *mut JPH_SliderConstraint, settings: *mut JPH_MotorSettings);
+    fn JPH_SliderConstraint_GetMotorSettings(constraint: *JPH_SliderConstraint, result: *mut JPH_MotorSettings);
+    fn JPH_SliderConstraint_SetMotorState(constraint: *mut JPH_SliderConstraint, state: JPH_MotorState);
+    fn JPH_SliderConstraint_GetMotorState(constraint: *mut JPH_SliderConstraint) -> JPH_MotorState;
+    fn JPH_SliderConstraint_SetTargetVelocity(constraint: *mut JPH_SliderConstraint, velocity: f32);
+    fn JPH_SliderConstraint_GetTargetVelocity(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_SetTargetPosition(constraint: *mut JPH_SliderConstraint, position: f32);
+    fn JPH_SliderConstraint_GetTargetPosition(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_SetLimits(constraint: *mut JPH_SliderConstraint, inLimitsMin: f32, inLimitsMax: f32);
+    fn JPH_SliderConstraint_GetLimitsMin(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_GetLimitsMax(constraint: *mut JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_HasLimits(constraint: *mut JPH_SliderConstraint) -> bool;
+    fn JPH_SliderConstraint_GetLimitsSpringSettings(constraint: *mut JPH_SliderConstraint, result: *mut JPH_SpringSettings);
+    fn JPH_SliderConstraint_SetLimitsSpringSettings(constraint: *mut JPH_SliderConstraint, settings: *mut JPH_SpringSettings);
+    fn JPH_SliderConstraint_GetTotalLambdaPosition(constraint: *JPH_SliderConstraint, position: *mut f32);
+    fn JPH_SliderConstraint_GetTotalLambdaPositionLimits(constraint: *JPH_SliderConstraint) -> f32;
+    fn JPH_SliderConstraint_GetTotalLambdaRotation(constraint: *JPH_SliderConstraint, result: *mut JPH_Vec3);
+    fn JPH_SliderConstraint_GetTotalLambdaMotor(constraint: *JPH_SliderConstraint) -> f32;
+    fn JPH_ConeConstraintSettings_Init(settings: *mut JPH_ConeConstraintSettings);
+    fn JPH_ConeConstraint_Create(settings: *JPH_ConeConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_ConeConstraint;
+    fn JPH_ConeConstraint_GetSettings(constraint: *mut JPH_ConeConstraint, settings: *mut JPH_ConeConstraintSettings);
+    fn JPH_ConeConstraint_SetHalfConeAngle(constraint: *mut JPH_ConeConstraint, halfConeAngle: f32);
+    fn JPH_ConeConstraint_GetCosHalfConeAngle(constraint: *JPH_ConeConstraint) -> f32;
+    fn JPH_ConeConstraint_GetTotalLambdaPosition(constraint: *JPH_ConeConstraint, result: *mut JPH_Vec3);
+    fn JPH_ConeConstraint_GetTotalLambdaRotation(constraint: *JPH_ConeConstraint) -> f32;
+    fn JPH_SwingTwistConstraintSettings_Init(settings: *mut JPH_SwingTwistConstraintSettings);
+    fn JPH_SwingTwistConstraint_Create(settings: *JPH_SwingTwistConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_SwingTwistConstraint;
+    fn JPH_SwingTwistConstraint_GetSettings(constraint: *mut JPH_SwingTwistConstraint, settings: *mut JPH_SwingTwistConstraintSettings);
+    fn JPH_SwingTwistConstraint_GetNormalHalfConeAngle(constraint: *mut JPH_SwingTwistConstraint) -> f32;
+    fn JPH_SwingTwistConstraint_GetTotalLambdaPosition(constraint: *JPH_SwingTwistConstraint, result: *mut JPH_Vec3);
+    fn JPH_SwingTwistConstraint_GetTotalLambdaTwist(constraint: *JPH_SwingTwistConstraint) -> f32;
+    fn JPH_SwingTwistConstraint_GetTotalLambdaSwingY(constraint: *JPH_SwingTwistConstraint) -> f32;
+    fn JPH_SwingTwistConstraint_GetTotalLambdaSwingZ(constraint: *JPH_SwingTwistConstraint) -> f32;
+    fn JPH_SwingTwistConstraint_GetTotalLambdaMotor(constraint: *JPH_SwingTwistConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraintSettings_Init(settings: *mut JPH_SixDOFConstraintSettings);
+    fn JPH_SixDOFConstraintSettings_MakeFreeAxis(settings: *mut JPH_SixDOFConstraintSettings, axis: JPH_SixDOFConstraintAxis);
+    fn JPH_SixDOFConstraintSettings_IsFreeAxis(settings: *JPH_SixDOFConstraintSettings, axis: JPH_SixDOFConstraintAxis) -> bool;
+    fn JPH_SixDOFConstraintSettings_MakeFixedAxis(settings: *mut JPH_SixDOFConstraintSettings, axis: JPH_SixDOFConstraintAxis);
+    fn JPH_SixDOFConstraintSettings_IsFixedAxis(settings: *JPH_SixDOFConstraintSettings, axis: JPH_SixDOFConstraintAxis) -> bool;
+    fn JPH_SixDOFConstraintSettings_SetLimitedAxis(settings: *mut JPH_SixDOFConstraintSettings, axis: JPH_SixDOFConstraintAxis, min: f32, max: f32);
+    fn JPH_SixDOFConstraint_Create(settings: *JPH_SixDOFConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_SixDOFConstraint;
+    fn JPH_SixDOFConstraint_GetSettings(constraint: *mut JPH_SixDOFConstraint, settings: *mut JPH_SixDOFConstraintSettings);
+    fn JPH_SixDOFConstraint_GetLimitsMin(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> f32;
+    fn JPH_SixDOFConstraint_GetLimitsMax(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> f32;
+    fn JPH_SixDOFConstraint_GetTotalLambdaPosition(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTotalLambdaRotation(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTotalLambdaMotorTranslation(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTotalLambdaMotorRotation(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTranslationLimitsMin(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTranslationLimitsMax(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetRotationLimitsMin(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetRotationLimitsMax(constraint: *JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_IsFixedAxis(constraint: *JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> bool;
+    fn JPH_SixDOFConstraint_IsFreeAxis(constraint: *JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> bool;
+    fn JPH_SixDOFConstraint_GetLimitsSpringSettings(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_SpringSettings, axis: JPH_SixDOFConstraintAxis);
+    fn JPH_SixDOFConstraint_SetLimitsSpringSettings(constraint: *mut JPH_SixDOFConstraint, settings: *mut JPH_SpringSettings, axis: JPH_SixDOFConstraintAxis);
+    fn JPH_SixDOFConstraint_SetMaxFriction(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis, inFriction: f32);
+    fn JPH_SixDOFConstraint_GetMaxFriction(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> f32;
+    fn JPH_SixDOFConstraint_GetRotationInConstraintSpace(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_Quat);
+    fn JPH_SixDOFConstraint_GetMotorSettings(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis, settings: *mut JPH_MotorSettings);
+    fn JPH_SixDOFConstraint_SetMotorState(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis, state: JPH_MotorState);
+    fn JPH_SixDOFConstraint_GetMotorState(constraint: *mut JPH_SixDOFConstraint, axis: JPH_SixDOFConstraintAxis) -> JPH_MotorState;
+    fn JPH_SixDOFConstraint_SetTargetVelocityCS(constraint: *mut JPH_SixDOFConstraint, inVelocity: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTargetVelocityCS(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_SetTargetAngularVelocityCS(constraint: *mut JPH_SixDOFConstraint, inAngularVelocity: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTargetAngularVelocityCS(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_SetTargetPositionCS(constraint: *mut JPH_SixDOFConstraint, inPosition: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_GetTargetPositionCS(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_Vec3);
+    fn JPH_SixDOFConstraint_SetTargetOrientationCS(constraint: *mut JPH_SixDOFConstraint, inOrientation: *mut JPH_Quat);
+    fn JPH_SixDOFConstraint_GetTargetOrientationCS(constraint: *mut JPH_SixDOFConstraint, result: *mut JPH_Quat);
+    fn JPH_SixDOFConstraint_SetTargetOrientationBS(constraint: *mut JPH_SixDOFConstraint, inOrientation: *mut JPH_Quat);
+    fn JPH_GearConstraintSettings_Init(settings: *mut JPH_GearConstraintSettings);
+    fn JPH_GearConstraint_Create(settings: *JPH_GearConstraintSettings, body1: *mut JPH_Body, body2: *mut JPH_Body) -> *mut JPH_GearConstraint;
+    fn JPH_GearConstraint_GetSettings(constraint: *mut JPH_GearConstraint, settings: *mut JPH_GearConstraintSettings);
+    fn JPH_GearConstraint_SetConstraints(constraint: *mut JPH_GearConstraint, gear1: *JPH_Constraint, gear2: *JPH_Constraint);
+    fn JPH_GearConstraint_GetTotalLambda(constraint: *JPH_GearConstraint) -> f32;
+    fn JPH_BodyInterface_DestroyBody(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID);
+    fn JPH_BodyInterface_CreateAndAddBody(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_BodyCreationSettings, activationMode: JPH_Activation) -> JPH_BodyID;
+    fn JPH_BodyInterface_CreateBody(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_BodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateBodyWithID(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, settings: *JPH_BodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateBodyWithoutID(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_BodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_DestroyBodyWithoutID(bodyInterface: *mut JPH_BodyInterface, body: *mut JPH_Body);
+    fn JPH_BodyInterface_AssignBodyID(bodyInterface: *mut JPH_BodyInterface, body: *mut JPH_Body) -> bool;
+    fn JPH_BodyInterface_AssignBodyID2(bodyInterface: *mut JPH_BodyInterface, body: *mut JPH_Body, bodyID: JPH_BodyID) -> bool;
+    fn JPH_BodyInterface_UnassignBodyID(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateSoftBody(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_SoftBodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateSoftBodyWithID(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, settings: *JPH_SoftBodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateSoftBodyWithoutID(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_SoftBodyCreationSettings) -> *mut JPH_Body;
+    fn JPH_BodyInterface_CreateAndAddSoftBody(bodyInterface: *mut JPH_BodyInterface, settings: *JPH_SoftBodyCreationSettings, activationMode: JPH_Activation) -> JPH_BodyID;
+    fn JPH_BodyInterface_AddBody(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_RemoveBody(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID);
+    fn JPH_BodyInterface_RemoveAndDestroyBody(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID);
+    fn JPH_BodyInterface_IsAdded(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID) -> bool;
+    fn JPH_BodyInterface_GetBodyType(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID) -> JPH_BodyType;
+    fn JPH_PhysicsSystem_GetBodyPtr(system: *JPH_PhysicsSystem, bodyID: JPH_BodyID) -> *JPH_Body;
+    fn JPH_BodyInterface_SetLinearVelocity(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, velocity: *JPH_Vec3);
+    fn JPH_BodyInterface_GetLinearVelocity(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, velocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_GetCenterOfMassPosition(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, position: *mut JPH_RVec3);
+    fn JPH_BodyInterface_GetMotionType(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID) -> JPH_MotionType;
+    fn JPH_BodyInterface_SetMotionType(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, motionType: JPH_MotionType, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_GetRestitution(bodyInterface: *JPH_BodyInterface, bodyID: JPH_BodyID) -> f32;
+    fn JPH_BodyInterface_SetRestitution(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, restitution: f32);
+    fn JPH_BodyInterface_GetFriction(bodyInterface: *JPH_BodyInterface, bodyID: JPH_BodyID) -> f32;
+    fn JPH_BodyInterface_SetFriction(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID, friction: f32);
+    fn JPH_BodyInterface_SetPosition(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, position: *mut JPH_RVec3, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_GetPosition(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_RVec3);
+    fn JPH_BodyInterface_SetRotation(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, rotation: *mut JPH_Quat, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_GetRotation(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_Quat);
+    fn JPH_BodyInterface_SetPositionAndRotation(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, position: *JPH_RVec3, rotation: *JPH_Quat, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_SetPositionAndRotationWhenChanged(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, position: *JPH_RVec3, rotation: *JPH_Quat, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_GetPositionAndRotation(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, position: *mut JPH_RVec3, rotation: *mut JPH_Quat);
+    fn JPH_BodyInterface_SetPositionRotationAndVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, position: *mut JPH_RVec3, rotation: *mut JPH_Quat, linearVelocity: *mut JPH_Vec3, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_GetCollisionGroup(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_CollisionGroup);
+    fn JPH_BodyInterface_SetCollisionGroup(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, group: *JPH_CollisionGroup);
+    fn JPH_BodyInterface_GetShape(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> *JPH_Shape;
+    fn JPH_BodyInterface_SetShape(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, shape: *JPH_Shape, updateMassProperties: bool, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_NotifyShapeChanged(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, previousCenterOfMass: *mut JPH_Vec3, updateMassProperties: bool, activationMode: JPH_Activation);
+    fn JPH_BodyInterface_ActivateBody(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID);
+    fn JPH_BodyInterface_ActivateBodies(bodyInterface: *mut JPH_BodyInterface, bodyIDs: *JPH_BodyID, count: u32);
+    fn JPH_BodyInterface_ActivateBodiesInAABox(bodyInterface: *mut JPH_BodyInterface, box: *JPH_AABox, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter);
+    fn JPH_BodyInterface_DeactivateBody(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID);
+    fn JPH_BodyInterface_DeactivateBodies(bodyInterface: *mut JPH_BodyInterface, bodyIDs: *JPH_BodyID, count: u32);
+    fn JPH_BodyInterface_IsActive(bodyInterface: *JPH_BodyInterface, bodyID: JPH_BodyID) -> bool;
+    fn JPH_BodyInterface_ResetSleepTimer(bodyInterface: *mut JPH_BodyInterface, bodyID: JPH_BodyID);
+    fn JPH_BodyInterface_GetObjectLayer(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> JPH_ObjectLayer;
+    fn JPH_BodyInterface_SetObjectLayer(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, layer: JPH_ObjectLayer);
+    fn JPH_BodyInterface_GetWorldTransform(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_RMat4);
+    fn JPH_BodyInterface_GetCenterOfMassTransform(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_RMat4);
+    fn JPH_BodyInterface_MoveKinematic(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, targetPosition: *mut JPH_RVec3, targetRotation: *mut JPH_Quat, deltaTime: f32);
+    fn JPH_BodyInterface_ApplyBuoyancyImpulse(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, surfacePosition: *JPH_RVec3, surfaceNormal: *JPH_Vec3, buoyancy: f32, linearDrag: f32, angularDrag: f32, fluidVelocity: *JPH_Vec3, gravity: *JPH_Vec3, deltaTime: f32) -> bool;
+    fn JPH_BodyInterface_SetLinearAndAngularVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, linearVelocity: *mut JPH_Vec3, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_GetLinearAndAngularVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, linearVelocity: *mut JPH_Vec3, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddLinearVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, linearVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddLinearAndAngularVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, linearVelocity: *mut JPH_Vec3, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_SetAngularVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_GetAngularVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, angularVelocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_GetPointVelocity(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, point: *mut JPH_RVec3, velocity: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddForce(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, force: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddForce2(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, force: *mut JPH_Vec3, point: *mut JPH_RVec3);
+    fn JPH_BodyInterface_AddTorque(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, torque: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddForceAndTorque(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, force: *mut JPH_Vec3, torque: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddImpulse(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, impulse: *mut JPH_Vec3);
+    fn JPH_BodyInterface_AddImpulse2(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, impulse: *mut JPH_Vec3, point: *mut JPH_RVec3);
+    fn JPH_BodyInterface_AddAngularImpulse(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, angularImpulse: *mut JPH_Vec3);
+    fn JPH_BodyInterface_SetMotionQuality(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, quality: JPH_MotionQuality);
+    fn JPH_BodyInterface_GetMotionQuality(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> JPH_MotionQuality;
+    fn JPH_BodyInterface_GetInverseInertia(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, result: *mut JPH_Mat4);
+    fn JPH_BodyInterface_SetGravityFactor(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, value: f32);
+    fn JPH_BodyInterface_GetGravityFactor(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> f32;
+    fn JPH_BodyInterface_SetUseManifoldReduction(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, value: bool);
+    fn JPH_BodyInterface_GetUseManifoldReduction(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> bool;
+    fn JPH_BodyInterface_SetUserData(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, inUserData: u64);
+    fn JPH_BodyInterface_GetUserData(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> u64;
+    fn JPH_BodyInterface_SetIsSensor(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, value: bool);
+    fn JPH_BodyInterface_IsSensor(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID) -> bool;
+    fn JPH_BodyInterface_GetMaterial(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID, subShapeID: JPH_SubShapeID) -> *JPH_PhysicsMaterial;
+    fn JPH_BodyInterface_InvalidateContactCache(bodyInterface: *mut JPH_BodyInterface, bodyId: JPH_BodyID);
+    fn JPH_BodyLockInterface_LockRead(lockInterface: *JPH_BodyLockInterface, bodyID: JPH_BodyID, outLock: *mut JPH_BodyLockRead);
+    fn JPH_BodyLockInterface_UnlockRead(lockInterface: *JPH_BodyLockInterface, ioLock: *mut JPH_BodyLockRead);
+    fn JPH_BodyLockInterface_LockWrite(lockInterface: *JPH_BodyLockInterface, bodyID: JPH_BodyID, outLock: *mut JPH_BodyLockWrite);
+    fn JPH_BodyLockInterface_UnlockWrite(lockInterface: *JPH_BodyLockInterface, ioLock: *mut JPH_BodyLockWrite);
+    fn JPH_BodyLockInterface_LockMultiRead(lockInterface: *JPH_BodyLockInterface, bodyIDs: *JPH_BodyID, count: u32) -> *mut JPH_BodyLockMultiRead;
+    fn JPH_BodyLockMultiRead_Destroy(ioLock: *mut JPH_BodyLockMultiRead);
+    fn JPH_BodyLockMultiRead_GetBody(ioLock: *mut JPH_BodyLockMultiRead, bodyIndex: u32) -> *JPH_Body;
+    fn JPH_BodyLockInterface_LockMultiWrite(lockInterface: *JPH_BodyLockInterface, bodyIDs: *JPH_BodyID, count: u32) -> *mut JPH_BodyLockMultiWrite;
+    fn JPH_BodyLockMultiWrite_Destroy(ioLock: *mut JPH_BodyLockMultiWrite);
+    fn JPH_BodyLockMultiWrite_GetBody(ioLock: *mut JPH_BodyLockMultiWrite, bodyIndex: u32) -> *mut JPH_Body;
+    fn JPH_MotionProperties_GetAllowedDOFs(properties: *JPH_MotionProperties) -> JPH_AllowedDOFs;
+    fn JPH_MotionProperties_SetLinearDamping(properties: *mut JPH_MotionProperties, damping: f32);
+    fn JPH_MotionProperties_GetLinearDamping(properties: *JPH_MotionProperties) -> f32;
+    fn JPH_MotionProperties_SetAngularDamping(properties: *mut JPH_MotionProperties, damping: f32);
+    fn JPH_MotionProperties_GetAngularDamping(properties: *JPH_MotionProperties) -> f32;
+    fn JPH_MotionProperties_SetMassProperties(properties: *mut JPH_MotionProperties, allowedDOFs: JPH_AllowedDOFs, massProperties: *JPH_MassProperties);
+    fn JPH_MotionProperties_GetInverseMassUnchecked(properties: *mut JPH_MotionProperties) -> f32;
+    fn JPH_MotionProperties_SetInverseMass(properties: *mut JPH_MotionProperties, inverseMass: f32);
+    fn JPH_MotionProperties_GetInverseInertiaDiagonal(properties: *mut JPH_MotionProperties, result: *mut JPH_Vec3);
+    fn JPH_MotionProperties_GetInertiaRotation(properties: *mut JPH_MotionProperties, result: *mut JPH_Quat);
+    fn JPH_MotionProperties_SetInverseInertia(properties: *mut JPH_MotionProperties, diagonal: *mut JPH_Vec3, rot: *mut JPH_Quat);
+    fn JPH_MotionProperties_ScaleToMass(properties: *mut JPH_MotionProperties, mass: f32);
+    fn JPH_RayCast_GetPointOnRay(origin: *JPH_Vec3, direction: *JPH_Vec3, fraction: f32, result: *mut JPH_Vec3);
+    fn JPH_RRayCast_GetPointOnRay(origin: *JPH_RVec3, direction: *JPH_Vec3, fraction: f32, result: *mut JPH_RVec3);
+    fn JPH_MassProperties_DecomposePrincipalMomentsOfInertia(properties: *mut JPH_MassProperties, rotation: *mut JPH_Mat4, diagonal: *mut JPH_Vec3);
+    fn JPH_MassProperties_ScaleToMass(properties: *mut JPH_MassProperties, mass: f32);
+    fn JPH_MassProperties_GetEquivalentSolidBoxSize(mass: f32, inertiaDiagonal: *JPH_Vec3, result: *mut JPH_Vec3);
+    fn JPH_CollideShapeSettings_Init(settings: *mut JPH_CollideShapeSettings);
+    fn JPH_ShapeCastSettings_Init(settings: *mut JPH_ShapeCastSettings);
+    fn JPH_BroadPhaseQuery_CastRay(query: *JPH_BroadPhaseQuery, origin: *JPH_Vec3, direction: *JPH_Vec3, callback: JPH_RayCastBodyCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter) -> bool;
+    fn JPH_BroadPhaseQuery_CastRay2(query: *JPH_BroadPhaseQuery, origin: *JPH_Vec3, direction: *JPH_Vec3, collectorType: JPH_CollisionCollectorType, callback: JPH_RayCastBodyResultCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter) -> bool;
+    fn JPH_BroadPhaseQuery_CollideAABox(query: *JPH_BroadPhaseQuery, box: *JPH_AABox, callback: JPH_CollideShapeBodyCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter) -> bool;
+    fn JPH_BroadPhaseQuery_CollideSphere(query: *JPH_BroadPhaseQuery, center: *JPH_Vec3, radius: f32, callback: JPH_CollideShapeBodyCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter) -> bool;
+    fn JPH_BroadPhaseQuery_CollidePoint(query: *JPH_BroadPhaseQuery, point: *JPH_Vec3, callback: JPH_CollideShapeBodyCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CastRay(query: *JPH_NarrowPhaseQuery, origin: *JPH_RVec3, direction: *JPH_Vec3, hit: *mut JPH_RayCastResult, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CastRay2(query: *JPH_NarrowPhaseQuery, origin: *JPH_RVec3, direction: *JPH_Vec3, rayCastSettings: *JPH_RayCastSettings, callback: JPH_CastRayCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CastRay3(query: *JPH_NarrowPhaseQuery, origin: *JPH_RVec3, direction: *JPH_Vec3, rayCastSettings: *JPH_RayCastSettings, collectorType: JPH_CollisionCollectorType, callback: JPH_CastRayResultCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CollidePoint(query: *JPH_NarrowPhaseQuery, point: *JPH_RVec3, callback: JPH_CollidePointCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CollidePoint2(query: *JPH_NarrowPhaseQuery, point: *JPH_RVec3, collectorType: JPH_CollisionCollectorType, callback: JPH_CollidePointResultCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CollideShape(query: *JPH_NarrowPhaseQuery, shape: *JPH_Shape, scale: *JPH_Vec3, centerOfMassTransform: *JPH_RMat4, settings: *JPH_CollideShapeSettings, baseOffset: *mut JPH_RVec3, callback: JPH_CollideShapeCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CollideShape2(query: *JPH_NarrowPhaseQuery, shape: *JPH_Shape, scale: *JPH_Vec3, centerOfMassTransform: *JPH_RMat4, settings: *JPH_CollideShapeSettings, baseOffset: *mut JPH_RVec3, collectorType: JPH_CollisionCollectorType, callback: JPH_CollideShapeResultCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CastShape(query: *JPH_NarrowPhaseQuery, shape: *JPH_Shape, worldTransform: *JPH_RMat4, direction: *JPH_Vec3, settings: *JPH_ShapeCastSettings, baseOffset: *mut JPH_RVec3, callback: JPH_CastShapeCollectorCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_NarrowPhaseQuery_CastShape2(query: *JPH_NarrowPhaseQuery, shape: *JPH_Shape, worldTransform: *JPH_RMat4, direction: *JPH_Vec3, settings: *JPH_ShapeCastSettings, baseOffset: *mut JPH_RVec3, collectorType: JPH_CollisionCollectorType, callback: JPH_CastShapeResultCallback, userData: *mut void, broadPhaseLayerFilter: *JPH_BroadPhaseLayerFilter, objectLayerFilter: *JPH_ObjectLayerFilter, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_Body_GetID(body: *JPH_Body) -> JPH_BodyID;
+    fn JPH_Body_GetBodyType(body: *JPH_Body) -> JPH_BodyType;
+    fn JPH_Body_IsRigidBody(body: *JPH_Body) -> bool;
+    fn JPH_Body_IsSoftBody(body: *JPH_Body) -> bool;
+    fn JPH_Body_IsActive(body: *JPH_Body) -> bool;
+    fn JPH_Body_IsStatic(body: *JPH_Body) -> bool;
+    fn JPH_Body_IsKinematic(body: *JPH_Body) -> bool;
+    fn JPH_Body_IsDynamic(body: *JPH_Body) -> bool;
+    fn JPH_Body_CanBeKinematicOrDynamic(body: *JPH_Body) -> bool;
+    fn JPH_Body_SetIsSensor(body: *mut JPH_Body, value: bool);
+    fn JPH_Body_IsSensor(body: *JPH_Body) -> bool;
+    fn JPH_Body_SetCollideKinematicVsNonDynamic(body: *mut JPH_Body, value: bool);
+    fn JPH_Body_GetCollideKinematicVsNonDynamic(body: *JPH_Body) -> bool;
+    fn JPH_Body_SetUseManifoldReduction(body: *mut JPH_Body, value: bool);
+    fn JPH_Body_GetUseManifoldReduction(body: *JPH_Body) -> bool;
+    fn JPH_Body_GetUseManifoldReductionWithBody(body: *JPH_Body, other: *JPH_Body) -> bool;
+    fn JPH_Body_SetApplyGyroscopicForce(body: *mut JPH_Body, value: bool);
+    fn JPH_Body_GetApplyGyroscopicForce(body: *JPH_Body) -> bool;
+    fn JPH_Body_SetEnhancedInternalEdgeRemoval(body: *mut JPH_Body, value: bool);
+    fn JPH_Body_GetEnhancedInternalEdgeRemoval(body: *JPH_Body) -> bool;
+    fn JPH_Body_GetEnhancedInternalEdgeRemovalWithBody(body: *JPH_Body, other: *JPH_Body) -> bool;
+    fn JPH_Body_GetMotionType(body: *JPH_Body) -> JPH_MotionType;
+    fn JPH_Body_SetMotionType(body: *mut JPH_Body, motionType: JPH_MotionType);
+    fn JPH_Body_GetBroadPhaseLayer(body: *JPH_Body) -> JPH_BroadPhaseLayer;
+    fn JPH_Body_GetObjectLayer(body: *JPH_Body) -> JPH_ObjectLayer;
+    fn JPH_Body_GetCollisionGroup(body: *JPH_Body, result: *mut JPH_CollisionGroup);
+    fn JPH_Body_SetCollisionGroup(body: *mut JPH_Body, value: *JPH_CollisionGroup);
+    fn JPH_Body_GetAllowSleeping(body: *mut JPH_Body) -> bool;
+    fn JPH_Body_SetAllowSleeping(body: *mut JPH_Body, allowSleeping: bool);
+    fn JPH_Body_ResetSleepTimer(body: *mut JPH_Body);
+    fn JPH_Body_GetFriction(body: *JPH_Body) -> f32;
+    fn JPH_Body_SetFriction(body: *mut JPH_Body, friction: f32);
+    fn JPH_Body_GetRestitution(body: *JPH_Body) -> f32;
+    fn JPH_Body_SetRestitution(body: *mut JPH_Body, restitution: f32);
+    fn JPH_Body_GetLinearVelocity(body: *mut JPH_Body, velocity: *mut JPH_Vec3);
+    fn JPH_Body_SetLinearVelocity(body: *mut JPH_Body, velocity: *JPH_Vec3);
+    fn JPH_Body_SetLinearVelocityClamped(body: *mut JPH_Body, velocity: *JPH_Vec3);
+    fn JPH_Body_GetAngularVelocity(body: *mut JPH_Body, velocity: *mut JPH_Vec3);
+    fn JPH_Body_SetAngularVelocity(body: *mut JPH_Body, velocity: *JPH_Vec3);
+    fn JPH_Body_SetAngularVelocityClamped(body: *mut JPH_Body, velocity: *JPH_Vec3);
+    fn JPH_Body_GetPointVelocityCOM(body: *mut JPH_Body, pointRelativeToCOM: *JPH_Vec3, velocity: *mut JPH_Vec3);
+    fn JPH_Body_GetPointVelocity(body: *mut JPH_Body, point: *JPH_RVec3, velocity: *mut JPH_Vec3);
+    fn JPH_Body_AddForce(body: *mut JPH_Body, force: *JPH_Vec3);
+    fn JPH_Body_AddForceAtPosition(body: *mut JPH_Body, force: *JPH_Vec3, position: *JPH_RVec3);
+    fn JPH_Body_AddTorque(body: *mut JPH_Body, force: *JPH_Vec3);
+    fn JPH_Body_GetAccumulatedForce(body: *mut JPH_Body, force: *mut JPH_Vec3);
+    fn JPH_Body_GetAccumulatedTorque(body: *mut JPH_Body, force: *mut JPH_Vec3);
+    fn JPH_Body_ResetForce(body: *mut JPH_Body);
+    fn JPH_Body_ResetTorque(body: *mut JPH_Body);
+    fn JPH_Body_ResetMotion(body: *mut JPH_Body);
+    fn JPH_Body_GetInverseInertia(body: *mut JPH_Body, result: *mut JPH_Mat4);
+    fn JPH_Body_AddImpulse(body: *mut JPH_Body, impulse: *JPH_Vec3);
+    fn JPH_Body_AddImpulseAtPosition(body: *mut JPH_Body, impulse: *JPH_Vec3, position: *JPH_RVec3);
+    fn JPH_Body_AddAngularImpulse(body: *mut JPH_Body, angularImpulse: *JPH_Vec3);
+    fn JPH_Body_MoveKinematic(body: *mut JPH_Body, targetPosition: *mut JPH_RVec3, targetRotation: *mut JPH_Quat, deltaTime: f32);
+    fn JPH_Body_ApplyBuoyancyImpulse(body: *mut JPH_Body, surfacePosition: *JPH_RVec3, surfaceNormal: *JPH_Vec3, buoyancy: f32, linearDrag: f32, angularDrag: f32, fluidVelocity: *JPH_Vec3, gravity: *JPH_Vec3, deltaTime: f32) -> bool;
+    fn JPH_Body_IsInBroadPhase(body: *mut JPH_Body) -> bool;
+    fn JPH_Body_IsCollisionCacheInvalid(body: *mut JPH_Body) -> bool;
+    fn JPH_Body_GetShape(body: *mut JPH_Body) -> *JPH_Shape;
+    fn JPH_Body_GetPosition(body: *JPH_Body, result: *mut JPH_RVec3);
+    fn JPH_Body_GetRotation(body: *JPH_Body, result: *mut JPH_Quat);
+    fn JPH_Body_GetWorldTransform(body: *JPH_Body, result: *mut JPH_RMat4);
+    fn JPH_Body_GetCenterOfMassPosition(body: *JPH_Body, result: *mut JPH_RVec3);
+    fn JPH_Body_GetCenterOfMassTransform(body: *JPH_Body, result: *mut JPH_RMat4);
+    fn JPH_Body_GetInverseCenterOfMassTransform(body: *JPH_Body, result: *mut JPH_RMat4);
+    fn JPH_Body_GetWorldSpaceBounds(body: *JPH_Body, result: *mut JPH_AABox);
+    fn JPH_Body_GetWorldSpaceSurfaceNormal(body: *JPH_Body, subShapeID: JPH_SubShapeID, position: *JPH_RVec3, normal: *mut JPH_Vec3);
+    fn JPH_Body_GetMotionProperties(body: *mut JPH_Body) -> *mut JPH_MotionProperties;
+    fn JPH_Body_GetMotionPropertiesUnchecked(body: *mut JPH_Body) -> *mut JPH_MotionProperties;
+    fn JPH_Body_SetUserData(body: *mut JPH_Body, userData: u64);
+    fn JPH_Body_GetUserData(body: *mut JPH_Body) -> u64;
+    fn JPH_Body_GetFixedToWorldBody() -> *mut JPH_Body;
+    fn JPH_Body_GetSoftBodyVertexCount(body: *JPH_Body) -> u32;
+    fn JPH_Body_GetSoftBodyVertexPosition(body: *JPH_Body, index: u32, outPos: *mut JPH_Vec3);
+    fn JPH_Body_GetSoftBodyVertexPositions(body: *JPH_Body, outPositions: *mut JPH_Vec3, capacity: u32, outCount: *mut u32);
+    fn JPH_BroadPhaseLayerFilter_SetProcs(procs: *JPH_BroadPhaseLayerFilter_Procs);
+    fn JPH_BroadPhaseLayerFilter_Create(userData: *mut void) -> *mut JPH_BroadPhaseLayerFilter;
+    fn JPH_BroadPhaseLayerFilter_Destroy(filter: *mut JPH_BroadPhaseLayerFilter);
+    fn JPH_ObjectLayerFilter_SetProcs(procs: *JPH_ObjectLayerFilter_Procs);
+    fn JPH_ObjectLayerFilter_Create(userData: *mut void) -> *mut JPH_ObjectLayerFilter;
+    fn JPH_ObjectLayerFilter_Destroy(filter: *mut JPH_ObjectLayerFilter);
+    fn JPH_BodyFilter_SetProcs(procs: *JPH_BodyFilter_Procs);
+    fn JPH_BodyFilter_Create(userData: *mut void) -> *mut JPH_BodyFilter;
+    fn JPH_BodyFilter_Destroy(filter: *mut JPH_BodyFilter);
+    fn JPH_ShapeFilter_SetProcs(procs: *JPH_ShapeFilter_Procs);
+    fn JPH_ShapeFilter_Create(userData: *mut void) -> *mut JPH_ShapeFilter;
+    fn JPH_ShapeFilter_Destroy(filter: *mut JPH_ShapeFilter);
+    fn JPH_ShapeFilter_GetBodyID2(filter: *mut JPH_ShapeFilter) -> JPH_BodyID;
+    fn JPH_ShapeFilter_SetBodyID2(filter: *mut JPH_ShapeFilter, id: JPH_BodyID);
+    fn JPH_SimShapeFilter_SetProcs(procs: *JPH_SimShapeFilter_Procs);
+    fn JPH_SimShapeFilter_Create(userData: *mut void) -> *mut JPH_SimShapeFilter;
+    fn JPH_SimShapeFilter_Destroy(filter: *mut JPH_SimShapeFilter);
+    fn JPH_ContactListener_SetProcs(procs: *JPH_ContactListener_Procs);
+    fn JPH_ContactListener_Create(userData: *mut void) -> *mut JPH_ContactListener;
+    fn JPH_ContactListener_Destroy(listener: *mut JPH_ContactListener);
+    fn JPH_BodyActivationListener_SetProcs(procs: *JPH_BodyActivationListener_Procs);
+    fn JPH_BodyActivationListener_Create(userData: *mut void) -> *mut JPH_BodyActivationListener;
+    fn JPH_BodyActivationListener_Destroy(listener: *mut JPH_BodyActivationListener);
+    fn JPH_BodyDrawFilter_SetProcs(procs: *JPH_BodyDrawFilter_Procs);
+    fn JPH_BodyDrawFilter_Create(userData: *mut void) -> *mut JPH_BodyDrawFilter;
+    fn JPH_BodyDrawFilter_Destroy(filter: *mut JPH_BodyDrawFilter);
+    fn JPH_ContactManifold_GetWorldSpaceNormal(manifold: *JPH_ContactManifold, result: *mut JPH_Vec3);
+    fn JPH_ContactManifold_GetPenetrationDepth(manifold: *JPH_ContactManifold) -> f32;
+    fn JPH_ContactManifold_GetSubShapeID1(manifold: *JPH_ContactManifold) -> JPH_SubShapeID;
+    fn JPH_ContactManifold_GetSubShapeID2(manifold: *JPH_ContactManifold) -> JPH_SubShapeID;
+    fn JPH_ContactManifold_GetPointCount(manifold: *JPH_ContactManifold) -> u32;
+    fn JPH_ContactManifold_GetWorldSpaceContactPointOn1(manifold: *JPH_ContactManifold, index: u32, result: *mut JPH_RVec3);
+    fn JPH_ContactManifold_GetWorldSpaceContactPointOn2(manifold: *JPH_ContactManifold, index: u32, result: *mut JPH_RVec3);
+    fn JPH_CharacterBase_Destroy(character: *mut JPH_CharacterBase);
+    fn JPH_CharacterBase_GetCosMaxSlopeAngle(character: *mut JPH_CharacterBase) -> f32;
+    fn JPH_CharacterBase_SetMaxSlopeAngle(character: *mut JPH_CharacterBase, maxSlopeAngle: f32);
+    fn JPH_CharacterBase_GetUp(character: *mut JPH_CharacterBase, result: *mut JPH_Vec3);
+    fn JPH_CharacterBase_SetUp(character: *mut JPH_CharacterBase, value: *JPH_Vec3);
+    fn JPH_CharacterBase_IsSlopeTooSteep(character: *mut JPH_CharacterBase, value: *JPH_Vec3) -> bool;
+    fn JPH_CharacterBase_GetShape(character: *mut JPH_CharacterBase) -> *JPH_Shape;
+    fn JPH_CharacterBase_GetGroundState(character: *mut JPH_CharacterBase) -> JPH_GroundState;
+    fn JPH_CharacterBase_IsSupported(character: *mut JPH_CharacterBase) -> bool;
+    fn JPH_CharacterBase_GetGroundPosition(character: *mut JPH_CharacterBase, position: *mut JPH_RVec3);
+    fn JPH_CharacterBase_GetGroundNormal(character: *mut JPH_CharacterBase, normal: *mut JPH_Vec3);
+    fn JPH_CharacterBase_GetGroundVelocity(character: *mut JPH_CharacterBase, velocity: *mut JPH_Vec3);
+    fn JPH_CharacterBase_GetGroundMaterial(character: *mut JPH_CharacterBase) -> *JPH_PhysicsMaterial;
+    fn JPH_CharacterBase_GetGroundBodyId(character: *mut JPH_CharacterBase) -> JPH_BodyID;
+    fn JPH_CharacterBase_GetGroundSubShapeId(character: *mut JPH_CharacterBase) -> JPH_SubShapeID;
+    fn JPH_CharacterBase_GetGroundUserData(character: *mut JPH_CharacterBase) -> u64;
+    fn JPH_CharacterSettings_Init(settings: *mut JPH_CharacterSettings);
+    fn JPH_Character_Create(settings: *JPH_CharacterSettings, position: *JPH_RVec3, rotation: *JPH_Quat, userData: u64, system: *mut JPH_PhysicsSystem) -> *mut JPH_Character;
+    fn JPH_Character_AddToPhysicsSystem(character: *mut JPH_Character, activationMode: JPH_Activation, lockBodies: bool);
+    fn JPH_Character_RemoveFromPhysicsSystem(character: *mut JPH_Character, lockBodies: bool);
+    fn JPH_Character_Activate(character: *mut JPH_Character, lockBodies: bool);
+    fn JPH_Character_PostSimulation(character: *mut JPH_Character, maxSeparationDistance: f32, lockBodies: bool);
+    fn JPH_Character_SetLinearAndAngularVelocity(character: *mut JPH_Character, linearVelocity: *mut JPH_Vec3, angularVelocity: *mut JPH_Vec3, lockBodies: bool);
+    fn JPH_Character_GetLinearVelocity(character: *mut JPH_Character, result: *mut JPH_Vec3);
+    fn JPH_Character_SetLinearVelocity(character: *mut JPH_Character, value: *JPH_Vec3, lockBodies: bool);
+    fn JPH_Character_AddLinearVelocity(character: *mut JPH_Character, value: *JPH_Vec3, lockBodies: bool);
+    fn JPH_Character_AddImpulse(character: *mut JPH_Character, value: *JPH_Vec3, lockBodies: bool);
+    fn JPH_Character_GetBodyID(character: *JPH_Character) -> JPH_BodyID;
+    fn JPH_Character_GetPositionAndRotation(character: *mut JPH_Character, position: *mut JPH_RVec3, rotation: *mut JPH_Quat, lockBodies: bool);
+    fn JPH_Character_SetPositionAndRotation(character: *mut JPH_Character, position: *JPH_RVec3, rotation: *JPH_Quat, activationMode: JPH_Activation, lockBodies: bool);
+    fn JPH_Character_GetPosition(character: *mut JPH_Character, position: *mut JPH_RVec3, lockBodies: bool);
+    fn JPH_Character_SetPosition(character: *mut JPH_Character, position: *JPH_RVec3, activationMode: JPH_Activation, lockBodies: bool);
+    fn JPH_Character_GetRotation(character: *mut JPH_Character, rotation: *mut JPH_Quat, lockBodies: bool);
+    fn JPH_Character_SetRotation(character: *mut JPH_Character, rotation: *JPH_Quat, activationMode: JPH_Activation, lockBodies: bool);
+    fn JPH_Character_GetCenterOfMassPosition(character: *mut JPH_Character, result: *mut JPH_RVec3, lockBodies: bool);
+    fn JPH_Character_GetWorldTransform(character: *mut JPH_Character, result: *mut JPH_RMat4, lockBodies: bool);
+    fn JPH_Character_GetLayer(character: *JPH_Character) -> JPH_ObjectLayer;
+    fn JPH_Character_SetLayer(character: *mut JPH_Character, value: JPH_ObjectLayer, lockBodies: bool);
+    fn JPH_Character_SetShape(character: *mut JPH_Character, shape: *JPH_Shape, maxPenetrationDepth: f32, lockBodies: bool);
+    fn JPH_CharacterVirtualSettings_Init(settings: *mut JPH_CharacterVirtualSettings);
+    fn JPH_CharacterVirtual_Create(settings: *JPH_CharacterVirtualSettings, position: *JPH_RVec3, rotation: *JPH_Quat, userData: u64, system: *mut JPH_PhysicsSystem) -> *mut JPH_CharacterVirtual;
+    fn JPH_CharacterVirtual_GetID(character: *JPH_CharacterVirtual) -> JPH_CharacterID;
+    fn JPH_CharacterVirtual_SetListener(character: *mut JPH_CharacterVirtual, listener: *mut JPH_CharacterContactListener);
+    fn JPH_CharacterVirtual_SetCharacterVsCharacterCollision(character: *mut JPH_CharacterVirtual, characterVsCharacterCollision: *mut JPH_CharacterVsCharacterCollision);
+    fn JPH_CharacterVirtual_GetLinearVelocity(character: *mut JPH_CharacterVirtual, velocity: *mut JPH_Vec3);
+    fn JPH_CharacterVirtual_SetLinearVelocity(character: *mut JPH_CharacterVirtual, velocity: *JPH_Vec3);
+    fn JPH_CharacterVirtual_GetPosition(character: *mut JPH_CharacterVirtual, position: *mut JPH_RVec3);
+    fn JPH_CharacterVirtual_SetPosition(character: *mut JPH_CharacterVirtual, position: *JPH_RVec3);
+    fn JPH_CharacterVirtual_GetRotation(character: *mut JPH_CharacterVirtual, rotation: *mut JPH_Quat);
+    fn JPH_CharacterVirtual_SetRotation(character: *mut JPH_CharacterVirtual, rotation: *JPH_Quat);
+    fn JPH_CharacterVirtual_GetWorldTransform(character: *mut JPH_CharacterVirtual, result: *mut JPH_RMat4);
+    fn JPH_CharacterVirtual_GetCenterOfMassTransform(character: *mut JPH_CharacterVirtual, result: *mut JPH_RMat4);
+    fn JPH_CharacterVirtual_GetMass(character: *mut JPH_CharacterVirtual) -> f32;
+    fn JPH_CharacterVirtual_SetMass(character: *mut JPH_CharacterVirtual, value: f32);
+    fn JPH_CharacterVirtual_GetMaxStrength(character: *mut JPH_CharacterVirtual) -> f32;
+    fn JPH_CharacterVirtual_SetMaxStrength(character: *mut JPH_CharacterVirtual, value: f32);
+    fn JPH_CharacterVirtual_GetPenetrationRecoverySpeed(character: *mut JPH_CharacterVirtual) -> f32;
+    fn JPH_CharacterVirtual_SetPenetrationRecoverySpeed(character: *mut JPH_CharacterVirtual, value: f32);
+    fn JPH_CharacterVirtual_GetEnhancedInternalEdgeRemoval(character: *mut JPH_CharacterVirtual) -> bool;
+    fn JPH_CharacterVirtual_SetEnhancedInternalEdgeRemoval(character: *mut JPH_CharacterVirtual, value: bool);
+    fn JPH_CharacterVirtual_GetCharacterPadding(character: *mut JPH_CharacterVirtual) -> f32;
+    fn JPH_CharacterVirtual_GetMaxNumHits(character: *mut JPH_CharacterVirtual) -> u32;
+    fn JPH_CharacterVirtual_SetMaxNumHits(character: *mut JPH_CharacterVirtual, value: u32);
+    fn JPH_CharacterVirtual_GetHitReductionCosMaxAngle(character: *mut JPH_CharacterVirtual) -> f32;
+    fn JPH_CharacterVirtual_SetHitReductionCosMaxAngle(character: *mut JPH_CharacterVirtual, value: f32);
+    fn JPH_CharacterVirtual_GetMaxHitsExceeded(character: *mut JPH_CharacterVirtual) -> bool;
+    fn JPH_CharacterVirtual_GetShapeOffset(character: *mut JPH_CharacterVirtual, result: *mut JPH_Vec3);
+    fn JPH_CharacterVirtual_SetShapeOffset(character: *mut JPH_CharacterVirtual, value: *JPH_Vec3);
+    fn JPH_CharacterVirtual_GetUserData(character: *JPH_CharacterVirtual) -> u64;
+    fn JPH_CharacterVirtual_SetUserData(character: *mut JPH_CharacterVirtual, value: u64);
+    fn JPH_CharacterVirtual_GetInnerBodyID(character: *JPH_CharacterVirtual) -> JPH_BodyID;
+    fn JPH_CharacterVirtual_CancelVelocityTowardsSteepSlopes(character: *mut JPH_CharacterVirtual, desiredVelocity: *JPH_Vec3, velocity: *mut JPH_Vec3);
+    fn JPH_CharacterVirtual_StartTrackingContactChanges(character: *mut JPH_CharacterVirtual);
+    fn JPH_CharacterVirtual_FinishTrackingContactChanges(character: *mut JPH_CharacterVirtual);
+    fn JPH_CharacterVirtual_Update(character: *mut JPH_CharacterVirtual, deltaTime: f32, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter);
+    fn JPH_CharacterVirtual_ExtendedUpdate(character: *mut JPH_CharacterVirtual, deltaTime: f32, settings: *JPH_ExtendedUpdateSettings, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter);
+    fn JPH_CharacterVirtual_RefreshContacts(character: *mut JPH_CharacterVirtual, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter);
+    fn JPH_CharacterVirtual_CanWalkStairs(character: *mut JPH_CharacterVirtual, linearVelocity: *JPH_Vec3) -> bool;
+    fn JPH_CharacterVirtual_WalkStairs(character: *mut JPH_CharacterVirtual, deltaTime: f32, stepUp: *JPH_Vec3, stepForward: *JPH_Vec3, stepForwardTest: *JPH_Vec3, stepDownExtra: *JPH_Vec3, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_CharacterVirtual_StickToFloor(character: *mut JPH_CharacterVirtual, stepDown: *JPH_Vec3, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_CharacterVirtual_UpdateGroundVelocity(character: *mut JPH_CharacterVirtual);
+    fn JPH_CharacterVirtual_SetShape(character: *mut JPH_CharacterVirtual, shape: *JPH_Shape, maxPenetrationDepth: f32, layer: JPH_ObjectLayer, system: *mut JPH_PhysicsSystem, bodyFilter: *JPH_BodyFilter, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_CharacterVirtual_SetInnerBodyShape(character: *mut JPH_CharacterVirtual, shape: *JPH_Shape);
+    fn JPH_CharacterVirtual_GetNumActiveContacts(character: *mut JPH_CharacterVirtual) -> u32;
+    fn JPH_CharacterVirtual_GetActiveContact(character: *mut JPH_CharacterVirtual, index: u32, result: *mut JPH_CharacterContact);
+    fn JPH_CharacterVirtual_HasCollidedWithBody(character: *mut JPH_CharacterVirtual, body: JPH_BodyID) -> bool;
+    fn JPH_CharacterVirtual_HasCollidedWith(character: *mut JPH_CharacterVirtual, other: JPH_CharacterID) -> bool;
+    fn JPH_CharacterVirtual_HasCollidedWithCharacter(character: *mut JPH_CharacterVirtual, other: *JPH_CharacterVirtual) -> bool;
+    fn JPH_CharacterContactListener_SetProcs(procs: *JPH_CharacterContactListener_Procs);
+    fn JPH_CharacterContactListener_Create(userData: *mut void) -> *mut JPH_CharacterContactListener;
+    fn JPH_CharacterContactListener_Destroy(listener: *mut JPH_CharacterContactListener);
+    fn JPH_CharacterVsCharacterCollision_SetProcs(procs: *JPH_CharacterVsCharacterCollision_Procs);
+    fn JPH_CharacterVsCharacterCollision_Create(userData: *mut void) -> *mut JPH_CharacterVsCharacterCollision;
+    fn JPH_CharacterVsCharacterCollision_CreateSimple() -> *mut JPH_CharacterVsCharacterCollision;
+    fn JPH_CharacterVsCharacterCollisionSimple_AddCharacter(characterVsCharacter: *mut JPH_CharacterVsCharacterCollision, character: *mut JPH_CharacterVirtual);
+    fn JPH_CharacterVsCharacterCollisionSimple_RemoveCharacter(characterVsCharacter: *mut JPH_CharacterVsCharacterCollision, character: *mut JPH_CharacterVirtual);
+    fn JPH_CharacterVsCharacterCollision_Destroy(listener: *mut JPH_CharacterVsCharacterCollision);
+    fn JPH_CollisionDispatch_CollideShapeVsShape(shape1: *JPH_Shape, shape2: *JPH_Shape, scale1: *JPH_Vec3, scale2: *JPH_Vec3, centerOfMassTransform1: *JPH_Mat4, centerOfMassTransform2: *JPH_Mat4, collideShapeSettings: *JPH_CollideShapeSettings, callback: JPH_CollideShapeCollectorCallback, userData: *mut void, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_CollisionDispatch_CastShapeVsShapeLocalSpace(direction: *JPH_Vec3, shape1: *JPH_Shape, shape2: *JPH_Shape, scale1InShape2LocalSpace: *JPH_Vec3, scale2: *JPH_Vec3, centerOfMassTransform1InShape2LocalSpace: *mut JPH_Mat4, centerOfMassWorldTransform2: *mut JPH_Mat4, shapeCastSettings: *JPH_ShapeCastSettings, callback: JPH_CastShapeCollectorCallback, userData: *mut void, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_CollisionDispatch_CastShapeVsShapeWorldSpace(direction: *JPH_Vec3, shape1: *JPH_Shape, shape2: *JPH_Shape, scale1: *JPH_Vec3, inScale2: *JPH_Vec3, centerOfMassWorldTransform1: *JPH_Mat4, centerOfMassWorldTransform2: *JPH_Mat4, shapeCastSettings: *JPH_ShapeCastSettings, callback: JPH_CastShapeCollectorCallback, userData: *mut void, shapeFilter: *JPH_ShapeFilter) -> bool;
+    fn JPH_DebugRenderer_SetProcs(procs: *JPH_DebugRenderer_Procs);
+    fn JPH_DebugRenderer_Create(userData: *mut void) -> *mut JPH_DebugRenderer;
+    fn JPH_DebugRenderer_Destroy(renderer: *mut JPH_DebugRenderer);
+    fn JPH_DebugRenderer_NextFrame(renderer: *mut JPH_DebugRenderer);
+    fn JPH_DebugRenderer_SetCameraPos(renderer: *mut JPH_DebugRenderer, position: *JPH_RVec3);
+    fn JPH_DebugRenderer_DrawLine(renderer: *mut JPH_DebugRenderer, from: *JPH_RVec3, to: *JPH_RVec3, color: JPH_Color);
+    fn JPH_DebugRenderer_DrawWireBox(renderer: *mut JPH_DebugRenderer, box: *JPH_AABox, color: JPH_Color);
+    fn JPH_DebugRenderer_DrawWireBox2(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, box: *JPH_AABox, color: JPH_Color);
+    fn JPH_DebugRenderer_DrawMarker(renderer: *mut JPH_DebugRenderer, position: *JPH_RVec3, color: JPH_Color, size: f32);
+    fn JPH_DebugRenderer_DrawArrow(renderer: *mut JPH_DebugRenderer, from: *JPH_RVec3, to: *JPH_RVec3, color: JPH_Color, size: f32);
+    fn JPH_DebugRenderer_DrawCoordinateSystem(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, size: f32);
+    fn JPH_DebugRenderer_DrawPlane(renderer: *mut JPH_DebugRenderer, point: *JPH_RVec3, normal: *JPH_Vec3, color: JPH_Color, size: f32);
+    fn JPH_DebugRenderer_DrawWireTriangle(renderer: *mut JPH_DebugRenderer, v1: *JPH_RVec3, v2: *JPH_RVec3, v3: *JPH_RVec3, color: JPH_Color);
+    fn JPH_DebugRenderer_DrawWireSphere(renderer: *mut JPH_DebugRenderer, center: *JPH_RVec3, radius: f32, color: JPH_Color, level: i32);
+    fn JPH_DebugRenderer_DrawWireUnitSphere(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, color: JPH_Color, level: i32);
+    fn JPH_DebugRenderer_DrawTriangle(renderer: *mut JPH_DebugRenderer, v1: *JPH_RVec3, v2: *JPH_RVec3, v3: *JPH_RVec3, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow);
+    fn JPH_DebugRenderer_DrawBox(renderer: *mut JPH_DebugRenderer, box: *JPH_AABox, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawBox2(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, box: *JPH_AABox, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawSphere(renderer: *mut JPH_DebugRenderer, center: *JPH_RVec3, radius: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawUnitSphere(renderer: *mut JPH_DebugRenderer, matrix: JPH_RMat4, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawCapsule(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, halfHeightOfCylinder: f32, radius: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawCylinder(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, halfHeight: f32, radius: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawOpenCone(renderer: *mut JPH_DebugRenderer, top: *JPH_RVec3, axis: *JPH_Vec3, perpendicular: *JPH_Vec3, halfAngle: f32, length: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawSwingConeLimits(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, swingYHalfAngle: f32, swingZHalfAngle: f32, edgeLength: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawSwingPyramidLimits(renderer: *mut JPH_DebugRenderer, matrix: *JPH_RMat4, minSwingYAngle: f32, maxSwingYAngle: f32, minSwingZAngle: f32, maxSwingZAngle: f32, edgeLength: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawPie(renderer: *mut JPH_DebugRenderer, center: *JPH_RVec3, radius: f32, normal: *JPH_Vec3, axis: *JPH_Vec3, minAngle: f32, maxAngle: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_DebugRenderer_DrawTaperedCylinder(renderer: *mut JPH_DebugRenderer, inMatrix: *JPH_RMat4, top: f32, bottom: f32, topRadius: f32, bottomRadius: f32, color: JPH_Color, castShadow: JPH_DebugRenderer_CastShadow, drawMode: JPH_DebugRenderer_DrawMode);
+    fn JPH_Skeleton_Create() -> *mut JPH_Skeleton;
+    fn JPH_Skeleton_Destroy(skeleton: *mut JPH_Skeleton);
+    fn JPH_Skeleton_AddJoint(skeleton: *mut JPH_Skeleton, name: *i8) -> u32;
+    fn JPH_Skeleton_AddJoint2(skeleton: *mut JPH_Skeleton, name: *i8, parentIndex: i32) -> u32;
+    fn JPH_Skeleton_AddJoint3(skeleton: *mut JPH_Skeleton, name: *i8, parentName: *i8) -> u32;
+    fn JPH_Skeleton_GetJointCount(skeleton: *JPH_Skeleton) -> i32;
+    fn JPH_Skeleton_GetJoint(skeleton: *JPH_Skeleton, index: i32, joint: *mut JPH_SkeletonJoint);
+    fn JPH_Skeleton_GetJointIndex(skeleton: *JPH_Skeleton, name: *i8) -> i32;
+    fn JPH_Skeleton_CalculateParentJointIndices(skeleton: *mut JPH_Skeleton);
+    fn JPH_Skeleton_AreJointsCorrectlyOrdered(skeleton: *JPH_Skeleton) -> bool;
+    fn JPH_SkeletonPose_Create() -> *mut JPH_SkeletonPose;
+    fn JPH_SkeletonPose_Destroy(pose: *mut JPH_SkeletonPose);
+    fn JPH_SkeletonPose_SetSkeleton(pose: *mut JPH_SkeletonPose, skeleton: *JPH_Skeleton);
+    fn JPH_SkeletonPose_GetSkeleton(pose: *JPH_SkeletonPose) -> *JPH_Skeleton;
+    fn JPH_SkeletonPose_SetRootOffset(pose: *mut JPH_SkeletonPose, offset: *JPH_RVec3);
+    fn JPH_SkeletonPose_GetRootOffset(pose: *JPH_SkeletonPose, result: *mut JPH_RVec3);
+    fn JPH_SkeletonPose_GetJointCount(pose: *JPH_SkeletonPose) -> i32;
+    fn JPH_SkeletonPose_GetJointState(pose: *JPH_SkeletonPose, index: i32, outTranslation: *mut JPH_Vec3, outRotation: *mut JPH_Quat);
+    fn JPH_SkeletonPose_SetJointState(pose: *mut JPH_SkeletonPose, index: i32, translation: *JPH_Vec3, rotation: *JPH_Quat);
+    fn JPH_SkeletonPose_GetJointMatrix(pose: *JPH_SkeletonPose, index: i32, result: *mut JPH_Mat4);
+    fn JPH_SkeletonPose_SetJointMatrix(pose: *mut JPH_SkeletonPose, index: i32, matrix: *JPH_Mat4);
+    fn JPH_SkeletonPose_GetJointMatrices(pose: *JPH_SkeletonPose, outMatrices: *mut JPH_Mat4, count: i32);
+    fn JPH_SkeletonPose_SetJointMatrices(pose: *mut JPH_SkeletonPose, matrices: *JPH_Mat4, count: i32);
+    fn JPH_SkeletonPose_CalculateJointMatrices(pose: *mut JPH_SkeletonPose);
+    fn JPH_SkeletonPose_CalculateJointStates(pose: *mut JPH_SkeletonPose);
+    fn JPH_SkeletonPose_CalculateLocalSpaceJointMatrices(pose: *JPH_SkeletonPose, outMatrices: *mut JPH_Mat4);
+    fn JPH_SkeletalAnimation_Create() -> *mut JPH_SkeletalAnimation;
+    fn JPH_SkeletalAnimation_Destroy(animation: *mut JPH_SkeletalAnimation);
+    fn JPH_SkeletalAnimation_GetDuration(animation: *JPH_SkeletalAnimation) -> f32;
+    fn JPH_SkeletalAnimation_IsLooping(animation: *JPH_SkeletalAnimation) -> bool;
+    fn JPH_SkeletalAnimation_SetIsLooping(animation: *mut JPH_SkeletalAnimation, looping: bool);
+    fn JPH_SkeletalAnimation_ScaleJoints(animation: *mut JPH_SkeletalAnimation, scale: f32);
+    fn JPH_SkeletalAnimation_Sample(animation: *JPH_SkeletalAnimation, time: f32, pose: *mut JPH_SkeletonPose);
+    fn JPH_SkeletalAnimation_GetAnimatedJointCount(animation: *JPH_SkeletalAnimation) -> i32;
+    fn JPH_SkeletalAnimation_AddAnimatedJoint(animation: *mut JPH_SkeletalAnimation, jointName: *i8);
+    fn JPH_SkeletalAnimation_AddKeyframe(animation: *mut JPH_SkeletalAnimation, jointIndex: i32, time: f32, translation: *JPH_Vec3, rotation: *JPH_Quat);
+    fn JPH_SkeletonMapper_Create() -> *mut JPH_SkeletonMapper;
+    fn JPH_SkeletonMapper_Destroy(mapper: *mut JPH_SkeletonMapper);
+    fn JPH_SkeletonMapper_Initialize(mapper: *mut JPH_SkeletonMapper, skeleton1: *JPH_Skeleton, neutralPose1: *JPH_Mat4, skeleton2: *JPH_Skeleton, neutralPose2: *JPH_Mat4);
+    fn JPH_SkeletonMapper_LockAllTranslations(mapper: *mut JPH_SkeletonMapper, skeleton2: *JPH_Skeleton, neutralPose2: *JPH_Mat4);
+    fn JPH_SkeletonMapper_LockTranslations(mapper: *mut JPH_SkeletonMapper, skeleton2: *JPH_Skeleton, lockedTranslations: *bool, neutralPose2: *JPH_Mat4);
+    fn JPH_SkeletonMapper_Map(mapper: *JPH_SkeletonMapper, pose1ModelSpace: *JPH_Mat4, pose2LocalSpace: *JPH_Mat4, outPose2ModelSpace: *mut JPH_Mat4);
+    fn JPH_SkeletonMapper_MapReverse(mapper: *JPH_SkeletonMapper, pose2ModelSpace: *JPH_Mat4, outPose1ModelSpace: *mut JPH_Mat4);
+    fn JPH_SkeletonMapper_GetMappedJointIndex(mapper: *JPH_SkeletonMapper, joint1Index: i32) -> i32;
+    fn JPH_SkeletonMapper_IsJointTranslationLocked(mapper: *JPH_SkeletonMapper, joint2Index: i32) -> bool;
+    fn JPH_RagdollSettings_Create() -> *mut JPH_RagdollSettings;
+    fn JPH_RagdollSettings_Destroy(settings: *mut JPH_RagdollSettings);
+    fn JPH_RagdollSettings_GetSkeleton(character: *JPH_RagdollSettings) -> *JPH_Skeleton;
+    fn JPH_RagdollSettings_SetSkeleton(character: *mut JPH_RagdollSettings, skeleton: *mut JPH_Skeleton);
+    fn JPH_RagdollSettings_Stabilize(settings: *mut JPH_RagdollSettings) -> bool;
+    fn JPH_RagdollSettings_DisableParentChildCollisions(settings: *mut JPH_RagdollSettings, jointMatrices: *JPH_Mat4, minSeparationDistance: f32);
+    fn JPH_RagdollSettings_CalculateBodyIndexToConstraintIndex(settings: *mut JPH_RagdollSettings);
+    fn JPH_RagdollSettings_GetConstraintIndexForBodyIndex(settings: *mut JPH_RagdollSettings, bodyIndex: i32) -> i32;
+    fn JPH_RagdollSettings_CalculateConstraintIndexToBodyIdxPair(settings: *mut JPH_RagdollSettings);
+    fn JPH_RagdollSettings_ResizeParts(settings: *mut JPH_RagdollSettings, count: i32);
+    fn JPH_RagdollSettings_GetPartCount(settings: *JPH_RagdollSettings) -> i32;
+    fn JPH_RagdollSettings_SetPartShape(settings: *mut JPH_RagdollSettings, partIndex: i32, shape: *JPH_Shape);
+    fn JPH_RagdollSettings_SetPartPosition(settings: *mut JPH_RagdollSettings, partIndex: i32, position: *JPH_RVec3);
+    fn JPH_RagdollSettings_SetPartRotation(settings: *mut JPH_RagdollSettings, partIndex: i32, rotation: *JPH_Quat);
+    fn JPH_RagdollSettings_SetPartMotionType(settings: *mut JPH_RagdollSettings, partIndex: i32, motionType: JPH_MotionType);
+    fn JPH_RagdollSettings_SetPartObjectLayer(settings: *mut JPH_RagdollSettings, partIndex: i32, layer: JPH_ObjectLayer);
+    fn JPH_RagdollSettings_SetPartMassProperties(settings: *mut JPH_RagdollSettings, partIndex: i32, mass: f32);
+    fn JPH_RagdollSettings_SetPartToParent(settings: *mut JPH_RagdollSettings, partIndex: i32, constraintSettings: *JPH_SwingTwistConstraintSettings);
+    fn JPH_RagdollSettings_CreateRagdoll(settings: *mut JPH_RagdollSettings, system: *mut JPH_PhysicsSystem, collisionGroup: JPH_CollisionGroupID, userData: u64) -> *mut JPH_Ragdoll;
+    fn JPH_Ragdoll_Destroy(ragdoll: *mut JPH_Ragdoll);
+    fn JPH_Ragdoll_AddToPhysicsSystem(ragdoll: *mut JPH_Ragdoll, activationMode: JPH_Activation, lockBodies: bool);
+    fn JPH_Ragdoll_RemoveFromPhysicsSystem(ragdoll: *mut JPH_Ragdoll, lockBodies: bool);
+    fn JPH_Ragdoll_Activate(ragdoll: *mut JPH_Ragdoll, lockBodies: bool);
+    fn JPH_Ragdoll_IsActive(ragdoll: *JPH_Ragdoll, lockBodies: bool) -> bool;
+    fn JPH_Ragdoll_ResetWarmStart(ragdoll: *mut JPH_Ragdoll);
+    fn JPH_Ragdoll_SetPose(ragdoll: *mut JPH_Ragdoll, pose: *JPH_SkeletonPose, lockBodies: bool);
+    fn JPH_Ragdoll_SetPose2(ragdoll: *mut JPH_Ragdoll, rootOffset: *JPH_RVec3, jointMatrices: *JPH_Mat4, lockBodies: bool);
+    fn JPH_Ragdoll_GetPose(ragdoll: *JPH_Ragdoll, outPose: *mut JPH_SkeletonPose, lockBodies: bool);
+    fn JPH_Ragdoll_GetPose2(ragdoll: *JPH_Ragdoll, outRootOffset: *mut JPH_RVec3, outJointMatrices: *mut JPH_Mat4, lockBodies: bool);
+    fn JPH_Ragdoll_DriveToPoseUsingMotors(ragdoll: *mut JPH_Ragdoll, pose: *JPH_SkeletonPose);
+    fn JPH_Ragdoll_DriveToPoseUsingKinematics(ragdoll: *mut JPH_Ragdoll, pose: *JPH_SkeletonPose, deltaTime: f32, lockBodies: bool);
+    fn JPH_Ragdoll_GetBodyCount(ragdoll: *JPH_Ragdoll) -> i32;
+    fn JPH_Ragdoll_GetBodyID(ragdoll: *JPH_Ragdoll, bodyIndex: i32) -> JPH_BodyID;
+    fn JPH_Ragdoll_GetConstraintCount(ragdoll: *JPH_Ragdoll) -> i32;
+    fn JPH_Ragdoll_GetConstraint(ragdoll: *mut JPH_Ragdoll, constraintIndex: i32) -> *mut JPH_TwoBodyConstraint;
+    fn JPH_Ragdoll_GetRootTransform(ragdoll: *JPH_Ragdoll, outPosition: *mut JPH_RVec3, outRotation: *mut JPH_Quat, lockBodies: bool);
+    fn JPH_Ragdoll_GetRagdollSettings(ragdoll: *JPH_Ragdoll) -> *JPH_RagdollSettings;
+    fn JPH_EstimateCollisionResponse(body1: *JPH_Body, body2: *JPH_Body, manifold: *JPH_ContactManifold, combinedFriction: f32, combinedRestitution: f32, minVelocityForRestitution: f32, numIterations: u32, result: *mut JPH_CollisionEstimationResult);
+    fn JPH_VehicleConstraintSettings_Init(settings: *mut JPH_VehicleConstraintSettings);
+    fn JPH_VehicleConstraint_Create(body: *mut JPH_Body, settings: *JPH_VehicleConstraintSettings) -> *mut JPH_VehicleConstraint;
+    fn JPH_VehicleConstraint_AsPhysicsStepListener(constraint: *mut JPH_VehicleConstraint) -> *mut JPH_PhysicsStepListener;
+    fn JPH_VehicleConstraint_SetMaxPitchRollAngle(constraint: *mut JPH_VehicleConstraint, maxPitchRollAngle: f32);
+    fn JPH_VehicleConstraint_SetVehicleCollisionTester(constraint: *mut JPH_VehicleConstraint, tester: *JPH_VehicleCollisionTester);
+    fn JPH_VehicleConstraint_OverrideGravity(constraint: *mut JPH_VehicleConstraint, value: *JPH_Vec3);
+    fn JPH_VehicleConstraint_IsGravityOverridden(constraint: *JPH_VehicleConstraint) -> bool;
+    fn JPH_VehicleConstraint_GetGravityOverride(constraint: *JPH_VehicleConstraint, result: *mut JPH_Vec3);
+    fn JPH_VehicleConstraint_ResetGravityOverride(constraint: *mut JPH_VehicleConstraint);
+    fn JPH_VehicleConstraint_GetLocalForward(constraint: *JPH_VehicleConstraint, result: *mut JPH_Vec3);
+    fn JPH_VehicleConstraint_GetLocalUp(constraint: *JPH_VehicleConstraint, result: *mut JPH_Vec3);
+    fn JPH_VehicleConstraint_GetWorldUp(constraint: *JPH_VehicleConstraint, result: *mut JPH_Vec3);
+    fn JPH_VehicleConstraint_GetVehicleBody(constraint: *JPH_VehicleConstraint) -> *JPH_Body;
+    fn JPH_VehicleConstraint_GetController(constraint: *mut JPH_VehicleConstraint) -> *mut JPH_VehicleController;
+    fn JPH_VehicleConstraint_GetWheelsCount(constraint: *mut JPH_VehicleConstraint) -> u32;
+    fn JPH_VehicleConstraint_GetWheel(constraint: *mut JPH_VehicleConstraint, index: u32) -> *mut JPH_Wheel;
+    fn JPH_VehicleConstraint_GetWheelLocalBasis(constraint: *mut JPH_VehicleConstraint, wheel: *JPH_Wheel, outForward: *mut JPH_Vec3, outUp: *mut JPH_Vec3, outRight: *mut JPH_Vec3);
+    fn JPH_VehicleConstraint_GetWheelLocalTransform(constraint: *mut JPH_VehicleConstraint, wheelIndex: u32, wheelRight: *JPH_Vec3, wheelUp: *JPH_Vec3, result: *mut JPH_Mat4);
+    fn JPH_VehicleConstraint_GetWheelWorldTransform(constraint: *mut JPH_VehicleConstraint, wheelIndex: u32, wheelRight: *JPH_Vec3, wheelUp: *JPH_Vec3, result: *mut JPH_RMat4);
+    fn JPH_WheelSettings_Create() -> *mut JPH_WheelSettings;
+    fn JPH_WheelSettings_Destroy(settings: *mut JPH_WheelSettings);
+    fn JPH_WheelSettings_GetPosition(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetPosition(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetSuspensionForcePoint(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetSuspensionForcePoint(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetSuspensionDirection(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetSuspensionDirection(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetSteeringAxis(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetSteeringAxis(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetWheelUp(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetWheelUp(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetWheelForward(settings: *JPH_WheelSettings, result: *mut JPH_Vec3);
+    fn JPH_WheelSettings_SetWheelForward(settings: *mut JPH_WheelSettings, value: *JPH_Vec3);
+    fn JPH_WheelSettings_GetSuspensionMinLength(settings: *JPH_WheelSettings) -> f32;
+    fn JPH_WheelSettings_SetSuspensionMinLength(settings: *mut JPH_WheelSettings, value: f32);
+    fn JPH_WheelSettings_GetSuspensionMaxLength(settings: *JPH_WheelSettings) -> f32;
+    fn JPH_WheelSettings_SetSuspensionMaxLength(settings: *mut JPH_WheelSettings, value: f32);
+    fn JPH_WheelSettings_GetSuspensionPreloadLength(settings: *JPH_WheelSettings) -> f32;
+    fn JPH_WheelSettings_SetSuspensionPreloadLength(settings: *mut JPH_WheelSettings, value: f32);
+    fn JPH_WheelSettings_GetSuspensionSpring(settings: *JPH_WheelSettings, result: *mut JPH_SpringSettings);
+    fn JPH_WheelSettings_SetSuspensionSpring(settings: *mut JPH_WheelSettings, springSettings: *mut JPH_SpringSettings);
+    fn JPH_WheelSettings_GetRadius(settings: *JPH_WheelSettings) -> f32;
+    fn JPH_WheelSettings_SetRadius(settings: *mut JPH_WheelSettings, value: f32);
+    fn JPH_WheelSettings_GetWidth(settings: *JPH_WheelSettings) -> f32;
+    fn JPH_WheelSettings_SetWidth(settings: *mut JPH_WheelSettings, value: f32);
+    fn JPH_WheelSettings_GetEnableSuspensionForcePoint(settings: *JPH_WheelSettings) -> bool;
+    fn JPH_WheelSettings_SetEnableSuspensionForcePoint(settings: *mut JPH_WheelSettings, value: bool);
+    fn JPH_Wheel_Create(settings: *JPH_WheelSettings) -> *mut JPH_Wheel;
+    fn JPH_Wheel_Destroy(wheel: *mut JPH_Wheel);
+    fn JPH_Wheel_GetSettings(wheel: *JPH_Wheel) -> *JPH_WheelSettings;
+    fn JPH_Wheel_GetAngularVelocity(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_SetAngularVelocity(wheel: *mut JPH_Wheel, value: f32);
+    fn JPH_Wheel_GetRotationAngle(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_SetRotationAngle(wheel: *mut JPH_Wheel, value: f32);
+    fn JPH_Wheel_GetSteerAngle(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_SetSteerAngle(wheel: *mut JPH_Wheel, value: f32);
+    fn JPH_Wheel_HasContact(wheel: *JPH_Wheel) -> bool;
+    fn JPH_Wheel_GetContactBodyID(wheel: *JPH_Wheel) -> JPH_BodyID;
+    fn JPH_Wheel_GetContactSubShapeID(wheel: *JPH_Wheel) -> JPH_SubShapeID;
+    fn JPH_Wheel_GetContactPosition(wheel: *JPH_Wheel, result: *mut JPH_RVec3);
+    fn JPH_Wheel_GetContactPointVelocity(wheel: *JPH_Wheel, result: *mut JPH_Vec3);
+    fn JPH_Wheel_GetContactNormal(wheel: *JPH_Wheel, result: *mut JPH_Vec3);
+    fn JPH_Wheel_GetContactLongitudinal(wheel: *JPH_Wheel, result: *mut JPH_Vec3);
+    fn JPH_Wheel_GetContactLateral(wheel: *JPH_Wheel, result: *mut JPH_Vec3);
+    fn JPH_Wheel_GetSuspensionLength(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_GetSuspensionLambda(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_GetLongitudinalLambda(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_GetLateralLambda(wheel: *JPH_Wheel) -> f32;
+    fn JPH_Wheel_HasHitHardPoint(wheel: *JPH_Wheel) -> bool;
+    fn JPH_VehicleAntiRollBar_Init(antiRollBar: *mut JPH_VehicleAntiRollBar);
+    fn JPH_VehicleEngineSettings_Init(settings: *mut JPH_VehicleEngineSettings);
+    fn JPH_VehicleEngine_ClampRPM(engine: *mut JPH_VehicleEngine);
+    fn JPH_VehicleEngine_GetCurrentRPM(engine: *JPH_VehicleEngine) -> f32;
+    fn JPH_VehicleEngine_SetCurrentRPM(engine: *mut JPH_VehicleEngine, rpm: f32);
+    fn JPH_VehicleEngine_GetAngularVelocity(engine: *JPH_VehicleEngine) -> f32;
+    fn JPH_VehicleEngine_GetTorque(engine: *JPH_VehicleEngine, acceleration: f32) -> f32;
+    fn JPH_VehicleEngine_ApplyTorque(engine: *mut JPH_VehicleEngine, torque: f32, deltaTime: f32);
+    fn JPH_VehicleEngine_ApplyDamping(engine: *mut JPH_VehicleEngine, deltaTime: f32);
+    fn JPH_VehicleEngine_AllowSleep(engine: *JPH_VehicleEngine) -> bool;
+    fn JPH_VehicleDifferentialSettings_Init(settings: *mut JPH_VehicleDifferentialSettings);
+    fn JPH_VehicleTransmissionSettings_Create() -> *mut JPH_VehicleTransmissionSettings;
+    fn JPH_VehicleTransmissionSettings_Destroy(settings: *mut JPH_VehicleTransmissionSettings);
+    fn JPH_VehicleTransmissionSettings_GetMode(settings: *JPH_VehicleTransmissionSettings) -> JPH_TransmissionMode;
+    fn JPH_VehicleTransmissionSettings_SetMode(settings: *mut JPH_VehicleTransmissionSettings, value: JPH_TransmissionMode);
+    fn JPH_VehicleTransmissionSettings_GetGearRatioCount(settings: *JPH_VehicleTransmissionSettings) -> u32;
+    fn JPH_VehicleTransmissionSettings_GetGearRatio(settings: *JPH_VehicleTransmissionSettings, index: u32) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetGearRatio(settings: *mut JPH_VehicleTransmissionSettings, index: u32, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetGearRatios(settings: *JPH_VehicleTransmissionSettings) -> *f32;
+    fn JPH_VehicleTransmissionSettings_SetGearRatios(settings: *mut JPH_VehicleTransmissionSettings, values: *f32, count: u32);
+    fn JPH_VehicleTransmissionSettings_GetReverseGearRatioCount(settings: *JPH_VehicleTransmissionSettings) -> u32;
+    fn JPH_VehicleTransmissionSettings_GetReverseGearRatio(settings: *JPH_VehicleTransmissionSettings, index: u32) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetReverseGearRatio(settings: *mut JPH_VehicleTransmissionSettings, index: u32, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetReverseGearRatios(settings: *JPH_VehicleTransmissionSettings) -> *f32;
+    fn JPH_VehicleTransmissionSettings_SetReverseGearRatios(settings: *mut JPH_VehicleTransmissionSettings, values: *f32, count: u32);
+    fn JPH_VehicleTransmissionSettings_GetSwitchTime(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetSwitchTime(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetClutchReleaseTime(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetClutchReleaseTime(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetSwitchLatency(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetSwitchLatency(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetShiftUpRPM(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetShiftUpRPM(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetShiftDownRPM(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetShiftDownRPM(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmissionSettings_GetClutchStrength(settings: *JPH_VehicleTransmissionSettings) -> f32;
+    fn JPH_VehicleTransmissionSettings_SetClutchStrength(settings: *mut JPH_VehicleTransmissionSettings, value: f32);
+    fn JPH_VehicleTransmission_SetMode(transmission: *mut JPH_VehicleTransmission, mode: JPH_TransmissionMode);
+    fn JPH_VehicleTransmission_Set(transmission: *mut JPH_VehicleTransmission, currentGear: i32, clutchFriction: f32);
+    fn JPH_VehicleTransmission_Update(transmission: *mut JPH_VehicleTransmission, deltaTime: f32, currentRPM: f32, forwardInput: f32, canShiftUp: bool);
+    fn JPH_VehicleTransmission_GetCurrentGear(transmission: *JPH_VehicleTransmission) -> i32;
+    fn JPH_VehicleTransmission_GetClutchFriction(transmission: *JPH_VehicleTransmission) -> f32;
+    fn JPH_VehicleTransmission_IsSwitchingGear(transmission: *JPH_VehicleTransmission) -> bool;
+    fn JPH_VehicleTransmission_GetCurrentRatio(transmission: *JPH_VehicleTransmission) -> f32;
+    fn JPH_VehicleTransmission_AllowSleep(transmission: *JPH_VehicleTransmission) -> bool;
+    fn JPH_VehicleCollisionTester_Destroy(tester: *mut JPH_VehicleCollisionTester);
+    fn JPH_VehicleCollisionTester_GetObjectLayer(tester: *JPH_VehicleCollisionTester) -> JPH_ObjectLayer;
+    fn JPH_VehicleCollisionTester_SetObjectLayer(tester: *mut JPH_VehicleCollisionTester, value: JPH_ObjectLayer);
+    fn JPH_VehicleCollisionTesterRay_Create(layer: JPH_ObjectLayer, up: *JPH_Vec3, maxSlopeAngle: f32) -> *mut JPH_VehicleCollisionTesterRay;
+    fn JPH_VehicleCollisionTesterCastSphere_Create(layer: JPH_ObjectLayer, radius: f32, up: *JPH_Vec3, maxSlopeAngle: f32) -> *mut JPH_VehicleCollisionTesterCastSphere;
+    fn JPH_VehicleCollisionTesterCastCylinder_Create(layer: JPH_ObjectLayer, convexRadiusFraction: f32) -> *mut JPH_VehicleCollisionTesterCastCylinder;
+    fn JPH_VehicleControllerSettings_Destroy(settings: *mut JPH_VehicleControllerSettings);
+    fn JPH_VehicleController_GetConstraint(controller: *mut JPH_VehicleController) -> *JPH_VehicleConstraint;
+    fn JPH_WheelSettingsWV_Create() -> *mut JPH_WheelSettingsWV;
+    fn JPH_WheelSettingsWV_GetInertia(settings: *JPH_WheelSettingsWV) -> f32;
+    fn JPH_WheelSettingsWV_SetInertia(settings: *mut JPH_WheelSettingsWV, value: f32);
+    fn JPH_WheelSettingsWV_GetAngularDamping(settings: *JPH_WheelSettingsWV) -> f32;
+    fn JPH_WheelSettingsWV_SetAngularDamping(settings: *mut JPH_WheelSettingsWV, value: f32);
+    fn JPH_WheelSettingsWV_GetMaxSteerAngle(settings: *JPH_WheelSettingsWV) -> f32;
+    fn JPH_WheelSettingsWV_SetMaxSteerAngle(settings: *mut JPH_WheelSettingsWV, value: f32);
+    fn JPH_WheelSettingsWV_GetLongitudinalFriction(settings: *JPH_WheelSettingsWV) -> *JPH_LinearCurve;
+    fn JPH_WheelSettingsWV_SetLongitudinalFriction(settings: *mut JPH_WheelSettingsWV, value: *JPH_LinearCurve);
+    fn JPH_WheelSettingsWV_GetLateralFriction(settings: *JPH_WheelSettingsWV) -> *JPH_LinearCurve;
+    fn JPH_WheelSettingsWV_SetLateralFriction(settings: *mut JPH_WheelSettingsWV, value: *JPH_LinearCurve);
+    fn JPH_WheelSettingsWV_GetMaxBrakeTorque(settings: *JPH_WheelSettingsWV) -> f32;
+    fn JPH_WheelSettingsWV_SetMaxBrakeTorque(settings: *mut JPH_WheelSettingsWV, value: f32);
+    fn JPH_WheelSettingsWV_GetMaxHandBrakeTorque(settings: *JPH_WheelSettingsWV) -> f32;
+    fn JPH_WheelSettingsWV_SetMaxHandBrakeTorque(settings: *mut JPH_WheelSettingsWV, value: f32);
+    fn JPH_WheelWV_Create(settings: *JPH_WheelSettingsWV) -> *mut JPH_WheelWV;
+    fn JPH_WheelWV_GetSettings(wheel: *JPH_WheelWV) -> *JPH_WheelSettingsWV;
+    fn JPH_WheelWV_ApplyTorque(wheel: *mut JPH_WheelWV, torque: f32, deltaTime: f32);
+    fn JPH_WheeledVehicleControllerSettings_Create() -> *mut JPH_WheeledVehicleControllerSettings;
+    fn JPH_WheeledVehicleControllerSettings_GetEngine(settings: *JPH_WheeledVehicleControllerSettings, result: *mut JPH_VehicleEngineSettings);
+    fn JPH_WheeledVehicleControllerSettings_SetEngine(settings: *mut JPH_WheeledVehicleControllerSettings, value: *JPH_VehicleEngineSettings);
+    fn JPH_WheeledVehicleControllerSettings_GetTransmission(settings: *JPH_WheeledVehicleControllerSettings) -> *JPH_VehicleTransmissionSettings;
+    fn JPH_WheeledVehicleControllerSettings_SetTransmission(settings: *mut JPH_WheeledVehicleControllerSettings, value: *JPH_VehicleTransmissionSettings);
+    fn JPH_WheeledVehicleControllerSettings_GetDifferentialsCount(settings: *JPH_WheeledVehicleControllerSettings) -> u32;
+    fn JPH_WheeledVehicleControllerSettings_SetDifferentialsCount(settings: *mut JPH_WheeledVehicleControllerSettings, count: u32);
+    fn JPH_WheeledVehicleControllerSettings_GetDifferential(settings: *JPH_WheeledVehicleControllerSettings, index: u32, result: *mut JPH_VehicleDifferentialSettings);
+    fn JPH_WheeledVehicleControllerSettings_SetDifferential(settings: *mut JPH_WheeledVehicleControllerSettings, index: u32, value: *JPH_VehicleDifferentialSettings);
+    fn JPH_WheeledVehicleControllerSettings_SetDifferentials(settings: *mut JPH_WheeledVehicleControllerSettings, values: *JPH_VehicleDifferentialSettings, count: u32);
+    fn JPH_WheeledVehicleControllerSettings_AddDifferential(settings: *mut JPH_WheeledVehicleControllerSettings, leftWheel: i32, rightWheel: i32);
+    fn JPH_WheeledVehicleControllerSettings_GetDifferentialLimitedSlipRatio(settings: *JPH_WheeledVehicleControllerSettings) -> f32;
+    fn JPH_WheeledVehicleControllerSettings_SetDifferentialLimitedSlipRatio(settings: *mut JPH_WheeledVehicleControllerSettings, value: f32);
+    fn JPH_WheeledVehicleController_SetDriverInput(controller: *mut JPH_WheeledVehicleController, forward: f32, right: f32, brake: f32, handBrake: f32);
+    fn JPH_WheeledVehicleController_SetForwardInput(controller: *mut JPH_WheeledVehicleController, forward: f32);
+    fn JPH_WheeledVehicleController_GetForwardInput(controller: *JPH_WheeledVehicleController) -> f32;
+    fn JPH_WheeledVehicleController_SetRightInput(controller: *mut JPH_WheeledVehicleController, rightRatio: f32);
+    fn JPH_WheeledVehicleController_GetRightInput(controller: *JPH_WheeledVehicleController) -> f32;
+    fn JPH_WheeledVehicleController_SetBrakeInput(controller: *mut JPH_WheeledVehicleController, brakeInput: f32);
+    fn JPH_WheeledVehicleController_GetBrakeInput(controller: *JPH_WheeledVehicleController) -> f32;
+    fn JPH_WheeledVehicleController_SetHandBrakeInput(controller: *mut JPH_WheeledVehicleController, handBrakeInput: f32);
+    fn JPH_WheeledVehicleController_GetHandBrakeInput(controller: *JPH_WheeledVehicleController) -> f32;
+    fn JPH_WheeledVehicleController_GetWheelSpeedAtClutch(controller: *JPH_WheeledVehicleController) -> f32;
+    fn JPH_WheeledVehicleController_SetTireMaxImpulseCallback(controller: *mut JPH_WheeledVehicleController, tireMaxImpulseCallback: JPH_TireMaxImpulseCallback, userData: *mut void);
+    fn JPH_WheeledVehicleController_GetEngine(controller: *JPH_WheeledVehicleController) -> *JPH_VehicleEngine;
+    fn JPH_WheeledVehicleController_GetTransmission(controller: *JPH_WheeledVehicleController) -> *JPH_VehicleTransmission;
+    fn JPH_VehicleTrackSettings_Init(settings: *mut JPH_VehicleTrackSettings);
+    fn JPH_VehicleTrack_GetAngularVelocity(track: *JPH_VehicleTrack) -> f32;
+    fn JPH_VehicleTrack_SetAngularVelocity(track: *mut JPH_VehicleTrack, velocity: f32);
+    fn JPH_VehicleTrack_GetDrivenWheel(track: *JPH_VehicleTrack) -> u32;
+    fn JPH_VehicleTrack_GetInertia(track: *JPH_VehicleTrack) -> f32;
+    fn JPH_VehicleTrack_GetAngularDamping(track: *JPH_VehicleTrack) -> f32;
+    fn JPH_VehicleTrack_GetMaxBrakeTorque(track: *JPH_VehicleTrack) -> f32;
+    fn JPH_VehicleTrack_GetDifferentialRatio(track: *JPH_VehicleTrack) -> f32;
+    fn JPH_TrackedVehicleController_GetTrack(controller: *JPH_TrackedVehicleController, side: JPH_TrackSide) -> *JPH_VehicleTrack;
+    fn JPH_WheelSettingsTV_Create() -> *mut JPH_WheelSettingsTV;
+    fn JPH_WheelSettingsTV_GetLongitudinalFriction(settings: *JPH_WheelSettingsTV) -> f32;
+    fn JPH_WheelSettingsTV_SetLongitudinalFriction(settings: *mut JPH_WheelSettingsTV, value: f32);
+    fn JPH_WheelSettingsTV_GetLateralFriction(settings: *JPH_WheelSettingsTV) -> f32;
+    fn JPH_WheelSettingsTV_SetLateralFriction(settings: *mut JPH_WheelSettingsTV, value: f32);
+    fn JPH_WheelTV_Create(settings: *JPH_WheelSettingsTV) -> *mut JPH_WheelTV;
+    fn JPH_WheelTV_GetSettings(wheel: *JPH_WheelTV) -> *JPH_WheelSettingsTV;
+    fn JPH_TrackedVehicleControllerSettings_Create() -> *mut JPH_TrackedVehicleControllerSettings;
+    fn JPH_TrackedVehicleControllerSettings_GetEngine(settings: *JPH_TrackedVehicleControllerSettings, result: *mut JPH_VehicleEngineSettings);
+    fn JPH_TrackedVehicleControllerSettings_SetEngine(settings: *mut JPH_TrackedVehicleControllerSettings, value: *JPH_VehicleEngineSettings);
+    fn JPH_TrackedVehicleControllerSettings_GetTransmission(settings: *JPH_TrackedVehicleControllerSettings) -> *JPH_VehicleTransmissionSettings;
+    fn JPH_TrackedVehicleControllerSettings_SetTransmission(settings: *mut JPH_TrackedVehicleControllerSettings, value: *JPH_VehicleTransmissionSettings);
+    fn JPH_TrackedVehicleControllerSettings_SetTrack(settings: *mut JPH_TrackedVehicleControllerSettings, index: u32, track: *JPH_VehicleTrackSettings);
+    fn JPH_TrackedVehicleController_SetDriverInput(controller: *mut JPH_TrackedVehicleController, forward: f32, leftRatio: f32, rightRatio: f32, brake: f32);
+    fn JPH_TrackedVehicleController_GetForwardInput(controller: *JPH_TrackedVehicleController) -> f32;
+    fn JPH_TrackedVehicleController_SetForwardInput(controller: *mut JPH_TrackedVehicleController, value: f32);
+    fn JPH_TrackedVehicleController_GetLeftRatio(controller: *JPH_TrackedVehicleController) -> f32;
+    fn JPH_TrackedVehicleController_SetLeftRatio(controller: *mut JPH_TrackedVehicleController, value: f32);
+    fn JPH_TrackedVehicleController_GetRightRatio(controller: *JPH_TrackedVehicleController) -> f32;
+    fn JPH_TrackedVehicleController_SetRightRatio(controller: *mut JPH_TrackedVehicleController, value: f32);
+    fn JPH_TrackedVehicleController_GetBrakeInput(controller: *JPH_TrackedVehicleController) -> f32;
+    fn JPH_TrackedVehicleController_SetBrakeInput(controller: *mut JPH_TrackedVehicleController, value: f32);
+    fn JPH_TrackedVehicleController_GetEngine(controller: *JPH_TrackedVehicleController) -> *JPH_VehicleEngine;
+    fn JPH_TrackedVehicleController_GetTransmission(controller: *JPH_TrackedVehicleController) -> *JPH_VehicleTransmission;
+    fn JPH_MotorcycleControllerSettings_Create() -> *mut JPH_MotorcycleControllerSettings;
+    fn JPH_MotorcycleControllerSettings_GetMaxLeanAngle(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetMaxLeanAngle(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleControllerSettings_GetLeanSpringConstant(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetLeanSpringConstant(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleControllerSettings_GetLeanSpringDamping(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetLeanSpringDamping(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleControllerSettings_GetLeanSpringIntegrationCoefficient(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetLeanSpringIntegrationCoefficient(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleControllerSettings_GetLeanSpringIntegrationCoefficientDecay(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetLeanSpringIntegrationCoefficientDecay(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleControllerSettings_GetLeanSmoothingFactor(settings: *JPH_MotorcycleControllerSettings) -> f32;
+    fn JPH_MotorcycleControllerSettings_SetLeanSmoothingFactor(settings: *mut JPH_MotorcycleControllerSettings, value: f32);
+    fn JPH_MotorcycleController_GetWheelBase(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_IsLeanControllerEnabled(controller: *JPH_MotorcycleController) -> bool;
+    fn JPH_MotorcycleController_EnableLeanController(controller: *mut JPH_MotorcycleController, value: bool);
+    fn JPH_MotorcycleController_IsLeanSteeringLimitEnabled(controller: *JPH_MotorcycleController) -> bool;
+    fn JPH_MotorcycleController_EnableLeanSteeringLimit(controller: *mut JPH_MotorcycleController, value: bool);
+    fn JPH_MotorcycleController_GetLeanSpringConstant(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_SetLeanSpringConstant(controller: *mut JPH_MotorcycleController, value: f32);
+    fn JPH_MotorcycleController_GetLeanSpringDamping(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_SetLeanSpringDamping(controller: *mut JPH_MotorcycleController, value: f32);
+    fn JPH_MotorcycleController_GetLeanSpringIntegrationCoefficient(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_SetLeanSpringIntegrationCoefficient(controller: *mut JPH_MotorcycleController, value: f32);
+    fn JPH_MotorcycleController_GetLeanSpringIntegrationCoefficientDecay(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_SetLeanSpringIntegrationCoefficientDecay(controller: *mut JPH_MotorcycleController, value: f32);
+    fn JPH_MotorcycleController_GetLeanSmoothingFactor(controller: *JPH_MotorcycleController) -> f32;
+    fn JPH_MotorcycleController_SetLeanSmoothingFactor(controller: *mut JPH_MotorcycleController, value: f32);
+    fn JPH_LinearCurve_Create() -> *mut JPH_LinearCurve;
+    fn JPH_LinearCurve_Destroy(curve: *mut JPH_LinearCurve);
+    fn JPH_LinearCurve_Clear(curve: *mut JPH_LinearCurve);
+    fn JPH_LinearCurve_Reserve(curve: *mut JPH_LinearCurve, numPoints: u32);
+    fn JPH_LinearCurve_AddPoint(curve: *mut JPH_LinearCurve, x: f32, y: f32);
+    fn JPH_LinearCurve_Sort(curve: *mut JPH_LinearCurve);
+    fn JPH_LinearCurve_GetMinX(curve: *JPH_LinearCurve) -> f32;
+    fn JPH_LinearCurve_GetMaxX(curve: *JPH_LinearCurve) -> f32;
+    fn JPH_LinearCurve_GetValue(curve: *JPH_LinearCurve, x: f32) -> f32;
+    fn JPH_LinearCurve_GetPointCount(curve: *JPH_LinearCurve) -> u32;
+    fn JPH_LinearCurve_GetPoint(curve: *JPH_LinearCurve, index: u32, result: *mut JPH_Point);
+    fn JPH_LinearCurve_GetPoints(curve: *JPH_LinearCurve, points: *mut JPH_Point, count: *mut u32);
+    fn JPH_TempAllocator_Create(size: u32) -> *mut JPH_TempAllocator;
+    fn JPH_TempAllocatorMalloc_Create() -> *mut JPH_TempAllocator;
+    fn JPH_TempAllocator_Destroy(allocator: *mut JPH_TempAllocator);
+    fn JPH_PhysicsSystem_Update2(system: *mut JPH_PhysicsSystem, deltaTime: f32, collisionSteps: i32, tempAllocator: *mut JPH_TempAllocator, jobSystem: *mut JPH_JobSystem) -> JPH_PhysicsUpdateError;
+}

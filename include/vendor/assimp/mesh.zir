@@ -1,0 +1,96 @@
+#[include "vendor/assimp/aabb.zir", "vendor/assimp/types.zir" : *]
+
+const AI_MAX_FACE_INDICES: i32 = 0x7fff;
+const AI_MAX_BONE_WEIGHTS: i32 = 0x7fffffff;
+const AI_MAX_VERTICES: i32 = 0x7fffffff;
+const AI_MAX_FACES: i32 = 0x7fffffff;
+const AI_MAX_NUMBER_OF_COLOR_SETS: i32 = 0x8;
+const AI_MAX_NUMBER_OF_TEXTURECOORDS: i32 = 0x8;
+
+struct aiFace {
+    pub mNumIndices: u32,
+    pub mIndices: *mut u32
+}
+
+struct aiVertexWeight {
+    pub mVertexId: u32,
+    pub mWeight: ai_real
+}
+
+struct aiBone {
+    pub mName: aiString,
+    pub mNumWeights: u32,
+    pub mArmature: *mut aiNode,
+    pub mNode: *mut aiNode,
+    pub mWeights: *mut aiVertexWeight,
+    pub mOffsetMatrix: aiMatrix4x4
+}
+
+enum aiPrimitiveType: i32 {
+    aiPrimitiveType_POINT = 0x1,
+    aiPrimitiveType_LINE = 0x2,
+    aiPrimitiveType_TRIANGLE = 0x4,
+    aiPrimitiveType_POLYGON = 0x8,
+    aiPrimitiveType_NGONEncodingFlag = 0x10,
+    _aiPrimitiveType_Force32Bit
+}
+
+struct aiAnimMesh {
+    pub mName: aiString,
+    pub mVertices: *mut aiVector3D,
+    pub mNormals: *mut aiVector3D,
+    pub mTangents: *mut aiVector3D,
+    pub mBitangents: *mut aiVector3D,
+    pub mColors: [*mut aiColor4D; 8],
+    pub mTextureCoords: [*mut aiVector3D; 8],
+    pub mNumVertices: u32,
+    pub mWeight: f32
+}
+
+enum aiMorphingMethod: i32 {
+    aiMorphingMethod_UNKNOWN = 0x0,
+    aiMorphingMethod_VERTEX_BLEND = 0x1,
+    aiMorphingMethod_MORPH_NORMALIZED = 0x2,
+    aiMorphingMethod_MORPH_RELATIVE = 0x3,
+    _aiMorphingMethod_Force32Bit
+}
+
+struct aiMesh {
+    pub mPrimitiveTypes: u32,
+    pub mNumVertices: u32,
+    pub mNumFaces: u32,
+    pub mVertices: *mut aiVector3D,
+    pub mNormals: *mut aiVector3D,
+    pub mTangents: *mut aiVector3D,
+    pub mBitangents: *mut aiVector3D,
+    pub mColors: [*mut aiColor4D; 8],
+    pub mTextureCoords: [*mut aiVector3D; 8],
+    pub mNumUVComponents: [u32; 8],
+    pub mFaces: *mut aiFace,
+    pub mNumBones: u32,
+    pub mBones: *mut *mut aiBone,
+    pub mMaterialIndex: u32,
+    pub mName: aiString,
+    pub mNumAnimMeshes: u32,
+    pub mAnimMeshes: *mut *mut aiAnimMesh,
+    pub mMethod: aiMorphingMethod,
+    pub mAABB: aiAABB,
+    pub mTextureCoordsNames: *mut *mut aiString
+}
+
+struct aiSkeletonBone {
+    pub mParent: i32,
+    pub mArmature: *mut aiNode,
+    pub mNode: *mut aiNode,
+    pub mNumnWeights: u32,
+    pub mMeshId: *mut aiMesh,
+    pub mWeights: *mut aiVertexWeight,
+    pub mOffsetMatrix: aiMatrix4x4,
+    pub mLocalMatrix: aiMatrix4x4
+}
+
+struct aiSkeleton {
+    pub mName: aiString,
+    pub mNumBones: u32,
+    pub mBones: *mut *mut aiSkeletonBone
+}

@@ -1,0 +1,125 @@
+#[include "vendor/assimp/importerdesc.zir", "vendor/assimp/types.zir" : *]
+
+const AI_FALSE: i32 = 0;
+const AI_TRUE: i32 = 1;
+
+struct aiFileIO {}
+
+type aiLogStreamCallback = fn(*i8, *mut i8);
+
+struct aiLogStream {
+    pub callback: aiLogStreamCallback,
+    pub user: *mut i8
+}
+
+struct aiPropertyStore {
+    pub sentinel: i8
+}
+
+type aiBool = i32;
+
+extern "C" {
+    fn aiImportFile(pFile: *i8, pFlags: u32) -> *aiScene;
+    fn aiImportFileEx(pFile: *i8, pFlags: u32, pFS: *mut aiFileIO) -> *aiScene;
+    fn aiImportFileExWithProperties(pFile: *i8, pFlags: u32, pFS: *mut aiFileIO, pProps: *aiPropertyStore) -> *aiScene;
+    fn aiImportFileFromMemory(pBuffer: *i8, pLength: u32, pFlags: u32, pHint: *i8) -> *aiScene;
+    fn aiImportFileFromMemoryWithProperties(pBuffer: *i8, pLength: u32, pFlags: u32, pHint: *i8, pProps: *aiPropertyStore) -> *aiScene;
+    fn aiApplyPostProcessing(pScene: *aiScene, pFlags: u32) -> *aiScene;
+    fn aiGetPredefinedLogStream(pStreams: aiDefaultLogStream, file: *i8) -> aiLogStream;
+    fn aiAttachLogStream(stream: *aiLogStream);
+    fn aiEnableVerboseLogging(d: aiBool);
+    fn aiDetachLogStream(stream: *aiLogStream) -> aiReturn;
+    fn aiDetachAllLogStreams();
+    fn aiReleaseImport(pScene: *aiScene);
+    fn aiGetErrorString() -> *i8;
+    fn aiIsExtensionSupported(szExtension: *i8) -> aiBool;
+    fn aiGetExtensionList(szOut: *mut aiString);
+    fn aiGetMemoryRequirements(pIn: *aiScene, _in: *mut aiMemoryInfo);
+    fn aiGetEmbeddedTexture(pIn: *aiScene, filename: *i8) -> *aiTexture;
+    fn aiCreatePropertyStore() -> *mut aiPropertyStore;
+    fn aiReleasePropertyStore(p: *mut aiPropertyStore);
+    fn aiSetImportPropertyInteger(store: *mut aiPropertyStore, szName: *i8, value: i32);
+    fn aiSetImportPropertyFloat(store: *mut aiPropertyStore, szName: *i8, value: ai_real);
+    fn aiSetImportPropertyString(store: *mut aiPropertyStore, szName: *i8, st: *aiString);
+    fn aiSetImportPropertyMatrix(store: *mut aiPropertyStore, szName: *i8, mat: *aiMatrix4x4);
+    fn aiCreateQuaternionFromMatrix(quat: *mut aiQuaternion, mat: *aiMatrix3x3);
+    fn aiDecomposeMatrix(mat: *aiMatrix4x4, scaling: *mut aiVector3D, rotation: *mut aiQuaternion, position: *mut aiVector3D);
+    fn aiTransposeMatrix4(mat: *mut aiMatrix4x4);
+    fn aiTransposeMatrix3(mat: *mut aiMatrix3x3);
+    fn aiTransformVecByMatrix3(vec: *mut aiVector3D, mat: *aiMatrix3x3);
+    fn aiTransformVecByMatrix4(vec: *mut aiVector3D, mat: *aiMatrix4x4);
+    fn aiMultiplyMatrix4(dst: *mut aiMatrix4x4, src: *aiMatrix4x4);
+    fn aiMultiplyMatrix3(dst: *mut aiMatrix3x3, src: *aiMatrix3x3);
+    fn aiIdentityMatrix3(mat: *mut aiMatrix3x3);
+    fn aiIdentityMatrix4(mat: *mut aiMatrix4x4);
+    fn aiGetImportFormatCount() -> usize;
+    fn aiGetImportFormatDescription(pIndex: usize) -> *aiImporterDesc;
+    fn aiVector2AreEqual(a: *aiVector2D, b: *aiVector2D) -> i32;
+    fn aiVector2AreEqualEpsilon(a: *aiVector2D, b: *aiVector2D, epsilon: f32) -> i32;
+    fn aiVector2Add(dst: *mut aiVector2D, src: *aiVector2D);
+    fn aiVector2Subtract(dst: *mut aiVector2D, src: *aiVector2D);
+    fn aiVector2Scale(dst: *mut aiVector2D, s: f32);
+    fn aiVector2SymMul(dst: *mut aiVector2D, other: *aiVector2D);
+    fn aiVector2DivideByScalar(dst: *mut aiVector2D, s: f32);
+    fn aiVector2DivideByVector(dst: *mut aiVector2D, v: *mut aiVector2D);
+    fn aiVector2Length(v: *aiVector2D) -> ai_real;
+    fn aiVector2SquareLength(v: *aiVector2D) -> ai_real;
+    fn aiVector2Negate(dst: *mut aiVector2D);
+    fn aiVector2DotProduct(a: *aiVector2D, b: *aiVector2D) -> ai_real;
+    fn aiVector2Normalize(v: *mut aiVector2D);
+    fn aiVector3AreEqual(a: *aiVector3D, b: *aiVector3D) -> i32;
+    fn aiVector3AreEqualEpsilon(a: *aiVector3D, b: *aiVector3D, epsilon: f32) -> i32;
+    fn aiVector3LessThan(a: *aiVector3D, b: *aiVector3D) -> i32;
+    fn aiVector3Add(dst: *mut aiVector3D, src: *aiVector3D);
+    fn aiVector3Subtract(dst: *mut aiVector3D, src: *aiVector3D);
+    fn aiVector3Scale(dst: *mut aiVector3D, s: f32);
+    fn aiVector3SymMul(dst: *mut aiVector3D, other: *aiVector3D);
+    fn aiVector3DivideByScalar(dst: *mut aiVector3D, s: f32);
+    fn aiVector3DivideByVector(dst: *mut aiVector3D, v: *mut aiVector3D);
+    fn aiVector3Length(v: *aiVector3D) -> ai_real;
+    fn aiVector3SquareLength(v: *aiVector3D) -> ai_real;
+    fn aiVector3Negate(dst: *mut aiVector3D);
+    fn aiVector3DotProduct(a: *aiVector3D, b: *aiVector3D) -> ai_real;
+    fn aiVector3CrossProduct(dst: *mut aiVector3D, a: *aiVector3D, b: *aiVector3D);
+    fn aiVector3Normalize(v: *mut aiVector3D);
+    fn aiVector3NormalizeSafe(v: *mut aiVector3D);
+    fn aiVector3RotateByQuaternion(v: *mut aiVector3D, q: *aiQuaternion);
+    fn aiMatrix3FromMatrix4(dst: *mut aiMatrix3x3, mat: *aiMatrix4x4);
+    fn aiMatrix3FromQuaternion(mat: *mut aiMatrix3x3, q: *aiQuaternion);
+    fn aiMatrix3AreEqual(a: *aiMatrix3x3, b: *aiMatrix3x3) -> i32;
+    fn aiMatrix3AreEqualEpsilon(a: *aiMatrix3x3, b: *aiMatrix3x3, epsilon: f32) -> i32;
+    fn aiMatrix3Inverse(mat: *mut aiMatrix3x3);
+    fn aiMatrix3Determinant(mat: *aiMatrix3x3) -> ai_real;
+    fn aiMatrix3RotationZ(mat: *mut aiMatrix3x3, angle: f32);
+    fn aiMatrix3FromRotationAroundAxis(mat: *mut aiMatrix3x3, axis: *aiVector3D, angle: f32);
+    fn aiMatrix3Translation(mat: *mut aiMatrix3x3, translation: *aiVector2D);
+    fn aiMatrix3FromTo(mat: *mut aiMatrix3x3, from: *aiVector3D, to: *aiVector3D);
+    fn aiMatrix4FromMatrix3(dst: *mut aiMatrix4x4, mat: *aiMatrix3x3);
+    fn aiMatrix4FromScalingQuaternionPosition(mat: *mut aiMatrix4x4, scaling: *aiVector3D, rotation: *aiQuaternion, position: *aiVector3D);
+    fn aiMatrix4Add(dst: *mut aiMatrix4x4, src: *aiMatrix4x4);
+    fn aiMatrix4AreEqual(a: *aiMatrix4x4, b: *aiMatrix4x4) -> i32;
+    fn aiMatrix4AreEqualEpsilon(a: *aiMatrix4x4, b: *aiMatrix4x4, epsilon: f32) -> i32;
+    fn aiMatrix4Inverse(mat: *mut aiMatrix4x4);
+    fn aiMatrix4Determinant(mat: *aiMatrix4x4) -> ai_real;
+    fn aiMatrix4IsIdentity(mat: *aiMatrix4x4) -> i32;
+    fn aiMatrix4DecomposeIntoScalingEulerAnglesPosition(mat: *aiMatrix4x4, scaling: *mut aiVector3D, rotation: *mut aiVector3D, position: *mut aiVector3D);
+    fn aiMatrix4DecomposeIntoScalingAxisAnglePosition(mat: *aiMatrix4x4, scaling: *mut aiVector3D, axis: *mut aiVector3D, angle: *mut ai_real, position: *mut aiVector3D);
+    fn aiMatrix4DecomposeNoScaling(mat: *aiMatrix4x4, rotation: *mut aiQuaternion, position: *mut aiVector3D);
+    fn aiMatrix4FromEulerAngles(mat: *mut aiMatrix4x4, x: f32, y: f32, z: f32);
+    fn aiMatrix4RotationX(mat: *mut aiMatrix4x4, angle: f32);
+    fn aiMatrix4RotationY(mat: *mut aiMatrix4x4, angle: f32);
+    fn aiMatrix4RotationZ(mat: *mut aiMatrix4x4, angle: f32);
+    fn aiMatrix4FromRotationAroundAxis(mat: *mut aiMatrix4x4, axis: *aiVector3D, angle: f32);
+    fn aiMatrix4Translation(mat: *mut aiMatrix4x4, translation: *aiVector3D);
+    fn aiMatrix4Scaling(mat: *mut aiMatrix4x4, scaling: *aiVector3D);
+    fn aiMatrix4FromTo(mat: *mut aiMatrix4x4, from: *aiVector3D, to: *aiVector3D);
+    fn aiQuaternionFromEulerAngles(q: *mut aiQuaternion, x: f32, y: f32, z: f32);
+    fn aiQuaternionFromAxisAngle(q: *mut aiQuaternion, axis: *aiVector3D, angle: f32);
+    fn aiQuaternionFromNormalizedQuaternion(q: *mut aiQuaternion, normalized: *aiVector3D);
+    fn aiQuaternionAreEqual(a: *aiQuaternion, b: *aiQuaternion) -> i32;
+    fn aiQuaternionAreEqualEpsilon(a: *aiQuaternion, b: *aiQuaternion, epsilon: f32) -> i32;
+    fn aiQuaternionNormalize(q: *mut aiQuaternion);
+    fn aiQuaternionConjugate(q: *mut aiQuaternion);
+    fn aiQuaternionMultiply(dst: *mut aiQuaternion, q: *aiQuaternion);
+    fn aiQuaternionInterpolate(dst: *mut aiQuaternion, start: *aiQuaternion, end: *aiQuaternion, factor: f32);
+}

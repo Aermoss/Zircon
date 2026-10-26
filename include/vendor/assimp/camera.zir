@@ -1,0 +1,13 @@
+#[include "vendor/assimp/types.zir" : *]
+
+struct aiCamera {
+    pub mName: aiString,
+    pub mPosition: aiVector3D,
+    pub mUp: aiVector3D,
+    pub mLookAt: aiVector3D,
+    pub mHorizontalFOV: f32,
+    pub mClipPlaneNear: f32,
+    pub mClipPlaneFar: f32,
+    pub mAspect: f32,
+    pub mOrthographicWidth: f32
+}

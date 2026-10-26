@@ -1,0 +1,144 @@
+#[include "vendor/assimp/types.zir" : *]
+
+const AI_DEFAULT_MATERIAL_NAME: *i8 = "DefaultMaterial";
+const _AI_MATKEY_TEXTURE_BASE: *i8 = "$tex.file";
+const _AI_MATKEY_UVWSRC_BASE: *i8 = "$tex.uvwsrc";
+const _AI_MATKEY_TEXOP_BASE: *i8 = "$tex.op";
+const _AI_MATKEY_MAPPING_BASE: *i8 = "$tex.mapping";
+const _AI_MATKEY_TEXBLEND_BASE: *i8 = "$tex.blend";
+const _AI_MATKEY_MAPPINGMODE_U_BASE: *i8 = "$tex.mapmodeu";
+const _AI_MATKEY_MAPPINGMODE_V_BASE: *i8 = "$tex.mapmodev";
+const _AI_MATKEY_TEXMAP_AXIS_BASE: *i8 = "$tex.mapaxis";
+const _AI_MATKEY_UVTRANSFORM_BASE: *i8 = "$tex.uvtrafo";
+const _AI_MATKEY_TEXFLAGS_BASE: *i8 = "$tex.flags";
+
+enum aiTextureOp: i32 {
+    aiTextureOp_Multiply = 0x0,
+    aiTextureOp_Add = 0x1,
+    aiTextureOp_Subtract = 0x2,
+    aiTextureOp_Divide = 0x3,
+    aiTextureOp_SmoothAdd = 0x4,
+    aiTextureOp_SignedAdd = 0x5,
+    _aiTextureOp_Force32Bit
+}
+
+enum aiTextureMapMode: i32 {
+    aiTextureMapMode_Wrap = 0x0,
+    aiTextureMapMode_Clamp = 0x1,
+    aiTextureMapMode_Decal = 0x3,
+    aiTextureMapMode_Mirror = 0x2,
+    _aiTextureMapMode_Force32Bit
+}
+
+enum aiTextureMapping: i32 {
+    aiTextureMapping_UV = 0x0,
+    aiTextureMapping_SPHERE = 0x1,
+    aiTextureMapping_CYLINDER = 0x2,
+    aiTextureMapping_BOX = 0x3,
+    aiTextureMapping_PLANE = 0x4,
+    aiTextureMapping_OTHER = 0x5,
+    _aiTextureMapping_Force32Bit
+}
+
+enum aiTextureType: i32 {
+    aiTextureType_NONE = 0,
+    aiTextureType_DIFFUSE = 1,
+    aiTextureType_SPECULAR = 2,
+    aiTextureType_AMBIENT = 3,
+    aiTextureType_EMISSIVE = 4,
+    aiTextureType_HEIGHT = 5,
+    aiTextureType_NORMALS = 6,
+    aiTextureType_SHININESS = 7,
+    aiTextureType_OPACITY = 8,
+    aiTextureType_DISPLACEMENT = 9,
+    aiTextureType_LIGHTMAP = 10,
+    aiTextureType_REFLECTION = 11,
+    aiTextureType_BASE_COLOR = 12,
+    aiTextureType_NORMAL_CAMERA = 13,
+    aiTextureType_EMISSION_COLOR = 14,
+    aiTextureType_METALNESS = 15,
+    aiTextureType_DIFFUSE_ROUGHNESS = 16,
+    aiTextureType_AMBIENT_OCCLUSION = 17,
+    aiTextureType_UNKNOWN = 18,
+    aiTextureType_SHEEN = 19,
+    aiTextureType_CLEARCOAT = 20,
+    aiTextureType_TRANSMISSION = 21,
+    aiTextureType_MAYA_BASE = 22,
+    aiTextureType_MAYA_SPECULAR = 23,
+    aiTextureType_MAYA_SPECULAR_COLOR = 24,
+    aiTextureType_MAYA_SPECULAR_ROUGHNESS = 25,
+    aiTextureType_ANISOTROPY = 26,
+    aiTextureType_GLTF_METALLIC_ROUGHNESS = 27,
+    _aiTextureType_Force32Bit
+}
+
+enum aiShadingMode: i32 {
+    aiShadingMode_Flat = 0x1,
+    aiShadingMode_Gouraud = 0x2,
+    aiShadingMode_Phong = 0x3,
+    aiShadingMode_Blinn = 0x4,
+    aiShadingMode_Toon = 0x5,
+    aiShadingMode_OrenNayar = 0x6,
+    aiShadingMode_Minnaert = 0x7,
+    aiShadingMode_CookTorrance = 0x8,
+    aiShadingMode_NoShading = 0x9,
+    aiShadingMode_Unlit = 9,
+    aiShadingMode_Fresnel = 0xa,
+    aiShadingMode_PBR_BRDF = 0xb,
+    _aiShadingMode_Force32Bit
+}
+
+enum aiTextureFlags: i32 {
+    aiTextureFlags_Invert = 0x1,
+    aiTextureFlags_UseAlpha = 0x2,
+    aiTextureFlags_IgnoreAlpha = 0x4,
+    _aiTextureFlags_Force32Bit
+}
+
+enum aiBlendMode: i32 {
+    aiBlendMode_Default = 0x0,
+    aiBlendMode_Additive = 0x1,
+    _aiBlendMode_Force32Bit
+}
+
+struct aiUVTransform {
+    pub mTranslation: aiVector2D,
+    pub mScaling: aiVector2D,
+    pub mRotation: ai_real
+}
+
+enum aiPropertyTypeInfo: i32 {
+    aiPTI_Float = 0x1,
+    aiPTI_Double = 0x2,
+    aiPTI_String = 0x3,
+    aiPTI_Integer = 0x4,
+    aiPTI_Buffer = 0x5,
+    _aiPTI_Force32Bit
+}
+
+struct aiMaterialProperty {
+    pub mKey: aiString,
+    pub mSemantic: u32,
+    pub mIndex: u32,
+    pub mDataLength: u32,
+    pub mType: aiPropertyTypeInfo,
+    pub mData: *mut i8
+}
+
+struct aiMaterial {
+    pub mProperties: *mut *mut aiMaterialProperty,
+    pub mNumProperties: u32,
+    pub mNumAllocated: u32
+}
+
+extern "C" {
+    fn aiTextureTypeToString(_in: aiTextureType) -> *i8;
+    fn aiGetMaterialProperty(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pPropOut: *mut *aiMaterialProperty) -> aiReturn;
+    fn aiGetMaterialFloatArray(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pOut: *mut ai_real, pMax: *mut u32) -> aiReturn;
+    fn aiGetMaterialIntegerArray(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pOut: *mut i32, pMax: *mut u32) -> aiReturn;
+    fn aiGetMaterialColor(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pOut: *mut aiColor4D) -> aiReturn;
+    fn aiGetMaterialUVTransform(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pOut: *mut aiUVTransform) -> aiReturn;
+    fn aiGetMaterialString(pMat: *aiMaterial, pKey: *i8, _type: u32, index: u32, pOut: *mut aiString) -> aiReturn;
+    fn aiGetMaterialTextureCount(pMat: *aiMaterial, _type: aiTextureType) -> u32;
+    fn aiGetMaterialTexture(mat: *aiMaterial, _type: aiTextureType, index: u32, path: *mut aiString, mapping: *mut aiTextureMapping, uvindex: *mut u32, blend: *mut ai_real, op: *mut aiTextureOp, mapmode: *mut aiTextureMapMode, flags: *mut u32) -> aiReturn;
+}

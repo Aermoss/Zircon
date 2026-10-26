@@ -1,0 +1,8 @@
+#[include "vendor/assimp/defs.zir" : *]
+
+struct aiQuaternion {
+    pub w: ai_real,
+    pub x: ai_real,
+    pub y: ai_real,
+    pub z: ai_real
+}

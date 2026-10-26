@@ -1,0 +1,6 @@
+#[include "vendor/assimp/vector3.zir" : *]
+
+struct aiAABB {
+    pub mMin: aiVector3D,
+    pub mMax: aiVector3D
+}

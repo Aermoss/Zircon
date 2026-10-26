@@ -1,0 +1,19 @@
+#[include "vendor/assimp/types.zir" : *]
+
+const AI_EMBEDDED_TEXNAME_PREFIX: *i8 = "*";
+const HINTMAXTEXTURELEN: i32 = 9;
+
+struct aiTexel {
+    pub b: u8,
+    pub g: u8,
+    pub r: u8,
+    pub a: u8
+}
+
+struct aiTexture {
+    pub mWidth: u32,
+    pub mHeight: u32,
+    pub achFormatHint: [i8; 9],
+    pub pcData: *mut aiTexel,
+    pub mFilename: aiString
+}
