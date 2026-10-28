@@ -1,0 +1,254 @@
+const VULKAN_BETA_H_: i32 = 1;
+const VK_KHR_portability_subset: i32 = 1;
+const VK_KHR_PORTABILITY_SUBSET_SPEC_VERSION: i32 = 1;
+const VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME: *i8 = "VK_KHR_portability_subset";
+const VK_AMDX_shader_enqueue: i32 = 1;
+const VK_AMDX_SHADER_ENQUEUE_SPEC_VERSION: i32 = 2;
+const VK_AMDX_SHADER_ENQUEUE_EXTENSION_NAME: *i8 = "VK_AMDX_shader_enqueue";
+const VK_NV_cuda_kernel_launch: i32 = 1;
+const VK_NV_CUDA_KERNEL_LAUNCH_SPEC_VERSION: i32 = 2;
+const VK_NV_CUDA_KERNEL_LAUNCH_EXTENSION_NAME: *i8 = "VK_NV_cuda_kernel_launch";
+const VK_NV_displacement_micromap: i32 = 1;
+const VK_NV_DISPLACEMENT_MICROMAP_SPEC_VERSION: i32 = 2;
+const VK_NV_DISPLACEMENT_MICROMAP_EXTENSION_NAME: *i8 = "VK_NV_displacement_micromap";
+const VK_AMDX_dense_geometry_format: i32 = 1;
+const VK_AMDX_DENSE_GEOMETRY_FORMAT_SPEC_VERSION: i32 = 1;
+const VK_AMDX_DENSE_GEOMETRY_FORMAT_EXTENSION_NAME: *i8 = "VK_AMDX_dense_geometry_format";
+const VK_COMPRESSED_TRIANGLE_FORMAT_DGF1_BYTE_ALIGNMENT_AMDX: u32 = 128;
+const VK_COMPRESSED_TRIANGLE_FORMAT_DGF1_BYTE_STRIDE_AMDX: u32 = 128;
+const VK_SHADER_INDEX_UNUSED_AMDX: u32 = 4294967295;
+
+struct VkPhysicalDevicePortabilitySubsetFeaturesKHR {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub constantAlphaColorBlendFactors: VkBool32,
+    pub events: VkBool32,
+    pub imageViewFormatReinterpretation: VkBool32,
+    pub imageViewFormatSwizzle: VkBool32,
+    pub imageView2DOn3DImage: VkBool32,
+    pub multisampleArrayImage: VkBool32,
+    pub mutableComparisonSamplers: VkBool32,
+    pub pointPolygons: VkBool32,
+    pub samplerMipLodBias: VkBool32,
+    pub separateStencilMaskRef: VkBool32,
+    pub shaderSampleRateInterpolationFunctions: VkBool32,
+    pub tessellationIsolines: VkBool32,
+    pub tessellationPointMode: VkBool32,
+    pub triangleFans: VkBool32,
+    pub vertexAttributeAccessBeyondStride: VkBool32
+}
+
+struct VkPhysicalDevicePortabilitySubsetPropertiesKHR {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub minVertexInputBindingStrideAlignment: u32
+}
+
+struct VkPhysicalDeviceShaderEnqueueFeaturesAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub shaderEnqueue: VkBool32,
+    pub shaderMeshEnqueue: VkBool32
+}
+
+struct VkPhysicalDeviceShaderEnqueuePropertiesAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub maxExecutionGraphDepth: u32,
+    pub maxExecutionGraphShaderOutputNodes: u32,
+    pub maxExecutionGraphShaderPayloadSize: u32,
+    pub maxExecutionGraphShaderPayloadCount: u32,
+    pub executionGraphDispatchAddressAlignment: u32,
+    pub maxExecutionGraphWorkgroupCount: [u32; 3],
+    pub maxExecutionGraphWorkgroups: u32
+}
+
+struct VkExecutionGraphPipelineScratchSizeAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub minSize: VkDeviceSize,
+    pub maxSize: VkDeviceSize,
+    pub sizeGranularity: VkDeviceSize
+}
+
+struct VkExecutionGraphPipelineCreateInfoAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub flags: VkPipelineCreateFlags,
+    pub stageCount: u32,
+    pub pStages: *VkPipelineShaderStageCreateInfo,
+    pub pLibraryInfo: *VkPipelineLibraryCreateInfoKHR,
+    pub layout: VkPipelineLayout,
+    pub basePipelineHandle: VkPipeline,
+    pub basePipelineIndex: i32
+}
+
+struct VkDeviceOrHostAddressConstAMDX {
+    pub _data: [u64; 1]
+}
+
+struct VkDispatchGraphInfoAMDX {
+    pub nodeIndex: u32,
+    pub payloadCount: u32,
+    pub payloads: VkDeviceOrHostAddressConstAMDX,
+    pub payloadStride: u64
+}
+
+struct VkDispatchGraphCountInfoAMDX {
+    pub count: u32,
+    pub infos: VkDeviceOrHostAddressConstAMDX,
+    pub stride: u64
+}
+
+struct VkPipelineShaderStageNodeCreateInfoAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub pName: *i8,
+    pub index: u32
+}
+
+type PFN_vkCreateExecutionGraphPipelinesAMDX = fn(VkDevice, VkPipelineCache, u32, *VkExecutionGraphPipelineCreateInfoAMDX, *VkAllocationCallbacks, *mut VkPipeline) -> VkResult;
+type PFN_vkGetExecutionGraphPipelineScratchSizeAMDX = fn(VkDevice, VkPipeline, *mut VkExecutionGraphPipelineScratchSizeAMDX) -> VkResult;
+type PFN_vkGetExecutionGraphPipelineNodeIndexAMDX = fn(VkDevice, VkPipeline, *VkPipelineShaderStageNodeCreateInfoAMDX, *mut u32) -> VkResult;
+type PFN_vkCmdInitializeGraphScratchMemoryAMDX = fn(VkCommandBuffer, VkPipeline, VkDeviceAddress, VkDeviceSize);
+type PFN_vkCmdDispatchGraphAMDX = fn(VkCommandBuffer, VkDeviceAddress, VkDeviceSize, *VkDispatchGraphCountInfoAMDX);
+type PFN_vkCmdDispatchGraphIndirectAMDX = fn(VkCommandBuffer, VkDeviceAddress, VkDeviceSize, *VkDispatchGraphCountInfoAMDX);
+type PFN_vkCmdDispatchGraphIndirectCountAMDX = fn(VkCommandBuffer, VkDeviceAddress, VkDeviceSize, VkDeviceAddress);
+
+struct VkCudaModuleNV_T {}
+
+type VkCudaModuleNV = *mut VkCudaModuleNV_T;
+
+struct VkCudaFunctionNV_T {}
+
+type VkCudaFunctionNV = *mut VkCudaFunctionNV_T;
+
+struct VkCudaModuleCreateInfoNV {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub dataSize: usize,
+    pub pData: *void
+}
+
+struct VkCudaFunctionCreateInfoNV {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub module: VkCudaModuleNV,
+    pub pName: *i8
+}
+
+struct VkCudaLaunchInfoNV {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub function: VkCudaFunctionNV,
+    pub gridDimX: u32,
+    pub gridDimY: u32,
+    pub gridDimZ: u32,
+    pub blockDimX: u32,
+    pub blockDimY: u32,
+    pub blockDimZ: u32,
+    pub sharedMemBytes: u32,
+    pub paramCount: usize,
+    pub pParams: **void,
+    pub extraCount: usize,
+    pub pExtras: **void
+}
+
+struct VkPhysicalDeviceCudaKernelLaunchFeaturesNV {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub cudaKernelLaunchFeatures: VkBool32
+}
+
+struct VkPhysicalDeviceCudaKernelLaunchPropertiesNV {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub computeCapabilityMinor: u32,
+    pub computeCapabilityMajor: u32
+}
+
+type PFN_vkCreateCudaModuleNV = fn(VkDevice, *VkCudaModuleCreateInfoNV, *VkAllocationCallbacks, *mut VkCudaModuleNV) -> VkResult;
+type PFN_vkGetCudaModuleCacheNV = fn(VkDevice, VkCudaModuleNV, *mut usize, *mut void) -> VkResult;
+type PFN_vkCreateCudaFunctionNV = fn(VkDevice, *VkCudaFunctionCreateInfoNV, *VkAllocationCallbacks, *mut VkCudaFunctionNV) -> VkResult;
+type PFN_vkDestroyCudaModuleNV = fn(VkDevice, VkCudaModuleNV, *VkAllocationCallbacks);
+type PFN_vkDestroyCudaFunctionNV = fn(VkDevice, VkCudaFunctionNV, *VkAllocationCallbacks);
+type PFN_vkCmdCudaLaunchKernelNV = fn(VkCommandBuffer, *VkCudaLaunchInfoNV);
+
+enum VkDisplacementMicromapFormatNV: i32 {
+    VK_DISPLACEMENT_MICROMAP_FORMAT_64_TRIANGLES_64_BYTES_NV = 1,
+    VK_DISPLACEMENT_MICROMAP_FORMAT_256_TRIANGLES_128_BYTES_NV = 2,
+    VK_DISPLACEMENT_MICROMAP_FORMAT_1024_TRIANGLES_128_BYTES_NV = 3,
+    VK_DISPLACEMENT_MICROMAP_FORMAT_MAX_ENUM_NV = 0x7FFFFFFF
+}
+
+struct VkPhysicalDeviceDisplacementMicromapFeaturesNV {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub displacementMicromap: VkBool32
+}
+
+struct VkPhysicalDeviceDisplacementMicromapPropertiesNV {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub maxDisplacementMicromapSubdivisionLevel: u32
+}
+
+struct VkAccelerationStructureTrianglesDisplacementMicromapNV {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub displacementBiasAndScaleFormat: VkFormat,
+    pub displacementVectorFormat: VkFormat,
+    pub displacementBiasAndScaleBuffer: VkDeviceOrHostAddressConstKHR,
+    pub displacementBiasAndScaleStride: VkDeviceSize,
+    pub displacementVectorBuffer: VkDeviceOrHostAddressConstKHR,
+    pub displacementVectorStride: VkDeviceSize,
+    pub displacedMicromapPrimitiveFlags: VkDeviceOrHostAddressConstKHR,
+    pub displacedMicromapPrimitiveFlagsStride: VkDeviceSize,
+    pub indexType: VkIndexType,
+    pub indexBuffer: VkDeviceOrHostAddressConstKHR,
+    pub indexStride: VkDeviceSize,
+    pub baseTriangle: u32,
+    pub usageCountsCount: u32,
+    pub pUsageCounts: *VkMicromapUsageEXT,
+    pub ppUsageCounts: **VkMicromapUsageEXT,
+    pub micromap: VkMicromapEXT
+}
+
+enum VkCompressedTriangleFormatAMDX: i32 {
+    VK_COMPRESSED_TRIANGLE_FORMAT_DGF1_AMDX = 0,
+    VK_COMPRESSED_TRIANGLE_FORMAT_MAX_ENUM_AMDX = 0x7FFFFFFF
+}
+
+struct VkPhysicalDeviceDenseGeometryFormatFeaturesAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *mut void,
+    pub denseGeometryFormat: VkBool32
+}
+
+struct VkAccelerationStructureDenseGeometryFormatTrianglesDataAMDX {
+    pub sType: VkStructureType,
+    pub pNext: *void,
+    pub compressedData: VkDeviceOrHostAddressConstKHR,
+    pub dataSize: VkDeviceSize,
+    pub numTriangles: u32,
+    pub numVertices: u32,
+    pub maxPrimitiveIndex: u32,
+    pub maxGeometryIndex: u32,
+    pub format: VkCompressedTriangleFormatAMDX
+}
+
+extern "C" {
+    fn vkCreateExecutionGraphPipelinesAMDX(device: VkDevice, pipelineCache: VkPipelineCache, createInfoCount: u32, pCreateInfos: *VkExecutionGraphPipelineCreateInfoAMDX, pAllocator: *VkAllocationCallbacks, pPipelines: *mut VkPipeline) -> VkResult;
+    fn vkGetExecutionGraphPipelineScratchSizeAMDX(device: VkDevice, executionGraph: VkPipeline, pSizeInfo: *mut VkExecutionGraphPipelineScratchSizeAMDX) -> VkResult;
+    fn vkGetExecutionGraphPipelineNodeIndexAMDX(device: VkDevice, executionGraph: VkPipeline, pNodeInfo: *VkPipelineShaderStageNodeCreateInfoAMDX, pNodeIndex: *mut u32) -> VkResult;
+    fn vkCmdInitializeGraphScratchMemoryAMDX(commandBuffer: VkCommandBuffer, executionGraph: VkPipeline, scratch: VkDeviceAddress, scratchSize: VkDeviceSize);
+    fn vkCmdDispatchGraphAMDX(commandBuffer: VkCommandBuffer, scratch: VkDeviceAddress, scratchSize: VkDeviceSize, pCountInfo: *VkDispatchGraphCountInfoAMDX);
+    fn vkCmdDispatchGraphIndirectAMDX(commandBuffer: VkCommandBuffer, scratch: VkDeviceAddress, scratchSize: VkDeviceSize, pCountInfo: *VkDispatchGraphCountInfoAMDX);
+    fn vkCmdDispatchGraphIndirectCountAMDX(commandBuffer: VkCommandBuffer, scratch: VkDeviceAddress, scratchSize: VkDeviceSize, countInfo: VkDeviceAddress);
+    fn vkCreateCudaModuleNV(device: VkDevice, pCreateInfo: *VkCudaModuleCreateInfoNV, pAllocator: *VkAllocationCallbacks, pModule: *mut VkCudaModuleNV) -> VkResult;
+    fn vkGetCudaModuleCacheNV(device: VkDevice, module: VkCudaModuleNV, pCacheSize: *mut usize, pCacheData: *mut void) -> VkResult;
+    fn vkCreateCudaFunctionNV(device: VkDevice, pCreateInfo: *VkCudaFunctionCreateInfoNV, pAllocator: *VkAllocationCallbacks, pFunction: *mut VkCudaFunctionNV) -> VkResult;
+    fn vkDestroyCudaModuleNV(device: VkDevice, module: VkCudaModuleNV, pAllocator: *VkAllocationCallbacks);
+    fn vkDestroyCudaFunctionNV(device: VkDevice, function: VkCudaFunctionNV, pAllocator: *VkAllocationCallbacks);
+    fn vkCmdCudaLaunchKernelNV(commandBuffer: VkCommandBuffer, pLaunchInfo: *VkCudaLaunchInfoNV);
+}

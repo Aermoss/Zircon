@@ -241,7 +241,8 @@ fn _DecimalToDouble(digits: &Vector<u32>, significant: i64, exponent: i64) -> f6
 
 class String {
     data: *mut i8 = null,
-    length: usize = 0;
+    length: usize = 0,
+    capacity: usize = 0;
 
     String(&mut this) {
         this.Allocate(0);
@@ -345,13 +346,31 @@ class String {
     pub fn Length(&this) -> usize { this.length }
 
     fn Allocate(&mut this, length: usize) {
-        (this.data, this.length) = (new i8[length + 1], length);
+        (this.data, this.length, this.capacity) = (new i8[length + 1], length, length);
         this.data[length] = '\0';
     }
 
     fn Release(&mut this) {
         if this.data != null { delete[] this.data; }
-        (this.data, this.length) = (null, 0);
+        (this.data, this.length, this.capacity) = (null, 0, 0);
+    }
+
+    fn Append(&mut this, string: *i8, count: usize) {
+        let length = this.length + count;
+
+        if this.data != null && length <= this.capacity {
+            memcpy((this.data + this.length), string, count);
+        } else {
+            let capacity = if length > this.capacity * 2 { length } else { this.capacity * 2 };
+            let data = new i8[capacity + 1];
+            if this.data != null { memcpy(data, this.data, this.length); }
+            memcpy((data + this.length), string, count);
+            if this.data != null { delete[] this.data; }
+            (this.data, this.capacity) = (data, capacity);
+        }
+
+        this.length = length;
+        this.data[length] = '\0';
     }
 
     pub fn Clear(&mut this) {
@@ -429,6 +448,10 @@ class String {
             if fraction >= 1.0 {
                 fraction -= 1.0;
                 integer += 1;
+            }
+
+            if exponent != 0 && integer >= 10 {
+                (integer, exponent) = (integer / 10, exponent + 1);
             }
 
             let mut result = String::FromInteger(integer);
@@ -1013,29 +1036,13 @@ class String {
 
     pub fn operator+=(&mut this, string: *i8) -> &mut String {
         if string == null { return this; }
-        let string_length = strlen(string);
-        let (data, length) = (this.data, this.length);
-        this.Allocate(length + string_length);
-
-        if data != null {
-            memcpy(this.data, data, length);
-            delete[] data;
-        }
-
-        memcpy((this.data + length), string, string_length);
+        this.Append(string, strlen(string));
         this
     }
 
     pub fn operator+=(&mut this, character: i8) -> &mut String {
-        let (data, length) = (this.data, this.length);
-        this.Allocate(length + 1);
-
-        if data != null {
-            memcpy(this.data, data, length);
-            delete[] data;
-        }
-
-        this.data[length] = character;
+        let single = [character, '\0'];
+        this.Append(&single[0] as *i8, 1);
         this
     }
 

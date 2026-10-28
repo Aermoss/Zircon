@@ -1,0 +1,1 @@
+#[include "vendor/vulkan/vulkan_core.zir", "vendor/vulkan/vulkan_win32.zir", "vendor/vulkan/vulkan_beta.zir" : *]

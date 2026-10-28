@@ -32,12 +32,23 @@ class FileState {
     pub count: u64 = 0
 }
 
+class PendingMacro {
+    pub name: String,
+    pub file_state: *mut FileState = null;
+
+    PendingMacro(&mut this, name: &String, file_state: *mut FileState) {
+        (this.name, this.file_state) = (name, file_state);
+    }
+}
+
 class GlobalState {
     pub files: Map<String, *mut FileState>,
     pub transpile_states: Map<String, TranspileState>,
     pub included_from: Map<String, *mut FileState>,
     pub external: Map<String, String>,
+    pub modules: Map<String, String>,
     pub enum_constants: Map<String, String>,
+    pub pending: Vector<PendingMacro>,
     pub translation_unit: CXTranslationUnit = null,
     pub output_directory: String,
     pub root_directory: String,
@@ -85,6 +96,14 @@ fn GetRelativePath(path: &String, root_directory: &String) -> String {
     SplitExtension(SplitPath(normalized).1).0
 }
 
+fn ModuleOf(state: *mut GlobalState, path: &String) -> String {
+    for directory in state->modules.Keys() {
+        if path.Length() > directory.Length() && path.StartsWith(directory) && path[directory.Length()] == '/' { return state->modules[directory]; }
+    }
+
+    String()
+}
+
 fn GetFileState(state: *mut GlobalState, cursor: CXCursor) -> *mut FileState {
     let location = clang_getCursorLocation(cursor);
     if clang_Location_isInSystemHeader(location) != 0 { return null; }
@@ -96,6 +115,7 @@ fn GetFileState(state: *mut GlobalState, cursor: CXCursor) -> *mut FileState {
     let spelling = clang_getFileName(file);
     let path = NormalizePath(clang_getCString(spelling).ToString());
     clang_disposeString(spelling);
+    if !ModuleOf(state, path).Empty() { return null; }
 
     if state->included_from.Has(path) {
         return state->included_from[path];
@@ -155,6 +175,7 @@ fn TypeToString(_type: CXType) -> String {
         CXTypeKind::CXType_Double => "f64".ToString(),
         CXTypeKind::CXType_WChar => "u16".ToString(),
         CXTypeKind::CXType_Elaborated => TypeToString(clang_Type_getNamedType(_type)),
+        CXTypeKind::CXType_Attributed => TypeToString(clang_Type_getModifiedType(_type)),
         CXTypeKind::CXType_FunctionProto | CXTypeKind::CXType_FunctionNoProto => FuncTypeToString(_type),
         CXTypeKind::CXType_Pointer => PointerTypeToString(_type),
         CXTypeKind::CXType_Record | CXTypeKind::CXType_Enum | CXTypeKind::CXType_Typedef => NamedTypeToString(_type),
@@ -655,25 +676,132 @@ fn TranslateMacro(state: *mut GlobalState, file_state: *mut FileState, cursor: C
     let (mut tokens, mut num_tokens): (*mut CXToken, u32) = (null, 0);
     clang_tokenize(state->translation_unit, extent, &mut tokens, &mut num_tokens);
 
-    if num_tokens != 2 || tokens == null {
+    if num_tokens < 2 || tokens == null {
         if tokens != null {
             clang_disposeTokens(state->translation_unit, tokens, num_tokens);
         } return;
     }
 
-    if clang_getTokenKind(tokens[1]) != CXTokenKind::CXToken_Literal {
-        clang_disposeTokens(state->translation_unit, tokens, num_tokens);
-        return;
-    }
-
+    let kind = clang_getTokenKind(tokens[1]);
     let value_spelling = clang_getTokenSpelling(state->translation_unit, tokens[1]);
     let value = clang_getCString(value_spelling).ToString();
     clang_disposeString(value_spelling);
+    let (mut depth, mut separated) = (0i32, false);
+
+    for i in 1u32..num_tokens {
+        if clang_getTokenKind(tokens[i as usize]) != CXTokenKind::CXToken_Punctuation { continue; }
+        let punctuation_spelling = clang_getTokenSpelling(state->translation_unit, tokens[i as usize]);
+        let punctuation = clang_getCString(punctuation_spelling).ToString();
+        clang_disposeString(punctuation_spelling);
+        if punctuation == "(" { depth += 1; } else if punctuation == ")" { depth -= 1; } else if punctuation == "," && depth == 0 { separated = true; }
+    }
+
     clang_disposeTokens(state->translation_unit, tokens, num_tokens);
+
+    if num_tokens == 2 && kind == CXTokenKind::CXToken_Identifier && state->enum_constants.Has(value) && IsIdentifier(state->enum_constants[value]) {
+        let enumeration = state->enum_constants[value];
+        file_state->macros += "const " + name + ": " + enumeration + " = " + enumeration + "::" + value + ";\n";
+        return;
+    }
+
+    if num_tokens != 2 || kind != CXTokenKind::CXToken_Literal {
+        if !separated { state->pending.PushBack(PendingMacro(name, file_state)); }
+        return;
+    }
+
     let _type = InferMacroType(value);
     if _type.Empty() { return; }
 
     file_state->macros += "const " + name + ": " + _type + " = " + StripCSuffix(value, _type) + ";\n";
+}
+
+fn IsIdentifier(name: &String) -> bool {
+    if name.Empty() || (name[0] >= '0' && name[0] <= '9') { return false; }
+
+    for i in 0..name.Length() {
+        let character = name[i];
+        if !((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '_') { return false; }
+    }
+
+    true
+}
+
+fn FloatLiteral(value: f64, single: bool) -> String {
+    for precision in 1usize..18 {
+        let text = String::FromFloat(value, precision);
+        let parsed = text.ToFloat().UnwrapOr(0.0);
+        if (single && parsed as f32 == value as f32) || (!single && parsed == value) { return text; }
+    }
+
+    String::FromFloat(value, 17)
+}
+
+fn ConstantValue(cursor: CXCursor, _type: CXType) -> (String, String) {
+    let canonical = clang_getCanonicalType(_type);
+    let result = clang_Cursor_Evaluate(cursor);
+    if result == null { return (String(), String()); }
+    let kind = clang_EvalResult_getKind(result);
+    let integer = canonical.kind >= CXTypeKind::CXType_Bool && canonical.kind <= CXTypeKind::CXType_Int128;
+    let floating = canonical.kind == CXTypeKind::CXType_Float || canonical.kind == CXTypeKind::CXType_Double;
+
+    let value = match kind {
+        CXEvalResultKind::CXEval_Int => if !integer { String() }
+            else if clang_EvalResult_isUnsignedInt(result) != 0 { String::FromInteger(clang_EvalResult_getAsUnsigned(result)) }
+            else { String::FromInteger(clang_EvalResult_getAsLongLong(result)) },
+        CXEvalResultKind::CXEval_Float => if floating { FloatLiteral(clang_EvalResult_getAsDouble(result), canonical.kind == CXTypeKind::CXType_Float) } else { String() },
+        CXEvalResultKind::CXEval_StrLiteral => "\"" + clang_EvalResult_getAsStr(result).ToString().Escape() + "\"",
+        _ => String()
+    };
+
+    clang_EvalResult_dispose(result);
+    if value.Empty() { return (String(), String()); }
+    let type_name = if kind == CXEvalResultKind::CXEval_StrLiteral { "*i8".ToString() } else { TypeToString(_type) };
+    if type_name.Empty() { return (String(), String()); }
+    (type_name, value)
+}
+
+fn EmitVariable(state: *mut GlobalState, file_state: *mut FileState, cursor: CXCursor) {
+    let spelling = clang_getCursorSpelling(cursor);
+    let name = clang_getCString(spelling).ToString();
+    clang_disposeString(spelling);
+    let _type = clang_getCursorType(cursor);
+    if name.Empty() || state->transpile_states.Has(name) || clang_isConstQualifiedType(_type) == 0 { return; }
+    let initializer = clang_Cursor_getVarDeclInitializer(cursor);
+    if clang_Cursor_isNull(initializer) != 0 { return; }
+    let (type_name, mut value) = ConstantValue(cursor, _type);
+    if type_name.Empty() { return; }
+
+    if initializer.kind == CXCursorKind::CXCursor_IntegerLiteral {
+        let literal = TranslateExpression(initializer);
+        if !literal.Empty() { value = literal; }
+    }
+
+    state->transpile_states[name] = TranspileState::Defined;
+    file_state->declarations += "const " + name + ": " + type_name + " = " + value + ";\n";
+}
+
+fn EvaluateMacros(state: *mut GlobalState, header: &String, clang_args: &Vector<*i8>) {
+    if state->pending.Empty() { return; }
+    let path = NormalizePath(header);
+    let probe = JoinPath(SplitPath(path).0, "zirgen_probe.h".ToString());
+    let mut source = "#include \"" + path + "\"\n";
+
+    for i in 0..state->pending.Length() {
+        source += "static const __auto_type zirgen_value_" + String::FromInteger(i as u64) + " = (" + state->pending[i].name + ");\n";
+    }
+
+    let mut unsaved: CXUnsavedFile;
+    (unsaved.Filename, unsaved.Contents, unsaved.Length) = (probe.Data(), source.Data(), source.Length() as u32);
+    let index = clang_createIndex(0, 0);
+    let unit = clang_parseTranslationUnit(index, probe.Data(), clang_args.Data(), clang_args.Length() as i32, &mut unsaved, 1, CXTranslationUnit_Flags::CXTranslationUnit_None as u32);
+
+    if unit != null {
+        clang_visitChildren(clang_getTranslationUnitCursor(unit), VisitProbe, state as CXClientData);
+        clang_disposeTranslationUnit(unit);
+    }
+
+    clang_disposeIndex(index);
+    state->pending.Clear();
 }
 
 extern "C" {
@@ -886,6 +1014,26 @@ extern "C" {
         CXChildVisitResult::CXChildVisit_Continue
     }
 
+    fn VisitProbe(cursor: CXCursor, parent: CXCursor, client_data: CXClientData) -> CXChildVisitResult {
+        if cursor.kind != CXCursorKind::CXCursor_VarDecl { return CXChildVisitResult::CXChildVisit_Continue; }
+        let spelling = clang_getCursorSpelling(cursor);
+        let name = clang_getCString(spelling).ToString();
+        clang_disposeString(spelling);
+        if !name.StartsWith("zirgen_value_") { return CXChildVisitResult::CXChildVisit_Continue; }
+
+        let state = client_data as *mut GlobalState;
+        let index = name.SubString(13).ToUnsignedInteger().UnwrapOr(state->pending.Length() as u64) as usize;
+        if index >= state->pending.Length() { return CXChildVisitResult::CXChildVisit_Continue; }
+        let (type_name, value) = ConstantValue(cursor, clang_getCanonicalType(clang_getCursorType(cursor)));
+
+        if !type_name.Empty() {
+            let &pending = state->pending[index];
+            pending.file_state->macros += "const " + pending.name + ": " + type_name + " = " + value + ";\n";
+        }
+
+        CXChildVisitResult::CXChildVisit_Continue
+    }
+
     fn VisitTopLevel(cursor: CXCursor, parent: CXCursor, client_data: CXClientData) -> CXChildVisitResult {
         let location = clang_getCursorLocation(cursor);
 
@@ -910,8 +1058,11 @@ extern "C" {
                     clang_disposeString(spelling);
 
                     let extension = SplitExtension(SplitPath(path).1).1;
+                    let module = ModuleOf(state, path);
 
-                    if extension == ".def" || extension == ".inc" {
+                    if !module.Empty() {
+                        if !file_state->imports.Contains(module) { file_state->imports.PushBack(module); }
+                    } else if extension == ".def" || extension == ".inc" {
                         if !state->included_from.Has(path) {
                             state->included_from[path] = file_state;
                         }
@@ -1009,6 +1160,10 @@ extern "C" {
             CXCursorKind::CXCursor_MacroDefinition => {
                 FlushAnonymousEnum(state, file_state);
                 TranslateMacro(state, file_state, cursor);
+            },
+            CXCursorKind::CXCursor_VarDecl => {
+                FlushAnonymousEnum(state, file_state);
+                EmitVariable(state, file_state, cursor);
             },
             CXCursorKind::CXCursor_FunctionDecl => {
                 FlushAnonymousEnum(state, file_state);
@@ -1125,7 +1280,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
 
     if args.Length() < 2 {
-        WriteLine("Usage: " + executable + " <header.h | input_directory> [-o output_directory] [-I include_directory] [-ignore file_name] [-from module record_name]");
+        WriteLine("Usage: " + executable + " <header.h | input_directory> [-o output_directory] [-I include_directory] [-ignore file_name] [-from module record_name|directory]");
         return 1;
     }
 
@@ -1163,7 +1318,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-from" {
             i += 2;
 
-            if i < args.Length() {
+            if i < args.Length() && IsDirectory(args[i]) {
+                state.modules[NormalizePath(args[i])] = args[i - 1];
+            } else if i < args.Length() {
                 state.external[args[i]] = args[i - 1];
             } else {
                 WriteLine(executable + ": \x1b[31mError:\x1b[0m Missing arguments to '-from'.");
@@ -1224,6 +1381,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
             clang_visitChildren(root, VisitTopLevel, &mut state as CXClientData);
             clang_disposeTranslationUnit(translation_unit);
         }
+
+        EvaluateMacros(&mut state, header_file, clang_args);
     }
 
     FlushAnonymousEnum(&mut state, null);

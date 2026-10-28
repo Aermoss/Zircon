@@ -1,0 +1,50 @@
+#[include "vendor/vulkan/vulkan_video_codec_av1std.zir" : *]
+
+const VULKAN_VIDEO_CODEC_AV1STD_DECODE_H_: i32 = 1;
+const vulkan_video_codec_av1std_decode: i32 = 1;
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_EXTENSION_NAME: *i8 = "VK_STD_vulkan_video_codec_av1_decode";
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_API_VERSION_1_0_0: u32 = 4194304;
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_DECODE_SPEC_VERSION: u32 = 4194304;
+
+struct StdVideoDecodeAV1PictureInfoFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoDecodeAV1PictureInfo {
+    pub flags: StdVideoDecodeAV1PictureInfoFlags,
+    pub frame_type: StdVideoAV1FrameType,
+    pub current_frame_id: u32,
+    pub OrderHint: u8,
+    pub primary_ref_frame: u8,
+    pub refresh_frame_flags: u8,
+    pub reserved1: u8,
+    pub interpolation_filter: StdVideoAV1InterpolationFilter,
+    pub TxMode: StdVideoAV1TxMode,
+    pub delta_q_res: u8,
+    pub delta_lf_res: u8,
+    pub SkipModeFrame: [u8; 2],
+    pub coded_denom: u8,
+    pub reserved2: [u8; 3],
+    pub OrderHints: [u8; 8],
+    pub expectedFrameId: [u32; 8],
+    pub pTileInfo: *StdVideoAV1TileInfo,
+    pub pQuantization: *StdVideoAV1Quantization,
+    pub pSegmentation: *StdVideoAV1Segmentation,
+    pub pLoopFilter: *StdVideoAV1LoopFilter,
+    pub pCDEF: *StdVideoAV1CDEF,
+    pub pLoopRestoration: *StdVideoAV1LoopRestoration,
+    pub pGlobalMotion: *StdVideoAV1GlobalMotion,
+    pub pFilmGrain: *StdVideoAV1FilmGrain
+}
+
+struct StdVideoDecodeAV1ReferenceInfoFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoDecodeAV1ReferenceInfo {
+    pub flags: StdVideoDecodeAV1ReferenceInfoFlags,
+    pub frame_type: u8,
+    pub RefFrameSignBias: u8,
+    pub OrderHint: u8,
+    pub SavedOrderHints: [u8; 8]
+}

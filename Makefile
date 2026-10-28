@@ -34,7 +34,7 @@ transpile-clang: bin/zirgen.exe
 	$< "$(LLVM_PATH)\include\clang-c" -I"$(LLVM_PATH)\include"
 
 transpile-vulkan: bin/zirgen.exe
-	$< "$(VK_SDK_PATH)\Include\vulkan" -I"$(VK_SDK_PATH)\Include"
+	$< "$(VK_SDK_PATH)\Include\vulkan\vulkan.h" -I"$(VK_SDK_PATH)\Include" -DVK_USE_PLATFORM_WIN32_KHR -DVK_ENABLE_BETA_EXTENSIONS
 
 transpile-glfw: bin/zirgen.exe
 	$< "$(VCPKG_PATH)\include\GLFW" -I"$(VCPKG_PATH)\include"

@@ -1,0 +1,81 @@
+#[include "vendor/vulkan/vulkan_video_codec_av1std.zir" : *]
+
+const VULKAN_VIDEO_CODEC_AV1STD_ENCODE_H_: i32 = 1;
+const vulkan_video_codec_av1std_encode: i32 = 1;
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_EXTENSION_NAME: *i8 = "VK_STD_vulkan_video_codec_av1_encode";
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_API_VERSION_1_0_0: u32 = 4194304;
+const VK_STD_VULKAN_VIDEO_CODEC_AV1_ENCODE_SPEC_VERSION: u32 = 4194304;
+
+struct StdVideoEncodeAV1DecoderModelInfo {
+    pub buffer_delay_length_minus_1: u8,
+    pub buffer_removal_time_length_minus_1: u8,
+    pub frame_presentation_time_length_minus_1: u8,
+    pub reserved1: u8,
+    pub num_units_in_decoding_tick: u32
+}
+
+struct StdVideoEncodeAV1ExtensionHeader {
+    pub temporal_id: u8,
+    pub spatial_id: u8
+}
+
+struct StdVideoEncodeAV1OperatingPointInfoFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoEncodeAV1OperatingPointInfo {
+    pub flags: StdVideoEncodeAV1OperatingPointInfoFlags,
+    pub operating_point_idc: u16,
+    pub seq_level_idx: u8,
+    pub seq_tier: u8,
+    pub decoder_buffer_delay: u32,
+    pub encoder_buffer_delay: u32,
+    pub initial_display_delay_minus_1: u8
+}
+
+struct StdVideoEncodeAV1PictureInfoFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoEncodeAV1PictureInfo {
+    pub flags: StdVideoEncodeAV1PictureInfoFlags,
+    pub frame_type: StdVideoAV1FrameType,
+    pub frame_presentation_time: u32,
+    pub current_frame_id: u32,
+    pub order_hint: u8,
+    pub primary_ref_frame: u8,
+    pub refresh_frame_flags: u8,
+    pub coded_denom: u8,
+    pub render_width_minus_1: u16,
+    pub render_height_minus_1: u16,
+    pub interpolation_filter: StdVideoAV1InterpolationFilter,
+    pub TxMode: StdVideoAV1TxMode,
+    pub delta_q_res: u8,
+    pub delta_lf_res: u8,
+    pub ref_order_hint: [u8; 8],
+    pub ref_frame_idx: [i8; 7],
+    pub reserved1: [u8; 3],
+    pub delta_frame_id_minus_1: [u32; 7],
+    pub pTileInfo: *StdVideoAV1TileInfo,
+    pub pQuantization: *StdVideoAV1Quantization,
+    pub pSegmentation: *StdVideoAV1Segmentation,
+    pub pLoopFilter: *StdVideoAV1LoopFilter,
+    pub pCDEF: *StdVideoAV1CDEF,
+    pub pLoopRestoration: *StdVideoAV1LoopRestoration,
+    pub pGlobalMotion: *StdVideoAV1GlobalMotion,
+    pub pExtensionHeader: *StdVideoEncodeAV1ExtensionHeader,
+    pub pBufferRemovalTimes: *u32
+}
+
+struct StdVideoEncodeAV1ReferenceInfoFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoEncodeAV1ReferenceInfo {
+    pub flags: StdVideoEncodeAV1ReferenceInfoFlags,
+    pub RefFrameId: u32,
+    pub frame_type: StdVideoAV1FrameType,
+    pub OrderHint: u8,
+    pub reserved1: [u8; 3],
+    pub pExtensionHeader: *StdVideoEncodeAV1ExtensionHeader
+}

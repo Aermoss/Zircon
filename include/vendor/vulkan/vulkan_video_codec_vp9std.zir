@@ -1,0 +1,116 @@
+const VULKAN_VIDEO_CODEC_VP9STD_H_: i32 = 1;
+const vulkan_video_codec_vp9std: i32 = 1;
+const STD_VIDEO_VP9_NUM_REF_FRAMES: u32 = 8;
+const STD_VIDEO_VP9_REFS_PER_FRAME: u32 = 3;
+const STD_VIDEO_VP9_MAX_REF_FRAMES: u32 = 4;
+const STD_VIDEO_VP9_LOOP_FILTER_ADJUSTMENTS: u32 = 2;
+const STD_VIDEO_VP9_MAX_SEGMENTS: u32 = 8;
+const STD_VIDEO_VP9_SEG_LVL_MAX: u32 = 4;
+const STD_VIDEO_VP9_MAX_SEGMENTATION_TREE_PROBS: u32 = 7;
+const STD_VIDEO_VP9_MAX_SEGMENTATION_PRED_PROB: u32 = 3;
+
+enum StdVideoVP9Profile: i32 {
+    STD_VIDEO_VP9_PROFILE_0 = 0,
+    STD_VIDEO_VP9_PROFILE_1 = 1,
+    STD_VIDEO_VP9_PROFILE_2 = 2,
+    STD_VIDEO_VP9_PROFILE_3 = 3,
+    STD_VIDEO_VP9_PROFILE_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_PROFILE_MAX_ENUM = 0x7FFFFFFF
+}
+
+enum StdVideoVP9Level: i32 {
+    STD_VIDEO_VP9_LEVEL_1_0 = 0,
+    STD_VIDEO_VP9_LEVEL_1_1 = 1,
+    STD_VIDEO_VP9_LEVEL_2_0 = 2,
+    STD_VIDEO_VP9_LEVEL_2_1 = 3,
+    STD_VIDEO_VP9_LEVEL_3_0 = 4,
+    STD_VIDEO_VP9_LEVEL_3_1 = 5,
+    STD_VIDEO_VP9_LEVEL_4_0 = 6,
+    STD_VIDEO_VP9_LEVEL_4_1 = 7,
+    STD_VIDEO_VP9_LEVEL_5_0 = 8,
+    STD_VIDEO_VP9_LEVEL_5_1 = 9,
+    STD_VIDEO_VP9_LEVEL_5_2 = 10,
+    STD_VIDEO_VP9_LEVEL_6_0 = 11,
+    STD_VIDEO_VP9_LEVEL_6_1 = 12,
+    STD_VIDEO_VP9_LEVEL_6_2 = 13,
+    STD_VIDEO_VP9_LEVEL_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_LEVEL_MAX_ENUM = 0x7FFFFFFF
+}
+
+enum StdVideoVP9FrameType: i32 {
+    STD_VIDEO_VP9_FRAME_TYPE_KEY = 0,
+    STD_VIDEO_VP9_FRAME_TYPE_NON_KEY = 1,
+    STD_VIDEO_VP9_FRAME_TYPE_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_FRAME_TYPE_MAX_ENUM = 0x7FFFFFFF
+}
+
+enum StdVideoVP9ReferenceName: i32 {
+    STD_VIDEO_VP9_REFERENCE_NAME_INTRA_FRAME = 0,
+    STD_VIDEO_VP9_REFERENCE_NAME_LAST_FRAME = 1,
+    STD_VIDEO_VP9_REFERENCE_NAME_GOLDEN_FRAME = 2,
+    STD_VIDEO_VP9_REFERENCE_NAME_ALTREF_FRAME = 3,
+    STD_VIDEO_VP9_REFERENCE_NAME_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_REFERENCE_NAME_MAX_ENUM = 0x7FFFFFFF
+}
+
+enum StdVideoVP9InterpolationFilter: i32 {
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_EIGHTTAP = 0,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_EIGHTTAP_SMOOTH = 1,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_EIGHTTAP_SHARP = 2,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_BILINEAR = 3,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_SWITCHABLE = 4,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_INTERPOLATION_FILTER_MAX_ENUM = 0x7FFFFFFF
+}
+
+enum StdVideoVP9ColorSpace: i32 {
+    STD_VIDEO_VP9_COLOR_SPACE_UNKNOWN = 0,
+    STD_VIDEO_VP9_COLOR_SPACE_BT_601 = 1,
+    STD_VIDEO_VP9_COLOR_SPACE_BT_709 = 2,
+    STD_VIDEO_VP9_COLOR_SPACE_SMPTE_170 = 3,
+    STD_VIDEO_VP9_COLOR_SPACE_SMPTE_240 = 4,
+    STD_VIDEO_VP9_COLOR_SPACE_BT_2020 = 5,
+    STD_VIDEO_VP9_COLOR_SPACE_RESERVED = 6,
+    STD_VIDEO_VP9_COLOR_SPACE_RGB = 7,
+    STD_VIDEO_VP9_COLOR_SPACE_INVALID = 0x7FFFFFFF,
+    STD_VIDEO_VP9_COLOR_SPACE_MAX_ENUM = 0x7FFFFFFF
+}
+
+struct StdVideoVP9ColorConfigFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoVP9ColorConfig {
+    pub flags: StdVideoVP9ColorConfigFlags,
+    pub BitDepth: u8,
+    pub subsampling_x: u8,
+    pub subsampling_y: u8,
+    pub reserved1: u8,
+    pub color_space: StdVideoVP9ColorSpace
+}
+
+struct StdVideoVP9LoopFilterFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoVP9LoopFilter {
+    pub flags: StdVideoVP9LoopFilterFlags,
+    pub loop_filter_level: u8,
+    pub loop_filter_sharpness: u8,
+    pub update_ref_delta: u8,
+    pub loop_filter_ref_deltas: [i8; 4],
+    pub update_mode_delta: u8,
+    pub loop_filter_mode_deltas: [i8; 2]
+}
+
+struct StdVideoVP9SegmentationFlags {
+    pub _bitfield0: u32
+}
+
+struct StdVideoVP9Segmentation {
+    pub flags: StdVideoVP9SegmentationFlags,
+    pub segmentation_tree_probs: [u8; 7],
+    pub segmentation_pred_prob: [u8; 3],
+    pub FeatureEnabled: [u8; 8],
+    pub FeatureData: [[i16; 4]; 8]
+}
