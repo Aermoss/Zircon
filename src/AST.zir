@@ -450,10 +450,10 @@ class ASTCharacterLiteral : ASTLiteral {
 }
 
 class ASTIntegerLiteral : ASTLiteral {
-    pub value: u64,
+    pub value: HostUnsigned,
     pub suffix: String;
 
-    ASTIntegerLiteral(&mut this, value: u64, suffix: String, start: Token) : ASTLiteral(ASTLiteralKind::Integer, start) {
+    ASTIntegerLiteral(&mut this, value: HostUnsigned, suffix: String, start: Token) : ASTLiteral(ASTLiteralKind::Integer, start) {
         (this.value, this.suffix) = (value, suffix);
     }
 
@@ -462,6 +462,7 @@ class ASTIntegerLiteral : ASTLiteral {
     }
 }
 
+#[if !ZODIAC]
 class ASTFloatLiteral : ASTLiteral {
     pub value: f64,
     pub suffix: String;
@@ -474,6 +475,7 @@ class ASTFloatLiteral : ASTLiteral {
         String::FromFloat(this.value) + this.suffix
     }
 }
+#[endif]
 
 class ASTStringLiteral : ASTLiteral {
     pub value: String;
@@ -699,7 +701,7 @@ class ASTTupleAccessExpression : ASTExpression {
     }
 
     pub override fn ToString(&this) -> String {
-        this.expression->ToString() + (if this.arrow { "->" } else { "." }) + String::FromInteger(this.index as u64)
+        this.expression->ToString() + (if this.arrow { "->" } else { "." }) + String::FromInteger(this.index as HostUnsigned)
     }
 }
 

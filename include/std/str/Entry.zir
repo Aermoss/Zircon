@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/mem", "std/vec", "std/opt" : *]
+#[include "std/std", "std/mem", "std/vec", "std/opt" : *]
 
 extern "C" {
     fn strlen(str: *i8) -> usize #[if LIBC] ; #[else] {
@@ -58,11 +58,12 @@ extern "C" {
     } #[endif]
 }
 
+#[if !ZODIAC]
 fn _BigMultiplyAdd(value: &mut Vector<u32>, multiplier: u32, addend: u32) {
-    let mut carry = addend as u64;
+    let mut carry = addend as HostUnsigned;
 
     for i in 0..value.Length() {
-        let product = value[i] as u64 * multiplier as u64 + carry;
+        let product = value[i] as HostUnsigned * multiplier as HostUnsigned + carry;
         value[i] = (product & 0xFFFFFFFF) as u32;
         carry = product >> 32;
     }
@@ -70,26 +71,26 @@ fn _BigMultiplyAdd(value: &mut Vector<u32>, multiplier: u32, addend: u32) {
     if carry != 0 { value.PushBack(carry as u32); }
 }
 
-fn _BigBitLength(value: &Vector<u32>) -> i64 {
+fn _BigBitLength(value: &Vector<u32>) -> HostSigned {
     let mut limb = value.Length();
     while limb > 0 && value[limb - 1] == 0 { limb -= 1; }
     if limb == 0 { return 0; }
-    let (mut top, mut bits) = (value[limb - 1], 0i64);
+    let (mut top, mut bits): (u32, HostSigned) = (value[limb - 1], 0);
 
     while top != 0 {
         top >>= 1;
         bits += 1;
     }
 
-    (limb as i64 - 1) * 32 + bits
+    (limb as HostSigned - 1) * 32 + bits
 }
 
-fn _BigBit(value: &Vector<u32>, index: i64) -> bool {
+fn _BigBit(value: &Vector<u32>, index: HostSigned) -> bool {
     let limb = (index / 32) as usize;
     index >= 0 && limb < value.Length() && ((value[limb] >> (index % 32) as u32) & 1) != 0
 }
 
-fn _BigShiftLeft(value: &Vector<u32>, bits: i64) -> Vector<u32> {
+fn _BigShiftLeft(value: &Vector<u32>, bits: HostSigned) -> Vector<u32> {
     let mut result = Vector<u32>();
     let offset = (bits % 32) as u32;
     let mut carry = 0u32;
@@ -125,10 +126,10 @@ fn _BigCompare(a: &Vector<u32>, b: &Vector<u32>) -> i32 {
 }
 
 fn _BigSubtract(a: &mut Vector<u32>, b: &Vector<u32>) {
-    let mut borrow = 0i64;
+    let mut borrow: HostSigned = 0;
 
     for i in 0..a.Length() {
-        let mut difference = a[i] as i64 - borrow - if i < b.Length() { b[i] as i64 } else { 0 };
+        let mut difference = a[i] as HostSigned - borrow - if i < b.Length() { b[i] as HostSigned } else { 0 };
         borrow = 0;
 
         if difference < 0 {
@@ -140,7 +141,7 @@ fn _BigSubtract(a: &mut Vector<u32>, b: &Vector<u32>) {
     }
 }
 
-fn _BigToDouble(value: &Vector<u32>, exponent: i64, sticky: bool) -> f64 {
+fn _BigToDouble(value: &Vector<u32>, exponent: HostSigned, sticky: bool) -> f64 {
     let length = _BigBitLength(value);
     if length == 0 { return 0.0; }
     let mut leading = length - 1 + exponent;
@@ -149,7 +150,7 @@ fn _BigToDouble(value: &Vector<u32>, exponent: i64, sticky: bool) -> f64 {
     if precision < 0 { return 0.0; }
 
     if precision == 0 {
-        let mut bits = 1u64;
+        let mut bits: HostUnsigned = 1;
 
         if !sticky {
             let mut half = true;
@@ -164,14 +165,14 @@ fn _BigToDouble(value: &Vector<u32>, exponent: i64, sticky: bool) -> f64 {
             if half { bits = 0; }
         }
 
-        return *((&mut bits as *mut u64) as *mut f64);
+        return *((&mut bits as *mut HostUnsigned) as *mut f64);
     }
 
     let shift = length - precision;
-    let mut mantissa = 0u64;
+    let mut mantissa: HostUnsigned = 0;
 
     for i in 0..precision {
-        if _BigBit(value, shift + precision - 1 - i) { mantissa |= 1u64 << (precision - 1 - i) as u64; }
+        if _BigBit(value, shift + precision - 1 - i) { mantissa |= 1 as HostUnsigned << (precision - 1 - i) as HostUnsigned; }
     }
 
     if shift > 0 && _BigBit(value, shift - 1) {
@@ -190,19 +191,19 @@ fn _BigToDouble(value: &Vector<u32>, exponent: i64, sticky: bool) -> f64 {
     let mut bits = mantissa;
 
     if precision == 53 {
-        if mantissa == 1u64 << 53 {
+        if mantissa == 1 as HostUnsigned << 53 {
             mantissa >>= 1;
             leading += 1;
             if leading > 1023 { return 1.0 / 0.0; }
         }
 
-        bits = ((leading + 1023) as u64 << 52) | (mantissa & 0xFFFFFFFFFFFFF);
+        bits = ((leading + 1023) as HostUnsigned << 52) | (mantissa & 0xFFFFFFFFFFFFF);
     }
 
-    *((&mut bits as *mut u64) as *mut f64)
+    *((&mut bits as *mut HostUnsigned) as *mut f64)
 }
 
-fn _DecimalToDouble(digits: &Vector<u32>, significant: i64, exponent: i64) -> f64 {
+fn _DecimalToDouble(digits: &Vector<u32>, significant: HostSigned, exponent: HostSigned) -> f64 {
     if _BigBitLength(digits) == 0 { return 0.0; }
     if significant - 1 + exponent > 310 { return 1.0 / 0.0; }
     if significant + exponent < -330 { return 0.0; }
@@ -219,15 +220,15 @@ fn _DecimalToDouble(digits: &Vector<u32>, significant: i64, exponent: i64) -> f6
     let scale = _BigBitLength(divisor) - _BigBitLength(digits) + 55;
     let mut remainder = _BigShiftLeft(digits, if scale > 0 { scale } else { 0 });
     if scale < 0 { divisor = _BigShiftLeft(divisor, -scale); }
-    let mut quotient = 0u64;
-    let mut bit = 57i64;
+    let mut quotient: HostUnsigned = 0;
+    let mut bit: HostSigned = 57;
 
     while bit >= 0 {
         let shifted = _BigShiftLeft(divisor, bit);
 
         if _BigCompare(remainder, shifted) >= 0 {
             _BigSubtract(&mut remainder, shifted);
-            quotient |= 1u64 << bit as u64;
+            quotient |= 1 as HostUnsigned << bit as HostUnsigned;
         }
 
         bit -= 1;
@@ -238,6 +239,7 @@ fn _DecimalToDouble(digits: &Vector<u32>, significant: i64, exponent: i64) -> f6
     result.PushBack((quotient >> 32) as u32);
     _BigToDouble(result, -scale, _BigBitLength(remainder) != 0)
 }
+#[endif]
 
 class String {
     data: *mut i8 = null,
@@ -378,7 +380,7 @@ class String {
         this.Allocate(0);
     }
 
-    pub fn FromInteger(mut value: u64, base: u64) -> String {
+    pub fn FromInteger(mut value: HostUnsigned, base: HostUnsigned) -> String {
         if base < 2 || base > 36 { String() }
         else if value == 0 { String("0") }
         else {
@@ -393,26 +395,27 @@ class String {
         }
     }
 
-    pub fn FromInteger(value: u64) -> String {
+    pub fn FromInteger(value: HostUnsigned) -> String {
         String::FromInteger(value, 10)
     }
 
-    pub fn FromInteger(value: i64, base: i64) -> String {
+    pub fn FromInteger(value: HostSigned, base: HostSigned) -> String {
         if base < 2 || base > 36 {
             String()
         } else if value >= 0 {
-            String::FromInteger(value as u64, base as u64)
+            String::FromInteger(value as HostUnsigned, base as HostUnsigned)
         } else if base != 10 {
-            String::FromInteger((!value + 1) as u64, base as u64)
+            String::FromInteger(!(value as HostUnsigned) + 1, base as HostUnsigned)
         } else {
-            '-' + String::FromInteger((!value + 1) as u64, base as u64)
+            '-' + String::FromInteger(!(value as HostUnsigned) + 1, base as HostUnsigned)
         }
     }
 
-    pub fn FromInteger(value: i64) -> String {
+    pub fn FromInteger(value: HostSigned) -> String {
         String::FromInteger(value, 10)
     }
 
+#[if !ZODIAC]
     pub fn FromFloat(mut value: f64, precision: usize) -> String {
         if value != value { "nan".ToString() }
         else if value == (1.0 / 0.0) { "inf".ToString() }
@@ -421,7 +424,7 @@ class String {
         else if value < 0.0 {
             '-' + String::FromFloat(-value, precision)
         } else {
-            let mut exponent: i64 = 0;
+            let mut exponent: HostSigned = 0;
 
             if value >= 1e9 {
                 while value >= 10.0 {
@@ -435,7 +438,7 @@ class String {
                 }
             }
 
-            let mut integer = value as u64;
+            let mut integer = value as HostUnsigned;
             let mut fraction = value - (integer as f64);
             let mut round = 0.5;
 
@@ -484,65 +487,68 @@ class String {
     pub fn FromFloat(mut value: f64) -> String {
         String::FromFloat(value, 6)
     }
+#[endif]
 
-    fn ParseUnsigned(&this, start: usize, base: u64) -> Option<u64> {
+    fn ParseUnsigned(&this, start: usize, base: HostUnsigned) -> Option<HostUnsigned> {
         if base < 2 || base > 36 || start >= this.length {
-            return Option<u64>::None;
+            return Option<HostUnsigned>::None;
         }
 
-        let mut result: u64 = 0;
+        let mut result: HostUnsigned = 0;
 
         for i in start..this.length {
             let c = this.data[i];
 
-            let value: u64 = if c >= '0' && c <= '9' {
-                (c - '0') as u64
+            let value: HostUnsigned = if c >= '0' && c <= '9' {
+                (c - '0') as HostUnsigned
             } else if c >= 'A' && c <= 'Z' {
-                (c - 'A' + 10) as u64
+                (c - 'A' + 10) as HostUnsigned
             } else if c >= 'a' && c <= 'z' {
-                (c - 'a' + 10) as u64
+                (c - 'a' + 10) as HostUnsigned
             } else {
-                return Option<u64>::None;
+                return Option<HostUnsigned>::None;
             };
 
-            if value >= base || result > (0xFFFFFFFFFFFFFFFF - value) / base {
-                return Option<u64>::None;
+            if value >= base || result > (-1 as HostUnsigned - value) / base {
+                return Option<HostUnsigned>::None;
             }
 
             result = result * base + value;
         }
 
-        Option<u64>::Some(result)
+        Option<HostUnsigned>::Some(result)
     }
 
-    pub fn ToUnsignedInteger(&this, base: u64) -> Option<u64> {
+    pub fn ToUnsignedInteger(&this, base: HostUnsigned) -> Option<HostUnsigned> {
         this.ParseUnsigned(if this.StartsWith('+') { 1 } else { 0 }, base)
     }
 
-    pub fn ToUnsignedInteger(&this) -> Option<u64> {
+    pub fn ToUnsignedInteger(&this) -> Option<HostUnsigned> {
         this.ToUnsignedInteger(10)
     }
 
-    pub fn ToInteger(&this, base: i64) -> Option<i64> {
+    pub fn ToInteger(&this, base: HostSigned) -> Option<HostSigned> {
         let negative = this.StartsWith('-');
+        let sign_bit = 1 as HostUnsigned << (sizeof(HostUnsigned) * 8 - 1);
 
-        match this.ParseUnsigned(if negative || this.StartsWith('+') { 1 } else { 0 }, base as u64) {
-            Option<u64>::Some(value) if negative && value <= 0x8000000000000000 => Option<i64>::Some((!value + 1) as i64),
-            Option<u64>::Some(value) if !negative && value <= 0x7FFFFFFFFFFFFFFF => Option<i64>::Some(value as i64),
-            _ => Option<i64>::None
+        match this.ParseUnsigned(if negative || this.StartsWith('+') { 1 } else { 0 }, base as HostUnsigned) {
+            Option<HostUnsigned>::Some(value) if negative && value <= sign_bit => Option<HostSigned>::Some((!value + 1) as HostSigned),
+            Option<HostUnsigned>::Some(value) if !negative && value < sign_bit => Option<HostSigned>::Some(value as HostSigned),
+            _ => Option<HostSigned>::None
         }
     }
 
-    pub fn ToInteger(&this) -> Option<i64> {
+    pub fn ToInteger(&this) -> Option<HostSigned> {
         this.ToInteger(10)
     }
 
+#[if !ZODIAC]
     pub fn ToFloat(&this) -> Option<f64> {
         if this == "nan" { return Option<f64>::Some(0.0 / 0.0); }
         if this == "inf" || this == "+inf" { return Option<f64>::Some(1.0 / 0.0); }
         if this == "-inf" { return Option<f64>::Some(-1.0 / 0.0); }
         let (mut mantissa, mut negative, mut digits) = (Vector<u32>(), false, 0);
-        let (mut significant, mut fraction_digits, mut exponent) = (0i64, 0i64, 0i64);
+        let (mut significant, mut fraction_digits, mut exponent): (HostSigned, HostSigned, HostSigned) = (0, 0, 0);
         let mut i: usize = 0;
 
         if this.StartsWith('-') {
@@ -589,7 +595,7 @@ class String {
 
             while i < this.length && this.data[i] >= '0' && this.data[i] <= '9' {
                 if exponent < 100000 {
-                    exponent = exponent * 10 + (this.data[i] - '0') as i64;
+                    exponent = exponent * 10 + (this.data[i] - '0') as HostSigned;
                 }
 
                 (i, exponent_digits) = (i + 1, exponent_digits + 1);
@@ -609,6 +615,7 @@ class String {
         Option<f64>::Some(if negative { -value } else { value })
     }
 
+#[endif]
     pub fn ToLower(&this) -> String {
         let mut result = String();
         result.Allocate(this.length);
@@ -994,13 +1001,21 @@ class String {
         this.SubString(start, end - start)
     }
 
-    pub fn Hash(&this) -> u64 {
-        let mut hash: u64 = 0xcbf29ce484222325;
+    pub fn Hash(&this) -> HostUnsigned {
+#[if ZODIAC]
+        let mut hash: HostUnsigned = 0x811c9dc5;
+#[else]
+        let mut hash: HostUnsigned = 0xcbf29ce484222325;
+#[endif]
 
         for i in 0..this.length {
             let character = this.data[i];
-            hash = hash ^ (character as u64 & 0xFF);
+            hash = hash ^ (character as HostUnsigned & 0xFF);
+#[if ZODIAC]
+            hash = hash * 0x01000193;
+#[else]
             hash = hash * 0x100000001b3;
+#[endif]
         }
 
         hash

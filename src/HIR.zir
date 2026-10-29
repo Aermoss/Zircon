@@ -236,7 +236,7 @@ class HIRType {
         }
     }
 
-    pub fn ScorePointer(&this, other: &HIRType, base: u64) -> u64 {
+    pub fn ScorePointer(&this, other: &HIRType, base: usize) -> usize {
         let mut reference_mismatch = false;
         let mut mutability_mismatch = false;
         let mut left: *HIRType = this;
@@ -258,7 +258,7 @@ class HIRType {
         score
     }
 
-    pub fn ScoreParameter(&this, other: &HIRType) -> u64 {
+    pub fn ScoreParameter(&this, other: &HIRType) -> usize {
         if other.IsLiteral() {
             if this.IsInteger() && other.IsInteger() {
                 let (left, right) = (this as *HIRIntegerType, other as *HIRIntegerType);
@@ -276,7 +276,7 @@ class HIRType {
         if this.IsSlice() {
             let element: *HIRType = this.Element();
             let mut source: *HIRType = other;
-            let mut base: u64 = 80;
+            let mut base: usize = 80;
 
             if other.IsSlice() {
                 if this.IsMutable() && !other.IsMutable() { return 0; }
@@ -302,7 +302,7 @@ class HIRType {
         if this.IsTuple() && other.IsTuple() {
             let (left, right) = (this as *HIRTupleType, other as *HIRTupleType);
             if left->elements.Length() != right->elements.Length() { return 0; }
-            let mut score: u64 = 100;
+            let mut score: usize = 100;
 
             for i in 0..left->elements.Length() {
                 let element_score = left->elements[i]->ScoreParameter(*right->elements[i]);
@@ -375,7 +375,7 @@ class HIRType {
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             (this.Width() / 8) as usize
         } else if this.IsPointer() || this.IsFunction() || this.IsSlice() {
-            llvm_lowerer->target->Info().pointer_size
+            hir_lowerer->target_info.pointer_size
         } else if this.IsArray() {
             this.Element().Alignment()
         } else if this.IsTuple() {
@@ -392,7 +392,7 @@ class HIRType {
 
             if this.IsClass() {
                 if (this as *HIRClassType)->declaration->vptr {
-                    alignment = llvm_lowerer->target->Info().pointer_size;
+                    alignment = hir_lowerer->target_info.pointer_size;
                 }
 
                 let parent = (this as *HIRClassType)->declaration->parent;
@@ -432,9 +432,9 @@ class HIRType {
         } else if this.IsCharacter() || this.IsInteger() || this.IsFloat() || this.IsEnumeration() {
             (this.Width() / 8) as usize
         } else if this.IsPointer() || this.IsFunction() {
-            llvm_lowerer->target->Info().pointer_size
+            hir_lowerer->target_info.pointer_size
         } else if this.IsSlice() {
-            llvm_lowerer->target->Info().pointer_size * 2
+            hir_lowerer->target_info.pointer_size * 2
         } else if this.IsArray() {
             this.Element().Size() * this.Length()
         } else if this.IsTuple() {
@@ -458,7 +458,7 @@ class HIRType {
 
             if this.IsClass() {
                 if (this as *HIRClassType)->declaration->vptr {
-                    size = llvm_lowerer->target->Info().pointer_size;
+                    size = hir_lowerer->target_info.pointer_size;
                     alignment = size;
                 }
 
@@ -783,7 +783,7 @@ class HIRIntegerType : HIRType {
     pub override fn ToString(&this) -> String {
         if !this.literal {
             if !this.native {
-                (if this.signed { 'i' } else { 'u' }) + String::FromInteger(this.width as u64)
+                (if this.signed { 'i' } else { 'u' }) + String::FromInteger(this.width as HostUnsigned)
             } else {
                 (if this.signed { "isize" } else { "usize" }).ToString()
             }
@@ -803,7 +803,7 @@ class HIRFloatType : HIRType {
 
     pub override fn ToString(&this) -> String {
         if !this.literal {
-            'f' + String::FromInteger(this.width as u64)
+            'f' + String::FromInteger(this.width as HostUnsigned)
         } else {
             "<float literal>".ToString()
         }
@@ -862,7 +862,7 @@ class HIRArrayType : HIRType {
     }
 
     pub override fn ToString(&this) -> String {
-        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
+        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as HostUnsigned) + ']'
     }
 }
 
@@ -1320,9 +1320,9 @@ class HIRCharacterLiteral : HIRLiteral {
 }
 
 class HIRIntegerLiteral : HIRLiteral {
-    pub value: u64;
+    pub value: HostUnsigned;
 
-    HIRIntegerLiteral(&mut this, value: u64, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Integer, _type) {
+    HIRIntegerLiteral(&mut this, value: HostUnsigned, _type: *HIRType) : HIRLiteral(HIRLiteralKind::Integer, _type) {
         this.value = value;
     }
 
@@ -1331,6 +1331,7 @@ class HIRIntegerLiteral : HIRLiteral {
     }
 }
 
+#[if !ZODIAC]
 class HIRFloatLiteral : HIRLiteral {
     pub value: f64;
 
@@ -1342,6 +1343,7 @@ class HIRFloatLiteral : HIRLiteral {
         String::FromFloat(this.value)
     }
 }
+#[endif]
 
 class HIRStringLiteral : HIRLiteral {
     pub value: String;
@@ -1365,7 +1367,7 @@ class HIRArrayLiteral : HIRLiteral {
 
     pub override fn ToString(&this) -> String {
         if this.repeat {
-            return '[' + this.elements[0]->ToString() + "; " + String::FromInteger(this._type->Length() as u64) + ']';
+            return '[' + this.elements[0]->ToString() + "; " + String::FromInteger(this._type->Length() as HostUnsigned) + ']';
         }
 
         let mut result = '['.ToString();
@@ -1697,7 +1699,7 @@ class HIRTupleAccessExpression : HIRExpression {
             result += this.instance->ToString();
         }
 
-        result + '.' + String::FromInteger(this.index as u64)
+        result + '.' + String::FromInteger(this.index as HostUnsigned)
     }
 }
 
@@ -2149,7 +2151,7 @@ class HIRPatternChecker {
         match value->kind {
             HIRLiteralKind::Boolean => if (value as *HIRBooleanLiteral)->value { "true".ToString() } else { "false".ToString() },
             HIRLiteralKind::Integer => "i" + String::FromInteger((value as *HIRIntegerLiteral)->value),
-            HIRLiteralKind::Character => "c" + String::FromInteger((value as *HIRCharacterLiteral)->value as u64),
+            HIRLiteralKind::Character => "c" + String::FromInteger((value as *HIRCharacterLiteral)->value as HostUnsigned),
             _ => "?" + literal->ToString()
         }
     }
@@ -2158,29 +2160,29 @@ class HIRPatternChecker {
         _type->IsCharacter() || (_type->IsInteger() && !_type->IsLiteral() && _type->Width() <= 64)
     }
 
-    fn RangeMax(&this, _type: *HIRType) -> u64 {
+    fn RangeMax(&this, _type: *HIRType) -> HostUnsigned {
         let width = _type->Width();
-        if width >= 64 { return 0xFFFFFFFFFFFFFFFFu64; }
-        (1u64 << width) - 1
+        if width >= (sizeof(HostUnsigned) * 8) as u32 { return -1 as HostUnsigned; }
+        (1 as HostUnsigned << width) - 1
     }
 
-    fn Bias(&this, value: u64, _type: *HIRType) -> u64 {
+    fn Bias(&this, value: HostUnsigned, _type: *HIRType) -> HostUnsigned {
         let masked = value & this.RangeMax(_type);
         if !_type->IsSigned() { return masked; }
-        masked ^ (1u64 << (_type->Width() - 1))
+        masked ^ (1 as HostUnsigned << (_type->Width() - 1))
     }
 
-    pub fn BoundValue(&this, bound: *HIRExpression, _type: *HIRType) -> u64 {
+    pub fn BoundValue(&this, bound: *HIRExpression, _type: *HIRType) -> HostUnsigned {
         let literal = bound as *HIRLiteral;
 
         if literal->kind == HIRLiteralKind::Character {
-            return this.Bias((literal as *HIRCharacterLiteral)->value as u64, _type);
+            return this.Bias((literal as *HIRCharacterLiteral)->value as HostUnsigned, _type);
         }
 
         this.Bias((literal as *HIRIntegerLiteral)->value, _type)
     }
 
-    fn RangeOf(&this, pattern: *HIRPattern, _type: *HIRType, low: &mut u64, high: &mut u64) -> bool {
+    fn RangeOf(&this, pattern: *HIRPattern, _type: *HIRType, low: &mut HostUnsigned, high: &mut HostUnsigned) -> bool {
         if pattern->kind == HIRPatternKind::Literal {
             let literal = (pattern as *HIRLiteralPattern)->literal;
             if literal->kind != HIRExpressionKind::Literal { return false; }
@@ -2203,14 +2205,14 @@ class HIRPatternChecker {
         false
     }
 
-    fn Split(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<u64> {
-        let mut points = Vector<u64>();
+    fn Split(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: HostUnsigned, high: HostUnsigned) -> Vector<HostUnsigned> {
+        let mut points = Vector<HostUnsigned>();
         points.PushBack(low);
 
         for row in rows {
             let head = this.Normalize(row[0]);
             if head == null { continue; }
-            let (mut start, mut end) = (0u64, 0u64);
+            let (mut start, mut end): (HostUnsigned, HostUnsigned) = (0, 0);
             if !this.RangeOf(head, _type, start, end) { continue; }
             if start > low && start <= high && !points.Contains(start) { points.PushBack(start); }
             if end < high && end + 1 > low && !points.Contains(end + 1) { points.PushBack(end + 1); }
@@ -2230,14 +2232,14 @@ class HIRPatternChecker {
         points
     }
 
-    fn SpecializeRange(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: u64, high: u64) -> Vector<Vector<*HIRPattern>> {
+    fn SpecializeRange(&this, rows: &Vector<Vector<*HIRPattern>>, _type: *HIRType, low: HostUnsigned, high: HostUnsigned) -> Vector<Vector<*HIRPattern>> {
         let mut specialized = Vector<Vector<*HIRPattern>>();
 
         for row in rows {
             let head = this.Normalize(row[0]);
 
             if head != null {
-                let (mut start, mut end) = (0u64, 0u64);
+                let (mut start, mut end): (HostUnsigned, HostUnsigned) = (0, 0);
                 if !this.RangeOf(head, _type, start, end) || start > low || end < high { continue; }
             }
 
@@ -2251,14 +2253,14 @@ class HIRPatternChecker {
         specialized
     }
 
-    fn PieceEnd(&this, points: &Vector<u64>, index: usize, high: u64) -> u64 {
+    fn PieceEnd(&this, points: &Vector<HostUnsigned>, index: usize, high: HostUnsigned) -> HostUnsigned {
         if index + 1 < points.Length() { return points[index + 1] - 1; }
         high
     }
 
     fn UsefulRange(&this, rows: &Vector<Vector<*HIRPattern>>, vector: &Vector<*HIRPattern>, types: &Vector<*HIRType>, _type: *HIRType) -> bool {
         let head = this.Normalize(vector[0]);
-        let (mut low, mut high) = (0u64, this.RangeMax(_type));
+        let (mut low, mut high): (HostUnsigned, HostUnsigned) = (0, this.RangeMax(_type));
         if head != null && !this.RangeOf(head, _type, low, high) { return true; }
         let mut rest = Vector<*HIRPattern>();
         for i in 1..vector.Length() { rest.PushBack(vector[i]); }
@@ -2291,23 +2293,23 @@ class HIRPatternChecker {
         false
     }
 
-    fn FormatBound(&this, _type: *HIRType, value: u64) -> String {
+    fn FormatBound(&this, _type: *HIRType, value: HostUnsigned) -> String {
         let width = _type->Width();
 
         if !_type->IsSigned() {
             return String::FromInteger(value);
         }
 
-        let unbiased = value ^ (1u64 << (width - 1));
+        let unbiased = value ^ (1 as HostUnsigned << (width - 1));
 
-        if width < 64 && (unbiased & (1u64 << (width - 1))) != 0 {
-            return String::FromInteger((unbiased | !this.RangeMax(_type)) as i64);
+        if width < 64 && (unbiased & (1 as HostUnsigned << (width - 1))) != 0 {
+            return String::FromInteger((unbiased | !this.RangeMax(_type)) as HostSigned);
         }
 
-        String::FromInteger(unbiased as i64)
+        String::FromInteger(unbiased as HostSigned)
     }
 
-    fn FormatRange(&this, _type: *HIRType, low: u64, high: u64) -> String {
+    fn FormatRange(&this, _type: *HIRType, low: HostUnsigned, high: HostUnsigned) -> String {
         if low == high { return this.FormatBound(_type, low); }
         this.FormatBound(_type, low) + "..=" + this.FormatBound(_type, high)
     }
@@ -3462,7 +3464,7 @@ class HIRContext {
     }
 
     pub fn IntegerPointerType(&mut this, signed: bool) -> *mut HIRIntegerType {
-        this.arena.New<HIRIntegerType>((llvm_lowerer->target->Info().pointer_size * 8) as u32, signed, false, true)
+        this.arena.New<HIRIntegerType>((hir_lowerer->target_info.pointer_size * 8) as u32, signed, false, true)
     }
 
     pub fn IntegerLiteralType(&mut this) -> *mut HIRIntegerType {
@@ -3641,13 +3643,15 @@ class HIRBuilder {
         this.context->arena.New<HIRCharacterLiteral>(value, _type)
     }
 
-    pub fn IntegerLiteral(&mut this, value: u64, _type: *HIRType) -> *mut HIRIntegerLiteral {
+    pub fn IntegerLiteral(&mut this, value: HostUnsigned, _type: *HIRType) -> *mut HIRIntegerLiteral {
         this.context->arena.New<HIRIntegerLiteral>(value, _type)
     }
 
+#[if !ZODIAC]
     pub fn FloatLiteral(&mut this, value: f64, _type: *HIRType) -> *mut HIRFloatLiteral {
         this.context->arena.New<HIRFloatLiteral>(value, _type)
     }
+#[endif]
 
     pub fn StringLiteral(&mut this, value: String, _type: *HIRType) -> *mut HIRStringLiteral {
         this.context->arena.New<HIRStringLiteral>(value, _type)
@@ -3738,15 +3742,16 @@ class HIRBuilder {
         this.context->arena.New<HIRUnaryExpression>(HIRUnaryKind::Dereference, operand, operand->_type->Pointee(), HIRExpressionCategory::Place, operand->_type->IsMutable())
     }
 
-    fn MaskToWidth(&this, value: u64, width: u32) -> u64 {
-        if width >= 64 { return value; }
-        value & ((1u64 << width) - 1)
+    fn MaskToWidth(&this, value: HostUnsigned, width: u32) -> HostUnsigned {
+        if width >= (sizeof(HostUnsigned) * 8) as u32 { return value; }
+        value & ((1 as HostUnsigned << width) - 1)
     }
 
-    fn SaturateToInteger(&this, value: f64, target: *HIRType) -> u64 {
+#[if !ZODIAC]
+    fn SaturateToInteger(&this, value: f64, target: *HIRType) -> HostUnsigned {
         let width = target->Width();
-        let limit = (1u64 << (width - 1)) - 1;
-        let half = (1u64 << (width - 1)) as f64;
+        let limit = (1 as HostUnsigned << (width - 1)) - 1;
+        let half = (1 as HostUnsigned << (width - 1)) as f64;
 
         let raw = if value != value {
             0
@@ -3756,25 +3761,28 @@ class HIRBuilder {
             } else if value <= -half {
                 limit + 1
             } else {
-                value as i64 as u64
+                value as HostSigned as HostUnsigned
             }
         } else if value <= 0.0 {
             0
         } else if value >= half * 2.0 {
             limit * 2 + 1
         } else {
-            value as u64
+            value as HostUnsigned
         };
 
         this.MaskToWidth(raw, width)
     }
+#[endif]
 
     fn FoldUnary(&mut this, kind: HIRUnaryKind, operand: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
         match kind {
             HIRUnaryKind::Negate => {
                 match operand->kind {
-                    HIRLiteralKind::Integer => this.IntegerLiteral(this.MaskToWidth((0u64 - (operand as *HIRIntegerLiteral)->value), _type->Width()), _type),
+                    HIRLiteralKind::Integer => this.IntegerLiteral(this.MaskToWidth(0 as HostUnsigned - (operand as *HIRIntegerLiteral)->value, _type->Width()), _type),
+#[if !ZODIAC]
                     HIRLiteralKind::Float => this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type),
+#[endif]
                     _ => null
                 }
             },
@@ -3798,16 +3806,16 @@ class HIRBuilder {
         this.context->arena.New<HIRUnaryExpression>(kind, operand, operand->_type, HIRExpressionCategory::Value, false)
     }
 
-    fn SignExtend(&this, value: u64, width: u32) -> i64 {
+    fn SignExtend(&this, value: HostUnsigned, width: u32) -> HostSigned {
         let masked = this.MaskToWidth(value, width);
-        if width >= 64 { return masked as i64; }
-        let sign_bit = 1u64 << (width - 1);
+        if width >= (sizeof(HostUnsigned) * 8) as u32 { return masked as HostSigned; }
+        let sign_bit = 1 as HostUnsigned << (width - 1);
 
         if (masked & sign_bit) != 0 {
-            return (masked | !((1u64 << width) - 1)) as i64;
+            return (masked | !((1 as HostUnsigned << width) - 1)) as HostSigned;
         }
 
-        masked as i64
+        masked as HostSigned
     }
 
     fn FoldBinary(&mut this, kind: HIRBinaryKind, left: *HIRLiteral, right: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
@@ -3821,13 +3829,13 @@ class HIRBuilder {
                     HIRBinaryKind::Add => this.IntegerLiteral(this.MaskToWidth(left + right, width), _type),
                     HIRBinaryKind::Subtract => this.IntegerLiteral(this.MaskToWidth(left - right, width), _type),
                     HIRBinaryKind::Multiply => this.IntegerLiteral(this.MaskToWidth(left * right, width), _type),
-                    HIRBinaryKind::Divide => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) / this.SignExtend(right, width)) as u64 } else { left / right }, width), _type),
-                    HIRBinaryKind::Modulo => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) % this.SignExtend(right, width)) as u64 } else { left % right }, width), _type),
+                    HIRBinaryKind::Divide => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) / this.SignExtend(right, width)) as HostUnsigned } else { left / right }, width), _type),
+                    HIRBinaryKind::Modulo => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) % this.SignExtend(right, width)) as HostUnsigned } else { left % right }, width), _type),
                     HIRBinaryKind::BitwiseAnd => this.IntegerLiteral(left & right, _type),
                     HIRBinaryKind::BitwiseOr => this.IntegerLiteral(left | right, _type),
                     HIRBinaryKind::BitwiseXor => this.IntegerLiteral(left ^ right, _type),
                     HIRBinaryKind::LeftShift => this.IntegerLiteral(this.MaskToWidth(left << right, width), _type),
-                    HIRBinaryKind::RightShift => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) >> right as i64) as u64 } else { left >> right }, width), _type),
+                    HIRBinaryKind::RightShift => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) >> right as HostSigned) as HostUnsigned } else { left >> right }, width), _type),
                     HIRBinaryKind::Equal => this.BooleanLiteral(left == right, this.context->BooleanType()),
                     HIRBinaryKind::NotEqual => this.BooleanLiteral(left != right, this.context->BooleanType()),
                     HIRBinaryKind::Less => this.BooleanLiteral(if signed { this.SignExtend(left, width) < this.SignExtend(right, width) } else { left < right }, this.context->BooleanType()),
@@ -3837,6 +3845,7 @@ class HIRBuilder {
                     _ => null
                 }
             },
+#[if !ZODIAC]
             HIRLiteralKind::Float if right->kind == HIRLiteralKind::Float => {
                 let left = (left as *HIRFloatLiteral)->value;
                 let right = (right as *HIRFloatLiteral)->value;
@@ -3855,6 +3864,7 @@ class HIRBuilder {
                     _ => null
                 }
             },
+#[endif]
             HIRLiteralKind::Boolean if right->kind == HIRLiteralKind::Boolean => {
                 let left = (left as *HIRBooleanLiteral)->value;
                 let right = (right as *HIRBooleanLiteral)->value;
@@ -3893,28 +3903,39 @@ class HIRBuilder {
             return null;
         }
 
+#[if ZODIAC]
+        if target->IsFloat() {
+            return null;
+        }
+#[endif]
+
         match value->kind {
             HIRLiteralKind::Integer | HIRLiteralKind::Character | HIRLiteralKind::Boolean => {
                 let raw = if value->kind == HIRLiteralKind::Boolean {
-                    if (value as *HIRBooleanLiteral)->value { 1u64 } else { 0u64 }
+                    if (value as *HIRBooleanLiteral)->value { 1 as HostUnsigned } else { 0 as HostUnsigned }
                 } else if value->kind == HIRLiteralKind::Character {
-                    (value as *HIRCharacterLiteral)->value as u64
+                    (value as *HIRCharacterLiteral)->value as HostUnsigned
                 } else {
                     (value as *HIRIntegerLiteral)->value
                 };
 
+#[if !ZODIAC]
                 if target->IsFloat() {
                     this.FloatLiteral(if value->_type->IsInteger() && value->_type->IsSigned() { this.SignExtend(raw, value->_type->Width()) as f64 } else { raw as f64 }, target)
                 } else {
+#[endif]
                     let mut converted = raw;
 
                     if value->_type->IsInteger() && value->_type->IsSigned() && target->Width() > value->_type->Width() {
-                        converted = this.SignExtend(raw, value->_type->Width()) as u64;
+                        converted = this.SignExtend(raw, value->_type->Width()) as HostUnsigned;
                     }
 
                     this.IntegerLiteral(this.MaskToWidth(converted, target->Width()), target)
+#[if !ZODIAC]
                 }
+#[endif]
             },
+#[if !ZODIAC]
             HIRLiteralKind::Float => {
                 let value = (value as *HIRFloatLiteral)->value;
 
@@ -3924,6 +3945,7 @@ class HIRBuilder {
                     this.FloatLiteral(value, target)
                 }
             },
+#[endif]
             _ => null
         }
     }
@@ -4166,4 +4188,4 @@ class HIRBuilder {
     }
 }
 
-#[include "src/HIRLowerer.zir", "src/LLVMLowerer.zir" : *]
+#[include "src/HIRLowerer.zir" : *]

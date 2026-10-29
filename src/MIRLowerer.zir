@@ -275,7 +275,7 @@ class MIRLowerer {
     fn IsIndirectAggregate(&mut this, _type: *HIRType) -> bool {
         if !this.IsAggregate(_type) { return false; }
         let size = _type->Size();
-        (size != 1 && size != 2 && size != 4 && size != 8) || !_type->IsTrivial() || _type->IsSlice()
+        (size != 1 && size != 2 && size != 4 && size != 8) || size > this.target_info.pointer_size || !_type->IsTrivial() || _type->IsSlice()
     }
 
     fn LowerReturnType(&mut this, _type: *HIRType) -> *MIRType {
@@ -997,7 +997,7 @@ class MIRLowerer {
             return this.strings[value];
         }
 
-        let name = "string." + String::FromInteger(this.strings.Length() as u64);
+        let name = "string." + String::FromInteger(this.strings.Length() as HostUnsigned);
         let array_type = this.context.ArrayType(this.context.IntegerType(8), value.Length() + 1);
         let initializer = this.builder.ConstantString(value, array_type);
         let _static = this.builder.BuildStatic(name, array_type, false, initializer, MIRDeclarationLinkage::Private);
@@ -1213,9 +1213,11 @@ class MIRLowerer {
 
         match literal->kind {
             HIRLiteralKind::Boolean => this.builder.ConstantInteger(if (literal as *HIRBooleanLiteral)->value { 1 } else { 0 }, _type),
-            HIRLiteralKind::Character => this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as u64, _type),
+            HIRLiteralKind::Character => this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as HostUnsigned, _type),
             HIRLiteralKind::Integer => this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type),
+#[if !ZODIAC]
             HIRLiteralKind::Float => this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type),
+#[endif]
             HIRLiteralKind::String => {
                 let reference = this.builder.ReferenceDeclaration(this.StringStatic((literal as *HIRStringLiteral)->value));
                 this.builder.BuildCast("string.cast".ToString(), MIRCastKind::Bitcast, reference, _type)
@@ -1253,7 +1255,7 @@ class MIRLowerer {
             this.builder.SetCurrentBlock(condition_block);
             let index = this.builder.BuildPhi("array.repeat.index".ToString(), size_type);
             index->AddIncoming(this.builder.ConstantInteger(1, size_type), entry_block);
-            let condition = this.builder.BuildBinary("array.repeat.test".ToString(), MIRBinaryKind::ICmpUlt, index, this.builder.ConstantInteger(length as u64, size_type), this.context.IntegerType(1));
+            let condition = this.builder.BuildBinary("array.repeat.test".ToString(), MIRBinaryKind::ICmpUlt, index, this.builder.ConstantInteger(length as HostUnsigned, size_type), this.context.IntegerType(1));
             this.builder.BuildConditionalBranch(condition, body_block, end_block);
 
             this.builder.SetCurrentBlock(body_block);
@@ -1266,7 +1268,7 @@ class MIRLowerer {
         }
 
         for i in 0..literal->elements.Length() {
-            this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as u64, size_type)));
+            this.LowerExpressionTo(literal->elements[i], this.builder.BuildArrayGEP("array.element".ToString(), base, this.builder.ConstantInteger(i as HostUnsigned, size_type)));
         }
     }
 
@@ -1301,7 +1303,7 @@ class MIRLowerer {
         let member_type = this.context.StructureType(fields);
         let pointer = this.builder.BuildCast("variant.cast".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(member_type));
         let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
-        this.builder.BuildStore(this.builder.ConstantInteger(member->index as u64, tag_type), tag_pointer);
+        this.builder.BuildStore(this.builder.ConstantInteger(member->index as HostUnsigned, tag_type), tag_pointer);
 
         for i in 0..literal->fields.Length() {
             this.LowerExpressionTo(literal->fields[i], this.builder.BuildStructGEP("variant.field".ToString(), pointer, (i + 1) as u32, this.context.PointerType(fields[i + 1])));
@@ -1310,7 +1312,7 @@ class MIRLowerer {
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
         let value = if intrinsic->kind == HIRIntrinsicKind::SizeOf { intrinsic->_type->Size() } else { intrinsic->_type->Alignment() };
-        this.builder.ConstantInteger(value as u64, this.LowerType((intrinsic as *HIRExpression)->_type))
+        this.builder.ConstantInteger(value as HostUnsigned, this.LowerType((intrinsic as *HIRExpression)->_type))
     }
 
     fn LowerAssignmentExpression(&mut this, assignment: *HIRAssignmentExpression) -> *MIRValue {
@@ -1448,7 +1450,7 @@ class MIRLowerer {
         let mut parameters = Vector<*MIRParameter>();
 
         for i in 0..parameter_types.Length() {
-            parameters.PushBack(this.builder.BuildParameter('_' + String::FromInteger(i as u64), i as u32, parameter_types[i]));
+            parameters.PushBack(this.builder.BuildParameter('_' + String::FromInteger(i as HostUnsigned), i as u32, parameter_types[i]));
         }
 
         if this.runtime_functions.Has(name) { return this.runtime_functions[name]; }
@@ -1457,8 +1459,8 @@ class MIRLowerer {
         function
     }
 
-    fn ArrayCookieSize(&mut this, element: *HIRType) -> u64 {
-        let (pointer_size, alignment) = (this.target_info.pointer_size as u64, element->Alignment() as u64);
+    fn ArrayCookieSize(&mut this, element: *HIRType) -> HostUnsigned {
+        let (pointer_size, alignment) = (this.target_info.pointer_size as HostUnsigned, element->Alignment() as HostUnsigned);
         if alignment > pointer_size { alignment } else { pointer_size }
     }
 
@@ -1467,7 +1469,7 @@ class MIRLowerer {
         let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
         parameters.PushBack(size_type);
         let malloc = this.LowerRuntimeFunction("malloc".ToString(), parameters, this.context.PointerType(this.context.VoidType()));
-        let mut allocation_size: *MIRValue = this.builder.ConstantInteger(_new->_type->Size() as u64, size_type);
+        let mut allocation_size: *MIRValue = this.builder.ConstantInteger(_new->_type->Size() as HostUnsigned, size_type);
         let callee = this.builder.ReferenceDeclaration(malloc);
         let mut pointer: *MIRValue = null;
 
@@ -1547,7 +1549,7 @@ class MIRLowerer {
         if _delete->array {
             let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
             let cookie_size = this.ArrayCookieSize(_delete->value->_type->Pointee());
-            raw_pointer = this.builder.BuildArrayGEP("delete.gep".ToString(), raw_pointer, this.builder.ConstantInteger(-(cookie_size as i64) as u64, size_type));
+            raw_pointer = this.builder.BuildArrayGEP("delete.gep".ToString(), raw_pointer, this.builder.ConstantInteger(-(cookie_size as HostSigned) as HostUnsigned, size_type));
 
             if _delete->callee != null {
                 let size = this.builder.BuildLoad("delete.size".ToString(), this.builder.BuildCast("delete.cast".ToString(), MIRCastKind::Bitcast, raw_pointer, this.context.PointerType(size_type)));
@@ -1615,7 +1617,7 @@ class MIRLowerer {
     fn LowerVirtualCallee(&mut this, instance: *MIRValue, _type: *HIRType, index: isize, callee_type: *MIRType) -> *MIRValue {
         let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
         let table = this.builder.BuildLoad("vtable".ToString(), this.VTablePointer(instance, _type));
-        let slot = this.builder.BuildArrayGEP("vtable.slot".ToString(), table, this.builder.ConstantInteger(index as u64, size_type));
+        let slot = this.builder.BuildArrayGEP("vtable.slot".ToString(), table, this.builder.ConstantInteger(index as HostUnsigned, size_type));
         let entry = this.builder.BuildLoad("vtable.entry".ToString(), slot);
         this.builder.BuildCast("vtable.function".ToString(), MIRCastKind::Bitcast, entry, callee_type)
     }
@@ -2060,7 +2062,7 @@ class MIRLowerer {
                     let left = this.builder.BuildCast("ptr.diff.left".ToString(), MIRCastKind::PtrToInt, left, size_type);
                     let right = this.builder.BuildCast("ptr.diff.right".ToString(), MIRCastKind::PtrToInt, right, size_type);
                     let difference = this.builder.BuildBinary("ptr.diff.bytes".ToString(), MIRBinaryKind::Sub, left, right, size_type);
-                    let size_value = this.builder.ConstantInteger(element_type.Size() as u64, size_type);
+                    let size_value = this.builder.ConstantInteger(element_type.Size() as HostUnsigned, size_type);
                     this.builder.BuildBinary("ptr.diff".ToString(), MIRBinaryKind::UDiv, difference, size_value, size_type)
                 },
                 HIRBinaryKind::Equal => this.builder.BuildBinary("eq".ToString(), MIRBinaryKind::ICmpEq, left, right, result_type),
@@ -2213,7 +2215,7 @@ class MIRLowerer {
         let member_type = this.context.StructureType(fields);
         let pointer = this.builder.BuildCast("variant.cast".ToString(), MIRCastKind::Bitcast, target, this.context.PointerType(member_type));
         let tag_pointer = this.builder.BuildStructGEP("variant.tag".ToString(), pointer, 0, this.context.PointerType(tag_type));
-        let (tag, member_tag) = (this.builder.BuildLoad("variant.tag.load".ToString(), tag_pointer), this.builder.ConstantInteger(member->index as u64, tag_type));
+        let (tag, member_tag) = (this.builder.BuildLoad("variant.tag.load".ToString(), tag_pointer), this.builder.ConstantInteger(member->index as HostUnsigned, tag_type));
         let tag_test = this.builder.BuildBinary("pattern.tag.eq".ToString(), MIRBinaryKind::ICmpEq, tag, member_tag, bool_type);
         let mut refutable = false;
 

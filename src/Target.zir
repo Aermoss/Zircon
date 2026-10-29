@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#[if !ZODIAC]
 #[include "std/io", "std/str", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/Target.zir", "vendor/llvm-c/TargetMachine.zir", "src/Logger.zir" : *]
+#[endif]
 
 class TargetInfo {
     pub pointer_size: usize,
@@ -28,6 +30,7 @@ class TargetInfo {
     }
 }
 
+#[if !ZODIAC]
 enum TargetBackend: u8 {
     LLVM, Zodiac
 }
@@ -117,3 +120,4 @@ class Target {
         result
     }
 }
+#[endif]

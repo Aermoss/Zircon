@@ -37,16 +37,22 @@ class Mangler {
         } else if _type->IsCharacter() {
             result += 'c';
         } else if _type->IsInteger() {
-            result += (if _type->IsSigned() { 'i' } else { 'u' }) + String::FromInteger(_type->Width() as u64);
+            result += if _type->IsSigned() { 'i' } else { 'u' };
+
+            if (_type as *HIRIntegerType)->native {
+                result += 'z';
+            } else {
+                result += String::FromInteger(_type->Width() as HostUnsigned);
+            }
         } else if _type->IsFloat() {
-            result += 'f' + String::FromInteger(_type->Width() as u64);
+            result += 'f' + String::FromInteger(_type->Width() as HostUnsigned);
         } else if _type->IsPointer() {
             result += (if _type->IsReference() { 'R' } else { 'P' }) + Mangler::MangleType(_type->Pointee());
         } else if _type->IsSlice() {
             result += 'L' + Mangler::MangleType(_type->Element());
         } else if _type->IsArray() {
             let array = _type as *HIRArrayType;
-            result += 'A' + String::FromInteger(array->length as u64) + '_' + Mangler::MangleType(array->element);
+            result += 'A' + String::FromInteger(array->length as HostUnsigned) + '_' + Mangler::MangleType(array->element);
         } else if _type->IsTuple() {
             result += 'T';
 
@@ -62,7 +68,7 @@ class Mangler {
             }
         } else if _type->IsClass() {
             let declaration = (_type as *HIRClassType)->declaration;
-            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+            result += String::FromInteger(declaration->name.Length() as HostUnsigned) + declaration->name;
 
             if declaration->instance != null {
                 result += "I";
@@ -73,7 +79,7 @@ class Mangler {
             }
         } else if _type->IsStructure() {
             let declaration = (_type as *HIRStructureType)->declaration;
-            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+            result += String::FromInteger(declaration->name.Length() as HostUnsigned) + declaration->name;
 
             if declaration->instance != null {
                 result += "I";
@@ -84,10 +90,10 @@ class Mangler {
             }
         } else if _type->IsEnumeration() {
             let declaration = (_type as *HIREnumerationType)->declaration;
-            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+            result += String::FromInteger(declaration->name.Length() as HostUnsigned) + declaration->name;
         } else if _type->IsVariant() {
             let declaration = (_type as *HIRVariantType)->declaration;
-            result += String::FromInteger(declaration->name.Length() as u64) + declaration->name;
+            result += String::FromInteger(declaration->name.Length() as HostUnsigned) + declaration->name;
 
             if declaration->instance != null {
                 result += "I";
@@ -123,14 +129,14 @@ class Mangler {
                 }
 
                 if equal {
-                    return "S" + String::FromInteger(i as u64) + "_";
+                    return "S" + String::FromInteger(i as HostUnsigned) + "_";
                 }
             }
         }
 
         let result = Mangler::MangleType(_type);
 
-        if result.Length() >= String::FromInteger(substitution_table.Length() as u64).Length() + 2 {
+        if result.Length() >= String::FromInteger(substitution_table.Length() as HostUnsigned).Length() + 2 {
             substitution_table[_type] = result;
         }
 
@@ -155,7 +161,7 @@ class Mangler {
                 name_result += name.SubString(start, end - start + 1);
                 has_namespace = true;
             } else {
-                name_result += String::FromInteger(name.Length() as u64) + name;
+                name_result += String::FromInteger(name.Length() as HostUnsigned) + name;
             }
         }
 
@@ -198,7 +204,7 @@ class Mangler {
                 name_result += name.SubString(start, end - start + 1);
                 has_namespace = true;
             } else {
-                name_result += String::FromInteger(name.Length() as u64) + name;
+                name_result += String::FromInteger(name.Length() as HostUnsigned) + name;
             }
         }
 

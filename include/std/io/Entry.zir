@@ -17,7 +17,22 @@
 #[include "std/str" : *]
 
 extern "C" {
-#[if WINDOWS]
+#[if ZENITH]
+#[if !ZENITH_UNIFIED]
+    fn ZenithConsoleRead(buffer: *mut i8, length: usize) -> isize;
+    fn ZenithConsoleWrite(buffer: *i8, length: usize) -> isize;
+#[endif]
+
+    fn read(fd: i32, buf: *mut i8, count: usize) -> isize {
+        if fd != 0 { return -1; }
+        ZenithConsoleRead(buf, count)
+    }
+
+    fn write(fd: i32, buf: *i8, len: usize) -> isize {
+        if fd != 1 && fd != 2 { return -1; }
+        ZenithConsoleWrite(buf, len)
+    }
+#[elif WINDOWS]
     fn ReadFile(hFile: *mut void, lpBuffer: *mut i8, nNumberOfBytesToRead: u32, lpNumberOfBytesRead: *mut u32, lpOverlapped: *mut void) -> i32;
     fn WriteFile(hFile: *mut void, lpBuffer: *i8, nNumberOfBytesToWrite: u32, lpNumberOfBytesWritten: *mut u32, lpOverlapped: *mut void) -> i32;
 
@@ -82,6 +97,7 @@ fn Write(text: &String) {
 #[endif]
 }
 
+#[if !ZENITH_UNIFIED]
 fn Write(text: *i8) {
 #[if WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, strlen(text) as u32, null, null);
@@ -89,6 +105,7 @@ fn Write(text: *i8) {
     write(STDOUT_FILENO, text, strlen(text));
 #[endif]
 }
+#[endif]
 
 fn WriteLine(text: &String) {
     Write(text);
@@ -99,6 +116,7 @@ fn WriteLine(text: &String) {
 #[endif]
 }
 
+#[if !ZENITH_UNIFIED]
 fn WriteLine(text: *i8) {
     Write(text);
 #[if WINDOWS]
@@ -107,6 +125,7 @@ fn WriteLine(text: *i8) {
     write(STDOUT_FILENO, "\n", 1);
 #[endif]
 }
+#[endif]
 
 fn WriteError(text: &String) {
 #[if WINDOWS]

@@ -48,7 +48,7 @@ class MIRIntegerType : MIRType {
     }
 
     pub override fn ToString(&this) -> String {
-        'i' + String::FromInteger(this.width as u64)
+        'i' + String::FromInteger(this.width as HostUnsigned)
     }
 }
 
@@ -60,7 +60,7 @@ class MIRFloatType : MIRType {
     }
 
     pub override fn ToString(&this) -> String {
-        'f' + String::FromInteger(this.width as u64)
+        'f' + String::FromInteger(this.width as HostUnsigned)
     }
 }
 
@@ -85,7 +85,7 @@ class MIRArrayType : MIRType {
     }
 
     pub override fn ToString(&this) -> String {
-        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as u64) + ']'
+        '[' + this.element->ToString() + "; " + String::FromInteger(this.length as HostUnsigned) + ']'
     }
 }
 
@@ -201,9 +201,9 @@ class MIRConstant : MIRValue {
 }
 
 class MIRConstantInteger : MIRConstant {
-    pub value: u64;
+    pub value: HostUnsigned;
 
-    MIRConstantInteger(&mut this, value: u64, _type: *MIRType) : MIRConstant(MIRConstantKind::Integer, _type) {
+    MIRConstantInteger(&mut this, value: HostUnsigned, _type: *MIRType) : MIRConstant(MIRConstantKind::Integer, _type) {
         this.value = value;
     }
 
@@ -212,10 +212,11 @@ class MIRConstantInteger : MIRConstant {
             return (if this.value != 0 { "true" } else { "false" }).ToString();
         }
 
-        String::FromInteger(this.value as i64)
+        String::FromInteger(this.value as HostSigned)
     }
 }
 
+#[if !ZODIAC]
 class MIRConstantFloat : MIRConstant {
     pub value: f64;
 
@@ -227,6 +228,7 @@ class MIRConstantFloat : MIRConstant {
         String::FromFloat(this.value)
     }
 }
+#[endif]
 
 class MIRConstantString : MIRConstant {
     pub value: String;
@@ -456,7 +458,7 @@ class MIRStructGEPExpression : MIRConstantExpression {
     }
 
     pub override fn ToString(&this) -> String {
-        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64)
+        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as HostUnsigned)
     }
 }
 
@@ -563,7 +565,7 @@ class MIRLoadInstruction : MIRInstruction {
 
     pub fn ToString(&this) -> String {
         let mut result = "load " + this._type->ToString() + ", " + this.pointer->ToString();
-        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
+        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as HostUnsigned); }
         result
     }
 }
@@ -579,7 +581,7 @@ class MIRStoreInstruction : MIRInstruction {
 
     pub fn ToString(&this) -> String {
         let mut result = "store " + this.value->ToString() + ", " + this.pointer->ToString();
-        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as u64); }
+        if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as HostUnsigned); }
         result
     }
 }
@@ -606,7 +608,7 @@ class MIRStructGEPInstruction : MIRInstruction {
     }
 
     pub fn ToString(&this) -> String {
-        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as u64)
+        "getelementptr " + this.pointer->ToString() + ", " + String::FromInteger(this.index as HostUnsigned)
     }
 }
 
@@ -1020,7 +1022,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         let count = this.names.Get(name, 0);
         this.names[name] = count + 1;
         if count == 0 { return name; }
-        name + '.' + String::FromInteger(count as u64)
+        name + '.' + String::FromInteger(count as HostUnsigned)
     }
 
     pub override fn ToString(&this) -> String {
@@ -1175,13 +1177,15 @@ class MIRBuilder {
         (this.context, this.module) = (context, module);
     }
 
-    pub fn ConstantInteger(&mut this, value: u64, _type: *MIRType) -> *mut MIRConstantInteger {
+    pub fn ConstantInteger(&mut this, value: HostUnsigned, _type: *MIRType) -> *mut MIRConstantInteger {
         this.context->arena.New<MIRConstantInteger>(value, _type)
     }
 
+#[if !ZODIAC]
     pub fn ConstantFloat(&mut this, value: f64, _type: *MIRType) -> *mut MIRConstantFloat {
         this.context->arena.New<MIRConstantFloat>(value, _type)
     }
+#[endif]
 
     pub fn ConstantString(&mut this, value: String, _type: *MIRType) -> *mut MIRConstantString {
         this.context->arena.New<MIRConstantString>(value, _type)

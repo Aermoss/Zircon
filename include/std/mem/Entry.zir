@@ -14,8 +14,20 @@
  * limitations under the License.
  */
 
+#[if ZENITH_COMPILER]
+static mut compiler_allocations: *mut usize = null;
+#[if ZENITH_UNIFIED]
+static mut compiler_owner: u32 = 0xFFFFFFFF;
+#[endif]
+#[endif]
+
 extern "C" {
-#[if WINDOWS]
+#[if ZENITH]
+#[if !ZENITH_UNIFIED]
+    fn ZenithAllocate(size: usize) -> *mut void;
+    fn ZenithFree(ptr: *mut void);
+#[endif]
+#[elif WINDOWS]
     fn GetProcessHeap() -> *mut void;
 
     fn HeapAlloc(hHeap: *mut void, dwFlags: u32, dwBytes: usize) -> *mut void;
@@ -28,7 +40,45 @@ extern "C" {
 #[endif]
 
     fn malloc(size: usize) -> *mut void #[if LIBC] ; #[else] {
-#[if WINDOWS]
+#[if ZENITH]
+#[if ZENITH_COMPILER]
+        if size > (-1 as usize) - 16 { return null; }
+#[if ZENITH_UNIFIED]
+        let interrupts = DisableInterrupts();
+#[endif]
+        let header = ZenithAllocate(size + 16) as *mut usize;
+
+        if header == null {
+#[if ZENITH_UNIFIED]
+            RestoreInterrupts(interrupts);
+#[endif]
+            return null;
+        }
+#[if ZENITH_UNIFIED]
+        let tracked = ZenithCurrentProcess() == compiler_owner;
+        header[3] = if tracked { 1 } else { 0 };
+        if tracked {
+#[endif]
+        header[0] = compiler_allocations as usize;
+        header[1] = 0;
+        if compiler_allocations != null { compiler_allocations[1] = header as usize; }
+        compiler_allocations = header;
+#[if ZENITH_UNIFIED]
+        }
+#[endif]
+        header[2] = size;
+#[if ZENITH_UNIFIED]
+        RestoreInterrupts(interrupts);
+#[endif]
+        return (header as *mut u8 + 16) as *mut void;
+#[else]
+        if size > (-1 as usize) - 8 { return null; }
+        let header = ZenithAllocate(size + 8) as *mut usize;
+        if header == null { return null; }
+        header[0] = size;
+        return (header as *mut u8 + 8) as *mut void;
+#[endif]
+#[elif WINDOWS]
         return HeapAlloc(GetProcessHeap(), 0, size);
 #[else]
         let mut address: i64 = 0;
@@ -46,7 +96,30 @@ extern "C" {
 
     fn free(ptr: *mut void) #[if LIBC] ; #[else] {
         if ptr == null { return; }
-#[if WINDOWS]
+#[if ZENITH]
+#[if ZENITH_COMPILER]
+#[if ZENITH_UNIFIED]
+        let interrupts = DisableInterrupts();
+#[endif]
+        let header = ((ptr as *mut u8) - 16) as *mut usize;
+#[if ZENITH_UNIFIED]
+        if header[3] != 0 {
+#[endif]
+        let next = header[0] as *mut usize;
+        let previous = header[1] as *mut usize;
+        if previous == null { compiler_allocations = next; } else { previous[0] = next as usize; }
+        if next != null { next[1] = previous as usize; }
+#[if ZENITH_UNIFIED]
+        }
+#[endif]
+        ZenithFree(header as *mut void);
+#[if ZENITH_UNIFIED]
+        RestoreInterrupts(interrupts);
+#[endif]
+#[else]
+        ZenithFree(((ptr as *mut u8) - 8) as *mut void);
+#[endif]
+#[elif WINDOWS]
         HeapFree(GetProcessHeap(), 0, ptr);
 #[else]
         let base = ptr as i64 - 8;
@@ -61,7 +134,11 @@ extern "C" {
 
     fn memcpy(dst: *mut void, src: *void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if size == 0 || dst == null || src == null { return dst; }
-#[if WINDOWS]
+#[if ZENITH]
+        for i in 0..size {
+            (dst as *mut u8)[i] = (src as *u8)[i];
+        }
+#[elif WINDOWS]
         RtlCopyMemory(dst, src, size);
 #[else]
         volatile asm : rdi(dst as *mut i8), rsi(src as *i8), rcx(size as i64) -> {
@@ -73,7 +150,20 @@ extern "C" {
 
     fn memmove(dst: *mut void, src: *void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if size == 0 || dst == null || src == null { return dst; }
-#[if WINDOWS]
+#[if ZENITH]
+        if (dst as usize) <= (src as usize) {
+            for i in 0..size {
+                (dst as *mut u8)[i] = (src as *u8)[i];
+            }
+        } else {
+            let mut i = size;
+
+            while i > 0 {
+                i -= 1;
+                (dst as *mut u8)[i] = (src as *u8)[i];
+            }
+        }
+#[elif WINDOWS]
         RtlMoveMemory(dst, src, size);
 #[else]
         if (dst as usize) <= (src as usize) || (dst as usize) >= (src as usize) + size {
@@ -93,7 +183,11 @@ extern "C" {
 
     fn memset(ptr: *mut void, value: i32, num: usize) -> *mut void #[if LIBC] ; #[else] {
         if num == 0 || ptr == null { return ptr; }
-#[if WINDOWS]
+#[if ZENITH]
+        for i in 0..num {
+            (ptr as *mut u8)[i] = value as u8;
+        }
+#[elif WINDOWS]
         RtlFillMemory(ptr, num, value as u8);
 #[else]
         volatile asm : rdi(ptr as *mut i8), al(value as i8), rcx(num as i64) -> {
@@ -104,6 +198,9 @@ extern "C" {
     } #[endif]
 
     fn calloc(nmemb: usize, size: usize) -> *mut void #[if LIBC] ; #[else] {
+#[if ZENITH]
+        if size != 0 && nmemb > (-1 as usize) / size { return null; }
+#[endif]
         let total = nmemb * size;
         let ptr = malloc(total);
         if ptr == null { return null; }
@@ -114,11 +211,14 @@ extern "C" {
     fn realloc(ptr: *mut void, size: usize) -> *mut void #[if LIBC] ; #[else] {
         if ptr == null { return malloc(size); }
         if size == 0 { free(ptr); return null; }
-#[if WINDOWS]
-    let old_size = HeapSize(GetProcessHeap(), 0, ptr);
+#[if ZENITH]
+        let header = ((ptr as *mut u8) - 8) as *usize;
+        let old_size = header[0];
+#[elif WINDOWS]
+        let old_size = HeapSize(GetProcessHeap(), 0, ptr);
 #[else]
-    let header = (ptr as i64 - 8) as *i64;
-    let old_size = header[0] as usize;
+        let header = (ptr as i64 - 8) as *i64;
+        let old_size = header[0] as usize;
 #[endif]
         if size <= old_size { return ptr; }
         let new_ptr = malloc(size);
@@ -128,3 +228,52 @@ extern "C" {
         return new_ptr;
     } #[endif]
 }
+
+#[if ZENITH_COMPILER]
+#[if ZENITH_UNIFIED]
+fn BeginCompilerMemory() -> bool {
+    let interrupts = DisableInterrupts();
+
+    if compiler_owner != 0xFFFFFFFF {
+        RestoreInterrupts(interrupts);
+        return false;
+    }
+
+    compiler_owner = ZenithCurrentProcess();
+    RestoreInterrupts(interrupts);
+    true
+}
+
+fn ReleaseCompilerMemoryForProcess(owner: u32) {
+    let interrupts = DisableInterrupts();
+
+    if owner != compiler_owner {
+        RestoreInterrupts(interrupts);
+        return;
+    }
+
+    let mut allocations = compiler_allocations;
+    compiler_allocations = null;
+    compiler_owner = 0xFFFFFFFF;
+    RestoreInterrupts(interrupts);
+
+    while allocations != null {
+        let header = allocations;
+        allocations = header[0] as *mut usize;
+        ZenithFree(header as *mut void);
+    }
+}
+#[endif]
+
+fn ReleaseCompilerMemory() {
+#[if ZENITH_UNIFIED]
+    ReleaseCompilerMemoryForProcess(ZenithCurrentProcess());
+#[else]
+    while compiler_allocations != null {
+        let header = compiler_allocations;
+        compiler_allocations = header[0] as *mut usize;
+        ZenithFree(header as *mut void);
+    }
+#[endif]
+}
+#[endif]

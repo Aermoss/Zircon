@@ -32,12 +32,12 @@ class LIRPhiEdge {
 
 class LIRConstant {
     pub symbol: String,
-    pub value: i64 = 0,
+    pub value: HostSigned = 0,
     pub valid: bool = false;
 
     LIRConstant(&mut this) {}
 
-    LIRConstant(&mut this, symbol: String, value: i64) {
+    LIRConstant(&mut this, symbol: String, value: HostSigned) {
         (this.symbol, this.value, this.valid) = (symbol, value, true);
     }
 }
@@ -101,9 +101,9 @@ class LIRLowerer {
         lowered
     }
 
-    fn WriteInteger(&mut this, global: *mut LIRGlobal, offset: u32, value: u64, size: u32) {
+    fn WriteInteger(&mut this, global: *mut LIRGlobal, offset: u32, value: HostUnsigned, size: u32) {
         for i in 0..size as usize {
-            global->data[offset as usize + i] = ((value >> ((i * 8) as u64)) & 0xFF) as u8;
+            global->data[offset as usize + i] = ((value >> ((i * 8) as HostUnsigned)) & 0xFF) as u8;
         }
     }
 
@@ -163,7 +163,7 @@ class LIRLowerer {
         if !result.valid {
             Logger::Log("Global '" + global->name + "' has an initializer that cannot be evaluated at compile time.", LogSeverity::Error);
         } else if result.symbol.Empty() {
-            this.WriteInteger(global, offset, result.value as u64, this.SizeOf(value->_type));
+            this.WriteInteger(global, offset, result.value as HostUnsigned, this.SizeOf(value->_type));
         } else if result.value != 0 {
             Logger::Log("Global '" + global->name + "' has an initializer with a symbol offset, which is not supported by the Zodiac backend.", LogSeverity::Error);
         } else {
@@ -172,7 +172,7 @@ class LIRLowerer {
     }
 
     fn LowerStringData(&mut this, value: &String) -> String {
-        let name = ".Lstring." + String::FromInteger(this.constant_index as u64);
+        let name = ".Lstring." + String::FromInteger(this.constant_index as HostUnsigned);
         this.constant_index += 1;
         let global = this.builder.BuildGlobal(name, false, 1, (value.Length() + 1) as u32);
 
@@ -198,7 +198,7 @@ class LIRLowerer {
 
         match constant->kind {
             MIRConstantKind::Integer => {
-                return LIRConstant(String(), (constant as *MIRConstantInteger)->value as i64);
+                return LIRConstant(String(), (constant as *MIRConstantInteger)->value as HostSigned);
             },
             MIRConstantKind::Null | MIRConstantKind::Undef => {
                 return LIRConstant(String(), 0);
@@ -241,14 +241,14 @@ class LIRLowerer {
                 let mut result = this.EvaluateConstant(gep->pointer);
                 let index = this.EvaluateConstant(gep->index);
                 if !result.valid || !index.valid || !index.symbol.Empty() { return LIRConstant(); }
-                result.value += index.value * this.SizeOf((gep->pointer->_type as *MIRPointerType)->pointee) as i64;
+                result.value += index.value * this.SizeOf((gep->pointer->_type as *MIRPointerType)->pointee) as HostSigned;
                 result
             },
             MIRConstantExpressionKind::StructGEP => {
                 let gep = expression as *MIRStructGEPExpression;
                 let mut result = this.EvaluateConstant(gep->pointer);
                 if !result.valid { return result; }
-                result.value += this.FieldOffset((gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType, gep->index) as i64;
+                result.value += this.FieldOffset((gep->pointer->_type as *MIRPointerType)->pointee as *MIRStructureType, gep->index) as HostSigned;
                 result
             },
             MIRConstantExpressionKind::Unary => {
@@ -293,20 +293,20 @@ class LIRLowerer {
                 }
 
                 let (a, b) = (this.SignExtendValue(left.value, width), this.SignExtendValue(right.value, width));
-                let ua = (this.TruncateValue(left.value, width) as u64) & 0xFFFFFFFF;
-                let ub = (this.TruncateValue(right.value, width) as u64) & 0xFFFFFFFF;
+                let ua = (this.TruncateValue(left.value, width) as HostUnsigned) & 0xFFFFFFFF;
+                let ub = (this.TruncateValue(right.value, width) as HostUnsigned) & 0xFFFFFFFF;
 
                 match binary->kind {
                     MIRBinaryKind::Mul => { left.value = a * b; },
                     MIRBinaryKind::SDiv if b != 0 => { left.value = a / b; },
                     MIRBinaryKind::SRem if b != 0 => { left.value = a % b; },
-                    MIRBinaryKind::UDiv if ub != 0 => { left.value = (ua / ub) as i64; },
-                    MIRBinaryKind::URem if ub != 0 => { left.value = (ua % ub) as i64; },
+                    MIRBinaryKind::UDiv if ub != 0 => { left.value = (ua / ub) as HostSigned; },
+                    MIRBinaryKind::URem if ub != 0 => { left.value = (ua % ub) as HostSigned; },
                     MIRBinaryKind::And => { left.value = a & b; },
                     MIRBinaryKind::Or => { left.value = a | b; },
                     MIRBinaryKind::Xor => { left.value = a ^ b; },
                     MIRBinaryKind::Shl => { left.value = a << (b & 31); },
-                    MIRBinaryKind::LShr => { left.value = (ua >> (ub & 31)) as i64; },
+                    MIRBinaryKind::LShr => { left.value = (ua >> (ub & 31)) as HostSigned; },
                     MIRBinaryKind::AShr => { left.value = a >> (b & 31); },
                     _ => { return LIRConstant(); }
                 }
@@ -361,11 +361,11 @@ class LIRLowerer {
         this.builder.SetCurrentFunction(null);
     }
 
-    fn VirtualIndex(&this, operand: *LIROperand) -> i64 {
+    fn VirtualIndex(&this, operand: *LIROperand) -> isize {
         if operand != null && operand->kind == LIROperandKind::Memory {
             return this.VirtualIndex((operand as *LIRMemoryOperand)->base);
         } else if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
-            return (operand as *LIRVirtualRegister)->index as i64;
+            return (operand as *LIRVirtualRegister)->index as isize;
         }
 
         -1
@@ -381,7 +381,7 @@ class LIRLowerer {
             && (operand as *LIRPhysicalRegister)->index == LIR_ZERO
     }
 
-    fn IsImmediateValue(&this, operand: *LIROperand, value: i64) -> bool {
+    fn IsImmediateValue(&this, operand: *LIROperand, value: HostSigned) -> bool {
         this.IsImmediate(operand) && this.ImmediateValue(operand) == value
     }
 
@@ -580,7 +580,7 @@ class LIRLowerer {
         }
 
         while !pending.Empty() {
-            let mut ready: i64 = -1;
+            let mut ready: isize = -1;
 
             for k in 0..pending.Length() {
                 let mut blocked = false;
@@ -592,7 +592,7 @@ class LIRLowerer {
                 }
 
                 if !blocked {
-                    ready = k as i64;
+                    ready = k as isize;
                     break;
                 }
             }
@@ -672,7 +672,7 @@ class LIRLowerer {
 
     fn LowerConstant(&mut this, constant: *MIRConstant) -> *LIROperand {
         match constant->kind {
-            MIRConstantKind::Integer => this.Immediate(this.TruncateValue((constant as *MIRConstantInteger)->value as i64, this.IntegerWidth(constant->_type))),
+            MIRConstantKind::Integer => this.Immediate(this.TruncateValue((constant as *MIRConstantInteger)->value as HostSigned, this.IntegerWidth(constant->_type))),
             MIRConstantKind::Null | MIRConstantKind::Undef => this.Immediate(0),
             MIRConstantKind::Float => this.Unsupported("Floating point"),
             MIRConstantKind::Expression => {
@@ -687,7 +687,7 @@ class LIRLowerer {
             },
             MIRConstantKind::String if constant->_type->kind == MIRTypeKind::Pointer => this.builder.SymbolOperand(this.LowerStringData((constant as *MIRConstantString)->value)),
             _ => {
-                let name = ".Lconstant." + String::FromInteger(this.constant_index as u64);
+                let name = ".Lconstant." + String::FromInteger(this.constant_index as HostUnsigned);
                 this.constant_index += 1;
                 this.LowerGlobal(name, false, constant->_type, constant);
                 this.builder.SymbolOperand(name)
@@ -835,30 +835,30 @@ class LIRLowerer {
         offset
     }
 
-    fn TruncateValue(&this, value: i64, width: u32) -> i64 {
-        if width == 0 || width >= 32 { return (((value as u64) & 0xFFFFFFFF) as u32) as i32 as i64; }
-        ((value as u64) & ((1u64 << (width as u64)) - 1)) as i64
+    fn TruncateValue(&this, value: HostSigned, width: u32) -> HostSigned {
+        if width == 0 || width >= 32 { return ((value as HostUnsigned & 0xFFFFFFFF) as u32) as i32 as HostSigned; }
+        (value as HostUnsigned & ((1 as HostUnsigned << width as HostUnsigned) - 1)) as HostSigned
     }
 
-    fn SignExtendValue(&this, value: i64, width: u32) -> i64 {
+    fn SignExtendValue(&this, value: HostSigned, width: u32) -> HostSigned {
         let bits = if width == 0 || width > 32 { 32 } else { width };
-        let shift = (64 - bits) as i64;
+        let shift = (sizeof(HostSigned) * 8 - bits as usize) as HostSigned;
         (value << shift) >> shift
     }
 
-    fn FitsSigned16(&this, value: i64) -> bool {
+    fn FitsSigned16(&this, value: HostSigned) -> bool {
         value >= -32768 && value <= 32767
     }
 
-    fn FitsUnsigned16(&this, value: i64) -> bool {
+    fn FitsUnsigned16(&this, value: HostSigned) -> bool {
         value >= 0 && value <= 65535
     }
 
-    fn Log2(&this, value: i64) -> i64 {
+    fn Log2(&this, value: HostSigned) -> HostSigned {
         if value <= 0 || (value & (value - 1)) != 0 { return -1; }
-        let mut result: i64 = 0;
+        let mut result: HostSigned = 0;
 
-        while (1i64 << result) < value {
+        while (1 as HostSigned << result) < value {
             result += 1;
         }
 
@@ -869,11 +869,11 @@ class LIRLowerer {
         operand != null && operand->kind == LIROperandKind::Immediate
     }
 
-    fn ImmediateValue(&this, operand: *LIROperand) -> i64 {
+    fn ImmediateValue(&this, operand: *LIROperand) -> HostSigned {
         (operand as *LIRImmediateOperand)->value
     }
 
-    fn Immediate(&mut this, value: i64) -> *LIROperand {
+    fn Immediate(&mut this, value: HostSigned) -> *LIROperand {
         this.builder.ImmediateOperand(value)
     }
 
@@ -908,7 +908,7 @@ class LIRLowerer {
         this.Emit(LIROpcode::B, null, this.builder.BlockOperand(target), null);
     }
 
-    fn EmitAddImmediate(&mut this, base: *LIROperand, value: i64) -> *LIROperand {
+    fn EmitAddImmediate(&mut this, base: *LIROperand, value: HostSigned) -> *LIROperand {
         if value == 0 {
             base
         } else if this.FitsSigned16(value) {
@@ -931,7 +931,7 @@ class LIRLowerer {
             },
             LIROperandKind::Memory => {
                 let memory = operand as *LIRMemoryOperand;
-                this.EmitAddImmediate(this.EnsureRegister(memory->base), memory->offset as i64)
+                this.EmitAddImmediate(this.EnsureRegister(memory->base), memory->offset as HostSigned)
             },
             LIROperandKind::Symbol => this.EmitValue(LIROpcode::La, operand, null),
             _ => this.Zero()
@@ -952,7 +952,7 @@ class LIRLowerer {
     }
 
     fn LegalMemory(&mut this, memory: *LIRMemoryOperand, size: u32) -> *LIRMemoryOperand {
-        if this.FitsSigned16(memory->offset as i64) && this.FitsSigned16(memory->offset as i64 + size as i64) {
+        if this.FitsSigned16(memory->offset as HostSigned) && this.FitsSigned16(memory->offset as HostSigned + size as HostSigned) {
             return memory;
         }
 
@@ -963,8 +963,8 @@ class LIRLowerer {
         if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(this.ImmediateValue(operand), width)); }
         let register = this.EnsureRegister(operand);
         if width >= 32 { return register; }
-        if width <= 16 { return this.EmitValue(LIROpcode::Andi, register, this.Immediate((1i64 << (width as i64)) - 1)); }
-        let shift = this.Immediate((32 - width) as i64);
+        if width <= 16 { return this.EmitValue(LIROpcode::Andi, register, this.Immediate((1 as HostSigned << width as HostSigned) - 1)); }
+        let shift = this.Immediate((32 - width) as HostSigned);
         this.EmitValue(LIROpcode::Srli, this.EmitValue(LIROpcode::Slli, register, shift), shift)
     }
 
@@ -972,7 +972,7 @@ class LIRLowerer {
         if this.IsImmediate(operand) { return this.Immediate(this.SignExtendValue(this.ImmediateValue(operand), width)); }
         let register = this.EnsureRegister(operand);
         if width >= 32 { return register; }
-        let shift = this.Immediate((32 - width) as i64);
+        let shift = this.Immediate((32 - width) as HostSigned);
         this.EmitValue(LIROpcode::Srai, this.EmitValue(LIROpcode::Slli, register, shift), shift)
     }
 
@@ -1053,11 +1053,11 @@ class LIRLowerer {
         let pointer = this.LowerValue(pointer_value);
         let index = this.LowerValue(index_value);
         if pointer == null || index == null { return null; }
-        let element_size = this.SizeOf((pointer_value->_type as *MIRPointerType)->pointee) as i64;
+        let element_size = this.SizeOf((pointer_value->_type as *MIRPointerType)->pointee) as HostSigned;
         let base = this.EnsureMemory(pointer);
 
         if this.IsImmediate(index) {
-            return this.builder.MemoryOperand(base->base, (base->offset as i64 + this.ImmediateValue(index) * element_size) as i32);
+            return this.builder.MemoryOperand(base->base, (base->offset as HostSigned + this.ImmediateValue(index) * element_size) as i32);
         } else if element_size == 0 {
             return base;
         }
@@ -1098,7 +1098,7 @@ class LIRLowerer {
             },
             MIRUnaryKind::Not => {
                 if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(!this.ImmediateValue(operand), width)); }
-                if width <= 16 { return this.EmitValue(LIROpcode::Xori, this.EnsureRegister(operand), this.Immediate((1i64 << (width as i64)) - 1)); }
+                if width <= 16 { return this.EmitValue(LIROpcode::Xori, this.EnsureRegister(operand), this.Immediate((1 as HostSigned << width as HostSigned) - 1)); }
                 this.EmitValue(LIROpcode::Subi, this.EmitValue(LIROpcode::Sub, this.Zero(), this.EnsureRegister(operand)), this.Immediate(1))
             },
             _ => null

@@ -139,12 +139,12 @@ class Logger {
         log.message += ":";
 
         if start_row != -1 as u32 {
-            log.message += String::FromInteger(start_row as u64);
+            log.message += String::FromInteger(start_row as HostUnsigned);
             log.message += ":";
         }
 
         if start_column != -1 as u32 {
-            log.message += String::FromInteger(start_column as u64);
+            log.message += String::FromInteger(start_column as HostUnsigned);
             log.message += ":";
         }
 

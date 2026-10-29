@@ -20,7 +20,7 @@ enum HIRLoweringPass: u8 {
 
 #[include "std/str", "std/vec", "std/map", "std/arena",
     "src/ScopeManager.zir", "src/Scope.zir", "src/Symbol.zir", "src/Generic.zir",
-        "src/Token.zir", "src/AST.zir", "src/HIR.zir", "src/Logger.zir" : *]
+        "src/Token.zir", "src/AST.zir", "src/HIR.zir", "src/Target.zir", "src/Logger.zir" : *]
 
 enum HIRBindingMode: u8 {
     Value, Reference
@@ -64,6 +64,7 @@ class HIRDeferredMethod {
 
 class HIRLowerer {
     context: HIRContext,
+    pub target_info: TargetInfo,
     pub module: *mut HIRModule = null,
     pub builder: HIRBuilder,
     pub extension_registry: HIRExtensionRegistry,
@@ -91,10 +92,12 @@ class HIRLowerer {
     current_generic: *mut GenericDeclaration = null,
     pub current_type: *HIRType = null;
 
-    HIRLowerer(&mut this) {
+    HIRLowerer(&mut this, target_info: TargetInfo) {
         if hir_lowerer != null {
             Logger::Log("Another instance of 'HIRLowerer' already exists!", LogSeverity::Fatal);
-        } hir_lowerer = this;
+        }
+
+        (hir_lowerer, this.target_info) = (this, target_info);
     }
 
     ~HIRLowerer(&mut this) {
@@ -508,7 +511,7 @@ class HIRLowerer {
     fn LowerArrayLength(&mut this, expression: *ASTExpression) -> isize {
         let length = this.LowerExpression(expression);
         if length == null { return -1; }
-        let mut value: u64 = 0;
+        let mut value: HostUnsigned = 0;
 
         if !this.IntegerLiteralValue(length, &mut value) {
             Logger::Log("Array length must be an integer literal.", expression, LogSeverity::Error);
@@ -518,7 +521,7 @@ class HIRLowerer {
         value as isize
     }
 
-    fn IntegerLiteralValue(&mut this, expression: *HIRExpression, value: &mut u64) -> bool {
+    fn IntegerLiteralValue(&mut this, expression: *HIRExpression, value: &mut HostUnsigned) -> bool {
         if expression == null || expression->kind != HIRExpressionKind::Literal || (expression as *HIRLiteral)->kind != HIRLiteralKind::Integer {
             return false;
         }
@@ -623,7 +626,7 @@ class HIRLowerer {
         let index_type = this.context.IntegerPointerType(false);
         let first = this.builder.AddressOf(this.builder.IndexAccess(array, this.builder.IntegerLiteral(0, index_type)));
         let data = this.builder.Cast(first, this.context.PointerType(element, array->mutable));
-        let length = this.builder.IntegerLiteral(array->_type->Length() as u64, index_type);
+        let length = this.builder.IntegerLiteral(array->_type->Length() as HostUnsigned, index_type);
         let slice = this.builder.Slice(data, length, this.context.SliceType(element, array->mutable));
         slice
     }
@@ -836,7 +839,7 @@ class HIRLowerer {
 
             for i in start..instance->types.Length() {
                 let _type = instance->types[i];
-                let name = function->pack_name + String::FromInteger((i - start) as u64);
+                let name = function->pack_name + String::FromInteger((i - start) as HostUnsigned);
                 parameters.PushBack(this.builder.BuildParameterDeclaration(name, _type, false));
                 parameter_types.PushBack(_type);
             }
@@ -1072,7 +1075,7 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->length as u64 {
+            for i in 0.._type->length as HostUnsigned {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
                 let this_element = this.builder.IndexAccess(this_dereferenced, index);
                 let other_element = this.builder.IndexAccess(other_dereferenced, index);
@@ -1096,7 +1099,7 @@ class HIRLowerer {
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            for i in 0.._type->length as u64 {
+            for i in 0.._type->length as HostUnsigned {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
                 let this_element = this.builder.IndexAccess(this_dereferenced, index);
                 this.LowerFieldDestructor(this_element, _type->element, null);
@@ -1123,7 +1126,7 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->length as u64 {
+            for i in 0.._type->length as HostUnsigned {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
                 let this_element = this.builder.IndexAccess(this_dereferenced, index);
                 let other_element = this.builder.IndexAccess(other_dereferenced, index);
@@ -1462,7 +1465,7 @@ class HIRLowerer {
                 if !this.LowerDefaultConstruction(this.builder.TupleAccess(target, i), elements[i], node) { return false; }
             }
         } else if _type->IsArray() {
-            for i in 0.._type->Length() as u64 {
+            for i in 0.._type->Length() as HostUnsigned {
                 let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
                 if !this.LowerDefaultConstruction(this.builder.IndexAccess(target, index), _type->Element(), node) { return false; }
             }
@@ -2080,7 +2083,7 @@ class HIRLowerer {
                 }
 
                 let mut name = field->name;
-                if !member->structure { name = member->name + "." + String::FromInteger(lowered_member->fields.Length() as u64); }
+                if !member->structure { name = member->name + "." + String::FromInteger(lowered_member->fields.Length() as HostUnsigned); }
                 if !this.ValidateFieldType(name, field_type, declaration->_type, variant) { continue; }
                 lowered_member->fields.PushBack(this.builder.BuildVariantField(field->name, field_type, lowered_member->fields.Length()));
             }
@@ -2139,7 +2142,7 @@ class HIRLowerer {
 
             for member in declaration->members {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
-                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
+                let member_tag = this.builder.IntegerLiteral(member->index as HostUnsigned, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.Block();
@@ -2171,7 +2174,7 @@ class HIRLowerer {
 
             for member in declaration->members {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
-                let member_tag = this.builder.IntegerLiteral(member->index as u64, this.context.IntegerType(8, false));
+                let member_tag = this.builder.IntegerLiteral(member->index as HostUnsigned, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.Block();
@@ -2208,7 +2211,7 @@ class HIRLowerer {
             for other_member in declaration->members {
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let other_tag = this.builder.TagAccess(other_dereferenced);
-                let member_tag = this.builder.IntegerLiteral(other_member->index as u64, this.context.IntegerType(8, false));
+                let member_tag = this.builder.IntegerLiteral(other_member->index as HostUnsigned, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, other_tag, member_tag, this.context.BooleanType()));
                 let previous_block = this.builder.GetCurrentBlock();
                 let then_block = this.builder.Block();
@@ -2227,7 +2230,7 @@ class HIRLowerer {
 
                 for this_member in declaration->members {
                     if this_member->index == other_member->index { continue; }
-                    let member_tag = this.builder.IntegerLiteral(this_member->index as u64, this.context.IntegerType(8, false));
+                    let member_tag = this.builder.IntegerLiteral(this_member->index as HostUnsigned, this.context.IntegerType(8, false));
                     let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
                     let previous_block = this.builder.GetCurrentBlock();
                     let then_block = this.builder.Block();
@@ -2732,7 +2735,9 @@ class HIRLowerer {
 
                 match literal->kind {
                     ASTLiteralKind::Integer if (literal as *ASTIntegerLiteral)->suffix.Empty() => this.context.IntegerLiteralType(),
+#[if !ZODIAC]
                     ASTLiteralKind::Float if (literal as *ASTFloatLiteral)->suffix.Empty() => this.context.FloatLiteralType(),
+#[endif]
                     _ => null
                 }
             },
@@ -2845,7 +2850,7 @@ class HIRLowerer {
                                     let member = declaration as *HIRVariantMember;
 
                                     if !member->fields.Empty() {
-                                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as u64) + " argument(s), but none were provided.", expression, LogSeverity::Error);
+                                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as HostUnsigned) + " argument(s), but none were provided.", expression, LogSeverity::Error);
                                         return null;
                                     }
 
@@ -2932,6 +2937,12 @@ class HIRLowerer {
                         let width = suffix.ToUnsignedInteger().Unwrap() as u32;
 
                         if width == 128 || width == 64 || width == 32 || width == 16 || width == 8 {
+#[if ZODIAC]
+                            if width > 32 {
+                                Logger::Log("Integer widths above 32 bits are not supported by the Zodiac compiler.", literal, LogSeverity::Error);
+                                return null;
+                            }
+#[endif]
                             _type = this.context.IntegerType(width, signed);
                         } else {
                             Logger::Log("Invalid integer suffix '" + integer->suffix +  "'.", literal, LogSeverity::Error);
@@ -2943,6 +2954,10 @@ class HIRLowerer {
                 this.builder.IntegerLiteral(integer->value, _type)
             },
             ASTLiteralKind::Float => {
+#[if ZODIAC]
+                Logger::Log("Floating point literals are not supported by the Zodiac compiler.", literal, LogSeverity::Error);
+                null
+#[else]
                 let float = literal as *ASTFloatLiteral;
                 let mut _type = this.context.FloatLiteralType();
 
@@ -2958,6 +2973,7 @@ class HIRLowerer {
                 }
 
                 this.builder.FloatLiteral(float->value, _type)
+#[endif]
             },
             ASTLiteralKind::String => this.builder.StringLiteral((literal as *ASTStringLiteral)->value, this.context.PointerType(this.context.IntegerType(8, true), false)),
             ASTLiteralKind::Array if (literal as *ASTArrayLiteral)->count != null => {
@@ -3398,7 +3414,12 @@ class HIRLowerer {
                     }
 
                     if path->segments[0].name == "typeid" {
+#[if ZODIAC]
+                        Logger::Log("The typeid intrinsic requires a 64-bit integer and is not supported by the Zodiac compiler.", call, LogSeverity::Error);
+                        return null;
+#[else]
                         return this.builder.IntegerLiteral(_type->ToString().Hash(), this.context.IntegerType(64, false));
+#[endif]
                     }
 
                     return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
@@ -3566,7 +3587,7 @@ class HIRLowerer {
                     }
 
                     if values.Length() != member->fields.Length() {
-                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as u64) + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", call, LogSeverity::Error);
+                        Logger::Log("Variant member '" + path->ToString() + "' expects " + String::FromInteger(member->fields.Length() as HostUnsigned) + " argument(s), but " + String::FromInteger(values.Length() as HostUnsigned) + " were provided.", call, LogSeverity::Error);
                         return null;
                     }
 
@@ -3648,14 +3669,14 @@ class HIRLowerer {
 
     fn ResolveOverload(&mut this, candidates: &Vector<*HIRFunctionDeclaration>, values: &Vector<*HIRExpression>, node: *ASTNode, test: bool) -> *HIRFunctionDeclaration {
         let mut index: usize = 0;
-        let mut best: u64 = 0;
+        let mut best: usize = 0;
 
         for i in 0..candidates.Length() {
             let function = candidates[i];
             let parameters = function->_type->Parameters();
             let variadic = function->_type->IsVariadic() && values.Length() > parameters.Length();
             if values.Length() != parameters.Length() && !variadic { continue; }
-            let (mut _match, mut score) = (true, 1u64);
+            let (mut _match, mut score) = (true, 1usize);
 
             for j in 0..parameters.Length() {
                 let mut parameter_score = parameters[j]->ScoreParameter(values[j]->_type);
@@ -3723,8 +3744,8 @@ class HIRLowerer {
         let variadic = callee->_type->IsVariadic();
 
         if values.Length() != parameter_types.Length() && !(variadic && values.Length() > parameter_types.Length()) {
-            let expected = String::FromInteger(parameter_types.Length() as u64) + (if variadic { " or more" } else { "" });
-            Logger::Log("Function expects " + expected + " argument(s), but " + String::FromInteger(values.Length() as u64) + " were provided.", node, LogSeverity::Error);
+            let expected = String::FromInteger(parameter_types.Length() as HostUnsigned) + (if variadic { " or more" } else { "" });
+            Logger::Log("Function expects " + expected + " argument(s), but " + String::FromInteger(values.Length() as HostUnsigned) + " were provided.", node, LogSeverity::Error);
             return false;
         }
 
@@ -3817,8 +3838,8 @@ class HIRLowerer {
         let _type = this.CallerLocationType();
         let mut elements = Vector<*HIRExpression>();
         elements.PushBack(this.builder.StringLiteral(token.file, _type->elements[0]));
-        elements.PushBack(this.builder.IntegerLiteral(token.row as u64, _type->elements[1]));
-        elements.PushBack(this.builder.IntegerLiteral(token.column as u64, _type->elements[2]));
+        elements.PushBack(this.builder.IntegerLiteral(token.row as HostUnsigned, _type->elements[1]));
+        elements.PushBack(this.builder.IntegerLiteral(token.column as HostUnsigned, _type->elements[2]));
         this.builder.TupleLiteral(elements, _type)
     }
 
@@ -4098,10 +4119,10 @@ class HIRLowerer {
             return null;
         }
 
-        let mut constant_index: u64 = 0;
+        let mut constant_index: HostUnsigned = 0;
 
-        if value->_type->IsArray() && this.IntegerLiteralValue(index, &mut constant_index) && constant_index >= value->_type->Length() as u64 {
-            Logger::Log("Index " + String::FromInteger(constant_index) + " is out of bounds for an array of length " + String::FromInteger(value->_type->Length() as u64) + ".", index_access, LogSeverity::Error);
+        if value->_type->IsArray() && this.IntegerLiteralValue(index, &mut constant_index) && constant_index >= value->_type->Length() as HostUnsigned {
+            Logger::Log("Index " + String::FromInteger(constant_index) + " is out of bounds for an array of length " + String::FromInteger(value->_type->Length() as HostUnsigned) + ".", index_access, LogSeverity::Error);
             return null;
         }
 
@@ -4149,12 +4170,12 @@ class HIRLowerer {
         }
 
         if !instance->_type->IsTuple() {
-            Logger::Log("Cannot access field '" + String::FromInteger(tuple_access->index as u64) + "' of type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
+            Logger::Log("Cannot access field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' of type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
 
         if tuple_access->index >= (instance->_type as *HIRTupleType)->elements.Length() {
-            Logger::Log("Field '" + String::FromInteger(tuple_access->index as u64) + "' not found in type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
+            Logger::Log("Field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' not found in type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
 
@@ -4443,14 +4464,14 @@ class HIRLowerer {
                 return null;
             }
 
-            let mut constant: u64 = 0;
+            let mut constant: HostUnsigned = 0;
 
             if (kind == ASTBinaryKind::Divide || kind == ASTBinaryKind::Modulo) && this.IntegerLiteralValue(right, &mut constant) && constant == 0 {
                 Logger::Log(if kind == ASTBinaryKind::Divide { "Division by zero." } else { "Remainder with a divisor of zero." }, node, LogSeverity::Error);
                 return null;
             }
 
-            if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as u64 {
+            if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as HostUnsigned {
                 Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
                 return null;
             }
@@ -4779,7 +4800,7 @@ class HIRLowerer {
                 let index_type = this.context.IntegerPointerType(false);
                 let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->mutable);
                 start = this.builder.Cast(this.builder.AddressOf(this.builder.IndexAccess(iterable, this.builder.IntegerLiteral(0, index_type))), pointer_type);
-                end = this.builder.Binary(HIRBinaryKind::Add, start, this.builder.IntegerLiteral(iterable->_type->Length() as u64, index_type), pointer_type);
+                end = this.builder.Binary(HIRBinaryKind::Add, start, this.builder.IntegerLiteral(iterable->_type->Length() as HostUnsigned, index_type), pointer_type);
             } else if iterable->_type->IsSlice() {
                 let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->_type->IsMutable());
                 start = this.builder.SliceAccess(iterable, HIRSliceField::Data);
@@ -4834,11 +4855,20 @@ class HIRLowerer {
         let target_reference = this.builder.ReferenceBinding(target);
 
         if is_range {
+#[if ZODIAC]
+            if iterator_type->IsFloat() {
+                Logger::Log("Floating point ranges are not supported by the Zodiac compiler.", _for, LogSeverity::Error);
+                return null;
+            }
+
+            let one: *HIRExpression = this.builder.IntegerLiteral(1, iterator_type);
+#[else]
             let one: *HIRExpression = if iterator_type->IsFloat() {
                 this.builder.FloatLiteral(1.0, iterator_type)
             } else {
                 this.builder.IntegerLiteral(1, iterator_type)
             };
+#[endif]
 
             item = iterator_reference;
             condition = this.builder.Binary(if inclusive { HIRBinaryKind::LessEqual } else { HIRBinaryKind::Less }, iterator_reference, target_reference, this.context.BooleanType());
@@ -5146,7 +5176,7 @@ class HIRLowerer {
         let explicit = if rest == -1 { patterns.Length() } else { patterns.Length() - 1 };
 
         if (rest == -1 && explicit != count) || explicit > count {
-            Logger::Log(description + " has " + String::FromInteger(count as u64) + " field(s), but the pattern has " + String::FromInteger(explicit as u64) + '.', node, LogSeverity::Error);
+            Logger::Log(description + " has " + String::FromInteger(count as HostUnsigned) + " field(s), but the pattern has " + String::FromInteger(explicit as HostUnsigned) + '.', node, LogSeverity::Error);
             return false;
         }
 
@@ -5681,9 +5711,19 @@ class HIRLowerer {
                         return null;
                     }
 
+#[if ZODIAC]
+                    if width > 32 {
+                        Logger::Log("Integer widths above 32 bits are not supported by the Zodiac compiler.", path, LogSeverity::Error);
+                        return null;
+                    }
+#[endif]
                     return this.context.IntegerType(width, signed);
                 }
             } else if name.StartsWith('f') {
+#[if ZODIAC]
+                Logger::Log("Floating point types are not supported by the Zodiac compiler.", path, LogSeverity::Error);
+                return null;
+#[else]
                 let width = name.SubString(1).ToUnsignedInteger().Unwrap() as u32;
 
                 if width != 32 && width != 64 {
@@ -5692,6 +5732,7 @@ class HIRLowerer {
                 }
 
                 return this.context.FloatType(width);
+#[endif]
             }
         }
 

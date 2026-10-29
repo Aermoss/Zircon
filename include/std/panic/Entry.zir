@@ -30,7 +30,7 @@ fn Panic(message: *i8) -> ! {
 fn PanicAt(message: *i8, file: *i8, line: u32, column: u32) -> ! {
     WriteError("\x1b[31mPanicked at ");
     WriteError(file);
-    WriteError(":" + String::FromInteger(line as u64) + ":" + String::FromInteger(column as u64) + ": ");
+    WriteError(":" + String::FromInteger(line as HostUnsigned) + ":" + String::FromInteger(column as HostUnsigned) + ": ");
     WriteError(message);
     WriteErrorLine("\x1b[0m");
     Exit(1);
@@ -38,18 +38,18 @@ fn PanicAt(message: *i8, file: *i8, line: u32, column: u32) -> ! {
 
 @nomangle
 fn __zircon_bounds_panic(index: usize, length: usize, file: *i8, line: u32, column: u32) -> ! {
-    let message = "Index " + String::FromInteger(index as u64) + " is out of bounds for a slice of length " + String::FromInteger(length as u64) + '.';
+    let message = "Index " + String::FromInteger(index as HostUnsigned) + " is out of bounds for a slice of length " + String::FromInteger(length as HostUnsigned) + '.';
     PanicAt(message.Data(), file, line, column)
 }
 
 @nomangle
 fn __zircon_range_panic(start: usize, end: usize, length: usize, file: *i8, line: u32, column: u32) -> ! {
-    let range = String::FromInteger(start as u64) + ".." + String::FromInteger(end as u64);
+    let range = String::FromInteger(start as HostUnsigned) + ".." + String::FromInteger(end as HostUnsigned);
 
     let message = if start > end {
         "Slice range " + range + " starts after it ends."
     } else {
-        "Slice range " + range + " is out of bounds for a slice of length " + String::FromInteger(length as u64) + '.'
+        "Slice range " + range + " is out of bounds for a slice of length " + String::FromInteger(length as HostUnsigned) + '.'
     };
 
     PanicAt(message.Data(), file, line, column)

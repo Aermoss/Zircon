@@ -97,7 +97,7 @@ fn Execute(command: *i8) -> u32 {
     CloseHandle(process_info.hThread);
     exit_code
 }
-#[else]
+#[elif !ZODIAC]
 class _TimeSpec {
     pub sec: i64,
     pub nsec: i64
@@ -651,8 +651,10 @@ fn Main(args: &mut Vector<String>) -> i32 {
         defines.PushBack("LIBC".ToString());
     }
 
+#[if !ZODIAC]
     let mut timer = Timer();
     let start = timer.Get();
+#[endif]
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
     let temp_path = match GetTemporaryPath() {
@@ -708,12 +710,18 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let tokens = preprocessor.Process(lexer.Lex(source, input_file), input_file);
 
             let mut parser = Parser();
+#[if !ZODIAC]
             let ast_start = timer.Get();
+#[endif]
             let ast_module = parser.Parse(tokens);
+#[if !ZODIAC]
             WriteLine("AST module parsed in " + String::FromFloat(timer.Get() - ast_start) + " seconds.");
+#[endif]
 
-            let mut hir_lowerer = HIRLowerer();
+            let mut hir_lowerer = HIRLowerer(target.Info());
+#[if !ZODIAC]
             let hir_start = timer.Get();
+#[endif]
             let mut hir_module: *HIRModule = null;
 
             if !Logger::HasError() {
@@ -721,36 +729,59 @@ fn Main(args: &mut Vector<String>) -> i32 {
             }
 
             if !check && !Logger::HasError() && hir_module != null {
+#[if !ZODIAC]
                 WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
+#[endif]
                 if emit_hir { WriteOutput(name + ".hir", hir_module->ToString()); }
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
+#[if !ZODIAC]
                 let mir_start = timer.Get();
+#[endif]
                 let mir_module = mir_lowerer.Lower(hir_module);
+#[if !ZODIAC]
                 WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
+#[endif]
 
                 if target.backend == TargetBackend::Zodiac {
                     let mut pass_manager = MIRPassManager(&mut mir_lowerer.context);
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
+#[if !ZODIAC]
                     let passes_start = timer.Get();
+#[endif]
                     pass_manager.Run(mir_module);
+#[if !ZODIAC]
                     WriteLine("MIR passes ran in " + String::FromFloat(timer.Get() - passes_start) + " seconds.");
+#[endif]
                 }
 
                 if emit_mir { WriteOutput(name + ".mir", mir_module->ToString()); }
 
                 if target.backend == TargetBackend::Zodiac {
                     let mut lir_lowerer = LIRLowerer();
+#[if !ZODIAC]
                     let lir_start = timer.Get();
+#[endif]
                     let lir_module = lir_lowerer.Lower(mir_module);
+#[if !ZODIAC]
                     WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
+#[endif]
                     if emit_lir { WriteOutput(name + ".virtual.lir", lir_module->ToString()); }
 
                     let mut allocator = LIRAllocator(&mut lir_lowerer.context);
+#[if !ZODIAC]
                     let allocator_start = timer.Get();
+#[endif]
                     allocator.Allocate(lir_module);
+#[if !ZODIAC]
                     WriteLine("LIR module allocated in " + String::FromFloat(timer.Get() - allocator_start) + " seconds.");
+#[endif]
+                    if Logger::HasError() {
+                        failed = true;
+                        Logger::Clear();
+                        continue;
+                    }
                     if emit_lir { WriteOutput(name + ".physical.lir", lir_module->ToString()); }
 
                     if emit_asm {
@@ -758,12 +789,16 @@ fn Main(args: &mut Vector<String>) -> i32 {
                         if !output_file.Empty() { asm_name = output_file; }
                         let mut emitter = ZodiacEmitter();
                         let assembly = emitter.Emit(lir_module);
-                        WriteOutput(asm_name, assembly);
+                        if !Logger::HasError() { WriteOutput(asm_name, assembly); }
                     }
                 } else {
+#[if !ZODIAC]
                     let llvm_start = timer.Get();
+#[endif]
                     module = llvm_lowerer.Lower(mir_module);
+#[if !ZODIAC]
                     WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
+#[endif]
                 }
             }
         } else if extension == ".ll" || extension == ".bc" {
@@ -1076,7 +1111,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } return 1;
     }
 
+#[if !ZODIAC]
     WriteLine("Program compiled in " + String::FromFloat(timer.Get() - start) + " seconds.");
+#[endif]
 
     for temp_file in temp_files {
         RemoveFile(temp_file);

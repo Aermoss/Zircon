@@ -108,8 +108,7 @@ class Parser {
 
     fn IsTypeApplication(&this) -> bool {
         if this.Current()._type != TokenType::LESS { return false; }
-        let mut index: usize = 1;
-        let mut depth: u64 = 1;
+        let (mut index, mut depth): (usize, usize) = (1, 1);
 
         loop {
             let token = this.Peek(index);
@@ -210,7 +209,7 @@ class Parser {
             },
             TokenType::INTEGER => {
                 this.Advance();
-                let (mut value, mut suffix, mut base) = (String(), String(), 10u64);
+                let (mut value, mut suffix, mut base): (String, String, HostUnsigned) = (String(), String(), 10);
                 let mut index = token.value.Find('u');
 
                 if index.IsNone() {
@@ -233,14 +232,19 @@ class Parser {
                 }
 
                 match value.ToUnsignedInteger(base) {
-                    Option<u64>::Some(value) => this.arena.New<ASTIntegerLiteral>(value, suffix, token),
-                    Option<u64>::None => {
+                    Option<HostUnsigned>::Some(value) => this.arena.New<ASTIntegerLiteral>(value, suffix, token),
+                    Option<HostUnsigned>::None => {
                         Logger::Log("Invalid integer literal '" + token.value + "'.", token, LogSeverity::Error);
                         null
                     }
                 }
             },
             TokenType::FLOAT => {
+#[if ZODIAC]
+                this.Advance();
+                Logger::Log("Floating point literals are not supported by the Zodiac compiler.", token, LogSeverity::Error);
+                null
+#[else]
                 this.Advance();
                 let (mut value, mut suffix) = (String(), String());
 
@@ -258,6 +262,7 @@ class Parser {
                         null
                     }
                 }
+#[endif]
             },
             TokenType::STRING => {
                 this.Advance();
@@ -394,10 +399,10 @@ class Parser {
                         let value = this.Advance().value;
 
                         match value.ToUnsignedInteger() {
-                            Option<u64>::Some(index) => {
+                            Option<HostUnsigned>::Some(index) => {
                                 expression = this.arena.New<ASTTupleAccessExpression>(expression, index as usize, token._type == TokenType::ARROW, token);
                             },
-                            Option<u64>::None => {
+                            Option<HostUnsigned>::None => {
                                 Logger::Log("Invalid tuple index '" + value + "'.", token, LogSeverity::Error);
                                 return null;
                             }

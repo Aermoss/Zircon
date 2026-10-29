@@ -95,7 +95,7 @@ class ZodiacEmitter {
             } else if character == '$' {
                 result += "__";
             } else {
-                result += "_" + String::FromInteger(character as u8 as u64, 16);
+                result += "_" + String::FromInteger(character as u8 as HostUnsigned, 16);
             }
         }
 
@@ -103,7 +103,7 @@ class ZodiacEmitter {
     }
 
     fn Label(&this, block: *LIRBlock) -> String {
-        "__LBB" + String::FromInteger(this.function_index as u64) + '_' + String::FromInteger(block->index as u64)
+        "__LBB" + String::FromInteger(this.function_index as HostUnsigned) + '_' + String::FromInteger(block->index as HostUnsigned)
     }
 
     fn Operand(&mut this, operand: *LIROperand) -> String {
@@ -120,7 +120,7 @@ class ZodiacEmitter {
             LIROperandKind::Immediate => String::FromInteger((operand as *LIRImmediateOperand)->value),
             LIROperandKind::Memory => {
                 let memory = operand as *LIRMemoryOperand;
-                String::FromInteger(memory->offset as i64) + '(' + this.Operand(memory->base) + ')'
+                String::FromInteger(memory->offset as HostSigned) + '(' + this.Operand(memory->base) + ')'
             },
             LIROperandKind::Block => this.Label((operand as *LIRBlockOperand)->block),
             LIROperandKind::Symbol => this.Symbol((operand as *LIRSymbolOperand)->name)
@@ -173,24 +173,24 @@ class ZodiacEmitter {
         let size = this.FrameSize();
 
         if size <= 32767 {
-            this.Line("addi sp, sp, -" + String::FromInteger(size as u64));
-            if function->has_calls { this.Line("sw ra, " + String::FromInteger((size - 4) as u64) + "(sp)"); }
-            this.Line("sw fp, " + String::FromInteger((size - 8) as u64) + "(sp)");
+            this.Line("addi sp, sp, -" + String::FromInteger(size as HostUnsigned));
+            if function->has_calls { this.Line("sw ra, " + String::FromInteger((size - 4) as HostUnsigned) + "(sp)"); }
+            this.Line("sw fp, " + String::FromInteger((size - 8) as HostUnsigned) + "(sp)");
         } else {
             this.Line("addi sp, sp, -8");
             if function->has_calls { this.Line("sw ra, 4(sp)"); }
             this.Line("sw fp, 0(sp)");
             this.Line("addi fp, sp, 8");
-            this.Line("li t6, " + String::FromInteger((size - 8) as u64));
+            this.Line("li t6, " + String::FromInteger((size - 8) as HostUnsigned));
             this.Line("sub sp, sp, t6");
         }
 
         for i in 0..function->saved_registers.Length() {
-            this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
+            this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as HostUnsigned) + "(sp)");
         }
 
         if size <= 32767 {
-            this.Line("addi fp, sp, " + String::FromInteger(size as u64));
+            this.Line("addi fp, sp, " + String::FromInteger(size as HostUnsigned));
         }
     }
 
@@ -201,22 +201,22 @@ class ZodiacEmitter {
             let size = this.FrameSize();
 
             if size <= 32767 {
-                this.Line("addi sp, fp, -" + String::FromInteger(size as u64));
+                this.Line("addi sp, fp, -" + String::FromInteger(size as HostUnsigned));
             } else {
-                this.Line("li t6, " + String::FromInteger(size as u64));
+                this.Line("li t6, " + String::FromInteger(size as HostUnsigned));
                 this.Line("sub sp, fp, t6");
             }
 
             for i in 0..function->saved_registers.Length() {
-                this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as u64) + "(sp)");
+                this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as HostUnsigned) + "(sp)");
             }
 
             if size <= 32767 {
-                this.Line("lw fp, " + String::FromInteger((size - 8) as u64) + "(sp)");
-                if function->has_calls { this.Line("lw ra, " + String::FromInteger((size - 4) as u64) + "(sp)"); }
-                this.Line("addi sp, sp, " + String::FromInteger(size as u64));
+                this.Line("lw fp, " + String::FromInteger((size - 8) as HostUnsigned) + "(sp)");
+                if function->has_calls { this.Line("lw ra, " + String::FromInteger((size - 4) as HostUnsigned) + "(sp)"); }
+                this.Line("addi sp, sp, " + String::FromInteger(size as HostUnsigned));
             } else {
-                this.Line("li t6, " + String::FromInteger((size - 8) as u64));
+                this.Line("li t6, " + String::FromInteger((size - 8) as HostUnsigned));
                 this.Line("add sp, sp, t6");
                 this.Line("lw fp, 0(sp)");
                 if function->has_calls { this.Line("lw ra, 4(sp)"); }
@@ -333,17 +333,17 @@ class ZodiacEmitter {
 
     fn EmitGlobal(&mut this, global: *LIRGlobal) {
         let name = this.Symbol(global->name);
-        if global->alignment > 1 { this.output += "\t.align\t" + String::FromInteger(global->alignment as u64) + '\n'; }
+        if global->alignment > 1 { this.output += "\t.align\t" + String::FromInteger(global->alignment as HostUnsigned) + '\n'; }
         if global->global { this.output += "\t.global\t" + name + '\n'; }
         this.output += name + ":\n";
         let mut offset: usize = 0;
 
         while offset < global->data.Length() {
-            let mut relocation: i64 = -1;
+            let mut relocation: HostSigned = -1;
 
             for i in 0..global->relocations.Length() {
                 if global->relocations[i].offset as usize == offset {
-                    relocation = i as i64;
+                    relocation = i as HostSigned;
                     break;
                 }
             }
@@ -366,7 +366,7 @@ class ZodiacEmitter {
 
                 if relocated { break; }
                 if count > 0 { text += ", "; }
-                text += String::FromInteger(global->data[offset] as u64);
+                text += String::FromInteger(global->data[offset] as HostUnsigned);
                 (offset, count) = (offset + 1, count + 1);
             }
 

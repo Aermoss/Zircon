@@ -46,8 +46,8 @@ class LIRAllocator {
     physical: Vector<*LIROperand>,
     order: Vector<u8>,
     intervals: Vector<LIRInterval>,
-    hints: Vector<i64>,
-    copies: Vector<i64>,
+    hints: Vector<isize>,
+    copies: Vector<isize>,
     ranges: Vector<LIRFixedRange>,
     range_offsets: Vector<u32>,
     scratch: Vector<i32>,
@@ -78,17 +78,17 @@ class LIRAllocator {
         (register >= LIR_S1 && register <= LIR_S11) || (register >= LIR_T0 && register < LIR_T5) || (register >= LIR_A0 && register <= LIR_A7)
     }
 
-    fn VirtualIndex(&this, operand: *LIROperand) -> i64 {
+    fn VirtualIndex(&this, operand: *LIROperand) -> isize {
         if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Virtual {
-            return (operand as *LIRVirtualRegister)->index as i64;
+            return (operand as *LIRVirtualRegister)->index as isize;
         }
 
         -1
     }
 
-    fn PhysicalIndex(&this, operand: *LIROperand) -> i64 {
+    fn PhysicalIndex(&this, operand: *LIROperand) -> isize {
         if operand != null && operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical {
-            return (operand as *LIRPhysicalRegister)->index as i64;
+            return (operand as *LIRPhysicalRegister)->index as isize;
         }
 
         -1
@@ -106,12 +106,12 @@ class LIRAllocator {
         instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt
     }
 
-    fn SetBit(&this, bits: &mut Vector<u64>, base: usize, index: u32) {
-        bits[base + (index / 64) as usize] |= 1u64 << ((index % 64) as u64);
+    fn SetBit(&this, bits: &mut Vector<u32>, base: usize, index: u32) {
+        bits[base + (index / 32) as usize] |= 1u32 << (index % 32);
     }
 
-    fn TestBit(&this, bits: &Vector<u64>, base: usize, index: u32) -> bool {
-        (bits[base + (index / 64) as usize] & (1u64 << ((index % 64) as u64))) != 0
+    fn TestBit(&this, bits: &Vector<u32>, base: usize, index: u32) -> bool {
+        (bits[base + (index / 32) as usize] & (1u32 << (index % 32))) != 0
     }
 
     fn Extend(&mut this, register: u32, position: u32) {
@@ -123,7 +123,7 @@ class LIRAllocator {
         this.function = function;
         let block_count = function->blocks.Length();
         let register_count = function->register_index;
-        let words = ((register_count + 63) / 64) as usize + 1;
+        let words = (register_count / 32) as usize + 1;
         let mut block_starts = Vector<u32>();
         let mut block_ends = Vector<u32>();
         let mut position: u32 = 0;
@@ -136,17 +136,17 @@ class LIRAllocator {
             block_ends.PushBack(position - 1);
         }
 
-        let mut successors = Vector<i64>();
+        let mut successors = Vector<isize>();
 
         for i in 0..block_count {
             let block = function->blocks[i];
-            let mut first: i64 = -1;
-            let mut second: i64 = -1;
+            let mut first: isize = -1;
+            let mut second: isize = -1;
 
             for instruction in block->instructions {
                 for operand in instruction->uses {
                     if operand->kind != LIROperandKind::Block { continue; }
-                    let target = (operand as *LIRBlockOperand)->block->index as i64;
+                    let target = (operand as *LIRBlockOperand)->block->index as isize;
 
                     if first < 0 {
                         first = target;
@@ -159,9 +159,9 @@ class LIRAllocator {
             if (block->instructions.Empty() || !this.IsTerminator(block->instructions.Back())) && i + 1 < block_count {
                 if first < 0 {
                     if first < 0 {
-                        first = (i + 1) as i64;
+                        first = (i + 1) as isize;
                     } else if second < 0 {
-                        second = (i + 1) as i64;
+                        second = (i + 1) as isize;
                     }
                 }
             }
@@ -170,10 +170,10 @@ class LIRAllocator {
             successors.PushBack(second);
         }
 
-        let mut gen = Vector<u64>();
-        let mut kill = Vector<u64>();
-        let mut live_in = Vector<u64>();
-        let mut live_out = Vector<u64>();
+        let mut gen = Vector<u32>();
+        let mut kill = Vector<u32>();
+        let mut live_in = Vector<u32>();
+        let mut live_out = Vector<u32>();
 
         for i in 0..(block_count * words) {
             gen.PushBack(0);
@@ -211,7 +211,7 @@ class LIRAllocator {
                 let base = i * words;
 
                 for w in 0..words {
-                    let mut out: u64 = 0;
+                    let mut out: u32 = 0;
 
                     for s in 0usize..2 {
                         let successor = successors[i * 2 + s];
@@ -246,11 +246,11 @@ class LIRAllocator {
                 let (_in, out) = (live_in[base + w], live_out[base + w]);
                 if (_in | out) == 0 { continue; }
 
-                for bit in 0usize..64 {
-                    let index = (w * 64 + bit) as u32;
+                for bit in 0usize..32 {
+                    let index = (w * 32 + bit) as u32;
                     if index >= register_count { break; }
-                    if (_in & (1u64 << (bit as u64))) != 0 { this.Extend(index, block_starts[i]); }
-                    if (out & (1u64 << (bit as u64))) != 0 { this.Extend(index, block_ends[i]); }
+                    if (_in & (1u32 << (bit as u32))) != 0 { this.Extend(index, block_starts[i]); }
+                    if (out & (1u32 << (bit as u32))) != 0 { this.Extend(index, block_ends[i]); }
                 }
             }
 
@@ -432,7 +432,7 @@ class LIRAllocator {
         }
 
         let mut active = Vector<u32>();
-        let mut owners = Vector<i64>();
+        let mut owners = Vector<isize>();
 
         for i in 0usize..32 {
             owners.PushBack(-1);
@@ -457,7 +457,7 @@ class LIRAllocator {
             let mut chosen = -1i32;
             let mut hint = this.hints[current as usize];
             let copy = this.copies[current as usize];
-            if hint < 0 && copy >= 0 { hint = this.intervals[copy as usize].register as i64; }
+            if hint < 0 && copy >= 0 { hint = this.intervals[copy as usize].register as isize; }
 
             if hint >= 0 && owners[hint as usize] < 0 && !this.Conflicts(hint as u8, start, end) {
                 chosen = hint as i32;
@@ -473,14 +473,14 @@ class LIRAllocator {
             }
 
             if chosen < 0 {
-                let mut victim: i64 = -1;
+                let mut victim: isize = -1;
                 let mut furthest = end;
 
                 for k in 0..active.Length() {
                     let other = this.intervals[active[k] as usize];
 
                     if other.end > furthest && !this.Conflicts(other.register as u8, start, end) {
-                        (victim, furthest) = (k as i64, other.end);
+                        (victim, furthest) = (k as isize, other.end);
                     }
                 }
 
@@ -496,7 +496,7 @@ class LIRAllocator {
             }
 
             this.intervals[current as usize].register = chosen;
-            owners[chosen as usize] = current as i64;
+            owners[chosen as usize] = current as isize;
             active.PushBack(current);
         }
     }
@@ -559,7 +559,7 @@ class LIRAllocator {
         if interval.spilled {
             return this.ScratchFor(index as u32, load);
         } else if interval.register < 0 {
-            Logger::Log("Virtual register v" + String::FromInteger(index) + " has no register in '" + this.function->name + "'.", LogSeverity::Error);
+            Logger::Log("Virtual register v" + String::FromInteger(index as HostUnsigned) + " has no register in '" + this.function->name + "'.", LogSeverity::Error);
             return this.physical[LIR_ZERO as usize];
         }
 

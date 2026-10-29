@@ -25,12 +25,109 @@ enum IOError {
             IOError::PermissionDenied => "permission denied".ToString(),
             IOError::AlreadyExists => "entity already exists".ToString(),
             IOError::InvalidInput => "invalid input".ToString(),
-            IOError::Other(code) => "os error " + String::FromInteger(code as i64)
+            IOError::Other(code) => "os error " + String::FromInteger(code as HostSigned)
         }
     }
 }
 
-#[if WINDOWS]
+#[if ZENITH]
+const PATH_SEPERATOR: i8 = '/';
+const ZENITH_PATH_MAX: usize = 2048;
+
+#[if !ZENITH_UNIFIED]
+extern "C" {
+    fn ZenithPathKind(path: *i8) -> u32;
+    fn ZenithCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32;
+    fn ZenithReadFile(path: *i8, buffer: *mut u8, capacity: usize, size: *mut usize) -> u32;
+    fn ZenithWriteFile(path: *i8, data: *u8, size: usize) -> u32;
+    fn ZenithRemoveFile(path: *i8) -> u32;
+}
+#[endif]
+
+fn _ZenithError(code: u32) -> IOError {
+    match code {
+        2 => IOError::NotFound,
+        3 | 7 | 8 => IOError::InvalidInput,
+        10 => IOError::AlreadyExists,
+        _ => IOError::Other(code as i32)
+    }
+}
+
+fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
+    let mut size: usize = 0;
+    let mut result = ZenithReadFile(path.Data(), null, 0, &mut size);
+    if result != 0 { return Result<Vector<u8>, IOError>::Err(_ZenithError(result)); }
+    let mut bytes = Vector<u8>();
+    bytes.Resize(size);
+
+    if size != 0 {
+        result = ZenithReadFile(path.Data(), bytes.Data(), size, &mut size);
+        if result != 0 { return Result<Vector<u8>, IOError>::Err(_ZenithError(result)); }
+        bytes.Resize(size);
+    }
+
+    Result<Vector<u8>, IOError>::Ok(bytes)
+}
+
+fn _ReadFile(path: &String) -> Result<String, IOError> {
+    let mut size: usize = 0;
+    let mut result = ZenithReadFile(path.Data(), null, 0, &mut size);
+    if result != 0 { return Result<String, IOError>::Err(_ZenithError(result)); }
+    let buffer = new i8[size + 1];
+
+    if size != 0 {
+        result = ZenithReadFile(path.Data(), buffer as *mut u8, size, &mut size);
+
+        if result != 0 {
+            delete[] buffer;
+            return Result<String, IOError>::Err(_ZenithError(result));
+        }
+    }
+
+    buffer[size] = 0;
+    let content = String(buffer, 0, size);
+    delete[] buffer;
+    Result<String, IOError>::Ok(content)
+}
+
+fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
+    let result = ZenithWriteFile(path.Data(), content.Data() as *u8, content.Length());
+    if result != 0 { return Result<(), IOError>::Err(_ZenithError(result)); }
+    Result<(), IOError>::Ok(())
+}
+
+fn AbsolutePath(path: &String) -> Result<String, IOError> {
+    let buffer = new i8[ZENITH_PATH_MAX];
+    let result = ZenithCanonicalPath(path.Data(), buffer, ZENITH_PATH_MAX);
+
+    if result != 0 {
+        delete[] buffer;
+        return Result<String, IOError>::Err(_ZenithError(result));
+    }
+
+    let canonical = String(buffer);
+    delete[] buffer;
+    Result<String, IOError>::Ok(canonical)
+}
+
+fn PathExists(path: &String) -> bool { ZenithPathKind(path.Data()) != 0 }
+fn FileExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 1 }
+fn FolderExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 2 }
+
+fn RemoveFile(path: &String) -> Result<(), IOError> {
+    let result = ZenithRemoveFile(path.Data());
+    if result != 0 { return Result<(), IOError>::Err(_ZenithError(result)); }
+    Result<(), IOError>::Ok(())
+}
+
+fn GetTemporaryPath() -> Result<String, IOError> {
+    Result<String, IOError>::Err(IOError::InvalidInput)
+}
+
+fn ExecutablePath() -> Result<String, IOError> {
+    Result<String, IOError>::Err(IOError::InvalidInput)
+}
+#[elif WINDOWS]
 const PATH_SEPERATOR: i8 = '\\';
 const MAX_PATH: usize = 260;
 

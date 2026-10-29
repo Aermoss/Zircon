@@ -52,7 +52,7 @@ class LIRVirtualRegister : LIRRegisterOperand {
     }
 
     pub override fn ToString(&this) -> String {
-        'v' + String::FromInteger(this.index as u64)
+        'v' + String::FromInteger(this.index as HostUnsigned)
     }
 }
 
@@ -76,9 +76,9 @@ fn LIRRegisterName(index: u8) -> String {
     else if index == 3 { "gp".ToString() }
     else if index == 4 { "tp".ToString() }
     else if index == 5 { "fp".ToString() }
-    else if index <= 16 { 's' + String::FromInteger((index - 5) as u64) }
-    else if index <= 23 { 't' + String::FromInteger((index - 17) as u64) }
-    else if index <= 31 { 'a' + String::FromInteger((index - 24) as u64) }
+    else if index <= 16 { 's' + String::FromInteger((index - 5) as HostUnsigned) }
+    else if index <= 23 { 't' + String::FromInteger((index - 17) as HostUnsigned) }
+    else if index <= 31 { 'a' + String::FromInteger((index - 24) as HostUnsigned) }
     else { "<invalid register>".ToString() }
 }
 
@@ -100,7 +100,7 @@ fn LIRRegisterIndex(name: &String) -> i32 {
         }
 
         let index = match rest.ToUnsignedInteger(10) {
-            Option<u64>::Some(index) if index <= 31 => index as i32,
+            Option<HostUnsigned>::Some(index) if index <= 31 => index as i32,
             _ => return -1
         };
 
@@ -122,7 +122,7 @@ class LIRPhysicalRegister : LIRRegisterOperand {
 
     pub override fn ToString(&this) -> String {
         if this.name.Empty() {
-            return 'x' + String::FromInteger(this.index as u64);
+            return 'x' + String::FromInteger(this.index as HostUnsigned);
         }
 
         this.name
@@ -130,9 +130,9 @@ class LIRPhysicalRegister : LIRRegisterOperand {
 }
 
 class LIRImmediateOperand : LIROperand {
-    pub value: i64;
+    pub value: HostSigned;
 
-    LIRImmediateOperand(&mut this, value: i64) : LIROperand(LIROperandKind::Immediate) {
+    LIRImmediateOperand(&mut this, value: HostSigned) : LIROperand(LIROperandKind::Immediate) {
         this.value = value;
     }
 
@@ -150,7 +150,7 @@ class LIRMemoryOperand : LIROperand {
     }
 
     pub override fn ToString(&this) -> String {
-        String::FromInteger(this.offset as i64) + '(' + this.base->ToString() + ')'
+        String::FromInteger(this.offset as HostSigned) + '(' + this.base->ToString() + ')'
     }
 }
 
@@ -389,11 +389,11 @@ class LIRGlobal {
 
         for i in 0..this.data.Length() {
             if i > 0 { result += ", "; }
-            result += String::FromInteger(this.data[i] as u64);
+            result += String::FromInteger(this.data[i] as HostUnsigned);
         } result += ']';
 
         for relocation in this.relocations {
-            result += ", @\"" + relocation.symbol + "\" at " + String::FromInteger(relocation.offset as u64);
+            result += ", @\"" + relocation.symbol + "\" at " + String::FromInteger(relocation.offset as HostUnsigned);
         }
 
         result
@@ -468,7 +468,7 @@ class LIRBuilder {
         this.context->arena.New<LIRPhysicalRegister>(index, LIRRegisterName(index))
     }
 
-    pub fn ImmediateOperand(&mut this, value: i64) -> *mut LIRImmediateOperand {
+    pub fn ImmediateOperand(&mut this, value: HostSigned) -> *mut LIRImmediateOperand {
         this.context->arena.New<LIRImmediateOperand>(value)
     }
 

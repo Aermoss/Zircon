@@ -218,9 +218,9 @@ class GenericDeclaration {
         };
 
         if mismatch {
-            let mut expected = String::FromInteger(this.types.Length() as u64);
+            let mut expected = String::FromInteger(this.types.Length() as HostUnsigned);
             if pack { expected = "at least " + expected; }
-            Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Length() as u64) + " were provided.", node, LogSeverity::Error);
+            Logger::Log("Generic '" + this.name + "' expects " + expected + " type argument(s), but " + String::FromInteger(types.Length() as HostUnsigned) + " were provided.", node, LogSeverity::Error);
             return null;
         }
 
