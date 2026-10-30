@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-#[if ZENITH]
-static mut _zenith_bins: [*mut u8; 32];
-static mut _zenith_chunk_ptr: *mut u8 = null;
-static mut _zenith_chunk_end: *mut u8 = null;
-#[endif]
-
 extern "C" {
 #[if ZENITH]
     fn ZenithAllocate(size: usize) -> *mut void {
@@ -51,38 +45,11 @@ extern "C" {
 
     fn malloc(size: usize) -> *mut void #[if LIBC] ; #[else] {
 #[if ZENITH]
-        if size > (-1 as usize) - 16 { return null; }
+        if size > (-1 as usize) - 15 { return null; }
         let aligned = if size <= 8 { 8usize } else { (size + 7) & !7usize };
-
-        if aligned <= 256 {
-            let bin = (aligned >> 3) - 1;
-            let cached = _zenith_bins[bin];
-
-            if cached != null {
-                _zenith_bins[bin] = *(cached as **mut u8);
-                return cached as *mut void;
-            }
-
-            let total = aligned + 8;
-
-            if _zenith_chunk_ptr == null || (_zenith_chunk_end as usize) - (_zenith_chunk_ptr as usize) < total {
-                let chunk = ZenithAllocate(32768) as *mut u8;
-                if chunk == null { return null; }
-                _zenith_chunk_ptr = chunk;
-                _zenith_chunk_end = chunk + 32768;
-            }
-
-            let header = _zenith_chunk_ptr as *mut usize;
-            _zenith_chunk_ptr = _zenith_chunk_ptr + total;
-            header[0] = aligned;
-            header[1] = bin;
-            return (header as *mut u8 + 8) as *mut void;
-        }
-
         let header = ZenithAllocate(aligned + 8) as *mut usize;
         if header == null { return null; }
         header[0] = aligned;
-        header[1] = 0xFFFFFFFF;
         return (header as *mut u8 + 8) as *mut void;
 #[elif WINDOWS]
         return HeapAlloc(GetProcessHeap(), 0, size);
@@ -104,14 +71,6 @@ extern "C" {
         if ptr == null { return; }
 #[if ZENITH]
         let header = ((ptr as *mut u8) - 8) as *mut usize;
-        let bin = header[1];
-
-        if bin < 32 {
-            *(ptr as *mut *mut u8) = _zenith_bins[bin];
-            _zenith_bins[bin] = ptr as *mut u8;
-            return;
-        }
-
         ZenithFree(header as *mut void);
 #[elif WINDOWS]
         HeapFree(GetProcessHeap(), 0, ptr);

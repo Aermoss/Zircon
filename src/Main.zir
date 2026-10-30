@@ -699,7 +699,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let (name, extension) = SplitExtension(input_file);
 
 #[if ZODIAC]
-        let target = Target(triple, arch, code_model, features);
+        let target = Target(triple);
 #[else]
         let mut module: LLVMModuleRef = null;
         let target = Target(triple, arch, code_model, features, opt_level);

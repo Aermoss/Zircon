@@ -37,16 +37,6 @@ extern "C" {
 
         result
     }
-
-    fn read(fd: i32, buf: *mut i8, count: usize) -> isize {
-        if fd != 0 { return -1; }
-        ZenithConsoleRead(buf, count)
-    }
-
-    fn write(fd: i32, buf: *i8, len: usize) -> isize {
-        if fd != 1 && fd != 2 { return -1; }
-        ZenithConsoleWrite(buf, len)
-    }
 #[elif WINDOWS]
     fn ReadFile(hFile: *mut void, lpBuffer: *mut i8, nNumberOfBytesToRead: u32, lpNumberOfBytesRead: *mut u32, lpOverlapped: *mut void) -> i32;
     fn WriteFile(hFile: *mut void, lpBuffer: *i8, nNumberOfBytesToWrite: u32, lpNumberOfBytesWritten: *mut u32, lpOverlapped: *mut void) -> i32;
@@ -90,7 +80,9 @@ fn ReadLine() -> Option<String> {
     let mut character: i8 = 0;
 
     loop {
-#[if WINDOWS]
+#[if ZENITH]
+        let count = ZenithConsoleRead(&mut character, 1);
+#[elif WINDOWS]
         let mut count: u32 = 0;
         ReadFile(GetStdHandle(STD_INPUT_HANDLE), &mut character, 1, &mut count, null);
 #[else]
@@ -105,7 +97,9 @@ fn ReadLine() -> Option<String> {
 }
 
 fn Write(text: &String) {
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite(text.Data(), text.Length());
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.Data(), text.Length() as u32, null, null);
 #[else]
     write(STDOUT_FILENO, text.Data(), text.Length());
@@ -113,7 +107,9 @@ fn Write(text: &String) {
 }
 
 fn Write(text: *i8) {
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite(text, strlen(text));
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, strlen(text) as u32, null, null);
 #[else]
     write(STDOUT_FILENO, text, strlen(text));
@@ -122,7 +118,9 @@ fn Write(text: *i8) {
 
 fn WriteLine(text: &String) {
     Write(text);
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite("\n", 1);
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
     write(STDOUT_FILENO, "\n", 1);
@@ -131,7 +129,9 @@ fn WriteLine(text: &String) {
 
 fn WriteLine(text: *i8) {
     Write(text);
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite("\n", 1);
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
     write(STDOUT_FILENO, "\n", 1);
@@ -139,7 +139,9 @@ fn WriteLine(text: *i8) {
 }
 
 fn WriteError(text: &String) {
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite(text.Data(), text.Length());
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), text.Data(), text.Length() as u32, null, null);
 #[else]
     write(STDERR_FILENO, text.Data(), text.Length());
@@ -147,7 +149,9 @@ fn WriteError(text: &String) {
 }
 
 fn WriteError(text: *i8) {
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite(text, strlen(text));
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, strlen(text) as u32, null, null);
 #[else]
     write(STDERR_FILENO, text, strlen(text));
@@ -156,7 +160,9 @@ fn WriteError(text: *i8) {
 
 fn WriteErrorLine(text: &String) {
     WriteError(text);
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite("\n", 1);
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
 #[else]
     write(STDERR_FILENO, "\n", 1);
@@ -165,7 +171,9 @@ fn WriteErrorLine(text: &String) {
 
 fn WriteErrorLine(text: *i8) {
     WriteError(text);
-#[if WINDOWS]
+#[if ZENITH]
+    ZenithConsoleWrite("\n", 1);
+#[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
 #[else]
     write(STDERR_FILENO, "\n", 1);
