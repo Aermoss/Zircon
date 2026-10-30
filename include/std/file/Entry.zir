@@ -34,15 +34,53 @@ enum IOError {
 const PATH_SEPERATOR: i8 = '/';
 const ZENITH_PATH_MAX: usize = 2048;
 
-#[if !ZENITH_UNIFIED]
 extern "C" {
-    fn ZenithPathKind(path: *i8) -> u32;
-    fn ZenithCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32;
-    fn ZenithReadFile(path: *i8, buffer: *mut u8, capacity: usize, size: *mut usize) -> u32;
-    fn ZenithWriteFile(path: *i8, data: *u8, size: usize) -> u32;
-    fn ZenithRemoveFile(path: *i8) -> u32;
+    fn ZenithPathKind(path: *i8) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(5), a0(path) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+    fn ZenithCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(6), a0(path), a1(buffer), a2(capacity) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+    fn ZenithReadFile(path: *i8, buffer: *mut u8, capacity: usize, size: *mut usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(7), a0(path), a1(buffer), a2(capacity), a3(size) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+    fn ZenithWriteFile(path: *i8, data: *u8, size: usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(8), a0(path), a1(data), a2(size) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+    fn ZenithRemoveFile(path: *i8) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(9), a0(path) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
 }
-#[endif]
 
 fn _ZenithError(code: u32) -> IOError {
     match code {

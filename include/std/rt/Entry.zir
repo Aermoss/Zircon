@@ -16,7 +16,9 @@
 
 #[include "std/panic" : *]
 
-#[if WINDOWS]
+#[if ZENITH]
+#[include "std/rt/zenith" : *]
+#[elif WINDOWS]
 #[include "std/rt/windows" : *]
 #[elif LINUX]
 #[include "std/rt/linux" : *]

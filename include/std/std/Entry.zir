@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-#[if ZENITH_COMPILER]
-#[include "std/mem" : *]
-#[endif]
-
 #[if ZODIAC]
 type HostUnsigned = u32;
 type HostSigned = i32;
@@ -28,9 +24,13 @@ type HostSigned = i64;
 
 extern "C" {
 #[if ZENITH]
-#[if !ZENITH_UNIFIED]
-    fn ZenithExit(status: i32) -> !;
-#[endif]
+    fn ZenithExit(status: i32) -> ! {
+        volatile asm : a7(0), a0(status) -> {
+            ecall
+        } : memory;
+
+        loop {}
+    }
 #[elif WINDOWS]
     fn ExitProcess(uExitCode: u32) -> !;
 #[else]
@@ -48,9 +48,6 @@ extern "C" {
 
 fn Exit(status: i32) -> ! {
 #[if ZENITH]
-#[if ZENITH_COMPILER]
-    ReleaseCompilerMemory();
-#[endif]
     ZenithExit(status);
 #[elif WINDOWS]
     ExitProcess(status as u32);

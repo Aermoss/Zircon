@@ -18,7 +18,7 @@
     "src/Logger.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/AST.zir" : *]
 
 class Parser {
-    arena: Arena,
+    pub arena: Arena,
     tokens: Vector<Token>,
     index: usize;
 

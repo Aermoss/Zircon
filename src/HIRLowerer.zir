@@ -63,7 +63,7 @@ class HIRDeferredMethod {
 }
 
 class HIRLowerer {
-    context: HIRContext,
+    pub context: HIRContext,
     pub target_info: TargetInfo,
     pub module: *mut HIRModule = null,
     pub builder: HIRBuilder,

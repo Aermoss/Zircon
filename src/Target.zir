@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#[include "std/str" : *]
+
 #[if !ZODIAC]
-#[include "std/io", "std/str", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/Target.zir", "vendor/llvm-c/TargetMachine.zir", "src/Logger.zir" : *]
+#[include "std/io", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/Target.zir", "vendor/llvm-c/TargetMachine.zir", "src/Logger.zir" : *]
 #[endif]
 
 class TargetInfo {
@@ -30,11 +32,24 @@ class TargetInfo {
     }
 }
 
-#[if !ZODIAC]
 enum TargetBackend: u8 {
     LLVM, Zodiac
 }
 
+#[if ZODIAC]
+class Target {
+    pub backend: TargetBackend = TargetBackend::Zodiac,
+    pub triple: String;
+
+    Target(&mut this, triple: &String) {
+        this.triple = triple;
+    }
+
+    pub fn Info(&this) -> TargetInfo {
+        TargetInfo(4, 4, 4)
+    }
+}
+#[else]
 class Target {
     pub backend: TargetBackend = TargetBackend::LLVM,
     pub target: LLVMTargetRef = null,

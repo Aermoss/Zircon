@@ -1,0 +1,67 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/std" : *]
+
+fn ZenithCommandLine(buffer: *mut i8, capacity: usize) -> usize {
+    let mut result: usize = 0;
+
+    volatile asm : a7(11), a0(buffer), a1(capacity) -> {
+        ecall
+    } -> a0(result) : memory;
+
+    result
+}
+
+extern "C" {
+    fn _start() {
+        let mut raw_cmd: [i8; 128];
+        ZenithCommandLine(&mut raw_cmd[0] as *mut i8, 128);
+        let mut args = Vector<String>();
+        let mut ptr = &mut raw_cmd[0] as *mut i8;
+        let mut start_ptr = ptr;
+        let mut in_arg = false;
+        let mut in_quotes = false;
+
+        while ptr[0] != 0 {
+            let character = ptr[0];
+
+            if character == '\"' {
+                in_quotes = !in_quotes;
+
+                if !in_arg {
+                    in_arg = true;
+                    start_ptr = (ptr + 1);
+                } ptr[0] = '\0';
+            } else if character == ' ' && !in_quotes {
+                if in_arg {
+                    in_arg = false;
+                    ptr[0] = '\0';
+                    args.PushBack(String(start_ptr));
+                }
+            } else if !in_arg {
+                in_arg = true;
+                start_ptr = ptr;
+            } ptr += 1;
+        }
+
+        if in_arg {
+            args.PushBack(String(start_ptr));
+        }
+
+        Exit(Main(args));
+    }
+}

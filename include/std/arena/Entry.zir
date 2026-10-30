@@ -17,7 +17,11 @@
 #[include "std/mem" : *]
 
 const ARENA_DEFAULT_ALIGNMENT: usize = 16;
+#[if ZODIAC]
+const ARENA_DEFAULT_CHUNK_SIZE: usize = 32768;
+#[else]
 const ARENA_DEFAULT_CHUNK_SIZE: usize = 1048576;
+#[endif]
 
 class ArenaChunk {
     pub next: *mut ArenaChunk = null,

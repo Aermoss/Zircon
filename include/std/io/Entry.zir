@@ -18,10 +18,25 @@
 
 extern "C" {
 #[if ZENITH]
-#[if !ZENITH_UNIFIED]
-    fn ZenithConsoleRead(buffer: *mut i8, length: usize) -> isize;
-    fn ZenithConsoleWrite(buffer: *i8, length: usize) -> isize;
-#[endif]
+    fn ZenithConsoleRead(buffer: *mut i8, length: usize) -> isize {
+        let mut result: isize = 0;
+
+        volatile asm : a7(3), a0(buffer), a1(length) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithConsoleWrite(buffer: *i8, length: usize) -> isize {
+        let mut result: isize = 0;
+
+        volatile asm : a7(4), a0(buffer), a1(length) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
 
     fn read(fd: i32, buf: *mut i8, count: usize) -> isize {
         if fd != 0 { return -1; }
@@ -97,7 +112,6 @@ fn Write(text: &String) {
 #[endif]
 }
 
-#[if !ZENITH_UNIFIED]
 fn Write(text: *i8) {
 #[if WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, strlen(text) as u32, null, null);
@@ -105,7 +119,6 @@ fn Write(text: *i8) {
     write(STDOUT_FILENO, text, strlen(text));
 #[endif]
 }
-#[endif]
 
 fn WriteLine(text: &String) {
     Write(text);
@@ -116,7 +129,6 @@ fn WriteLine(text: &String) {
 #[endif]
 }
 
-#[if !ZENITH_UNIFIED]
 fn WriteLine(text: *i8) {
     Write(text);
 #[if WINDOWS]
@@ -125,7 +137,6 @@ fn WriteLine(text: *i8) {
     write(STDOUT_FILENO, "\n", 1);
 #[endif]
 }
-#[endif]
 
 fn WriteError(text: &String) {
 #[if WINDOWS]

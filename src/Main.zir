@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir",
-    "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/LLVMLowerer.zir", "src/Assembler.zir", "src/Logger.zir" : *]
+#[include "std/io", "std/file", "std/std", "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/Logger.zir" : *]
+
+#[if !ZODIAC]
+#[include "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
+#[endif]
 
 #[if WINDOWS]
 const INFINITE: u32 = 0xFFFFFFFF;
@@ -369,7 +372,11 @@ fn WriteOutput(path: &String, content: &String) {
 }
 
 fn PrintVersion() {
-    WriteLine("Zircon 8.3 \"Octane\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
+#[if ZODIAC]
+    WriteLine("Zircon 8.4 \"Octane\" (zodiac-unknown-zenith)");
+#[else]
+    WriteLine("Zircon 8.4 \"Octane\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
+#[endif]
     WriteLine("Copyright (c) 2025-2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");
     WriteLine("See the LICENSE file for details.");
@@ -406,9 +413,11 @@ fn PrintUsage(executable: &String) {
     WriteLine("  -h, --help               Display this help message");
 }
 
+#[if !ZODIAC]
 fn FatalErrorHandler(reason: *i8) {
     Logger::Log("LLVM", reason, LogSeverity::Fatal);
 }
+#[endif]
 
 fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
@@ -419,6 +428,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
+#[if !ZODIAC]
     LLVMEnablePrettyStackTrace();
     LLVMInstallFatalErrorHandler(FatalErrorHandler);
 
@@ -433,6 +443,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     LLVMInitializeAArch64TargetMC();
     LLVMInitializeAArch64AsmPrinter();
     LLVMInitializeAArch64AsmParser();
+#[endif]
 
     let (mut input_files, mut output_file) = (Vector<String>(), String());
     let (mut include_paths, mut lib_paths) = (Vector<String>(), Vector<String>());
@@ -440,16 +451,24 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     include_paths.PushBack(".".ToString());
     include_paths.PushBack("include".ToString());
+#[if ZODIAC]
+    include_paths.PushBack("/include".ToString());
+#[else]
     let root = SplitPath(SplitPath(ExecutablePath().Unwrap()).0).0;
 
     if !root.Empty() {
         include_paths.PushBack(JoinPath(root, "include".ToString()));
     }
+#[endif]
 
     let mut features = String();
+#[if ZODIAC]
+    let mut triple = "zodiac-unknown-zenith".ToString();
+#[else]
     let mut triple = LLVMGetDefaultTargetTriple().ToString();
-    let (mut arch, mut code_model) = ("generic".ToString(), "default".ToString());
     let mut opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
+#[endif]
+    let (mut arch, mut code_model) = ("generic".ToString(), "default".ToString());
     let (mut emit_hir, mut emit_mir, mut emit_lir) = (false, false, false);
     let (mut emit_object, mut emit_asm, mut emit_llvm, mut emit_bc) = (false, false, false, false);
     let (mut run, mut debug, mut verbose, mut check) = (false, false, false, false);
@@ -499,13 +518,21 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-r" || arg == "--run" {
             run = true;
         } else if arg == "-O0" {
+#[if !ZODIAC]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
+#[endif]
         } else if arg == "-O1" {
+#[if !ZODIAC]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelLess;
+#[endif]
         } else if arg == "-O2" || arg == "-O" {
+#[if !ZODIAC]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault;
+#[endif]
         } else if arg == "-O3" {
+#[if !ZODIAC]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive;
+#[endif]
         } else if arg == "-o" {
             i += 1;
 
@@ -625,7 +652,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    if triple.Contains("windows") {
+    if triple.Contains("zenith") {
+        defines.PushBack("ZENITH".ToString());
+    } else if triple.Contains("windows") {
         defines.PushBack("WINDOWS".ToString());
     } else if triple.Contains("darwin") || triple.Contains("apple") {
         defines.PushBack("DARWIN".ToString());
@@ -633,18 +662,17 @@ fn Main(args: &mut Vector<String>) -> i32 {
         defines.PushBack("LINUX".ToString());
     }
 
-    if triple.Contains("x86_64") {
-        defines.PushBack("AMD64".ToString());
-    } else if triple.Contains("aarch64") || triple.Contains("arm64") {
-        defines.PushBack("ARM64".ToString());
-    } else if triple.StartsWith("zodiac") {
+    if triple.StartsWith("zodiac") {
         defines.PushBack("ZODIAC".ToString());
-        freestanding = true;
 
         if !emit_asm && !check {
             Logger::Log("The Zodiac target can only generate assembly, use '-S' and assemble with 'zas'.", LogSeverity::Error);
             return 1;
         }
+    } else if triple.Contains("x86_64") || triple.Contains("x64") || triple.Contains("amd64") {
+        defines.PushBack("AMD64".ToString());
+    } else if triple.Contains("aarch64") || triple.Contains("arm64") {
+        defines.PushBack("ARM64".ToString());
     }
 
     if triple.Contains("darwin") || triple.Contains("apple") || (triple.Contains("linux") && !freestanding) {
@@ -654,7 +682,6 @@ fn Main(args: &mut Vector<String>) -> i32 {
 #[if !ZODIAC]
     let mut timer = Timer();
     let start = timer.Get();
-#[endif]
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
     let temp_path = match GetTemporaryPath() {
@@ -664,16 +691,21 @@ fn Main(args: &mut Vector<String>) -> i32 {
             return 1;
         }
     };
+#[endif]
     let mut entry_included = false;
     let mut failed = false;
 
     for input_file in input_files {
         let (name, extension) = SplitExtension(input_file);
 
+#[if ZODIAC]
+        let target = Target(triple, arch, code_model, features);
+#[else]
         let mut module: LLVMModuleRef = null;
         let target = Target(triple, arch, code_model, features, opt_level);
         let mut llvm_lowerer = LLVMLowerer(target, freestanding, no_red_zone);
         let mut assembler = Assembler(target);
+#[endif]
 
         if target.backend == TargetBackend::Zodiac && extension != ".zir" {
             failed = true;
@@ -707,13 +739,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 entry_included = true;
             }
 
-            let tokens = preprocessor.Process(lexer.Lex(source, input_file), input_file);
+            let mut tokens = preprocessor.Process(lexer.Lex(source, input_file), input_file);
 
             let mut parser = Parser();
 #[if !ZODIAC]
             let ast_start = timer.Get();
 #[endif]
             let ast_module = parser.Parse(tokens);
+            tokens.Clear();
 #[if !ZODIAC]
             WriteLine("AST module parsed in " + String::FromFloat(timer.Get() - ast_start) + " seconds.");
 #[endif]
@@ -726,6 +759,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if !Logger::HasError() {
                 hir_module = hir_lowerer.Lower(ast_module);
+                parser.arena.Clear();
             }
 
             if !check && !Logger::HasError() && hir_module != null {
@@ -739,6 +773,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 let mir_start = timer.Get();
 #[endif]
                 let mir_module = mir_lowerer.Lower(hir_module);
+                hir_lowerer.context.arena.Reset();
 #[if !ZODIAC]
                 WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
 #[endif]
@@ -764,6 +799,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     let lir_start = timer.Get();
 #[endif]
                     let lir_module = lir_lowerer.Lower(mir_module);
+                    mir_lowerer.context.arena.Reset();
 #[if !ZODIAC]
                     WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
 #[endif]
@@ -791,16 +827,15 @@ fn Main(args: &mut Vector<String>) -> i32 {
                         let assembly = emitter.Emit(lir_module);
                         if !Logger::HasError() { WriteOutput(asm_name, assembly); }
                     }
+#[if !ZODIAC]
                 } else {
-#[if !ZODIAC]
                     let llvm_start = timer.Get();
-#[endif]
                     module = llvm_lowerer.Lower(mir_module);
-#[if !ZODIAC]
                     WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
 #[endif]
                 }
             }
+#[if !ZODIAC]
         } else if extension == ".ll" || extension == ".bc" {
             if verbose {
                 Logger::Log("Compiling: '" + input_file + "'.", LogSeverity::Info);
@@ -883,15 +918,18 @@ fn Main(args: &mut Vector<String>) -> i32 {
             } else {
                 objects.PushBack(input_file);
             } continue;
+#[endif]
         } else {
             Logger::Log(input_file, "Unsupported file extension '" + extension + "'.", LogSeverity::Error);
         }
 
         failed |= Logger::HasError();
 
+#[if !ZODIAC]
         if target.backend == TargetBackend::LLVM && !check {
             failed |= module == null;
         }
+#[endif]
 
         if check || failed {
             if !check {
@@ -903,6 +941,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             continue;
         }
 
+#[if !ZODIAC]
         if opt_level != LLVMCodeGenOptLevel::LLVMCodeGenLevelNone && extension == ".zir" {
             let mut passes = String();
 
@@ -983,8 +1022,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
         if !emit_object {
             temp_files.PushBack(object_name);
         }
+#[endif]
     }
 
+#[if ZODIAC]
+    if failed { 1 } else { 0 }
+#[else]
     if check || failed || emit_object || emit_asm {
         for temp_file in temp_files {
             RemoveFile(temp_file);
@@ -1041,7 +1084,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 #[endif]
     } else if triple.Contains("darwin") || triple.Contains("apple") {
 #[if DARWIN]
-        command = "cc -arch ".ToString() + (if arm64 { "arm64" } else { "x86_64" }) + " -o " + output_file;
+        command = "cc -arch ".ToString() + (if arm64 { "arm64" } else { "x64" }) + " -o " + output_file;
 
         for object in objects {
             command += " " + object;
@@ -1111,9 +1154,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } return 1;
     }
 
-#[if !ZODIAC]
     WriteLine("Program compiled in " + String::FromFloat(timer.Get() - start) + " seconds.");
-#[endif]
 
     for temp_file in temp_files {
         RemoveFile(temp_file);
@@ -1127,4 +1168,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     0
+#[endif]
 }
