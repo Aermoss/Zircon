@@ -42,26 +42,10 @@ extern "C" {
     fn WriteFile(hFile: *mut void, lpBuffer: *i8, nNumberOfBytesToWrite: u32, lpNumberOfBytesWritten: *mut u32, lpOverlapped: *mut void) -> i32;
 
     fn GetStdHandle(nStdHandle: u32) -> *mut void;
+    fn CloseHandle(hObject: *mut void) -> i32;
 #[else]
-    fn read(fd: i32, buf: *mut i8, count: usize) -> isize #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(0), rdi(fd as i64), rsi(buf), rdx(count as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as isize
-    } #[endif]
-
-    fn write(fd: i32, buf: *i8, len: usize) -> isize #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(1), rdi(fd), rsi(buf), rdx(len) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as isize
-    } #[endif]
+    fn read(fd: i32, buf: *mut i8, count: usize) -> isize;
+    fn write(fd: i32, buf: *i8, len: usize) -> isize;
 #[endif]
 }
 

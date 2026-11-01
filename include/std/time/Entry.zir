@@ -14,31 +14,84 @@
  * limitations under the License.
  */
 
-const CLOCKS_PER_SEC: i32 = 1000000;
-
-class tm {
-    pub tm_sec: i32,
-    pub tm_min: i32,
-    pub tm_hour: i32,
-    pub tm_mday: i32,
-    pub tm_mon: i32,
-    pub tm_year: i32,
-    pub tm_wday: i32,
-    pub tm_yday: i32,
-    pub tm_isdst: i32
-}
-
-type time_t = i64;
-type clock_t = i32;
+#[if WINDOWS]
+const UNIX_EPOCH_TICKS: u64 = 116444736000000000;
 
 extern "C" {
-    fn time(timer: *mut time_t) -> time_t;
-    fn difftime(time1: time_t, time0: time_t) -> f64;
-    fn clock() -> clock_t;
+    fn GetSystemTimePreciseAsFileTime(lpSystemTimeAsFileTime: *mut u64);
+    fn QueryPerformanceCounter(lpPerformanceCount: *mut i64) -> i32;
+    fn QueryPerformanceFrequency(lpFrequency: *mut i64) -> i32;
+}
+#[else]
+const CLOCK_REALTIME: i32 = 0;
 
-    fn gmtime(timer: *time_t) -> *mut tm;
-    fn localtime(timer: *time_t) -> *mut tm;
-    fn asctime(timeptr: *tm) -> *mut i8;
-    fn ctime(timer: *time_t) -> *mut i8;
-    fn strftime(s: *mut i8, maxsize: i64, format: *i8, timeptr: *tm) -> i64;
+#[if DARWIN]
+const CLOCK_MONOTONIC: i32 = 6;
+#[else]
+const CLOCK_MONOTONIC: i32 = 1;
+#[endif]
+
+class timespec {
+    pub tv_sec: i64,
+    pub tv_nsec: i64
+}
+
+extern "C" {
+    fn clock_gettime(clock: i32, time: *mut timespec) -> i32;
+}
+
+fn ClockNanoseconds(clock: i32) -> i64 {
+    let mut time: timespec;
+    clock_gettime(clock, &mut time);
+    time.tv_sec * 1000000000 + time.tv_nsec
+}
+#[endif]
+
+class SystemTime {
+    nanoseconds: i64;
+
+    pub fn Now() -> SystemTime {
+        let mut time: SystemTime;
+#[if WINDOWS]
+        let mut ticks: u64 = 0;
+        GetSystemTimePreciseAsFileTime(&mut ticks);
+        time.nanoseconds = ((ticks - UNIX_EPOCH_TICKS) * 100) as i64;
+#[else]
+        time.nanoseconds = ClockNanoseconds(CLOCK_REALTIME);
+#[endif]
+        time
+    }
+
+    pub fn UnixSeconds(&this) -> i64 {
+        this.nanoseconds / 1000000000
+    }
+
+    pub fn UnixMilliseconds(&this) -> i64 {
+        this.nanoseconds / 1000000
+    }
+}
+
+class Instant {
+    ticks: i64;
+
+    pub fn Now() -> Instant {
+        let mut instant: Instant;
+#[if WINDOWS]
+        QueryPerformanceCounter(&mut instant.ticks);
+#[else]
+        instant.ticks = ClockNanoseconds(CLOCK_MONOTONIC);
+#[endif]
+        instant
+    }
+
+    pub fn Elapsed(&this) -> f64 {
+#[if WINDOWS]
+        let (mut now, mut frequency) = (0i64, 0i64);
+        QueryPerformanceCounter(&mut now);
+        QueryPerformanceFrequency(&mut frequency);
+        (now - this.ticks) as f64 / frequency as f64
+#[else]
+        (ClockNanoseconds(CLOCK_MONOTONIC) - this.ticks) as f64 / 1000000000.0
+#[endif]
+    }
 }

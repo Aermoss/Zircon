@@ -14,167 +14,220 @@
  * limitations under the License.
  */
 
-const thrd_success: i32 = 0;
-const thrd_busy: i32 = 1;
-const thrd_error: i32 = 2;
-const thrd_nomem: i32 = 3;
-const thrd_timedout: i32 = 4;
+#[include "std/io", "std/mem", "std/time" : *]
 
-const mtx_plain: i32 = 0;
-const mtx_timed: i32 = 1;
-const mtx_recursive: i32 = 2;
+type ThreadFunction = fn(*mut void);
 
-class timespec {
-    pub tv_sec: i64,
-    pub tv_nsec: i32
+class ThreadStart {
+    pub function: ThreadFunction,
+    pub argument: *mut void;
+
+    ThreadStart(&mut this, function: ThreadFunction, argument: *mut void) {
+        this.function = function;
+        this.argument = argument;
+    }
 }
 
-class thrd_t {
-    pub _Handle: *mut void,
-    pub _Tid: u32
+#[if WINDOWS]
+class SRWLOCK {
+    pub Ptr: *mut void
 }
 
-class mtx_t {
-    pub _Type: u64,
-    pub _Ptr: *mut void,
-    pub _Cv: *mut void,
-    pub _Owner: u32,
-    pub _Cnt: u32
+class CONDITION_VARIABLE {
+    pub Ptr: *mut void
 }
 
-class cnd_t {
-    pub _Ptr: *mut void
-}
+type NativeMutex = SRWLOCK;
+type NativeCondition = CONDITION_VARIABLE;
 
-class tss_t {
-    pub _Idx: u32
-}
-
-class once_flag {
-    pub _Opaque: *mut void
-}
-
-type thrd_start_t = fn(*mut void);
-type tss_dtor_t = fn(*mut void);
+const INFINITE: u32 = 0xFFFFFFFF;
 
 extern "C" {
-    fn thrd_create(thr: *mut thrd_t, func_ptr: thrd_start_t, arg: *mut void) -> i32;
-    fn thrd_current() -> thrd_t;
-    fn thrd_detach(thr: thrd_t) -> i32;
-    fn thrd_equal(thr0: thrd_t, thr1: thrd_t) -> i32;
-    fn thrd_exit(res: i32);
-    fn thrd_join(thr: thrd_t, res: *mut i32) -> i32;
-#[if WINDOWS]
+    fn CreateThread(lpThreadAttributes: *mut void, dwStackSize: usize, lpStartAddress: *mut void, lpParameter: *mut void, dwCreationFlags: u32, lpThreadId: *mut u32) -> *mut void;
+    fn WaitForSingleObject(hHandle: *mut void, dwMilliseconds: u32) -> u32;
     fn Sleep(dwMilliseconds: u32);
+    fn SwitchToThread() -> i32;
+
+    fn InitializeSRWLock(SRWLock: *mut SRWLOCK);
+    fn AcquireSRWLockExclusive(SRWLock: *mut SRWLOCK);
+    fn TryAcquireSRWLockExclusive(SRWLock: *mut SRWLOCK) -> u8;
+    fn ReleaseSRWLockExclusive(SRWLock: *mut SRWLOCK);
+
+    fn InitializeConditionVariable(ConditionVariable: *mut CONDITION_VARIABLE);
+    fn WakeConditionVariable(ConditionVariable: *mut CONDITION_VARIABLE);
+    fn WakeAllConditionVariable(ConditionVariable: *mut CONDITION_VARIABLE);
+    fn SleepConditionVariableSRW(ConditionVariable: *mut CONDITION_VARIABLE, SRWLock: *mut SRWLOCK, dwMilliseconds: u32, Flags: u32) -> i32;
+
+    fn ThreadEntry(start: *mut void) -> u32 {
+        let data = start as *mut ThreadStart;
+        let (function, argument) = (data->function, data->argument);
+        delete data;
+        function(argument);
+        0
+    }
+}
 #[else]
-    fn thrd_sleep(duration: *timespec, remaining: *mut timespec) -> i32;
-#[endif]
-    fn thrd_yield();
-
-    fn mtx_init(mutex: *mut mtx_t, type_: i32) -> i32;
-    fn mtx_lock(mutex: *mut mtx_t) -> i32;
-    fn mtx_timedlock(mutex: *mut mtx_t, time_point: *timespec) -> i32;
-    fn mtx_trylock(mutex: *mut mtx_t) -> i32;
-    fn mtx_unlock(mutex: *mut mtx_t) -> i32;
-    fn mtx_destroy(mutex: *mut mtx_t);
-
-    fn cnd_init(cond: *mut cnd_t) -> i32;
-    fn cnd_signal(cond: *mut cnd_t) -> i32;
-    fn cnd_broadcast(cond: *mut cnd_t) -> i32;
-    fn cnd_wait(cond: *mut cnd_t, mutex: *mut mtx_t) -> i32;
-    fn cnd_timedwait(cond: *mut cnd_t, mutex: *mut mtx_t, time_point: *timespec) -> i32;
-    fn cnd_destroy(cond: *mut cnd_t);
-
-    fn tss_create(key: *mut tss_t, dtor: tss_dtor_t) -> i32;
-    fn tss_get(key: tss_t) -> *mut void;
-    fn tss_set(key: tss_t, val: *mut void) -> i32;
-    fn tss_delete(key: tss_t);
-
-    fn call_once(flag: *mut once_flag, func_ptr: *mut void);
+class pthread_mutex_t {
+    pub data: [u64; 8]
 }
 
-type ThreadFunction = thrd_start_t;
+class pthread_cond_t {
+    pub data: [u64; 8]
+}
+
+type pthread_t = usize;
+type NativeMutex = pthread_mutex_t;
+type NativeCondition = pthread_cond_t;
+
+extern "C" {
+    fn pthread_create(thread: *mut pthread_t, attr: *void, start: *mut void, arg: *mut void) -> i32;
+    fn pthread_join(thread: pthread_t, result: *mut *mut void) -> i32;
+    fn pthread_detach(thread: pthread_t) -> i32;
+
+    fn pthread_mutex_init(mutex: *mut pthread_mutex_t, attr: *void) -> i32;
+    fn pthread_mutex_lock(mutex: *mut pthread_mutex_t) -> i32;
+    fn pthread_mutex_trylock(mutex: *mut pthread_mutex_t) -> i32;
+    fn pthread_mutex_unlock(mutex: *mut pthread_mutex_t) -> i32;
+    fn pthread_mutex_destroy(mutex: *mut pthread_mutex_t) -> i32;
+
+    fn pthread_cond_init(cond: *mut pthread_cond_t, attr: *void) -> i32;
+    fn pthread_cond_signal(cond: *mut pthread_cond_t) -> i32;
+    fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> i32;
+    fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t) -> i32;
+    fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> i32;
+
+    fn nanosleep(request: *timespec, remaining: *mut timespec) -> i32;
+    fn sched_yield() -> i32;
+
+    fn ThreadEntry(start: *mut void) -> *mut void {
+        let data = start as *mut ThreadStart;
+        let (function, argument) = (data->function, data->argument);
+        delete data;
+        function(argument);
+        null
+    }
+}
+#[endif]
 
 class Thread {
-    thread: thrd_t,
+#[if WINDOWS]
+    handle: *mut void = null,
+    id: u32 = 0,
+#[else]
+    handle: pthread_t = 0,
+#[endif]
     joined: bool = false;
 
     Thread(&mut this, function: ThreadFunction, argument: *mut void) {
-        thrd_create(&mut this.thread, function, argument);
+        let start = new ThreadStart(function, argument);
+#[if WINDOWS]
+        this.handle = CreateThread(null, 0, ThreadEntry as *mut void, start as *mut void, 0, &mut this.id);
+        let created = this.handle != null;
+#[else]
+        let created = pthread_create(&mut this.handle, null, ThreadEntry as *mut void, start as *mut void) == 0;
+#[endif]
+
+        if !created {
+            delete start;
+            this.joined = true;
+        }
     }
 
     ~Thread(&mut this) {
-        if !this.joined {
-            this.Detach();
-        }
+        this.Detach();
     }
 
-    pub fn Join(&mut this) -> i32 {
-        if !this.joined {
-            let mut res = 0;
-            let status = thrd_join(this.thread, &mut res);
-            this.joined = true;
-            return res;
-        }
-
-        0
+    pub fn Join(&mut this) {
+        if this.joined { return; }
+#[if WINDOWS]
+        WaitForSingleObject(this.handle, INFINITE);
+        CloseHandle(this.handle);
+#[else]
+        pthread_join(this.handle, null);
+#[endif]
+        this.joined = true;
     }
 
     pub fn Detach(&mut this) {
-        if !this.joined {
-            thrd_detach(this.thread);
-            this.joined = true;
-        }
+        if this.joined { return; }
+#[if WINDOWS]
+        CloseHandle(this.handle);
+#[else]
+        pthread_detach(this.handle);
+#[endif]
+        this.joined = true;
     }
 
-    pub fn GetId(&this) -> u32 {
-        this.thread._Tid
+    pub fn GetId(&this) -> usize {
+#[if WINDOWS]
+        this.id as usize
+#[else]
+        this.handle
+#[endif]
     }
 
     pub fn Sleep(&this, seconds: i64, nanoseconds: i32) {
 #[if WINDOWS]
         ::Sleep((seconds * 1000 + (nanoseconds / 1000000) as i64) as u32);
 #[else]
-        let mut ts: timespec;
-        (ts.tv_sec, ts.tv_nsec) = (seconds, nanoseconds);
-        thrd_sleep(&ts, null);
+        let mut time: timespec;
+        (time.tv_sec, time.tv_nsec) = (seconds, nanoseconds as i64);
+        nanosleep(&time, null);
 #[endif]
     }
 
     pub fn Yield() {
-        thrd_yield();
+#[if WINDOWS]
+        SwitchToThread();
+#[else]
+        sched_yield();
+#[endif]
     }
 }
 
 class Mutex {
-    mutex: mtx_t;
+    lock: NativeMutex;
 
     Mutex(&mut this) {
-        mtx_init(&mut this.mutex, mtx_plain);
-    }
-
-    Mutex(&mut this, _type: i32) {
-        mtx_init(&mut this.mutex, _type);
+#[if WINDOWS]
+        InitializeSRWLock(&mut this.lock);
+#[else]
+        pthread_mutex_init(&mut this.lock, null);
+#[endif]
     }
 
     ~Mutex(&mut this) {
-        mtx_destroy(&mut this.mutex);
+#[if !WINDOWS]
+        pthread_mutex_destroy(&mut this.lock);
+#[endif]
     }
 
     pub fn Lock(&mut this) {
-        mtx_lock(&mut this.mutex);
+#[if WINDOWS]
+        AcquireSRWLockExclusive(&mut this.lock);
+#[else]
+        pthread_mutex_lock(&mut this.lock);
+#[endif]
     }
 
     pub fn Unlock(&mut this) {
-        mtx_unlock(&mut this.mutex);
+#[if WINDOWS]
+        ReleaseSRWLockExclusive(&mut this.lock);
+#[else]
+        pthread_mutex_unlock(&mut this.lock);
+#[endif]
     }
 
     pub fn TryLock(&mut this) -> bool {
-        mtx_trylock(&mut this.mutex) == thrd_success
+#[if WINDOWS]
+        TryAcquireSRWLockExclusive(&mut this.lock) != 0
+#[else]
+        pthread_mutex_trylock(&mut this.lock) == 0
+#[endif]
     }
 
-    pub fn Handle(&mut this) -> *mut mtx_t {
-        &mut this.mutex
+    pub fn Handle(&mut this) -> *mut NativeMutex {
+        &mut this.lock
     }
 }
 
@@ -192,25 +245,43 @@ class ScopedLock {
 }
 
 class ConditionVariable {
-    condition: cnd_t;
+    condition: NativeCondition;
 
     ConditionVariable(&mut this) {
-        cnd_init(&mut this.condition);
+#[if WINDOWS]
+        InitializeConditionVariable(&mut this.condition);
+#[else]
+        pthread_cond_init(&mut this.condition, null);
+#[endif]
     }
 
     ~ConditionVariable(&mut this) {
-        cnd_destroy(&mut this.condition);
+#[if !WINDOWS]
+        pthread_cond_destroy(&mut this.condition);
+#[endif]
     }
 
     pub fn Signal(&mut this) {
-        cnd_signal(&mut this.condition);
+#[if WINDOWS]
+        WakeConditionVariable(&mut this.condition);
+#[else]
+        pthread_cond_signal(&mut this.condition);
+#[endif]
     }
 
     pub fn Broadcast(&mut this) {
-        cnd_broadcast(&mut this.condition);
+#[if WINDOWS]
+        WakeAllConditionVariable(&mut this.condition);
+#[else]
+        pthread_cond_broadcast(&mut this.condition);
+#[endif]
     }
 
     pub fn Wait(&mut this, mtx: *mut Mutex) {
-        cnd_wait(&mut this.condition, mtx->Handle());
+#[if WINDOWS]
+        SleepConditionVariableSRW(&mut this.condition, mtx->Handle(), INFINITE, 0);
+#[else]
+        pthread_cond_wait(&mut this.condition, mtx->Handle());
+#[endif]
     }
 }

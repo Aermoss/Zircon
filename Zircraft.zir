@@ -1381,12 +1381,12 @@ class World {
     light_decrease_queue: Vector<(Vector3, u8)>,
     skylight_increase_queue: Vector<(Vector3, u8)>,
     skylight_decrease_queue: Vector<(Vector3, u8)>,
-    threads: Vector<thrd_t>,
-    pub chunk_mutex: mtx_t,
-    chunk_update_mutex: mtx_t,
-    chunk_upload_mutex: mtx_t,
-    chunk_delete_mutex: mtx_t,
-    current_chunk_mutex: mtx_t,
+    threads: Vector<*mut Thread>,
+    pub chunk_mutex: Mutex,
+    chunk_update_mutex: Mutex,
+    chunk_upload_mutex: Mutex,
+    chunk_delete_mutex: Mutex,
+    current_chunk_mutex: Mutex,
     pub running: bool = true;
 
     World(&mut this) {
@@ -1397,34 +1397,10 @@ class World {
             this.buckets[i] = new Vector<Shared<Chunk>>();
         }
 
-        if mtx_init(&mut this.chunk_mutex, mtx_plain) != thrd_success {
-            Logger::Error("Failed to initialize chunk mutex.");
-        }
-
-        if mtx_init(&mut this.chunk_update_mutex, mtx_plain) != thrd_success {
-            Logger::Error("Failed to initialize chunk update mutex.");
-        }
-
-        if mtx_init(&mut this.chunk_upload_mutex, mtx_plain) != thrd_success {
-            Logger::Error("Failed to initialize chunk upload mutex.");
-        }
-
-        if mtx_init(&mut this.chunk_delete_mutex, mtx_plain) != thrd_success {
-            Logger::Error("Failed to initialize chunk delete mutex.");
-        }
-
-        if mtx_init(&mut this.current_chunk_mutex, mtx_plain) != thrd_success {
-            Logger::Error("Failed to initialize current chunk mutex.");
-        }
-
-        let mut generator_thread: thrd_t;
-        thrd_create(&mut generator_thread, World::GeneratorThread as thrd_start_t, this);
-        this.threads.PushBack(generator_thread);
+        this.threads.PushBack(new Thread(World::GeneratorThread as ThreadFunction, this));
 
         for _ in 0..2 {
-            let mut mesher_thread: thrd_t;
-            thrd_create(&mut mesher_thread, World::MesherThread as thrd_start_t, this);
-            this.threads.PushBack(mesher_thread);
+            this.threads.PushBack(new Thread(World::MesherThread as ThreadFunction, this));
         }
 
         let grass_textures: [f32; 6] = [1.0, 1.0, 2.0, 3.0, 1.0, 1.0];
@@ -1450,15 +1426,9 @@ class World {
         this.running = false;
 
         for thread in this.threads {
-            let mut result: i32;
-            thrd_join(thread, &mut result);
+            thread->Join();
+            delete thread;
         }
-
-        mtx_destroy(&mut this.current_chunk_mutex);
-        mtx_destroy(&mut this.chunk_delete_mutex);
-        mtx_destroy(&mut this.chunk_upload_mutex);
-        mtx_destroy(&mut this.chunk_update_mutex);
-        mtx_destroy(&mut this.chunk_mutex);
 
         for block_type in this.block_types {
             delete block_type;
@@ -1477,15 +1447,15 @@ class World {
 
     pub fn AddChunk(&mut this, chunk: Shared<Chunk>) {
         let hash = this.GetHash(chunk->position.x as i32, chunk->position.z as i32);
-        mtx_lock(&mut this.chunk_mutex);
+        this.chunk_mutex.Lock();
         this.buckets[hash]->PushBack(chunk);
-        mtx_unlock(&mut this.chunk_mutex);
+        this.chunk_mutex.Unlock();
     }
 
     pub fn RemoveChunk(&mut this, chunk: Shared<Chunk>) {
         let mut index: usize = 0;
         let hash = this.GetHash(chunk->position.x as i32, chunk->position.z as i32);
-        mtx_lock(&mut this.chunk_mutex);
+        this.chunk_mutex.Lock();
 
         for _chunk in *this.buckets[hash] {
             if _chunk == chunk {
@@ -1494,22 +1464,22 @@ class World {
             } index += 1;
         }
 
-        mtx_unlock(&mut this.chunk_mutex);
+        this.chunk_mutex.Unlock();
     }
 
     pub fn GetChunk(&mut this, position: &Vector3) -> Shared<Chunk> {
         if position.y != 0.0 { return Shared<Chunk>(); }
         let hash = this.GetHash(position.x as i32, position.z as i32);
-        mtx_lock(&mut this.chunk_mutex);
+        this.chunk_mutex.Lock();
 
         for chunk in *this.buckets[hash] {
             if chunk->position.x == position.x && chunk->position.z == position.z {
-                mtx_unlock(&mut this.chunk_mutex);
+                this.chunk_mutex.Unlock();
                 return chunk;
             }
         }
 
-        mtx_unlock(&mut this.chunk_mutex);
+        this.chunk_mutex.Unlock();
         Shared<Chunk>()
     }
 
@@ -1602,13 +1572,13 @@ class World {
 
         while this.running {
             let mut chunk_update_queue = Vector<Shared<Chunk>>();
-            mtx_lock(&mut this.current_chunk_mutex);
+            this.current_chunk_mutex.Lock();
             let current_chunk = this.current_chunk;
-            mtx_unlock(&mut this.current_chunk_mutex);
+            this.current_chunk_mutex.Unlock();
 
             if current_chunk.y == 0.0 {
                 for i in 0..HASH_SIZE {
-                    mtx_lock(&mut this.chunk_mutex);
+                    this.chunk_mutex.Lock();
                     let mut j: usize = 0;
 
                     while j < this.buckets[i]->Length() {
@@ -1650,17 +1620,17 @@ class World {
                                 if north_neighbor.Valid() { north_neighbor->south_neighbor.Clear(); }
                                 if south_neighbor.Valid() { south_neighbor->north_neighbor.Clear(); }
                                 this.buckets[i]->RemoveAt(j);
-                                mtx_unlock(&mut this.chunk_mutex);
-                                mtx_lock(&mut this.chunk_delete_mutex);
+                                this.chunk_mutex.Unlock();
+                                this.chunk_delete_mutex.Lock();
                                 this.chunk_delete_queue.PushBack(chunk);
-                                mtx_unlock(&mut this.chunk_delete_mutex);
-                                mtx_lock(&mut this.chunk_mutex);
+                                this.chunk_delete_mutex.Unlock();
+                                this.chunk_mutex.Lock();
                                 continue;
                             }
                         } j += 1;
                     }
 
-                    mtx_unlock(&mut this.chunk_mutex);
+                    this.chunk_mutex.Unlock();
                 }
 
                 for x in (-RENDER_DISTANCE)..(RENDER_DISTANCE + 1) {
@@ -1705,7 +1675,7 @@ class World {
                                     }
 
                                     if !found {
-                                        mtx_lock(&mut this.chunk_update_mutex);
+                                        this.chunk_update_mutex.Lock();
 
                                         for _chunk in this.chunk_update_queue {
                                             if _chunk == neighbor_chunk {
@@ -1714,7 +1684,7 @@ class World {
                                             }
                                         }
 
-                                        mtx_unlock(&mut this.chunk_update_mutex);
+                                        this.chunk_update_mutex.Unlock();
                                     }
 
                                     if !found {
@@ -1726,9 +1696,9 @@ class World {
                     }
                 }
 
-                mtx_lock(&mut this.chunk_update_mutex);
+                this.chunk_update_mutex.Lock();
                 this.chunk_update_queue += chunk_update_queue;
-                mtx_unlock(&mut this.chunk_update_mutex);
+                this.chunk_update_mutex.Unlock();
                 this.last_chunk = current_chunk;
             }
         }
@@ -1742,16 +1712,16 @@ class World {
             let mut gen_count = 0;
 
             while this.running {
-                mtx_lock(&mut this.chunk_update_mutex);
+                this.chunk_update_mutex.Lock();
 
                 if this.chunk_update_queue.Empty() {
-                    mtx_unlock(&mut this.chunk_update_mutex);
+                    this.chunk_update_mutex.Unlock();
                     break;
                 }
 
-                mtx_lock(&mut this.current_chunk_mutex);
+                this.current_chunk_mutex.Lock();
                 let current_chunk = this.current_chunk;
-                mtx_unlock(&mut this.current_chunk_mutex);
+                this.current_chunk_mutex.Unlock();
 
                 let mut best_index: usize = 0;
                 let mut min_dist_sq: f32 = 1.0 / 0.0;
@@ -1769,7 +1739,7 @@ class World {
                 }
 
                 let chunk = this.chunk_update_queue.RemoveAt(best_index);
-                mtx_unlock(&mut this.chunk_update_mutex);
+                this.chunk_update_mutex.Unlock();
 
                 if chunk->state == ChunkState::Dead {
                     continue;
@@ -1783,9 +1753,9 @@ class World {
                 }
 
                 chunk->state = ChunkState::Uploading;
-                mtx_lock(&mut this.chunk_upload_mutex);
+                this.chunk_upload_mutex.Lock();
                 this.chunk_upload_queue.PushBack(chunk);
-                mtx_unlock(&mut this.chunk_upload_mutex);
+                this.chunk_upload_mutex.Unlock();
                 gen_count += 1;
             }
 
@@ -2075,7 +2045,7 @@ class World {
 
     fn QueueChunkUpload(&mut this, chunk: Shared<Chunk>) {
         let mut found = false;
-        mtx_lock(&mut this.chunk_upload_mutex);
+        this.chunk_upload_mutex.Lock();
 
         for _chunk in this.chunk_upload_queue {
             if _chunk == chunk { 
@@ -2088,7 +2058,7 @@ class World {
             this.chunk_upload_queue.PushBack(chunk); 
         }
 
-        mtx_unlock(&mut this.chunk_upload_mutex);
+        this.chunk_upload_mutex.Unlock();
     }
 
     fn UpdateAtPosition(&mut this, position: Vector3) {
@@ -2197,21 +2167,21 @@ class World {
     }
 
     pub fn Update(&mut this, delta_time: f64, player: &Player) {
-        mtx_lock(&mut this.current_chunk_mutex);
+        this.current_chunk_mutex.Lock();
         this.current_chunk = (player.translation / Vector3(CHUNK_WIDTH as f32, CHUNK_HEIGHT as f32, CHUNK_DEPTH as f32)).Floor();
         this.current_chunk.y = 0.0;
-        mtx_unlock(&mut this.current_chunk_mutex);
+        this.current_chunk_mutex.Unlock();
 
         loop {
-            mtx_lock(&mut this.chunk_upload_mutex);
+            this.chunk_upload_mutex.Lock();
 
             if this.chunk_upload_queue.Empty() {
-                mtx_unlock(&mut this.chunk_upload_mutex);
+                this.chunk_upload_mutex.Unlock();
                 break;
             }
 
             let chunk = this.chunk_upload_queue.RemoveAt(0);
-            mtx_unlock(&mut this.chunk_upload_mutex);
+            this.chunk_upload_mutex.Unlock();
 
             if chunk->state == ChunkState::Dead {
                 continue;
@@ -2222,21 +2192,21 @@ class World {
         }
 
         loop {
-            mtx_lock(&mut this.chunk_delete_mutex);
+            this.chunk_delete_mutex.Lock();
 
             if this.chunk_delete_queue.Empty() {
-                mtx_unlock(&mut this.chunk_delete_mutex);
+                this.chunk_delete_mutex.Unlock();
                 break;
             }
 
             let chunk = this.chunk_delete_queue.RemoveAt(0);
-            mtx_unlock(&mut this.chunk_delete_mutex);
+            this.chunk_delete_mutex.Unlock();
             chunk->Delete();
         }
     }
 
     pub fn Render(&mut this) {
-        mtx_lock(&mut this.chunk_mutex);
+        this.chunk_mutex.Lock();
 
         for i in 0..HASH_SIZE {
             for chunk in *this.buckets[i] {
@@ -2244,7 +2214,7 @@ class World {
             }
         }
 
-        mtx_unlock(&mut this.chunk_mutex);
+        this.chunk_mutex.Unlock();
     }
 }
 

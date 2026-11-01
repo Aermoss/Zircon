@@ -328,7 +328,6 @@ extern "C" {
     fn CreateFileA(lpFileName: *i8, dwDesiredAccess: u32, dwShareMode: u32, lpSecurityAttributes: *mut void, dwCreationDisposition: u32, dwFlagsAndAttributes: u32, hTemplateFile: *mut void) -> *mut void;
     fn SetFilePointerEx(hFile: *mut void, liDistanceToMove: i64, lpNewFilePointer: *mut i64, dwMoveMethod: u32) -> i32;
     fn GetFileSizeEx(hFile: *mut void, lpFileSize: *mut i64) -> i32;
-    fn CloseHandle(hObject: *mut void) -> i32;
 
     fn DeleteFileA(lpFileName: *i8) -> i32;
     fn CreateDirectoryA(lpPathName: *i8, lpSecurityAttributes: *mut void) -> i32;

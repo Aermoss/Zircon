@@ -17,8 +17,7 @@
 #[include "std/io", "std/file", "std/std", "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/Logger.zir" : *]
 
 #[if !ZODIAC]
-#[include "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
-#[endif]
+#[include "std/time", "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
 
 #[if WINDOWS]
 const INFINITE: u32 = 0xFFFFFFFF;
@@ -54,31 +53,33 @@ class PROCESS_INFORMATION {
 }
 
 type LPPROCESS_INFORMATION = *mut PROCESS_INFORMATION;
-
-extern "C" {
-    fn QueryPerformanceCounter(lpPerformanceCount: *mut i64) -> i32;
-    fn QueryPerformanceFrequency(lpFrequency: *mut i64) -> i32;
-
-    fn CreateProcessA(lpApplicationName: *i8, lpCommandLine: */* mut */ i8, lpProcessAttributes: *mut void, lpThreadAttributes: *mut void, bInheritHandles: i32, dwCreationFlags: u32, lpEnvironment: *mut void, lpCurrentDirectory: *i8, lpStartupInfo: LPSTARTUPINFOA, lpProcessInformation: LPPROCESS_INFORMATION) -> i32;
-    fn WaitForSingleObject(hHandle: *mut void, dwMilliseconds: u32) -> u32;
-    fn GetExitCodeProcess(hProcess: *mut void, lpExitCode: *mut u32) -> i32;
+#[else]
+class _SHArgs {
+    pub sh: *i8,
+    pub flag: *i8,
+    pub cmd: *i8,
+    pub end: *i8
 }
 
-class Timer {
-    frequency: i64,
-    counter: i64;
+class _NullEnv {
+    pub end: *i8
+}
+#[endif]
 
-    Timer(&mut this) {
-        QueryPerformanceFrequency(&mut this.frequency);
-    }
-
-    pub fn Get(&mut this) -> f64 {
-        QueryPerformanceCounter(&mut this.counter);
-        (this.counter as f64) / (this.frequency as f64)
-    }
+extern "C" {
+#[if WINDOWS]
+    fn CreateProcessA(lpApplicationName: *i8, lpCommandLine: *i8, lpProcessAttributes: *mut void, lpThreadAttributes: *mut void, bInheritHandles: i32, dwCreationFlags: u32, lpEnvironment: *mut void, lpCurrentDirectory: *i8, lpStartupInfo: LPSTARTUPINFOA, lpProcessInformation: LPPROCESS_INFORMATION) -> i32;
+    fn WaitForSingleObject(hHandle: *mut void, dwMilliseconds: u32) -> u32;
+    fn GetExitCodeProcess(hProcess: *mut void, lpExitCode: *mut u32) -> i32;
+#[else]
+    fn fork() -> i32;
+    fn execve(path: *i8, argv: **i8, envp: **i8) -> i32;
+    fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+#[endif]
 }
 
 fn Execute(command: *i8) -> u32 {
+#[if WINDOWS]
     let mut startup_info: STARTUPINFOA;
     memset(&mut startup_info, 0, sizeof(startup_info));
     startup_info.cb = sizeof(startup_info) as u32;
@@ -99,78 +100,7 @@ fn Execute(command: *i8) -> u32 {
     CloseHandle(process_info.hProcess);
     CloseHandle(process_info.hThread);
     exit_code
-}
-#[elif !ZODIAC]
-class _TimeSpec {
-    pub sec: i64,
-    pub nsec: i64
-}
-
-class _SHArgs {
-    pub sh: *i8,
-    pub flag: *i8,
-    pub cmd: *i8,
-    pub end: *i8
-}
-
-class _NullEnv {
-    pub end: *i8
-}
-
-extern "C" {
-    fn clock_gettime(clk_id: i32, tp: *mut _TimeSpec) -> i32 #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(228), rdi(clk_id as i64), rsi(tp) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as i32
-    } #[endif]
-
-    fn fork() -> i32 #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(57) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as i32
-    } #[endif]
-
-    fn execve(path: *i8, argv: **i8, envp: **i8) -> i32 #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(59), rdi(path), rsi(argv), rdx(envp) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as i32
-    } #[endif]
-
-    fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32 #[if LIBC] ; #[else] {
-        let mut result: i64 = 0;
-
-        volatile asm : rax(61), rdi(pid as i64), rsi(status), rdx(options as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        result as i32
-    } #[endif]
-}
-
-class Timer {
-    dummy: i64;
-
-    pub fn Get(&this) -> f64 {
-        let mut ts: _TimeSpec;
-        (ts.sec, ts.nsec) = (0, 0);
-        clock_gettime(0, &mut ts);
-        (ts.sec as f64) + (ts.nsec as f64) / 1000000000.0
-    }
-}
-
-fn Execute(command: *i8) -> u32 {
+#[else]
     let mut shargs: _SHArgs;
     shargs.sh = "/bin/sh";
     shargs.flag = "-c";
@@ -188,6 +118,7 @@ fn Execute(command: *i8) -> u32 {
     let mut status = 0;
     waitpid(pid, &mut status, 0);
     ((status >> 8) & 0xFF) as u32
+#[endif]
 }
 #[endif]
 
@@ -611,8 +542,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
 #[if !ZODIAC]
-    let mut timer = Timer();
-    let start = timer.Get();
+    let start = Instant::Now();
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
     let temp_path = match TemporaryPath() {
@@ -674,17 +604,17 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             let mut parser = Parser();
 #[if !ZODIAC]
-            let ast_start = timer.Get();
+            let ast_start = Instant::Now();
 #[endif]
             let ast_module = parser.Parse(tokens);
             tokens.Clear();
 #[if !ZODIAC]
-            WriteLine("AST module parsed in " + String::FromFloat(timer.Get() - ast_start) + " seconds.");
+            WriteLine("AST module parsed in " + String::FromFloat(ast_start.Elapsed()) + " seconds.");
 #[endif]
 
             let mut hir_lowerer = HIRLowerer(target.Info());
 #[if !ZODIAC]
-            let hir_start = timer.Get();
+            let hir_start = Instant::Now();
 #[endif]
             let mut hir_module: *HIRModule = null;
 
@@ -694,19 +624,19 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if !check && !Logger::HasError() && hir_module != null {
 #[if !ZODIAC]
-                WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
+                WriteLine("HIR module lowered in " + String::FromFloat(hir_start.Elapsed()) + " seconds.");
 #[endif]
                 if emit_hir { WriteOutput(name + ".hir", hir_module->ToString()); }
                 parser.arena.Clear();
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
 #[if !ZODIAC]
-                let mir_start = timer.Get();
+                let mir_start = Instant::Now();
 #[endif]
                 let mir_module = mir_lowerer.Lower(hir_module);
                 hir_lowerer.context.arena.Reset();
 #[if !ZODIAC]
-                WriteLine("MIR module lowered in " + String::FromFloat(timer.Get() - mir_start) + " seconds.");
+                WriteLine("MIR module lowered in " + String::FromFloat(mir_start.Elapsed()) + " seconds.");
 #[endif]
 
                 if target.backend == TargetBackend::Zodiac {
@@ -714,11 +644,11 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
 #[if !ZODIAC]
-                    let passes_start = timer.Get();
+                    let passes_start = Instant::Now();
 #[endif]
                     pass_manager.Run(mir_module);
 #[if !ZODIAC]
-                    WriteLine("MIR passes ran in " + String::FromFloat(timer.Get() - passes_start) + " seconds.");
+                    WriteLine("MIR passes ran in " + String::FromFloat(passes_start.Elapsed()) + " seconds.");
 #[endif]
                 }
 
@@ -727,22 +657,22 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 if target.backend == TargetBackend::Zodiac {
                     let mut lir_lowerer = LIRLowerer();
 #[if !ZODIAC]
-                    let lir_start = timer.Get();
+                    let lir_start = Instant::Now();
 #[endif]
                     let lir_module = lir_lowerer.Lower(mir_module);
                     mir_lowerer.context.arena.Reset();
 #[if !ZODIAC]
-                    WriteLine("LIR module lowered in " + String::FromFloat(timer.Get() - lir_start) + " seconds.");
+                    WriteLine("LIR module lowered in " + String::FromFloat(lir_start.Elapsed()) + " seconds.");
 #[endif]
                     if emit_lir { WriteOutput(name + ".virtual.lir", lir_module->ToString()); }
 
                     let mut allocator = LIRAllocator(&mut lir_lowerer.context);
 #[if !ZODIAC]
-                    let allocator_start = timer.Get();
+                    let allocator_start = Instant::Now();
 #[endif]
                     allocator.Allocate(lir_module);
 #[if !ZODIAC]
-                    WriteLine("LIR module allocated in " + String::FromFloat(timer.Get() - allocator_start) + " seconds.");
+                    WriteLine("LIR module allocated in " + String::FromFloat(allocator_start.Elapsed()) + " seconds.");
 #[endif]
                     if Logger::HasError() {
                         failed = true;
@@ -760,9 +690,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     }
 #[if !ZODIAC]
                 } else {
-                    let llvm_start = timer.Get();
+                    let llvm_start = Instant::Now();
                     module = llvm_lowerer.Lower(mir_module);
-                    WriteLine("LLVM module lowered in " + String::FromFloat(timer.Get() - llvm_start) + " seconds.");
+                    WriteLine("LLVM module lowered in " + String::FromFloat(llvm_start.Elapsed()) + " seconds.");
 #[endif]
                 }
             }
@@ -1085,7 +1015,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } return 1;
     }
 
-    WriteLine("Program compiled in " + String::FromFloat(timer.Get() - start) + " seconds.");
+    WriteLine("Program compiled in " + String::FromFloat(start.Elapsed()) + " seconds.");
 
     for temp_file in temp_files {
         RemoveFile(temp_file);
