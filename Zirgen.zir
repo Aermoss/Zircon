@@ -804,15 +804,11 @@ fn EvaluateMacros(state: *mut GlobalState, header: &String, clang_args: &Vector<
     state->pending.Clear();
 }
 
-extern "C" {
-    fn CreateDirectoryA(lpPathName: *i8, lpSecurityAttributes: *mut void) -> i32;
-}
-
 fn EnsureDirectory(path: &String) {
     if path.Empty() || FolderExists(path) { return; }
     let directory = SplitPath(path).0;
     if !directory.Empty() { EnsureDirectory(directory); }
-    CreateDirectoryA(path.Data(), null);
+    CreateFolder(path);
 }
 
 fn FlushAnonymousEnum(state: *mut GlobalState, file_state: *mut FileState) {
@@ -1245,35 +1241,26 @@ extern "C" {
 }
 
 fn IsDirectory(path: &String) -> bool {
-    let attributes = GetFileAttributesA(path.Data());
-    if attributes == INVALID_FILE_ATTRIBUTES { return false; }
-    (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
+    FolderExists(path)
 }
 
 fn CollectHeaders(directory: &String, headers: &mut Vector<String>) {
-    let mut find_data: WIN32_FIND_DATAA;
-    let handle = FindFirstFileA((directory + "\\*").Data(), &mut find_data);
-    if handle == INVALID_HANDLE_VALUE { return; }
-
-    loop {
-        let name = String(&find_data.cFileName[0] as *i8);
-
-        if name != "." && name != ".." {
-            let path = directory + "\\" + name;
-
-            if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
-                CollectHeaders(path, headers);
-            } else if name.Length() >= 2 && SplitExtension(name).1 == ".h" {
-                headers.PushBack(path);
-            }
+    let entries = match ListFolder(directory) {
+        Result<Vector<FolderEntry>, IOError>::Ok(entries) => entries,
+        Result<Vector<FolderEntry>, IOError>::Err(_) => {
+            return;
         }
+    };
 
-        if FindNextFileA(handle, &mut find_data) == 0 {
-            break;
+    for entry in entries {
+        let path = JoinPath(directory, entry.name);
+
+        if entry.kind == EntryKind::Folder {
+            CollectHeaders(path, headers);
+        } else if entry.name.Length() >= 2 && SplitExtension(entry.name).1 == ".h" {
+            headers.PushBack(path);
         }
     }
-
-    FindClose(handle);
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
@@ -1478,7 +1465,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let output_path = JoinPath(output_directory, name + ".zir");
         EnsureDirectory(SplitPath(output_path).0);
 
-        if _WriteFile(output_path, content.SubString(0, end)).IsOk() {
+        if File::WriteText(output_path, content.SubString(0, end)).IsOk() {
             WriteLine(executable + ": \x1b[32mInfo:\x1b[0m Generated '" + output_path + "'.");
         }
     }
@@ -1494,7 +1481,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         content += " : *]\n";
         let entry_path = JoinPath(output_directory, "Entry.zir".ToString());
 
-        if _WriteFile(entry_path, content).IsOk() {
+        if File::WriteText(entry_path, content).IsOk() {
             WriteLine(executable + ": \x1b[32mInfo:\x1b[0m Generated '" + entry_path + "'.");
         }
     }

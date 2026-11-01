@@ -192,181 +192,112 @@ fn Execute(command: *i8) -> u32 {
 #[endif]
 
 #[if WINDOWS]
-fn GetWindowsSDKPath() -> String {
-    let mut path = "C:\\Program Files (x86)\\Windows Kits\\10\\Lib".ToString();
+fn ListFolderOrExit(path: &String, what: &String) -> Vector<FolderEntry> {
+    match ListFolder(path) {
+        Result<Vector<FolderEntry>, IOError>::Ok(entries) => entries,
+        Result<Vector<FolderEntry>, IOError>::Err(_) => {
+            WriteLine("\x1b[31mFailed to find " + what + " path.\x1b[0m");
+            Exit(1)
+        }
+    }
+}
 
-    let mut find_data: WIN32_FIND_DATAA;
-    let find_handle = FindFirstFileA((path + "\\*").Data(), &mut find_data);
-
-    if find_handle == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to find Windows SDK path.\x1b[0m");
-        Exit(1);
+fn IsNewerVersion(version: &Vector<u64>, other: &Vector<u64>) -> bool {
+    for i in 0..version.Length() {
+        if version[i] != other[i] {
+            return version[i] > other[i];
+        }
     }
 
-    let mut highest_version_string = String();
-    let (mut highest_v1, mut highest_v2, mut highest_v3, mut highest_v4) = (0u64, 0u64, 0u64, 0u64);
+    false
+}
 
-    loop {
-        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
-            let file_name = String(&find_data.cFileName[0] as *i8);
+fn NewestVersionFolder(path: &String, count: usize, what: &String) -> String {
+    let mut newest = String();
+    let mut newest_version = Vector<u64>();
 
-            if file_name != "." && file_name != ".." && file_name != "wdf" {
-                let parts = file_name.Split('.');
-                let (mut parsed_v1, mut parsed_v2, mut parsed_v3, mut parsed_v4) = (0u64, 0u64, 0u64, 0u64);
+    for entry in ListFolderOrExit(path, what) {
+        if entry.kind != EntryKind::Folder {
+            continue;
+        }
 
-                if parts.Length() == 4 {
-                    (parsed_v1, parsed_v2, parsed_v3, parsed_v4) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap(), parts[3].ToUnsignedInteger().Unwrap());
-                } else {
-                    WriteLine("\x1b[31mFailed to parse Windows SDK version.\x1b[0m");
-                    Exit(1);
-                }
+        let mut version = Vector<u64>();
+        let parts = entry.name.Split('.');
 
-                if parsed_v1 > highest_v1 || (parsed_v1 == highest_v1 && parsed_v2 > highest_v2) || (parsed_v1 == highest_v1 && parsed_v2 == highest_v2 && parsed_v3 > highest_v3) || (parsed_v1 == highest_v1 && parsed_v2 == highest_v2 && parsed_v3 == highest_v3 && parsed_v4 > highest_v4) {
-                    (highest_version_string, highest_v1, highest_v2, highest_v3, highest_v4) = (file_name, parsed_v1, parsed_v2, parsed_v3, parsed_v4);
-                }
+        for part in parts {
+            let number = part.ToUnsignedInteger();
+
+            if number.IsSome() {
+                version.PushBack(number.Unwrap());
             }
         }
 
-        if FindNextFileA(find_handle, &mut find_data) == 0 {
-            break;
+        if parts.Length() == count && version.Length() == count && (newest.Empty() || IsNewerVersion(version, newest_version)) {
+            newest = entry.name;
+            newest_version = version;
         }
     }
 
-    if highest_version_string != "" {
-        path += "\\";
-        path += highest_version_string;
-    } else {
-        WriteLine("\x1b[31mFailed to find a valid Windows SDK version.\x1b[0m");
+    if newest.Empty() {
+        WriteLine("\x1b[31mFailed to find a valid " + what + " version.\x1b[0m");
         Exit(1);
     }
 
-    FindClose(find_handle);
-    path
+    JoinPath(path, newest)
+}
+
+fn GetWindowsSDKPath() -> String {
+    NewestVersionFolder("C:\\Program Files (x86)\\Windows Kits\\10\\Lib".ToString(), 4, "Windows SDK".ToString())
 }
 
 fn GetMSVCPath() -> String {
-    let mut path = "C:\\Program Files\\Microsoft Visual Studio".ToString();
+    let mut newest = String();
+    let mut newest_version: i64 = 0;
+    let root = "C:\\Program Files\\Microsoft Visual Studio".ToString();
+    let what = "Visual Studio".ToString();
 
-    let mut find_data: WIN32_FIND_DATAA;
-    let find_handle = FindFirstFileA((path + "\\*").Data(), &mut find_data);
+    for entry in ListFolderOrExit(root, what) {
+        let number = entry.name.ToInteger();
 
-    if find_handle == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to find Visual Studio path.\x1b[0m");
-        Exit(1);
-    }
-
-    let mut highest_version_string = String();
-    let mut highest_version: i64 = 0;
-
-    loop {
-        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
-            let file_name = String(&find_data.cFileName[0] as *i8);
-
-            if file_name != "." && file_name != ".." {
-                let mut parsed_version = file_name.ToInteger().Unwrap();
-
-                if parsed_version == 2017 { parsed_version = 15; }
-                else if parsed_version == 2019 { parsed_version = 16; }
-                else if parsed_version == 2022 { parsed_version = 17; }
-
-                if parsed_version > highest_version {
-                    (highest_version_string, highest_version) = (file_name, parsed_version);
-                }
-            }
+        if entry.kind != EntryKind::Folder || number.IsNone() {
+            continue;
         }
 
-        if FindNextFileA(find_handle, &mut find_data) == 0 {
-            break;
+        let version = match number.Unwrap() {
+            2017 => 15,
+            2019 => 16,
+            2022 => 17,
+            version => version
+        };
+
+        if version > newest_version {
+            newest = entry.name;
+            newest_version = version;
         }
     }
 
-    if highest_version_string != "" {
-        path += "\\";
-        path += highest_version_string;
-    } else {
+    if newest.Empty() {
         WriteLine("\x1b[31mFailed to find a valid Visual Studio version.\x1b[0m");
         Exit(1);
     }
 
-    FindClose(find_handle);
-    let mut find_data2: WIN32_FIND_DATAA;
-    let find_handle2 = FindFirstFileA((path + "\\*").Data(), &mut find_data2);
+    let installation = JoinPath(root, newest);
 
-    if find_handle2 == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to find Visual Studio path.\x1b[0m");
-        Exit(1);
-    }
+    for entry in ListFolderOrExit(installation, what) {
+        let path = JoinPath(JoinPath(installation, entry.name), "VC\\Tools\\MSVC".ToString());
 
-    loop {
-        if (find_data2.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
-            let file_name = String(&find_data2.cFileName[0] as *i8);
-
-            if file_name != "." && file_name != ".." {
-                path += "\\";
-                path += file_name;
-                path += "\\VC\\Tools\\MSVC";
-                break;
-            }
-        }
-
-        if FindNextFileA(find_handle2, &mut find_data2) == 0 {
-            break;
+        if entry.kind == EntryKind::Folder && FolderExists(path) {
+            return NewestVersionFolder(path, 3, "MSVC".ToString());
         }
     }
 
-    FindClose(find_handle2);
-    let mut find_data3: WIN32_FIND_DATAA;
-    let find_handle3 = FindFirstFileA((path + "\\*").Data(), &mut find_data3);
-
-    if find_handle3 == INVALID_HANDLE_VALUE {
-        WriteLine("\x1b[31mFailed to find MSVC path.\x1b[0m");
-        Exit(1);
-    }
-
-    let mut highest_version_string2 = String();
-    let (mut highest_v1, mut highest_v2, mut highest_v3, mut highest_v4) = (0u64, 0u64, 0u64, 0u64);
-
-    loop {
-        if (find_data3.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 {
-            let file_name = String(&find_data3.cFileName[0] as *i8);
-
-            if file_name != "." && file_name != ".." {
-                let parts = file_name.Split('.');
-                let (mut parsed_v1, mut parsed_v2, mut parsed_v3) = (0u64, 0u64, 0u64);
-
-                if parts.Length() == 3 {
-                    (parsed_v1, parsed_v2, parsed_v3) = (parts[0].ToUnsignedInteger().Unwrap(), parts[1].ToUnsignedInteger().Unwrap(), parts[2].ToUnsignedInteger().Unwrap());
-                } else {
-                    WriteLine("\x1b[31mFailed to parse MSVC version.\x1b[0m");
-                    Exit(1);
-                }
-
-                if parsed_v1 > highest_v1 || (parsed_v1 == highest_v1 && parsed_v2 > highest_v2) || (parsed_v1 == highest_v1 && parsed_v2 == highest_v2 && parsed_v3 > highest_v3) {
-                    (highest_version_string2, highest_v1, highest_v2, highest_v3) = (file_name, parsed_v1, parsed_v2, parsed_v3);
-                }
-            }
-        }
-
-        if FindNextFileA(find_handle3, &mut find_data3) == 0 {
-            break;
-        }
-    }
-
-    if highest_version_string2 != "" {
-        path += "\\";
-        path += highest_version_string2;
-    } else {
-        WriteLine("\x1b[31mFailed to find a valid MSVC version.\x1b[0m");
-        Exit(1);
-    }
-
-    FindClose(find_handle3);
-    path
+    WriteLine("\x1b[31mFailed to find MSVC path.\x1b[0m");
+    Exit(1);
 }
 #[endif]
 
 fn WriteOutput(path: &String, content: &String) {
-    if let Result<(), IOError>::Err(error) = _WriteFile(path, content) {
+    if let Result<(), IOError>::Err(error) = File::WriteText(path, content) {
         Logger::Log(path, "Failed to write file: " + error.ToString() + ".", LogSeverity::Error);
     }
 }
@@ -684,7 +615,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let start = timer.Get();
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
-    let temp_path = match GetTemporaryPath() {
+    let temp_path = match TemporaryPath() {
         Result<String, IOError>::Ok(path) => path,
         Result<String, IOError>::Err(error) => {
             Logger::Log("Failed to get temporary path: " + error.ToString() + ".", LogSeverity::Error);
@@ -724,7 +655,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             preprocessor.include_paths = include_paths;
             preprocessor.defines = defines;
 
-            let mut source = match _ReadFile(input_file) {
+            let mut source = match File::ReadText(input_file) {
                 Result<String, IOError>::Ok(source) => source,
                 Result<String, IOError>::Err(error) => {
                     failed = true;
@@ -759,7 +690,6 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             if !Logger::HasError() {
                 hir_module = hir_lowerer.Lower(ast_module);
-                parser.arena.Clear();
             }
 
             if !check && !Logger::HasError() && hir_module != null {
@@ -767,6 +697,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 WriteLine("HIR module lowered in " + String::FromFloat(timer.Get() - hir_start) + " seconds.");
 #[endif]
                 if emit_hir { WriteOutput(name + ".hir", hir_module->ToString()); }
+                parser.arena.Clear();
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
 #[if !ZODIAC]
@@ -901,7 +832,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 Logger::Log("Assembling: '" + input_file + "'.", LogSeverity::Info);
             }
 
-            match _ReadFile(input_file) {
+            match File::ReadText(input_file) {
                 Result<String, IOError>::Ok(source) => {
                     module = assembler.Assemble(source);
                 },

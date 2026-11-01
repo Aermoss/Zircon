@@ -53,7 +53,7 @@ test: bin/Test.exe
 	$<
 
 bin/Count.exe: bin/zirconc2.exe scripts/Count.zir
-	$^ -o $@ -L"C:\Users\rencb\Downloads\raylib-6.0_win64_msvc16\lib" -lraylibdll -g -v -emit-hir -emit-mir -emit-llvm
+	$^ -o $@ -g -v -emit-hir -emit-mir -emit-llvm
 
 count: bin/Count.exe
 	$<

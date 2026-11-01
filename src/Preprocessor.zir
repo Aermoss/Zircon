@@ -169,7 +169,7 @@ class Preprocessor {
                     break;
                 }
 
-                let source = match _ReadFile(path) {
+                let source = match File::ReadText(path) {
                     Result<String, IOError>::Ok(source) => source,
                     Result<String, IOError>::Err(error) => {
                         Logger::Log("Failed to read module '" + token.value + "': " + error.ToString() + ".", token, LogSeverity::Error);

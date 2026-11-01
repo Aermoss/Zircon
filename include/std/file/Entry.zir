@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/std", "std/str", "std/vec", "std/res" : *]
+#[include "std/io", "std/std", "std/str", "std/vec", "std/res", "std/mem" : *]
 
 enum IOError {
-    NotFound, PermissionDenied, AlreadyExists, InvalidInput, Other(i32);
+    NotFound, PermissionDenied, AlreadyExists, InvalidInput, UnexpectedEnd, NotEmpty, NoSpace, IsFolder, NotFolder, Other(i32);
 
     pub fn ToString(&this) -> String {
         match this {
@@ -25,14 +25,48 @@ enum IOError {
             IOError::PermissionDenied => "permission denied".ToString(),
             IOError::AlreadyExists => "entity already exists".ToString(),
             IOError::InvalidInput => "invalid input".ToString(),
+            IOError::UnexpectedEnd => "unexpected end of file".ToString(),
+            IOError::NotEmpty => "folder is not empty".ToString(),
+            IOError::NoSpace => "no space left".ToString(),
+            IOError::IsFolder => "entity is a folder".ToString(),
+            IOError::NotFolder => "entity is not a folder".ToString(),
             IOError::Other(code) => "os error " + String::FromInteger(code as HostSigned)
         }
     }
 }
 
+enum FileMode: u32 {
+    Read, Write, Append, Update
+}
+
+enum SeekOrigin: u32 {
+    Start, Current, End
+}
+
+enum EntryKind: u32 {
+    File, Folder
+}
+
+class FolderEntry {
+    pub name: String,
+    pub kind: EntryKind,
+    pub size: usize
+}
+
+const FILE_BUFFER_SIZE: usize = 4096;
+
 #[if ZENITH]
-const PATH_SEPERATOR: i8 = '/';
+const PATH_SEPARATOR: i8 = '/';
 const ZENITH_PATH_MAX: usize = 2048;
+
+const ZENITH_NO_SPACE: u32 = 5;
+const ZENITH_FOLDER: u32 = 2;
+
+class ZenithFolderRecord {
+    pub name: [i8; 32],
+    pub kind: u32,
+    pub size: u32
+}
 
 extern "C" {
     fn ZenithPathKind(path: *i8) -> u32 {
@@ -44,6 +78,7 @@ extern "C" {
 
         result
     }
+
     fn ZenithCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32 {
         let mut result: u32 = 0;
 
@@ -53,24 +88,7 @@ extern "C" {
 
         result
     }
-    fn ZenithReadFile(path: *i8, buffer: *mut u8, capacity: usize, size: *mut usize) -> u32 {
-        let mut result: u32 = 0;
 
-        volatile asm : a7(7), a0(path), a1(buffer), a2(capacity), a3(size) -> {
-            ecall
-        } -> a0(result) : memory;
-
-        result
-    }
-    fn ZenithWriteFile(path: *i8, data: *u8, size: usize) -> u32 {
-        let mut result: u32 = 0;
-
-        volatile asm : a7(8), a0(path), a1(data), a2(size) -> {
-            ecall
-        } -> a0(result) : memory;
-
-        result
-    }
     fn ZenithRemoveFile(path: *i8) -> u32 {
         let mut result: u32 = 0;
 
@@ -80,58 +98,170 @@ extern "C" {
 
         result
     }
+
+    fn ZenithOpen(path: *i8, mode: u32, handle: *mut u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(12), a0(path), a1(mode), a2(handle) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithClose(handle: u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(13), a0(handle) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithRead(handle: u32, buffer: *mut u8, count: usize, read: *mut usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(14), a0(handle), a1(buffer), a2(count), a3(read) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithWrite(handle: u32, data: *u8, count: usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(15), a0(handle), a1(data), a2(count) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithSeek(handle: u32, offset: i32, origin: u32, position: *mut u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(16), a0(handle), a1(offset), a2(origin), a3(position) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithSize(handle: u32, size: *mut u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(17), a0(handle), a1(size) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithListFolder(path: *i8, buffer: *mut ZenithFolderRecord, capacity: u32, count: *mut u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(18), a0(path), a1(buffer), a2(capacity), a3(count) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithCreateFolder(path: *i8) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(19), a0(path) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithRemoveFolder(path: *i8) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(20), a0(path) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn ZenithRename(source: *i8, destination: *i8) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(21), a0(source), a1(destination) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
 }
 
-fn _ZenithError(code: u32) -> IOError {
+fn ZenithError(code: u32) -> IOError {
     match code {
         2 => IOError::NotFound,
-        3 | 7 | 8 => IOError::InvalidInput,
+        3 | 11 | 13 | 17 => IOError::InvalidInput,
+        4 | 5 => IOError::NoSpace,
+        7 => IOError::NotFolder,
+        8 => IOError::IsFolder,
+        9 => IOError::NotEmpty,
         10 => IOError::AlreadyExists,
+        14 | 15 => IOError::PermissionDenied,
         _ => IOError::Other(code as i32)
     }
 }
 
-fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
-    let mut size: usize = 0;
-    let mut result = ZenithReadFile(path.Data(), null, 0, &mut size);
-    if result != 0 { return Result<Vector<u8>, IOError>::Err(_ZenithError(result)); }
-    let mut bytes = Vector<u8>();
-    bytes.Resize(size);
-
-    if size != 0 {
-        result = ZenithReadFile(path.Data(), bytes.Data(), size, &mut size);
-        if result != 0 { return Result<Vector<u8>, IOError>::Err(_ZenithError(result)); }
-        bytes.Resize(size);
-    }
-
-    Result<Vector<u8>, IOError>::Ok(bytes)
+fn ZenithResult(code: u32) -> Result<(), IOError> {
+    if code != 0 { return Result<(), IOError>::Err(ZenithError(code)); }
+    Result<(), IOError>::Ok(())
 }
 
-fn _ReadFile(path: &String) -> Result<String, IOError> {
-    let mut size: usize = 0;
-    let mut result = ZenithReadFile(path.Data(), null, 0, &mut size);
-    if result != 0 { return Result<String, IOError>::Err(_ZenithError(result)); }
-    let buffer = new i8[size + 1];
+fn PathExists(path: &String) -> bool { ZenithPathKind(path.Data()) != 0 }
+fn FileExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 1 }
+fn FolderExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 2 }
 
-    if size != 0 {
-        result = ZenithReadFile(path.Data(), buffer as *mut u8, size, &mut size);
+fn CreateFolder(path: &String) -> Result<(), IOError> { ZenithResult(ZenithCreateFolder(path.Data())) }
+fn RemoveFile(path: &String) -> Result<(), IOError> { ZenithResult(ZenithRemoveFile(path.Data())) }
+fn RemoveFolder(path: &String) -> Result<(), IOError> { ZenithResult(ZenithRemoveFolder(path.Data())) }
+fn RenamePath(source: &String, destination: &String) -> Result<(), IOError> { ZenithResult(ZenithRename(source.Data(), destination.Data())) }
+
+fn ListFolder(path: &String) -> Result<Vector<FolderEntry>, IOError> {
+    let mut entries = Vector<FolderEntry>();
+    let mut count: u32 = 0;
+    let mut result = ZenithListFolder(path.Data(), null, 0, &mut count);
+    if result != 0 { return Result<Vector<FolderEntry>, IOError>::Err(ZenithError(result)); }
+
+    while count != 0 {
+        let capacity = count;
+        let records = new ZenithFolderRecord[capacity as usize];
+        result = ZenithListFolder(path.Data(), records, capacity, &mut count);
+
+        if result == ZENITH_NO_SPACE {
+            delete[] records;
+            continue;
+        }
 
         if result != 0 {
-            delete[] buffer;
-            return Result<String, IOError>::Err(_ZenithError(result));
+            delete[] records;
+            return Result<Vector<FolderEntry>, IOError>::Err(ZenithError(result));
         }
+
+        for i in 0..count {
+            let mut entry: FolderEntry;
+            entry.name = String(&records[i as usize].name[0] as *i8);
+            entry.kind = if records[i as usize].kind == ZENITH_FOLDER { EntryKind::Folder } else { EntryKind::File };
+            entry.size = records[i as usize].size as usize;
+            entries.PushBack(entry);
+        }
+
+        delete[] records;
+        break;
     }
 
-    buffer[size] = 0;
-    let content = String(buffer, 0, size);
-    delete[] buffer;
-    Result<String, IOError>::Ok(content)
-}
-
-fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
-    let result = ZenithWriteFile(path.Data(), content.Data() as *u8, content.Length());
-    if result != 0 { return Result<(), IOError>::Err(_ZenithError(result)); }
-    Result<(), IOError>::Ok(())
+    Result<Vector<FolderEntry>, IOError>::Ok(entries)
 }
 
 fn AbsolutePath(path: &String) -> Result<String, IOError> {
@@ -140,7 +270,7 @@ fn AbsolutePath(path: &String) -> Result<String, IOError> {
 
     if result != 0 {
         delete[] buffer;
-        return Result<String, IOError>::Err(_ZenithError(result));
+        return Result<String, IOError>::Err(ZenithError(result));
     }
 
     let canonical = String(buffer);
@@ -148,25 +278,15 @@ fn AbsolutePath(path: &String) -> Result<String, IOError> {
     Result<String, IOError>::Ok(canonical)
 }
 
-fn PathExists(path: &String) -> bool { ZenithPathKind(path.Data()) != 0 }
-fn FileExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 1 }
-fn FolderExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 2 }
-
-fn RemoveFile(path: &String) -> Result<(), IOError> {
-    let result = ZenithRemoveFile(path.Data());
-    if result != 0 { return Result<(), IOError>::Err(_ZenithError(result)); }
-    Result<(), IOError>::Ok(())
-}
-
-fn GetTemporaryPath() -> Result<String, IOError> {
-    Result<String, IOError>::Err(IOError::InvalidInput)
-}
-
 fn ExecutablePath() -> Result<String, IOError> {
     Result<String, IOError>::Err(IOError::InvalidInput)
 }
+
+fn TemporaryPath() -> Result<String, IOError> {
+    Result<String, IOError>::Err(IOError::InvalidInput)
+}
 #[elif WINDOWS]
-const PATH_SEPERATOR: i8 = '\\';
+const PATH_SEPARATOR: i8 = '\\';
 const MAX_PATH: usize = 260;
 
 class FILETIME {
@@ -206,131 +326,59 @@ extern "C" {
     fn GetModuleFileNameA(hModule: *mut void, lpFilename: *mut i8, nSize: u32) -> u32;
 
     fn CreateFileA(lpFileName: *i8, dwDesiredAccess: u32, dwShareMode: u32, lpSecurityAttributes: *mut void, dwCreationDisposition: u32, dwFlagsAndAttributes: u32, hTemplateFile: *mut void) -> *mut void;
-    fn DeleteFileA(lpFileName: *i8) -> i32;
-
-    fn GetFileSize(hFile: *mut void, lpFileSizeHigh: *mut u32) -> u32;
+    fn SetFilePointerEx(hFile: *mut void, liDistanceToMove: i64, lpNewFilePointer: *mut i64, dwMoveMethod: u32) -> i32;
+    fn GetFileSizeEx(hFile: *mut void, lpFileSize: *mut i64) -> i32;
     fn CloseHandle(hObject: *mut void) -> i32;
+
+    fn DeleteFileA(lpFileName: *i8) -> i32;
+    fn CreateDirectoryA(lpPathName: *i8, lpSecurityAttributes: *mut void) -> i32;
+    fn RemoveDirectoryA(lpPathName: *i8) -> i32;
+    fn MoveFileExA(lpExistingFileName: *i8, lpNewFileName: *i8, dwFlags: u32) -> i32;
 
     fn GetLastError() -> u32;
 }
 
 const GENERIC_READ: u32 = 0x80000000;
-const FILE_SHARE_READ: u32 = 0x00000001;
-const OPEN_EXISTING: u32 = 0x00000003;
-
 const GENERIC_WRITE: u32 = 0x40000000;
-const FILE_SHARE_NONE: u32 = 0x00000000;
+const FILE_APPEND_DATA: u32 = 0x00000004;
+
+const FILE_SHARE_READ: u32 = 0x00000001;
+const FILE_SHARE_WRITE: u32 = 0x00000002;
+
 const CREATE_ALWAYS: u32 = 0x00000002;
+const OPEN_EXISTING: u32 = 0x00000003;
+const OPEN_ALWAYS: u32 = 0x00000004;
+
+const MOVEFILE_REPLACE_EXISTING: u32 = 0x00000001;
+const MOVEFILE_COPY_ALLOWED: u32 = 0x00000002;
 
 const FILE_ATTRIBUTE_NORMAL: u32 = 0x00000080;
 const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x00000010;
 const INVALID_FILE_ATTRIBUTES: u32 = 0xFFFFFFFF;
 
 const INVALID_HANDLE_VALUE: *mut void = -1isize as *mut void;
-const INVALID_FILE_SIZE: u32 = 0xFFFFFFFF;
+const MAX_TRANSFER: usize = 0x40000000;
 
-fn _LastError() -> IOError {
+fn LastError() -> IOError {
     match GetLastError() {
         2 | 3 => IOError::NotFound,
-        5 => IOError::PermissionDenied,
+        5 | 32 => IOError::PermissionDenied,
+        38 => IOError::UnexpectedEnd,
+        39 | 112 => IOError::NoSpace,
         80 | 183 => IOError::AlreadyExists,
-        87 | 123 => IOError::InvalidInput,
+        87 | 123 | 131 => IOError::InvalidInput,
+        145 => IOError::NotEmpty,
+        267 => IOError::NotFolder,
         code => IOError::Other(code as i32)
     }
 }
 
-fn _ReadFile(path: &String) -> Result<String, IOError> {
-    let handle = CreateFileA(path.Data(), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
-    if handle == INVALID_HANDLE_VALUE { return Result<String, IOError>::Err(_LastError()); }
-    let size = GetFileSize(handle, null);
-
-    if size == INVALID_FILE_SIZE {
-        let error = _LastError();
-        CloseHandle(handle);
-        return Result<String, IOError>::Err(error);
+fn WindowsResult(success: i32) -> Result<(), IOError> {
+    if success == 0 {
+        return Result<(), IOError>::Err(LastError());
     }
 
-    let buffer = new i8[size as usize + 1];
-    let mut count: u32 = 0;
-
-    if size != 0 && ReadFile(handle, buffer, size, &mut count, null) == 0 {
-        let error = _LastError();
-        delete[] buffer;
-        CloseHandle(handle);
-        return Result<String, IOError>::Err(error);
-    }
-
-    buffer[count as usize] = 0;
-    let content = String(buffer);
-    delete[] buffer;
-    CloseHandle(handle);
-    Result<String, IOError>::Ok(content)
-}
-
-fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
-    let handle = CreateFileA(path.Data(), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
-    if handle == INVALID_HANDLE_VALUE { return Result<Vector<u8>, IOError>::Err(_LastError()); }
-    let size = GetFileSize(handle, null);
-
-    if size == INVALID_FILE_SIZE {
-        let error = _LastError();
-        CloseHandle(handle);
-        return Result<Vector<u8>, IOError>::Err(error);
-    }
-
-    let mut bytes = Vector<u8>();
-    bytes.Resize(size as usize);
-    let mut count: u32 = 0;
-
-    if size != 0 && ReadFile(handle, bytes.Data() as *mut i8, size, &mut count, null) == 0 {
-        let error = _LastError();
-        CloseHandle(handle);
-        return Result<Vector<u8>, IOError>::Err(error);
-    }
-
-    bytes.Resize(count as usize);
-    CloseHandle(handle);
-    Result<Vector<u8>, IOError>::Ok(bytes)
-}
-
-fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
-    let handle = CreateFileA(path.Data(), GENERIC_WRITE, FILE_SHARE_NONE, null, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, null);
-    if handle == INVALID_HANDLE_VALUE { return Result<(), IOError>::Err(_LastError()); }
-    let mut written: u32 = 0;
-
-    if WriteFile(handle, content.Data(), content.Length() as u32, &mut written, null) == 0 {
-        let error = _LastError();
-        CloseHandle(handle);
-        return Result<(), IOError>::Err(error);
-    }
-
-    CloseHandle(handle);
     Result<(), IOError>::Ok(())
-}
-
-fn GetTemporaryPath() -> Result<String, IOError> {
-    let mut buffer: [i8; MAX_PATH];
-    let length = GetTempPathA(MAX_PATH as u32, &mut buffer[0]);
-    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
-    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
-    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
-}
-
-fn AbsolutePath(path: &String) -> Result<String, IOError> {
-    let mut buffer: [i8; MAX_PATH];
-    let mut filePart: *mut i8 = null;
-    let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, &mut buffer[0], &mut filePart);
-    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
-    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
-    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
-}
-
-fn ExecutablePath() -> Result<String, IOError> {
-    let mut buffer: [i8; MAX_PATH];
-    let length = GetModuleFileNameA(null, &mut buffer[0], MAX_PATH as u32);
-    if length == 0 { return Result<String, IOError>::Err(_LastError()); }
-    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
-    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 }
 
 fn PathExists(path: &String) -> bool {
@@ -339,57 +387,107 @@ fn PathExists(path: &String) -> bool {
 
 fn FileExists(path: &String) -> bool {
     let attributes = GetFileAttributesA(path.Data());
-
-    if attributes != INVALID_FILE_ATTRIBUTES {
-        (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0
-    } else {
-        false
-    }
+    attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0
 }
 
 fn FolderExists(path: &String) -> bool {
     let attributes = GetFileAttributesA(path.Data());
+    attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
+}
 
-    if attributes != INVALID_FILE_ATTRIBUTES {
-        (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
-    } else {
-        false
-    }
+fn CreateFolder(path: &String) -> Result<(), IOError> {
+    WindowsResult(CreateDirectoryA(path.Data(), null))
 }
 
 fn RemoveFile(path: &String) -> Result<(), IOError> {
-    if DeleteFileA(path.Data()) == 0 {
-        return Result<(), IOError>::Err(_LastError());
+    WindowsResult(DeleteFileA(path.Data()))
+}
+
+fn RemoveFolder(path: &String) -> Result<(), IOError> {
+    WindowsResult(RemoveDirectoryA(path.Data()))
+}
+
+fn RenamePath(source: &String, destination: &String) -> Result<(), IOError> {
+    WindowsResult(MoveFileExA(source.Data(), destination.Data(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
+}
+
+fn ListFolder(path: &String) -> Result<Vector<FolderEntry>, IOError> {
+    let mut find_data: WIN32_FIND_DATAA;
+    let handle = FindFirstFileA(JoinPath(path, String("*")).Data(), &mut find_data);
+    if handle == INVALID_HANDLE_VALUE { return Result<Vector<FolderEntry>, IOError>::Err(LastError()); }
+    let mut entries = Vector<FolderEntry>();
+
+    loop {
+        let name = String(&find_data.cFileName[0] as *i8);
+
+        if name != "." && name != ".." {
+            let mut entry: FolderEntry;
+            entry.name = name;
+            entry.kind = if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 { EntryKind::Folder } else { EntryKind::File };
+            entry.size = (((find_data.nFileSizeHigh as u64) << 32) | (find_data.nFileSizeLow as u64)) as usize;
+            entries.PushBack(entry);
+        }
+
+        if FindNextFileA(handle, &mut find_data) == 0 {
+            break;
+        }
     }
 
-    Result<(), IOError>::Ok(())
+    FindClose(handle);
+    Result<Vector<FolderEntry>, IOError>::Ok(entries)
+}
+
+fn AbsolutePath(path: &String) -> Result<String, IOError> {
+    let mut buffer: [i8; MAX_PATH];
+    let mut file_part: *mut i8 = null;
+    let length = GetFullPathNameA(path.Data(), MAX_PATH as u32, &mut buffer[0], &mut file_part);
+    if length == 0 { return Result<String, IOError>::Err(LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
+}
+
+fn ExecutablePath() -> Result<String, IOError> {
+    let mut buffer: [i8; MAX_PATH];
+    let length = GetModuleFileNameA(null, &mut buffer[0], MAX_PATH as u32);
+    if length == 0 { return Result<String, IOError>::Err(LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
+}
+
+fn TemporaryPath() -> Result<String, IOError> {
+    let mut buffer: [i8; MAX_PATH];
+    let length = GetTempPathA(MAX_PATH as u32, &mut buffer[0]);
+    if length == 0 { return Result<String, IOError>::Err(LastError()); }
+    if length >= MAX_PATH as u32 { return Result<String, IOError>::Err(IOError::InvalidInput); }
+    Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 }
 #[else]
-const PATH_SEPERATOR: i8 = '/';
+const PATH_SEPARATOR: i8 = '/';
 const PATH_MAX: usize = 4096;
 
 const O_RDONLY: i32 = 0;
 const O_WRONLY: i32 = 1;
+const O_RDWR: i32 = 2;
 
 #[if DARWIN]
+const O_APPEND: i32 = 8;
 const O_CREAT: i32 = 512;
 const O_TRUNC: i32 = 1024;
+const DIRENT_NAME_OFFSET: usize = 21;
 #[else]
 const O_CREAT: i32 = 64;
 const O_TRUNC: i32 = 512;
+const O_APPEND: i32 = 1024;
+const DIRENT_NAME_OFFSET: usize = 19;
 #[endif]
 
-const S_IRUSR: u32 = 256;
-const S_IWUSR: u32 = 128;
-const S_IRGRP: u32 = 32;
-const S_IWGRP: u32 = 16;
+const FILE_PERMISSIONS: u32 = 420;
+const FOLDER_PERMISSIONS: u32 = 493;
 
 const S_IFMT: u32 = 0xF000;
 const S_IFDIR: u32 = 0x4000;
 const S_IFREG: u32 = 0x8000;
 
-const SEEK_SET: i32 = 0;
-const SEEK_END: i32 = 2;
 const F_OK: i32 = 0;
 
 class _stat {
@@ -444,200 +542,119 @@ class _stat {
 }
 
 extern "C" {
-    fn open(pathname: *i8, flags: i32, mode: u32) -> i32 #[if LIBC] ; #[else] {
-        let mut result = 0;
-
-        volatile asm : rax(2), rdi(pathname), rsi(flags as i64), rdx(mode as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as i32;
-    } #[endif]
-
-    fn close(fd: i32) #[if LIBC] ; #[else] {
-        volatile asm : rax(3), rdi(fd as i64) -> {
-            syscall
-        } : memory, rcx, r11, rax;
-    } #[endif]
-
-    fn lseek(fd: i32, offset: i64, whence: i32) -> i64 #[if LIBC] ; #[else] {
-        let mut result = 0i64;
-
-        volatile asm : rax(8), rdi(fd as i64), rsi(offset), rdx(whence as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result;
-    } #[endif]
-
-    fn stat(pathname: *i8, statbuf: *mut _stat) -> i32 #[if LIBC] ; #[else] {
-        let mut result = 0;
-
-        volatile asm : rax(4), rdi(pathname), rsi(statbuf) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as i32;
-    } #[endif]
-
-    fn unlink(pathname: *i8) -> i32 #[if LIBC] ; #[else] {
-        let mut result = 0;
-
-        volatile asm : rax(87), rdi(pathname) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as i32;
-    } #[endif]
-
-    fn access(pathname: *i8, mode: i32) -> i32 #[if LIBC] ; #[else] {
-        let mut result = 0;
-
-        volatile asm : rax(21), rdi(pathname), rsi(mode as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as i32;
-    } #[endif]
-
+    fn open(pathname: *i8, flags: i32, ...) -> i32;
+    fn close(fd: i32) -> i32;
+    fn lseek(fd: i32, offset: i64, whence: i32) -> i64;
+    fn fstat(fd: i32, statbuf: *mut _stat) -> i32;
+    fn stat(pathname: *i8, statbuf: *mut _stat) -> i32;
+    fn access(pathname: *i8, mode: i32) -> i32;
+    fn unlink(pathname: *i8) -> i32;
+    fn mkdir(pathname: *i8, mode: u32) -> i32;
+    fn rmdir(pathname: *i8) -> i32;
+    fn rename(oldpath: *i8, newpath: *i8) -> i32;
     fn realpath(path: *i8, resolved_path: *mut i8) -> *mut i8;
+    fn opendir(name: *i8) -> *mut void;
+    fn readdir(directory: *mut void) -> *mut u8;
+    fn closedir(directory: *mut void) -> i32;
 #[if DARWIN]
     fn __error() -> *mut i32;
-    fn opendir(name: *i8) -> *mut void;
-    fn closedir(directory: *mut void) -> i32;
     fn _NSGetExecutablePath(buffer: *mut i8, size: *mut u32) -> i32;
 #[else]
     fn __errno_location() -> *mut i32;
-
-    fn readlink(pathname: *i8, buffer: *mut i8, size: usize) -> isize #[if LIBC] ; #[else] {
-        let mut result = 0i64;
-
-        volatile asm : rax(89), rdi(pathname), rsi(buffer), rdx(size as i64) -> {
-            syscall
-        } -> rax(result) : memory, rcx, r11;
-
-        return result as isize;
-    } #[endif]
+    fn readlink(pathname: *i8, buffer: *mut i8, size: usize) -> isize;
 #[endif]
 }
 
-fn _LastError(result: i64) -> IOError {
-#[if !LIBC]
-    let code = -result as i32;
-#[elif DARWIN]
+fn LastError() -> IOError {
+#[if DARWIN]
     let code = *__error();
 #[else]
     let code = *__errno_location();
 #[endif]
 
     match code {
-        2 | 20 => IOError::NotFound,
+        2 => IOError::NotFound,
         1 | 13 => IOError::PermissionDenied,
         17 => IOError::AlreadyExists,
+        20 => IOError::NotFolder,
+        21 => IOError::IsFolder,
         22 => IOError::InvalidInput,
+        28 => IOError::NoSpace,
+#[if DARWIN]
+        66 => IOError::NotEmpty,
+#[else]
+        39 => IOError::NotEmpty,
+#[endif]
         _ => IOError::Other(code)
     }
 }
 
-fn _ReadFile(path: &String) -> Result<String, IOError> {
-    let fd = open(path.Data(), O_RDONLY, 0);
-    if fd < 0 { return Result<String, IOError>::Err(_LastError(fd as i64)); }
-    let size = lseek(fd, 0, SEEK_END);
-
-    if size < 0 {
-        let error = _LastError(size);
-        close(fd);
-        return Result<String, IOError>::Err(error);
-    }
-
-    lseek(fd, 0, SEEK_SET);
-    let buffer = new i8[size as usize + 1];
-    let mut length: usize = 0;
-
-    while length < size as usize {
-        let count = read(fd, buffer + length, size as usize - length);
-
-        if count < 0 {
-            let error = _LastError(count as i64);
-            delete[] buffer;
-            close(fd);
-            return Result<String, IOError>::Err(error);
-        }
-
-        if count == 0 { break; }
-        length += count as usize;
-    }
-
-    buffer[length] = 0;
-    let content = String(buffer);
-    delete[] buffer;
-    close(fd);
-    Result<String, IOError>::Ok(content)
-}
-
-fn _ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
-    let fd = open(path.Data(), O_RDONLY, 0);
-    if fd < 0 { return Result<Vector<u8>, IOError>::Err(_LastError(fd as i64)); }
-    let size = lseek(fd, 0, SEEK_END);
-
-    if size < 0 {
-        let error = _LastError(size);
-        close(fd);
-        return Result<Vector<u8>, IOError>::Err(error);
-    }
-
-    lseek(fd, 0, SEEK_SET);
-    let mut bytes = Vector<u8>();
-    bytes.Resize(size as usize);
-    let mut length: usize = 0;
-
-    while length < size as usize {
-        let count = read(fd, (bytes.Data() as *mut i8) + length, size as usize - length);
-
-        if count < 0 {
-            let error = _LastError(count as i64);
-            close(fd);
-            return Result<Vector<u8>, IOError>::Err(error);
-        }
-
-        if count == 0 { break; }
-        length += count as usize;
-    }
-
-    bytes.Resize(length);
-    close(fd);
-    Result<Vector<u8>, IOError>::Ok(bytes)
-}
-
-fn _WriteFile(path: &String, content: &String) -> Result<(), IOError> {
-    let mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-    let fd = open(path.Data(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-    if fd < 0 { return Result<(), IOError>::Err(_LastError(fd as i64)); }
-    let mut written: usize = 0;
-
-    while written < content.Length() {
-        let count = write(fd, content.Data() + written, content.Length() - written);
-
-        if count <= 0 {
-            let error = _LastError(count as i64);
-            close(fd);
-            return Result<(), IOError>::Err(error);
-        }
-
-        written += count as usize;
-    }
-
-    close(fd);
+fn PosixResult(result: i32) -> Result<(), IOError> {
+    if result != 0 { return Result<(), IOError>::Err(LastError()); }
     Result<(), IOError>::Ok(())
 }
 
-fn GetTemporaryPath() -> Result<String, IOError> {
-    Result<String, IOError>::Ok("/tmp/".ToString())
+fn PathExists(path: &String) -> bool {
+    access(path.Data(), F_OK) == 0
+}
+
+fn FileExists(path: &String) -> bool {
+    let mut st: _stat;
+    stat(path.Data(), &mut st) == 0 && ((st.st_mode as u32) & S_IFMT) == S_IFREG
+}
+
+fn FolderExists(path: &String) -> bool {
+    let mut st: _stat;
+    stat(path.Data(), &mut st) == 0 && ((st.st_mode as u32) & S_IFMT) == S_IFDIR
+}
+
+fn CreateFolder(path: &String) -> Result<(), IOError> {
+    PosixResult(mkdir(path.Data(), FOLDER_PERMISSIONS))
+}
+
+fn RemoveFile(path: &String) -> Result<(), IOError> {
+    PosixResult(unlink(path.Data()))
+}
+
+fn RemoveFolder(path: &String) -> Result<(), IOError> {
+    PosixResult(rmdir(path.Data()))
+}
+
+fn RenamePath(source: &String, destination: &String) -> Result<(), IOError> {
+    PosixResult(rename(source.Data(), destination.Data()))
+}
+
+fn ListFolder(path: &String) -> Result<Vector<FolderEntry>, IOError> {
+    let directory = opendir(path.Data());
+    if directory == null { return Result<Vector<FolderEntry>, IOError>::Err(LastError()); }
+    let mut entries = Vector<FolderEntry>();
+
+    loop {
+        let record = readdir(directory);
+        if record == null { break; }
+        let mut entry: FolderEntry;
+        entry.name = String((record + DIRENT_NAME_OFFSET) as *i8);
+        if entry.name == "." || entry.name == ".." { continue; }
+        let mut st: _stat;
+
+        if stat(JoinPath(path, entry.name).Data(), &mut st) == 0 {
+            entry.kind = if ((st.st_mode as u32) & S_IFMT) == S_IFDIR { EntryKind::Folder } else { EntryKind::File };
+            entry.size = st.st_size as usize;
+        } else {
+            entry.kind = EntryKind::File;
+            entry.size = 0;
+        }
+
+        entries.PushBack(entry);
+    }
+
+    closedir(directory);
+    Result<Vector<FolderEntry>, IOError>::Ok(entries)
 }
 
 fn AbsolutePath(path: &String) -> Result<String, IOError> {
     let mut buffer: [i8; PATH_MAX];
-    if realpath(path.Data(), &mut buffer[0]) == null { return Result<String, IOError>::Err(_LastError(0)); }
+    if realpath(path.Data(), &mut buffer[0]) == null { return Result<String, IOError>::Err(LastError()); }
     Result<String, IOError>::Ok(String(&buffer[0] as *i8))
 }
 
@@ -649,55 +666,589 @@ fn ExecutablePath() -> Result<String, IOError> {
     AbsolutePath(String(&buffer[0] as *i8))
 #[else]
     let length = readlink("/proc/self/exe", &mut buffer[0], PATH_MAX);
-    if length < 0 { return Result<String, IOError>::Err(_LastError(length as i64)); }
+    if length < 0 { return Result<String, IOError>::Err(LastError()); }
     if length as usize >= PATH_MAX { return Result<String, IOError>::Err(IOError::InvalidInput); }
     Result<String, IOError>::Ok(String(&buffer[0] as *i8, 0, length as usize))
 #[endif]
 }
 
-fn PathExists(path: &String) -> bool {
-    access(path.Data(), F_OK) == 0
+fn TemporaryPath() -> Result<String, IOError> {
+    Result<String, IOError>::Ok("/tmp/".ToString())
 }
+#[endif]
 
-#[if DARWIN]
-fn FileExists(path: &String) -> bool {
-    PathExists(path) && !FolderExists(path)
-}
+class FileHandle {
+    value: usize = 0;
 
-fn FolderExists(path: &String) -> bool {
-    let directory = opendir(path.Data());
-    if directory == null { return false; }
-    closedir(directory);
-    true
-}
+    pub fn Open(path: &String, mode: FileMode) -> Result<FileHandle, IOError> {
+        let mut handle: FileHandle;
+#[if ZENITH]
+        let mut value: u32 = 0;
+        let result = ZenithOpen(path.Data(), mode as u32, &mut value);
+        if result != 0 { return Result<FileHandle, IOError>::Err(ZenithError(result)); }
+        handle.value = value as usize;
+#[elif WINDOWS]
+        let (mut access, mut share, mut disposition) = (GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING);
+
+        if mode == FileMode::Write {
+            (access, share, disposition) = (GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS);
+        } else if mode == FileMode::Append {
+            (access, share, disposition) = (FILE_APPEND_DATA, FILE_SHARE_READ, OPEN_ALWAYS);
+        } else if mode == FileMode::Update {
+            (access, share, disposition) = (GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OPEN_EXISTING);
+        }
+
+        let value = CreateFileA(path.Data(), access, share, null, disposition, FILE_ATTRIBUTE_NORMAL, null);
+
+        if value == INVALID_HANDLE_VALUE {
+            let error = LastError();
+            if FolderExists(path) { return Result<FileHandle, IOError>::Err(IOError::IsFolder); }
+            return Result<FileHandle, IOError>::Err(error);
+        }
+
+        handle.value = value as usize;
 #[else]
-fn FileExists(path: &String) -> bool {
-    let mut st: _stat;
+        let mut flags = O_RDONLY;
 
-    if stat(path.Data(), &mut st) != 0 {
-        return false;
+        if mode == FileMode::Read && FolderExists(path) {
+            return Result<FileHandle, IOError>::Err(IOError::IsFolder);
+        } else if mode == FileMode::Write {
+            flags = O_WRONLY | O_CREAT | O_TRUNC;
+        } else if mode == FileMode::Append {
+            flags = O_WRONLY | O_CREAT | O_APPEND;
+        } else if mode == FileMode::Update {
+            flags = O_RDWR;
+        }
+
+        let fd = open(path.Data(), flags, FILE_PERMISSIONS);
+        if fd < 0 { return Result<FileHandle, IOError>::Err(LastError()); }
+        handle.value = fd as usize;
+#[endif]
+        Result<FileHandle, IOError>::Ok(handle)
     }
 
-    (st.st_mode & S_IFMT) == S_IFREG
-}
-
-fn FolderExists(path: &String) -> bool {
-    let mut st: _stat;
-
-    if stat(path.Data(), &mut st) != 0 {
-        return false;
+    pub fn Close(&this) -> Result<(), IOError> {
+#[if ZENITH]
+        ZenithResult(ZenithClose(this.value as u32))
+#[elif WINDOWS]
+        WindowsResult(CloseHandle(this.value as *mut void))
+#[else]
+        PosixResult(close(this.value as i32))
+#[endif]
     }
 
-    (st.st_mode & S_IFMT) == S_IFDIR
+    pub fn Read(&this, buffer: *mut u8, count: usize) -> Result<usize, IOError> {
+#[if ZENITH]
+        let mut length: usize = 0;
+        let result = ZenithRead(this.value as u32, buffer, count, &mut length);
+        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        Result<usize, IOError>::Ok(length)
+#[elif WINDOWS]
+        let chunk = if count > MAX_TRANSFER { MAX_TRANSFER } else { count };
+        let mut length: u32 = 0;
+        if ReadFile(this.value as *mut void, buffer as *mut i8, chunk as u32, &mut length, null) == 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(length as usize)
+#[else]
+        let length = read(this.value as i32, buffer as *mut i8, count);
+        if length < 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(length as usize)
+#[endif]
+    }
+
+    pub fn Write(&this, data: *u8, count: usize) -> Result<usize, IOError> {
+#[if ZENITH]
+        let result = ZenithWrite(this.value as u32, data, count);
+        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        Result<usize, IOError>::Ok(count)
+#[elif WINDOWS]
+        let chunk = if count > MAX_TRANSFER { MAX_TRANSFER } else { count };
+        let mut length: u32 = 0;
+        if WriteFile(this.value as *mut void, data as *i8, chunk as u32, &mut length, null) == 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(length as usize)
+#[else]
+        let length = write(this.value as i32, data as *i8, count);
+        if length < 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(length as usize)
+#[endif]
+    }
+
+    pub fn Seek(&this, offset: isize, origin: SeekOrigin) -> Result<usize, IOError> {
+#[if ZENITH]
+        let mut position: u32 = 0;
+        let result = ZenithSeek(this.value as u32, offset as i32, origin as u32, &mut position);
+        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        Result<usize, IOError>::Ok(position as usize)
+#[elif WINDOWS]
+        let mut position: i64 = 0;
+        if SetFilePointerEx(this.value as *mut void, offset as i64, &mut position, origin as u32) == 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(position as usize)
+#[else]
+        let position = lseek(this.value as i32, offset as i64, origin as i32);
+        if position < 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(position as usize)
+#[endif]
+    }
+
+    pub fn Size(&this) -> Result<usize, IOError> {
+#[if ZENITH]
+        let mut size: u32 = 0;
+        let result = ZenithSize(this.value as u32, &mut size);
+        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        Result<usize, IOError>::Ok(size as usize)
+#[elif WINDOWS]
+        let mut size: i64 = 0;
+        if GetFileSizeEx(this.value as *mut void, &mut size) == 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(size as usize)
+#[else]
+        let mut st: _stat;
+        if fstat(this.value as i32, &mut st) != 0 { return Result<usize, IOError>::Err(LastError()); }
+        Result<usize, IOError>::Ok(st.st_size as usize)
+#[endif]
+    }
 }
+
+class File {
+    handle: FileHandle,
+    open: bool = false,
+    mode: FileMode,
+    buffer: *mut u8 = null,
+    position: usize = 0,
+    available: usize = 0,
+    cursor: usize = 0,
+    pending: usize = 0;
+
+    File(&mut this) {
+        this.mode = FileMode::Read;
+    }
+
+    ~File(&mut this) {
+        this.Close();
+    }
+
+    pub fn Open(&mut this, path: &String, mode: FileMode) -> Result<(), IOError> {
+        if let Result<(), IOError>::Err(error) = this.Close() {
+            return Result<(), IOError>::Err(error);
+        }
+
+        let handle = match FileHandle::Open(path, mode) {
+            Result<FileHandle, IOError>::Ok(handle) => handle,
+            Result<FileHandle, IOError>::Err(error) => {
+                return Result<(), IOError>::Err(error);
+            }
+        };
+
+        this.handle = handle;
+        this.mode = mode;
+        this.open = true;
+        this.buffer = new u8[FILE_BUFFER_SIZE];
+        this.position = 0;
+        this.available = 0;
+        this.cursor = 0;
+        this.pending = 0;
+
+        if mode == FileMode::Append {
+            match handle.Size() {
+                Result<usize, IOError>::Ok(size) => {
+                    this.position = size;
+                },
+                Result<usize, IOError>::Err(error) => {
+                    this.Close();
+                    return Result<(), IOError>::Err(error);
+                }
+            }
+        }
+
+        Result<(), IOError>::Ok(())
+    }
+
+    pub fn Close(&mut this) -> Result<(), IOError> {
+        if !this.open {
+            return Result<(), IOError>::Ok(());
+        }
+
+        let flushed = this.FlushPending();
+        let closed = this.handle.Close();
+        delete[] this.buffer;
+        this.buffer = null;
+        this.open = false;
+
+        if flushed.IsErr() {
+            return flushed;
+        }
+
+        closed
+    }
+
+    pub fn IsOpen(&this) -> bool {
+        this.open
+    }
+
+    pub fn Handle(&this) -> FileHandle {
+        this.handle
+    }
+
+    pub fn Read(&mut this, buffer: *mut u8, count: usize) -> Result<usize, IOError> {
+        if !this.open {
+            return Result<usize, IOError>::Err(IOError::InvalidInput);
+        }
+
+        if this.mode == FileMode::Write || this.mode == FileMode::Append {
+            return Result<usize, IOError>::Err(IOError::PermissionDenied);
+        }
+
+        if let Result<(), IOError>::Err(error) = this.FlushPending() {
+            return Result<usize, IOError>::Err(error);
+        }
+
+        let mut copied: usize = 0;
+
+        while copied < count {
+            if this.cursor < this.available {
+                let mut length = this.available - this.cursor;
+                if length > count - copied { length = count - copied; }
+                memcpy(buffer + copied, this.buffer + this.cursor, length);
+                this.cursor += length;
+                this.position += length;
+                copied += length;
+            } else if count - copied >= FILE_BUFFER_SIZE {
+                let read = match this.handle.Read(buffer + copied, count - copied) {
+                    Result<usize, IOError>::Ok(read) => read,
+                    Result<usize, IOError>::Err(error) => {
+                        return Result<usize, IOError>::Err(error);
+                    }
+                };
+
+                if read == 0 { break; }
+                this.position += read;
+                copied += read;
+            } else {
+                let read = match this.handle.Read(this.buffer, FILE_BUFFER_SIZE) {
+                    Result<usize, IOError>::Ok(read) => read,
+                    Result<usize, IOError>::Err(error) => {
+                        return Result<usize, IOError>::Err(error);
+                    }
+                };
+
+                this.available = read;
+                this.cursor = 0;
+                if read == 0 { break; }
+            }
+        }
+
+        Result<usize, IOError>::Ok(copied)
+    }
+
+    pub fn ReadExact(&mut this, buffer: *mut u8, count: usize) -> Result<(), IOError> {
+        match this.Read(buffer, count) {
+            Result<usize, IOError>::Ok(read) => {
+                if read != count {
+                    return Result<(), IOError>::Err(IOError::UnexpectedEnd);
+                }
+
+                Result<(), IOError>::Ok(())
+            },
+            Result<usize, IOError>::Err(error) => Result<(), IOError>::Err(error)
+        }
+    }
+
+    pub fn Write(&mut this, data: *u8, count: usize) -> Result<(), IOError> {
+        if !this.open {
+            return Result<(), IOError>::Err(IOError::InvalidInput);
+        }
+
+        if this.mode == FileMode::Read {
+            return Result<(), IOError>::Err(IOError::PermissionDenied);
+        }
+
+        if let Result<(), IOError>::Err(error) = this.DiscardReadAhead() {
+            return Result<(), IOError>::Err(error);
+        }
+
+        if this.pending + count > FILE_BUFFER_SIZE {
+            if let Result<(), IOError>::Err(error) = this.FlushPending() {
+                return Result<(), IOError>::Err(error);
+            }
+        }
+
+        if count >= FILE_BUFFER_SIZE {
+            if let Result<(), IOError>::Err(error) = this.WriteAll(data, count) {
+                return Result<(), IOError>::Err(error);
+            }
+        } else {
+            memcpy(this.buffer + this.pending, data, count);
+            this.pending += count;
+        }
+
+        this.position += count;
+        Result<(), IOError>::Ok(())
+    }
+
+    pub fn Write(&mut this, text: &String) -> Result<(), IOError> {
+        this.Write(text.Data() as *u8, text.Length())
+    }
+
+    pub fn Flush(&mut this) -> Result<(), IOError> {
+        if !this.open {
+            return Result<(), IOError>::Err(IOError::InvalidInput);
+        }
+
+        this.FlushPending()
+    }
+
+    pub fn Seek(&mut this, offset: isize, origin: SeekOrigin) -> Result<usize, IOError> {
+        if !this.open {
+            return Result<usize, IOError>::Err(IOError::InvalidInput);
+        }
+
+        if let Result<(), IOError>::Err(error) = this.FlushPending() {
+            return Result<usize, IOError>::Err(error);
+        }
+
+        let mut base: isize = 0;
+
+        if origin == SeekOrigin::Current {
+            base = this.position as isize;
+        } else if origin == SeekOrigin::End {
+            match this.handle.Size() {
+                Result<usize, IOError>::Ok(size) => {
+                    base = size as isize;
+                },
+                Result<usize, IOError>::Err(error) => {
+                    return Result<usize, IOError>::Err(error);
+                }
+            }
+        }
+
+        if base + offset < 0 {
+            return Result<usize, IOError>::Err(IOError::InvalidInput);
+        }
+
+        let target = (base + offset) as usize;
+        let buffer_start = this.position - this.cursor;
+
+        if this.available != 0 && target >= buffer_start && target <= buffer_start + this.available {
+            this.cursor = target - buffer_start;
+            this.position = target;
+            return Result<usize, IOError>::Ok(target);
+        }
+
+        if let Result<usize, IOError>::Err(error) = this.handle.Seek(target as isize, SeekOrigin::Start) {
+            return Result<usize, IOError>::Err(error);
+        }
+
+        this.available = 0;
+        this.cursor = 0;
+        this.position = target;
+        Result<usize, IOError>::Ok(target)
+    }
+
+    pub fn Position(&this) -> usize {
+        this.position
+    }
+
+    pub fn Size(&mut this) -> Result<usize, IOError> {
+        if !this.open {
+            return Result<usize, IOError>::Err(IOError::InvalidInput);
+        }
+
+        if let Result<(), IOError>::Err(error) = this.FlushPending() {
+            return Result<usize, IOError>::Err(error);
+        }
+
+        this.handle.Size()
+    }
+
+    pub fn ReadU8(&mut this) -> Result<u8, IOError> {
+        let mut bytes: [u8; 1];
+        if let Result<(), IOError>::Err(error) = this.ReadExact(&mut bytes[0], 1) { return Result<u8, IOError>::Err(error); }
+        Result<u8, IOError>::Ok(bytes[0])
+    }
+
+    pub fn ReadU16(&mut this) -> Result<u16, IOError> {
+        let mut bytes: [u8; 2];
+        if let Result<(), IOError>::Err(error) = this.ReadExact(&mut bytes[0], 2) { return Result<u16, IOError>::Err(error); }
+        Result<u16, IOError>::Ok((bytes[0] as u16) | ((bytes[1] as u16) << 8))
+    }
+
+    pub fn ReadU32(&mut this) -> Result<u32, IOError> {
+        let mut bytes: [u8; 4];
+        if let Result<(), IOError>::Err(error) = this.ReadExact(&mut bytes[0], 4) { return Result<u32, IOError>::Err(error); }
+        Result<u32, IOError>::Ok((bytes[0] as u32) | ((bytes[1] as u32) << 8) | ((bytes[2] as u32) << 16) | ((bytes[3] as u32) << 24))
+    }
+
+#[if !ZODIAC]
+    pub fn ReadU64(&mut this) -> Result<u64, IOError> {
+        let mut bytes: [u8; 8];
+        if let Result<(), IOError>::Err(error) = this.ReadExact(&mut bytes[0], 8) { return Result<u64, IOError>::Err(error); }
+        let mut value: u64 = 0;
+
+        for i in 0..8 {
+            value |= (bytes[i as usize] as u64) << ((i * 8) as u64);
+        }
+
+        Result<u64, IOError>::Ok(value)
+    }
 #[endif]
 
-fn RemoveFile(path: &String) -> Result<(), IOError> {
-    let result = unlink(path.Data());
-    if result != 0 { return Result<(), IOError>::Err(_LastError(result as i64)); }
-    Result<(), IOError>::Ok(())
-}
+    pub fn WriteU8(&mut this, value: u8) -> Result<(), IOError> {
+        let mut bytes: [u8; 1];
+        bytes[0] = value;
+        this.Write(&bytes[0], 1)
+    }
+
+    pub fn WriteU16(&mut this, value: u16) -> Result<(), IOError> {
+        let mut bytes: [u8; 2];
+        bytes[0] = value as u8;
+        bytes[1] = (value >> 8) as u8;
+        this.Write(&bytes[0], 2)
+    }
+
+    pub fn WriteU32(&mut this, value: u32) -> Result<(), IOError> {
+        let mut bytes: [u8; 4];
+        bytes[0] = value as u8;
+        bytes[1] = (value >> 8) as u8;
+        bytes[2] = (value >> 16) as u8;
+        bytes[3] = (value >> 24) as u8;
+        this.Write(&bytes[0], 4)
+    }
+
+#[if !ZODIAC]
+    pub fn WriteU64(&mut this, value: u64) -> Result<(), IOError> {
+        let mut bytes: [u8; 8];
+
+        for i in 0..8 {
+            bytes[i as usize] = (value >> ((i * 8) as u64)) as u8;
+        }
+
+        this.Write(&bytes[0], 8)
+    }
 #[endif]
+
+    pub fn ReadBytes(path: &String) -> Result<Vector<u8>, IOError> {
+        let mut file = File();
+    
+        if let Result<(), IOError>::Err(error) = file.Open(path, FileMode::Read) {
+            return Result<Vector<u8>, IOError>::Err(error);
+        }
+
+        let size = match file.Size() {
+            Result<usize, IOError>::Ok(size) => size,
+            Result<usize, IOError>::Err(error) => {
+                return Result<Vector<u8>, IOError>::Err(error);
+            }
+        };
+
+        let mut bytes = Vector<u8>();
+        bytes.Resize(size);
+
+        if size != 0 {
+            match file.Read(bytes.Data(), size) {
+                Result<usize, IOError>::Ok(read) => {
+                    bytes.Resize(read);
+                },
+                Result<usize, IOError>::Err(error) => {
+                    return Result<Vector<u8>, IOError>::Err(error);
+                }
+            }
+        }
+
+        Result<Vector<u8>, IOError>::Ok(bytes)
+    }
+
+    pub fn ReadText(path: &String) -> Result<String, IOError> {
+        let mut file = File();
+
+        if let Result<(), IOError>::Err(error) = file.Open(path, FileMode::Read) {
+            return Result<String, IOError>::Err(error);
+        }
+
+        let size = match file.Size() {
+            Result<usize, IOError>::Ok(size) => size,
+            Result<usize, IOError>::Err(error) => {
+                return Result<String, IOError>::Err(error);
+            }
+        };
+
+        let buffer = new i8[size + 1];
+        let mut length: usize = 0;
+
+        if size != 0 {
+            match file.Read(buffer as *mut u8, size) {
+                Result<usize, IOError>::Ok(read) => {
+                    length = read;
+                },
+                Result<usize, IOError>::Err(error) => {
+                    delete[] buffer;
+                    return Result<String, IOError>::Err(error);
+                }
+            }
+        }
+
+        buffer[length] = 0;
+        let text = String(buffer as *i8, 0, length);
+        delete[] buffer;
+        Result<String, IOError>::Ok(text)
+    }
+
+    pub fn WriteBytes(path: &String, bytes: &Vector<u8>) -> Result<(), IOError> {
+        let mut file = File();
+        if let Result<(), IOError>::Err(error) = file.Open(path, FileMode::Write) { return Result<(), IOError>::Err(error); }
+        if let Result<(), IOError>::Err(error) = file.Write(bytes.Data(), bytes.Length()) { return Result<(), IOError>::Err(error); }
+        file.Close()
+    }
+
+    pub fn WriteText(path: &String, text: &String) -> Result<(), IOError> {
+        let mut file = File();
+        if let Result<(), IOError>::Err(error) = file.Open(path, FileMode::Write) { return Result<(), IOError>::Err(error); }
+        if let Result<(), IOError>::Err(error) = file.Write(text) { return Result<(), IOError>::Err(error); }
+        file.Close()
+    }
+
+    fn WriteAll(&mut this, data: *u8, count: usize) -> Result<(), IOError> {
+        let mut written: usize = 0;
+
+        while written < count {
+            match this.handle.Write(data + written, count - written) {
+                Result<usize, IOError>::Ok(length) => {
+                    if length == 0 {
+                        return Result<(), IOError>::Err(IOError::NoSpace);
+                    }
+
+                    written += length;
+                },
+                Result<usize, IOError>::Err(error) => {
+                    return Result<(), IOError>::Err(error);
+                }
+            }
+        }
+
+        Result<(), IOError>::Ok(())
+    }
+
+    fn FlushPending(&mut this) -> Result<(), IOError> {
+        if this.pending == 0 {
+            return Result<(), IOError>::Ok(());
+        }
+
+        let count = this.pending;
+        this.pending = 0;
+        this.WriteAll(this.buffer as *u8, count)
+    }
+
+    fn DiscardReadAhead(&mut this) -> Result<(), IOError> {
+        let ahead = this.available > this.cursor;
+        this.available = 0;
+        this.cursor = 0;
+
+        if ahead {
+            if let Result<usize, IOError>::Err(error) = this.handle.Seek(this.position as isize, SeekOrigin::Start) {
+                return Result<(), IOError>::Err(error);
+            }
+        }
+
+        Result<(), IOError>::Ok(())
+    }
+}
 
 fn JoinPath(directory: &String, file: &String) -> String {
     if directory.Empty() {
@@ -707,7 +1258,7 @@ fn JoinPath(directory: &String, file: &String) -> String {
     if directory[directory.Length() - 1] == '\\' || directory[directory.Length() - 1] == '/' {
         directory + file
     } else {
-        directory + PATH_SEPERATOR + file
+        directory + PATH_SEPARATOR + file
     }
 }
 

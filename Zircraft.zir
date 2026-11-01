@@ -727,7 +727,7 @@ class Shader {
     }
 
     fn FromPath(&mut this, vertex_path: &String, fragment_path: &String) {
-        let (vertex_source, fragment_source) = (_ReadFile(vertex_path), _ReadFile(fragment_path));
+        let (vertex_source, fragment_source) = (File::ReadText(vertex_path), File::ReadText(fragment_path));
 
         if vertex_source.IsErr() || fragment_source.IsErr() {
             Logger::Error("Failed to read shader sources '" + vertex_path + "' and '" + fragment_path + "'.");
