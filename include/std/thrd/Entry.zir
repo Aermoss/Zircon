@@ -119,9 +119,17 @@ class Thread {
     joined: bool = false;
 
     Thread(&mut this, function: ThreadFunction, argument: *mut void) {
+        this.Start(function, argument, 0);
+    }
+
+    Thread(&mut this, function: ThreadFunction, argument: *mut void, committed_stack: usize) {
+        this.Start(function, argument, committed_stack);
+    }
+
+    fn Start(&mut this, function: ThreadFunction, argument: *mut void, committed_stack: usize) {
         let start = new ThreadStart(function, argument);
 #[if WINDOWS]
-        this.handle = CreateThread(null, 0, ThreadEntry as *mut void, start as *mut void, 0, &mut this.id);
+        this.handle = CreateThread(null, committed_stack, ThreadEntry as *mut void, start as *mut void, 0, &mut this.id);
         let created = this.handle != null;
 #[else]
         let created = pthread_create(&mut this.handle, null, ThreadEntry as *mut void, start as *mut void) == 0;

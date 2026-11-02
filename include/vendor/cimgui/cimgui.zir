@@ -1,5 +1,6 @@
 const IM_UNICODE_CODEPOINT_MAX: i32 = 0xFFFF;
 const IMGUI_HAS_DOCK: i32 = 1;
+const ImTextureID_Invalid: u64 = 0;
 
 type ImU64 = u64;
 type ImColor = ImColor_c;

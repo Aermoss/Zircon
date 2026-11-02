@@ -1,10 +1,94 @@
 #[include "vendor/glfw" : *]
 
-struct ImGui_ImplOpenGL3_RenderState {
-    pub UseBindSampler: bool,
-    pub UseTexParameterFilter: bool,
-    pub CurrentSampler: u32,
-    pub CurrentTexParameterFilter: u32
+const IMGUI_IMPL_VULKAN_MINIMUM_SAMPLED_IMAGE_POOL_SIZE: i32 = 8;
+const IMGUI_IMPL_VULKAN_MINIMUM_SAMPLER_POOL_SIZE: i32 = 2;
+
+struct ImVector_VkDynamicState {
+    pub Size: i32,
+    pub Capacity: i32,
+    pub Data: *mut VkDynamicState
+}
+
+struct ImGui_ImplVulkan_PipelineInfo {
+    pub RenderPass: VkRenderPass,
+    pub Subpass: u32,
+    pub MSAASamples: VkSampleCountFlagBits,
+    pub ExtraDynamicStates: ImVector_VkDynamicState,
+    pub PipelineRenderingCreateInfo: VkPipelineRenderingCreateInfoKHR,
+    pub SwapChainImageUsage: VkImageUsageFlags
+}
+
+struct ImGui_ImplVulkan_InitInfo {
+    pub ApiVersion: u32,
+    pub Instance: VkInstance,
+    pub PhysicalDevice: VkPhysicalDevice,
+    pub Device: VkDevice,
+    pub QueueFamily: u32,
+    pub Queue: VkQueue,
+    pub DescriptorPool: VkDescriptorPool,
+    pub DescriptorPoolSize: u32,
+    pub MinImageCount: u32,
+    pub ImageCount: u32,
+    pub PipelineCache: VkPipelineCache,
+    pub PipelineInfoMain: ImGui_ImplVulkan_PipelineInfo,
+    pub PipelineInfoForViewports: ImGui_ImplVulkan_PipelineInfo,
+    pub UseDynamicRendering: bool,
+    pub Allocator: *VkAllocationCallbacks,
+    pub CheckVkResultFn: fn(VkResult),
+    pub MinAllocationSize: VkDeviceSize,
+    pub CustomShaderVertCreateInfo: VkShaderModuleCreateInfo,
+    pub CustomShaderFragCreateInfo: VkShaderModuleCreateInfo
+}
+
+struct ImGui_ImplVulkan_RenderState {
+    pub CommandBuffer: VkCommandBuffer,
+    pub Pipeline: VkPipeline,
+    pub PipelineLayout: VkPipelineLayout
+}
+
+struct ImGui_ImplVulkanH_Frame {
+    pub CommandPool: VkCommandPool,
+    pub CommandBuffer: VkCommandBuffer,
+    pub Fence: VkFence,
+    pub Backbuffer: VkImage,
+    pub BackbufferView: VkImageView,
+    pub Framebuffer: VkFramebuffer
+}
+
+struct ImGui_ImplVulkanH_FrameSemaphores {
+    pub ImageAcquiredSemaphore: VkSemaphore,
+    pub RenderCompleteSemaphore: VkSemaphore
+}
+
+struct ImVector_ImGui_ImplVulkanH_Frame {
+    pub Size: i32,
+    pub Capacity: i32,
+    pub Data: *mut ImGui_ImplVulkanH_Frame
+}
+
+struct ImVector_ImGui_ImplVulkanH_FrameSemaphores {
+    pub Size: i32,
+    pub Capacity: i32,
+    pub Data: *mut ImGui_ImplVulkanH_FrameSemaphores
+}
+
+struct ImGui_ImplVulkanH_Window {
+    pub UseDynamicRendering: bool,
+    pub Surface: VkSurfaceKHR,
+    pub SurfaceFormat: VkSurfaceFormatKHR,
+    pub PresentMode: VkPresentModeKHR,
+    pub AttachmentDesc: VkAttachmentDescription,
+    pub ClearValue: VkClearValue,
+    pub Width: i32,
+    pub Height: i32,
+    pub Swapchain: VkSwapchainKHR,
+    pub RenderPass: VkRenderPass,
+    pub FrameIndex: u32,
+    pub ImageCount: u32,
+    pub SemaphoreCount: u32,
+    pub SemaphoreIndex: u32,
+    pub Frames: ImVector_ImGui_ImplVulkanH_Frame,
+    pub FrameSemaphores: ImVector_ImGui_ImplVulkanH_FrameSemaphores
 }
 
 extern "C" {
@@ -27,13 +111,24 @@ extern "C" {
     fn ImGui_ImplGlfw_Shutdown();
     fn ImGui_ImplGlfw_Sleep(milliseconds: i32);
     fn ImGui_ImplGlfw_WindowFocusCallback(window: *mut GLFWwindow, focused: i32);
-    fn ImGui_ImplOpenGL3_CreateDeviceObjects() -> bool;
-    fn ImGui_ImplOpenGL3_DestroyDeviceObjects();
-    fn ImGui_ImplOpenGL3_GetRenderState() -> *mut ImGui_ImplOpenGL3_RenderState;
-    fn ImGui_ImplOpenGL3_Init(glsl_version: *i8) -> bool;
-    fn ImGui_ImplOpenGL3_NewFrame();
-    fn ImGui_ImplOpenGL3_RenderDrawData(draw_data: *mut ImDrawData);
-    fn ImGui_ImplOpenGL3_SetClipOrigin(gl_clip_origin: u32);
-    fn ImGui_ImplOpenGL3_Shutdown();
-    fn ImGui_ImplOpenGL3_UpdateTexture(tex: *mut ImTextureData);
+    fn ImGui_ImplVulkanH_CreateOrResizeWindow(instance: VkInstance, physical_device: VkPhysicalDevice, device: VkDevice, wd: *mut ImGui_ImplVulkanH_Window, queue_family: u32, allocator: *VkAllocationCallbacks, w: i32, h: i32, min_image_count: u32, image_usage: VkImageUsageFlags);
+    fn ImGui_ImplVulkanH_DestroyWindow(instance: VkInstance, device: VkDevice, wd: *mut ImGui_ImplVulkanH_Window, allocator: *VkAllocationCallbacks);
+    fn ImGui_ImplVulkanH_GetMinImageCountFromPresentMode(present_mode: VkPresentModeKHR) -> i32;
+    fn ImGui_ImplVulkanH_GetWindowDataFromViewport(viewport: *mut ImGuiViewport) -> *mut ImGui_ImplVulkanH_Window;
+    fn ImGui_ImplVulkanH_SelectPhysicalDevice(instance: VkInstance) -> VkPhysicalDevice;
+    fn ImGui_ImplVulkanH_SelectPresentMode(physical_device: VkPhysicalDevice, surface: VkSurfaceKHR, request_modes: *VkPresentModeKHR, request_modes_count: i32) -> VkPresentModeKHR;
+    fn ImGui_ImplVulkanH_SelectQueueFamilyIndex(physical_device: VkPhysicalDevice) -> u32;
+    fn ImGui_ImplVulkanH_SelectSurfaceFormat(physical_device: VkPhysicalDevice, surface: VkSurfaceKHR, request_formats: *VkFormat, request_formats_count: i32, request_color_space: VkColorSpaceKHR) -> VkSurfaceFormatKHR;
+    fn ImGui_ImplVulkanH_Window_ImGui_ImplVulkanH_Window() -> *mut ImGui_ImplVulkanH_Window;
+    fn ImGui_ImplVulkan_AddTexture(image_view: VkImageView, image_layout: VkImageLayout) -> VkDescriptorSet;
+    fn ImGui_ImplVulkan_CreateMainPipeline(info: *ImGui_ImplVulkan_PipelineInfo);
+    fn ImGui_ImplVulkan_GetRenderState() -> *mut ImGui_ImplVulkan_RenderState;
+    fn ImGui_ImplVulkan_Init(info: *mut ImGui_ImplVulkan_InitInfo) -> bool;
+    fn ImGui_ImplVulkan_LoadFunctions(api_version: u32, loader_func: fn(*i8, *mut void) -> PFN_vkVoidFunction, user_data: *mut void) -> bool;
+    fn ImGui_ImplVulkan_NewFrame();
+    fn ImGui_ImplVulkan_RemoveTexture(descriptor_set: VkDescriptorSet);
+    fn ImGui_ImplVulkan_RenderDrawData(draw_data: *mut ImDrawData, command_buffer: VkCommandBuffer, pipeline: VkPipeline);
+    fn ImGui_ImplVulkan_SetMinImageCount(min_image_count: u32);
+    fn ImGui_ImplVulkan_Shutdown();
+    fn ImGui_ImplVulkan_UpdateTexture(tex: *mut ImTextureData);
 }
