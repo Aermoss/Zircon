@@ -73,8 +73,8 @@ fn PrintMap(title: *i8, map: &Map<String, usize>) -> usize {
     let mut total: usize = 0;
     WriteLine("--- " + title.ToString() + " ---");
 
-    for (file, lines) in map {
-        WriteLine(file + ": " + String::FromInteger(lines as u64) + " lines");
+    for (name, lines) in map {
+        WriteLine(name + ": " + String::FromInteger(lines as u64) + " lines");
         total += lines;
     }
 

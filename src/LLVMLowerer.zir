@@ -206,7 +206,7 @@ class LLVMLowerer {
             }
         }
 
-        if this.freestanding || true {
+        if this.freestanding {
             let attribute = LLVMCreateStringAttribute(this.context, "no-stack-arg-probe", 18, "", 0);
             LLVMAddAttributeAtIndex(value, LLVMAttributeIndex::LLVMAttributeFunctionIndex, attribute);
         }

@@ -14,16 +14,66 @@
  * limitations under the License.
  */
 
-#[include "std/panic" : *]
+#[include "std/str", "std/vec", "std/std" : *]
 
+extern "C" {
 #[if ZENITH]
-#[include "std/rt/zenith" : *]
-#[elif WINDOWS]
-#[include "std/rt/windows" : *]
-#[elif LINUX]
-#[include "std/rt/linux" : *]
-#[elif DARWIN]
-#[include "std/rt/darwin" : *]
+    fn ZenithCommandLine(buffer: *mut i8, capacity: usize) -> usize {
+        let mut result: usize = 0;
+
+        volatile asm : a7(11), a0(buffer), a1(capacity) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn _start() {
+        let mut raw_cmd: [i8; 128];
+        ZenithCommandLine(&mut raw_cmd[0] as *mut i8, 128);
+        let mut args = Vector<String>();
+        let mut ptr = &mut raw_cmd[0] as *mut i8;
+        let mut start_ptr = ptr;
+        let mut in_arg = false;
+        let mut in_quotes = false;
+
+        while ptr[0] != 0 {
+            let character = ptr[0];
+
+            if character == '\"' {
+                in_quotes = !in_quotes;
+
+                if !in_arg {
+                    in_arg = true;
+                    start_ptr = (ptr + 1);
+                } ptr[0] = '\0';
+            } else if character == ' ' && !in_quotes {
+                if in_arg {
+                    in_arg = false;
+                    ptr[0] = '\0';
+                    args.PushBack(String(start_ptr));
+                }
+            } else if !in_arg {
+                in_arg = true;
+                start_ptr = ptr;
+            } ptr += 1;
+        }
+
+        if in_arg {
+            args.PushBack(String(start_ptr));
+        }
+
+        Exit(Main(args));
+    }
 #[else]
-#[error "Unsupported platform!"]
+    fn main(argc: i32, argv: **i8) -> i32 {
+        let mut args = Vector<String>();
+
+        for i in 0..argc as usize {
+            args.PushBack(argv[i].ToString());
+        }
+
+        Main(args)
+    }
 #[endif]
+}
