@@ -97,12 +97,8 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-24.04
-            multiarch: x86_64-linux-gnu
-            loader: /lib64/ld-linux-x86-64.so.2
           - arch: arm64
             runner: ubuntu-24.04-arm
-            multiarch: aarch64-linux-gnu
-            loader: /lib/ld-linux-aarch64.so.1
 
     runs-on: ${{ matrix.runner }}
 
@@ -127,8 +123,7 @@ jobs:
 
       - name: Link compiler.
         run: |
-          ld.lld --nostdlib --entry _start --dynamic-linker ${{ matrix.loader }} -o zirconc objects/zirconc-linux-${{ matrix.arch }}.o \
-            -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -L/usr/lib/${{ matrix.multiarch }} -l:libc.so.6
+          cc -no-pie -o zirconc objects/zirconc-linux-${{ matrix.arch }}.o -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -Wl,-rpath,"/usr/lib/llvm-$LLVM_MAJOR/lib"
           ./zirconc --version
 
       - name: Rebuild compiler natively.
