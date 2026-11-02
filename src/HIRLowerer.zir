@@ -3965,24 +3965,25 @@ class HIRLowerer {
         let mut target = this.LowerType(cast->target);
         if target == null { return null; }
 
-        let value = this.Coerce(this.LowerExpression(cast->expression), target);
+        let expression = this.LowerExpression(cast->expression);
+        if expression == null { return null; }
+        let default_integer = target->IsInteger() && !target->IsIntegerPointer() && target->IsSigned() && target->Width() == 32;
+        let default_float = target->IsFloat() && target->Width() == 64;
+        let retyped = (expression->_type->IsIntegerLiteral() && !default_integer) || (expression->_type->IsFloatLiteral() && !default_float);
+        let mut value = this.Coerce(expression, target);
         if value == null { return null; }
 
         if *value->_type == *target && this.LiteralNeedsExplicitType(value->_type, target) {
             return value;
         }
 
-        this.LowerResolvedCastExpression(value, target, cast)
-    }
-
-    fn LowerResolvedCastExpression(&mut this, mut value: *HIRExpression, target: *HIRType, node: *ASTNode) -> *HIRExpression {
         if !target->IsPointer() {
             value = this.ImplicitDereference(value);
         } else if value->category == HIRExpressionCategory::Place && value->_type->IsReference() && value->_type->Pointee().IsPointer() && !value->_type->Pointee().IsReference() {
             value = this.ImplicitDereference(value);
         }
 
-        let (mut state, mut failed) = (false, false);
+        let (mut state, mut failed) = (retyped, false);
         let (mut left, mut right) = (target, value->_type);
 
         while left->IsPointer() && right->IsPointer() {
@@ -4001,12 +4002,12 @@ class HIRLowerer {
 
         if *value->_type == target {
             if !state {
-                Logger::Log("Redundant cast. ('" + value->_type->ToString() + "' to '" + target->ToString() + "')", node, LogSeverity::Warning);
+                Logger::Log("Redundant cast. ('" + value->_type->ToString() + "' to '" + target->ToString() + "')", cast, LogSeverity::Warning);
             } else {
                 if !failed || this._unsafe {
                     return this.builder.Cast(value, target);
                 } else {
-                    Logger::Log("Cannot cast immutable pointer to mutable pointer.", node, LogSeverity::Error);
+                    Logger::Log("Cannot cast immutable pointer to mutable pointer.", cast, LogSeverity::Error);
                     return null;
                 }
             }
@@ -4053,14 +4054,14 @@ class HIRLowerer {
                 if !destination.IsDerivedFrom(source) && !source.IsDerivedFrom(destination) {
                     let source_name = (source as *HIRClassType)->declaration->name;
                     let destination_name = (destination as *HIRClassType)->declaration->name;
-                    Logger::Log("Cannot cast class '" + source_name + "' to unrelated class '" + destination_name + "'.", node, LogSeverity::Error);
+                    Logger::Log("Cannot cast class '" + source_name + "' to unrelated class '" + destination_name + "'.", cast, LogSeverity::Error);
                     return null;
                 }
             }
 
             this.builder.Cast(value, target)
         } else {
-            Logger::Log("Cannot cast '" + value->_type->ToString() + "' to '" + target->ToString() + "'.", node, LogSeverity::Error);
+            Logger::Log("Cannot cast '" + value->_type->ToString() + "' to '" + target->ToString() + "'.", cast, LogSeverity::Error);
             null
         }
     }
