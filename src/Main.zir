@@ -60,10 +60,6 @@ class _SHArgs {
     pub cmd: *i8,
     pub end: *i8
 }
-
-class _NullEnv {
-    pub end: *i8
-}
 #[endif]
 
 extern "C" {
@@ -73,7 +69,7 @@ extern "C" {
     fn GetExitCodeProcess(hProcess: *mut void, lpExitCode: *mut u32) -> i32;
 #[else]
     fn fork() -> i32;
-    fn execve(path: *i8, argv: **i8, envp: **i8) -> i32;
+    fn execv(path: *i8, argv: **i8) -> i32;
     fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
 #[endif]
 }
@@ -106,12 +102,10 @@ fn Execute(command: *i8) -> u32 {
     shargs.flag = "-c";
     shargs.cmd = command;
     shargs.end = null;
-    let mut nullenv: _NullEnv;
-    nullenv.end = null;
     let pid = fork();
 
     if pid == 0 {
-        execve(shargs.sh, &shargs as **i8, &nullenv as **i8);
+        execv(shargs.sh, &shargs as **i8);
         Exit(1);
     }
 
