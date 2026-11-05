@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "std/std", "src/Target.zir", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/Logger.zir" : *]
+#[include "std/io", "std/file", "std/time", "std/std", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/Target.zir",
+    "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/Logger.zir" : *]
 
 #[if !ZODIAC]
-#[include "std/time", "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
+#[include "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
 
 #[if WINDOWS]
 const INFINITE: u32 = 0xFFFFFFFF;
@@ -274,6 +275,16 @@ fn FatalErrorHandler(reason: *i8) {
     Logger::Log("LLVM", reason, LogSeverity::Fatal);
 }
 #[endif]
+
+fn FormatElapsedSeconds(start: &Instant) -> String {
+#[if ZENITH]
+    let milliseconds = start.ElapsedMilliseconds();
+    let fraction = String::FromInteger(1000 + milliseconds % 1000);
+    String::FromInteger(milliseconds / 1000) + "." + fraction.SubString(1)
+#[else]
+    String::FromFloat(start.Elapsed())
+#[endif]
+}
 
 fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
@@ -535,8 +546,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
         defines.PushBack("LIBC".ToString());
     }
 
-#[if !ZODIAC]
     let start = Instant::Now();
+#[if !ZODIAC]
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
     let temp_path = match TemporaryPath() {
@@ -597,19 +608,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut tokens = preprocessor.Process(lexer.Lex(source, input_file), input_file);
 
             let mut parser = Parser();
-#[if !ZODIAC]
             let ast_start = Instant::Now();
-#[endif]
             let ast_module = parser.Parse(tokens);
             tokens.Clear();
-#[if !ZODIAC]
-            WriteLine("AST module parsed in " + String::FromFloat(ast_start.Elapsed()) + " seconds.");
-#[endif]
+            WriteLine("AST module parsed in " + FormatElapsedSeconds(ast_start) + " seconds.");
 
             let mut hir_lowerer = HIRLowerer(target.Info());
-#[if !ZODIAC]
             let hir_start = Instant::Now();
-#[endif]
             let mut hir_module: *HIRModule = null;
 
             if !Logger::HasError() {
@@ -617,57 +622,40 @@ fn Main(args: &mut Vector<String>) -> i32 {
             }
 
             if !check && !Logger::HasError() && hir_module != null {
-#[if !ZODIAC]
-                WriteLine("HIR module lowered in " + String::FromFloat(hir_start.Elapsed()) + " seconds.");
-#[endif]
+                WriteLine("HIR module lowered in " + FormatElapsedSeconds(hir_start) + " seconds.");
                 if emit_hir { WriteOutput(name + ".hir", hir_module->ToString()); }
                 parser.arena.Clear();
 
                 let mut mir_lowerer = MIRLowerer(target.Info());
-#[if !ZODIAC]
                 let mir_start = Instant::Now();
-#[endif]
                 let mir_module = mir_lowerer.Lower(hir_module);
                 hir_lowerer.context.arena.Reset();
-#[if !ZODIAC]
-                WriteLine("MIR module lowered in " + String::FromFloat(mir_start.Elapsed()) + " seconds.");
-#[endif]
+                WriteLine("MIR module lowered in " + FormatElapsedSeconds(mir_start) + " seconds.");
 
                 if target.backend == TargetBackend::Zodiac {
                     let mut pass_manager = MIRPassManager(&mut mir_lowerer.context);
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
-#[if !ZODIAC]
                     let passes_start = Instant::Now();
-#[endif]
                     pass_manager.Run(mir_module);
-#[if !ZODIAC]
-                    WriteLine("MIR passes ran in " + String::FromFloat(passes_start.Elapsed()) + " seconds.");
-#[endif]
+                    WriteLine("MIR passes ran in " + FormatElapsedSeconds(passes_start) + " seconds.");
                 }
 
                 if emit_mir { WriteOutput(name + ".mir", mir_module->ToString()); }
 
                 if target.backend == TargetBackend::Zodiac {
                     let mut lir_lowerer = LIRLowerer();
-#[if !ZODIAC]
                     let lir_start = Instant::Now();
-#[endif]
                     let lir_module = lir_lowerer.Lower(mir_module);
                     mir_lowerer.context.arena.Reset();
-#[if !ZODIAC]
-                    WriteLine("LIR module lowered in " + String::FromFloat(lir_start.Elapsed()) + " seconds.");
-#[endif]
+                    WriteLine("LIR module lowered in " + FormatElapsedSeconds(lir_start) + " seconds.");
                     if emit_lir { WriteOutput(name + ".virtual.lir", lir_module->ToString()); }
 
                     let mut allocator = LIRAllocator(&mut lir_lowerer.context);
-#[if !ZODIAC]
                     let allocator_start = Instant::Now();
-#[endif]
                     allocator.Allocate(lir_module);
-#[if !ZODIAC]
-                    WriteLine("LIR module allocated in " + String::FromFloat(allocator_start.Elapsed()) + " seconds.");
-#[endif]
+                    WriteLine("LIR module allocated in " + FormatElapsedSeconds(allocator_start) + " seconds.");
+
                     if Logger::HasError() {
                         failed = true;
                         Logger::Clear();
@@ -686,7 +674,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 } else {
                     let llvm_start = Instant::Now();
                     module = llvm_lowerer.Lower(mir_module);
-                    WriteLine("LLVM module lowered in " + String::FromFloat(llvm_start.Elapsed()) + " seconds.");
+                    WriteLine("LLVM module lowered in " + FormatElapsedSeconds(llvm_start) + " seconds.");
 #[endif]
                 }
             }
@@ -881,6 +869,10 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
 #[if ZODIAC]
+    if !failed && !check {
+        WriteLine("Program compiled in " + FormatElapsedSeconds(start) + " seconds.");
+    }
+
     if failed { 1 } else { 0 }
 #[else]
     if check || failed || emit_object || emit_asm {
@@ -1005,7 +997,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } return 1;
     }
 
-    WriteLine("Program compiled in " + String::FromFloat(start.Elapsed()) + " seconds.");
+    WriteLine("Program compiled in " + FormatElapsedSeconds(start) + " seconds.");
 
     for temp_file in temp_files {
         RemoveFile(temp_file);
