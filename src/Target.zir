@@ -20,15 +20,33 @@
 #[include "std/io", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/Target.zir", "vendor/llvm-c/TargetMachine.zir", "src/Logger.zir" : *]
 #[endif]
 
+enum TargetABI: u8 {
+    Zodiac, Win64, SysV64, AAPCS64, DarwinPCS64, WinARM64
+}
+
 class TargetInfo {
     pub pointer_size: usize,
     pub pointer_align: usize,
-    pub stack_align: usize;
+    pub stack_align: usize,
+    pub abi: TargetABI = TargetABI::Zodiac;
 
     TargetInfo(&mut this) {}
 
     TargetInfo(&mut this, pointer_size: usize, pointer_align: usize, stack_align: usize) {
         (this.pointer_size, this.pointer_align, this.stack_align) = (pointer_size, pointer_align, stack_align);
+    }
+
+    pub fn ABIFromTriple(triple: &String) -> TargetABI {
+        let windows = triple.Contains("windows") || triple.Contains("win32") || triple.Contains("mingw") || triple.Contains("uefi");
+        let darwin = triple.Contains("darwin") || triple.Contains("apple") || triple.Contains("macos") || triple.Contains("ios");
+
+        if triple.StartsWith("x86_64") || triple.StartsWith("amd64") {
+            if windows { TargetABI::Win64 } else { TargetABI::SysV64 }
+        } else if triple.StartsWith("aarch64") || triple.StartsWith("arm64") {
+            if windows { TargetABI::WinARM64 } else if darwin { TargetABI::DarwinPCS64 } else { TargetABI::AAPCS64 }
+        } else {
+            TargetABI::Zodiac
+        }
     }
 }
 
@@ -112,7 +130,9 @@ class Target {
             return TargetInfo(4, 4, 4);
         }
 
-        TargetInfo(LLVMPointerSize(this.layout) as usize, LLVMPointerSize(this.layout) as usize, 16)
+        let mut info = TargetInfo(LLVMPointerSize(this.layout) as usize, LLVMPointerSize(this.layout) as usize, 16);
+        info.abi = TargetInfo::ABIFromTriple(this.triple);
+        info
     }
 
     pub fn Emit(&this, module: LLVMModuleRef, file_name: &String, file_type: LLVMCodeGenFileType) -> String {

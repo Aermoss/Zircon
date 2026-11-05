@@ -49,6 +49,7 @@ class LIRLowerer {
     blocks: Map<*MIRBlock, *mut LIRBlock>,
     edges: Vector<LIRPhiEdge>,
     block: *MIRBlock = null,
+    function: *MIRFunctionDeclaration = null,
     constant_index: u32 = 0,
     module: *mut LIRModule;
 
@@ -330,17 +331,39 @@ class LIRLowerer {
         }
 
         this.builder.SetCurrentBlock(this.blocks[function->blocks[0]]);
+        this.function = function;
 
-        for i in 0..function->parameters.Length() {
-            let destination = this.builder.VirtualRegister();
+        let mut words = Vector<*LIROperand>();
+        let mut stack: usize = 0;
 
-            if i < LIR_ARGUMENT_COUNT {
-                this.EmitMove(destination, this.Physical(LIR_A0 + (i as u8)));
-            } else {
-                this.Emit(LIROpcode::Lw, destination, this.builder.MemoryOperand(this.Physical(LIR_FP), ((i - LIR_ARGUMENT_COUNT) * 4) as i32), null);
+        for parameter in function->parameters {
+            for _ in 0..this.Words(parameter->_type) {
+                let destination = this.builder.VirtualRegister();
+
+                if words.Length() < LIR_ARGUMENT_COUNT {
+                    this.EmitMove(destination, this.Physical(LIR_A0 + (words.Length() as u8)));
+                } else {
+                    this.Emit(LIROpcode::Lw, destination, this.builder.MemoryOperand(this.Physical(LIR_FP), (stack * 4) as i32), null);
+                    stack += 1;
+                }
+
+                words.PushBack(destination);
             }
+        }
 
-            this.values[function->parameters[i]] = destination;
+        let mut index: usize = 0;
+
+        for parameter in function->parameters {
+            if this.Words(parameter->_type) == 2 {
+                let temporary = this.LegalMemory(this.AllocateStack(8, 4), 8);
+                this.Emit(LIROpcode::Sw, null, words[index], temporary);
+                this.Emit(LIROpcode::Sw, null, words[index + 1], this.builder.MemoryOperand(temporary->base, temporary->offset + 4));
+                this.values[parameter] = temporary;
+                index += 2;
+            } else {
+                this.values[parameter] = words[index];
+                index += 1;
+            }
         }
 
         for block in function->blocks {
@@ -1010,6 +1033,21 @@ class LIRLowerer {
         width > 0 && width <= 32
     }
 
+    fn Words(&this, _type: *MIRType) -> u32 {
+        if this.IsAggregate(_type) && this.SizeOf(_type) > 4 && this.SizeOf(_type) <= 8 { 2 } else { 1 }
+    }
+
+    fn Extend(&mut this, operand: *LIROperand, _type: *MIRType, extension: MIRExtension) -> *LIROperand {
+        let width = this.IntegerWidth(_type);
+        if width == 0 || width >= 32 { return operand; }
+
+        match extension {
+            MIRExtension::Sign => this.SignExtend(operand, width),
+            MIRExtension::Zero => this.ZeroExtend(operand, width),
+            MIRExtension::None => operand
+        }
+    }
+
     fn LowerAllocaInstruction(&mut this, alloca: *MIRAllocaInstruction) -> *LIROperand {
         this.AllocateStack(this.SizeOf(alloca->_type), this.AlignOf(alloca->_type))
     }
@@ -1234,6 +1272,7 @@ class LIRLowerer {
     fn LowerCallInstruction(&mut this, call: *MIRCallInstruction) -> *LIROperand {
         let function = this.builder.GetCurrentFunction();
         let mut sources = Vector<*LIROperand>();
+        let mut stack: usize = 0;
 
         for i in 0..call->arguments.Length() {
             let argument = call->arguments[i];
@@ -1242,14 +1281,27 @@ class LIRLowerer {
                 return this.Unsupported(if argument->_type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
             }
 
-            let source = this.EnsureRegister(this.LowerValue(argument));
+            let mut pieces = Vector<*LIROperand>();
 
-            if i < LIR_ARGUMENT_COUNT {
-                sources.PushBack(source);
+            if this.Words(argument->_type) == 2 {
+                let memory = this.LegalMemory(this.EnsureMemory(this.LowerValue(argument)), 8);
+                pieces.PushBack(this.EmitValue(LIROpcode::Lw, memory, null));
+                pieces.PushBack(this.EmitValue(LIROpcode::Lw, this.builder.MemoryOperand(memory->base, memory->offset + 4), null));
             } else {
-                let offset = ((i - LIR_ARGUMENT_COUNT) * 4) as u32;
-                this.Emit(LIROpcode::Sw, null, source, this.builder.MemoryOperand(this.Physical(LIR_SP), offset as i32));
-                if offset + 4 > function->outgoing_size { function->outgoing_size = offset + 4; }
+                let mut source = this.LowerValue(argument);
+                if i < call->attributes.Length() { source = this.Extend(source, argument->_type, call->attributes[i].extension); }
+                pieces.PushBack(this.EnsureRegister(source));
+            }
+
+            for piece in pieces {
+                if sources.Length() < LIR_ARGUMENT_COUNT {
+                    sources.PushBack(piece);
+                } else {
+                    let offset = (stack * 4) as u32;
+                    this.Emit(LIROpcode::Sw, null, piece, this.builder.MemoryOperand(this.Physical(LIR_SP), offset as i32));
+                    if offset + 4 > function->outgoing_size { function->outgoing_size = offset + 4; }
+                    stack += 1;
+                }
             }
         }
 
@@ -1283,6 +1335,14 @@ class LIRLowerer {
 
         if call->_type == null || call->_type->kind == MIRTypeKind::Void {
             return null;
+        } else if this.Words(call->_type) == 2 {
+            let (low, high) = (this.builder.VirtualRegister(), this.builder.VirtualRegister());
+            this.EmitMove(low, this.Physical(LIR_A0));
+            this.EmitMove(high, this.Physical(LIR_A0 + 1));
+            let temporary = this.LegalMemory(this.AllocateStack(8, 4), 8);
+            this.Emit(LIROpcode::Sw, null, low, temporary);
+            this.Emit(LIROpcode::Sw, null, high, this.builder.MemoryOperand(temporary->base, temporary->offset + 4));
+            return temporary;
         } else if !this.IsScalar(call->_type) {
             return this.Unsupported(if call->_type->kind == MIRTypeKind::Float { "Floating point" } else { "Returning this type by value" });
         }
@@ -1412,12 +1472,24 @@ class LIRLowerer {
         let mut uses = Vector<*LIROperand>();
 
         if _return->value != null {
-            if !this.IsScalar(_return->value->_type) {
-                this.Unsupported(if _return->value->_type->kind == MIRTypeKind::Float { "Floating point" } else { "Returning this type by value" });
+            let _type = _return->value->_type;
+
+            if this.Words(_type) == 2 {
+                let memory = this.LegalMemory(this.EnsureMemory(this.LowerValue(_return->value)), 8);
+                let low = this.EmitValue(LIROpcode::Lw, memory, null);
+                let high = this.EmitValue(LIROpcode::Lw, this.builder.MemoryOperand(memory->base, memory->offset + 4), null);
+                let (first, second) = (this.Physical(LIR_A0), this.Physical(LIR_A0 + 1));
+                this.EmitMove(first, low);
+                this.EmitMove(second, high);
+                uses.PushBack(first);
+                uses.PushBack(second);
+            } else if !this.IsScalar(_type) {
+                this.Unsupported(if _type->kind == MIRTypeKind::Float { "Floating point" } else { "Returning this type by value" });
             } else {
-                let value = this.EnsureRegister(this.LowerValue(_return->value));
+                let mut value = this.LowerValue(_return->value);
+                if this.function != null { value = this.Extend(value, _type, this.function->return_attributes.extension); }
                 let register = this.Physical(LIR_A0);
-                this.EmitMove(register, value);
+                this.EmitMove(register, this.EnsureRegister(value));
                 uses.PushBack(register);
             }
         }

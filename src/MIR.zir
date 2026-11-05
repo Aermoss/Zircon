@@ -639,20 +639,49 @@ class MIRBinaryInstruction : MIRInstruction {
     }
 }
 
+enum MIRExtension: u8 {
+    None, Sign, Zero
+}
+
+class MIRAttributes {
+    pub sret: *MIRType = null,
+    pub byval: *MIRType = null,
+    pub extension: MIRExtension = MIRExtension::None,
+    pub stack_align: u32 = 0;
+
+    MIRAttributes(&mut this) {}
+
+    pub fn Empty(&this) -> bool {
+        this.sret == null && this.byval == null && this.extension == MIRExtension::None && this.stack_align == 0
+    }
+
+    pub fn ToString(&this) -> String {
+        let mut result = String();
+        if this.sret != null { result += "@sret(" + this.sret->ToString() + ") "; }
+        if this.byval != null { result += "@byval(" + this.byval->ToString() + ") "; }
+        if this.extension == MIRExtension::Sign { result += "@signext "; }
+        if this.extension == MIRExtension::Zero { result += "@zeroext "; }
+        if this.stack_align != 0 { result += "@alignstack(" + String::FromInteger(this.stack_align as HostUnsigned) + ") "; }
+        result
+    }
+}
+
 class MIRCallInstruction : MIRInstruction {
     pub callee: *MIRValue,
     pub arguments: Vector<*MIRValue>,
-    pub sret: *MIRType = null;
+    pub attributes: Vector<MIRAttributes>,
+    pub return_attributes: MIRAttributes;
 
     MIRCallInstruction(&mut this, name: String, callee: *MIRValue, arguments: Vector<*MIRValue>, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Call, name, _type) {
         (this.callee, this.arguments) = (callee, arguments);
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = "call " + this.callee->ToString() + '(';
+        let mut result = "call " + this.return_attributes.ToString() + this.callee->ToString() + '(';
 
         for i in 0..this.arguments.Length() {
             if i != 0 { result += ", "; }
+            if i < this.attributes.Length() { result += this.attributes[i].ToString(); }
             result += this.arguments[i]->ToString();
         }
 
@@ -855,8 +884,7 @@ class MIRDeclarationReference : MIRValue {
 
 class MIRParameter : MIRValue {
     pub name: String,
-    pub sret: *MIRType = null,
-    pub byval: *MIRType = null,
+    pub attributes: MIRAttributes,
     pub index: u32;
 
     MIRParameter(&mut this, name: String, index: u32, _type: *MIRType) : MIRValue(MIRValueKind::Parameter, _type) {
@@ -864,17 +892,7 @@ class MIRParameter : MIRValue {
     }
 
     pub fn ToDefinitionString(&this) -> String {
-        let mut result = '%' + this.name + ": ";
-
-        if this.sret != null {
-            result += "@sret(" + this.sret->ToString() + ") ";
-        }
-
-        if this.byval != null {
-            result += "@byval(" + this.byval->ToString() + ") ";
-        }
-
-        result + this._type->ToString()
+        '%' + this.name + ": " + this.attributes.ToString() + this._type->ToString()
     }
 
     pub fn ToString(&this) -> String {
@@ -991,6 +1009,7 @@ class MIRTypeDeclaration : MIRTypedDeclaration {
 class MIRFunctionDeclaration : MIRLinkableDeclaration {
     pub parameters: Vector<*MIRParameter>,
     pub _return: *MIRType,
+    pub return_attributes: MIRAttributes,
     pub blocks: Vector<*mut MIRBlock>,
     pub names: Map<String, u32>,
     pub alloca_index: usize = 0;
@@ -1034,7 +1053,7 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
         } result += ')';
 
         if this._return->kind != MIRTypeKind::Void {
-            result += " -> " + this._return->ToString();
+            result += " -> " + this.return_attributes.ToString() + this._return->ToString();
         }
 
         if !this.blocks.Empty() {

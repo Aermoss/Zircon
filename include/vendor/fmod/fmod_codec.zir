@@ -1,0 +1,72 @@
+const FMOD_CODEC_PLUGIN_VERSION: i32 = 1;
+const FMOD_CODEC_SEEK_METHOD_SET: i32 = 0;
+const FMOD_CODEC_SEEK_METHOD_CURRENT: i32 = 1;
+const FMOD_CODEC_SEEK_METHOD_END: i32 = 2;
+
+type FMOD_CODEC_SEEK_METHOD = i32;
+type FMOD_CODEC_OPEN_CALLBACK = fn(*mut FMOD_CODEC_STATE, FMOD_MODE, *mut FMOD_CREATESOUNDEXINFO) -> FMOD_RESULT;
+type FMOD_CODEC_CLOSE_CALLBACK = fn(*mut FMOD_CODEC_STATE) -> FMOD_RESULT;
+type FMOD_CODEC_READ_CALLBACK = fn(*mut FMOD_CODEC_STATE, *mut void, u32, *mut u32) -> FMOD_RESULT;
+type FMOD_CODEC_GETLENGTH_CALLBACK = fn(*mut FMOD_CODEC_STATE, *mut u32, FMOD_TIMEUNIT) -> FMOD_RESULT;
+type FMOD_CODEC_SETPOSITION_CALLBACK = fn(*mut FMOD_CODEC_STATE, i32, u32, FMOD_TIMEUNIT) -> FMOD_RESULT;
+type FMOD_CODEC_GETPOSITION_CALLBACK = fn(*mut FMOD_CODEC_STATE, *mut u32, FMOD_TIMEUNIT) -> FMOD_RESULT;
+type FMOD_CODEC_SOUNDCREATE_CALLBACK = fn(*mut FMOD_CODEC_STATE, i32, *mut FMOD_SOUND) -> FMOD_RESULT;
+type FMOD_CODEC_GETWAVEFORMAT_CALLBACK = fn(*mut FMOD_CODEC_STATE, i32, *mut FMOD_CODEC_WAVEFORMAT) -> FMOD_RESULT;
+type FMOD_CODEC_METADATA_FUNC = fn(*mut FMOD_CODEC_STATE, FMOD_TAGTYPE, *mut i8, *mut void, u32, FMOD_TAGDATATYPE, i32) -> FMOD_RESULT;
+type FMOD_CODEC_ALLOC_FUNC = fn(u32, u32, *i8, i32) -> *mut void;
+type FMOD_CODEC_FREE_FUNC = fn(*mut void, *i8, i32);
+type FMOD_CODEC_LOG_FUNC = fn(FMOD_DEBUG_FLAGS, *i8, i32, *i8, *i8, ...);
+type FMOD_CODEC_FILE_READ_FUNC = fn(*mut FMOD_CODEC_STATE, *mut void, u32, *mut u32) -> FMOD_RESULT;
+type FMOD_CODEC_FILE_SEEK_FUNC = fn(*mut FMOD_CODEC_STATE, u32, FMOD_CODEC_SEEK_METHOD) -> FMOD_RESULT;
+type FMOD_CODEC_FILE_TELL_FUNC = fn(*mut FMOD_CODEC_STATE, *mut u32) -> FMOD_RESULT;
+type FMOD_CODEC_FILE_SIZE_FUNC = fn(*mut FMOD_CODEC_STATE, *mut u32) -> FMOD_RESULT;
+
+struct FMOD_CODEC_DESCRIPTION {
+    pub apiversion: u32,
+    pub name: *i8,
+    pub version: u32,
+    pub defaultasstream: i32,
+    pub timeunits: FMOD_TIMEUNIT,
+    pub open: FMOD_CODEC_OPEN_CALLBACK,
+    pub close: FMOD_CODEC_CLOSE_CALLBACK,
+    pub read: FMOD_CODEC_READ_CALLBACK,
+    pub getlength: FMOD_CODEC_GETLENGTH_CALLBACK,
+    pub setposition: FMOD_CODEC_SETPOSITION_CALLBACK,
+    pub getposition: FMOD_CODEC_GETPOSITION_CALLBACK,
+    pub soundcreate: FMOD_CODEC_SOUNDCREATE_CALLBACK,
+    pub getwaveformat: FMOD_CODEC_GETWAVEFORMAT_CALLBACK
+}
+
+struct FMOD_CODEC_WAVEFORMAT {
+    pub name: *i8,
+    pub format: FMOD_SOUND_FORMAT,
+    pub channels: i32,
+    pub frequency: i32,
+    pub lengthbytes: u32,
+    pub lengthpcm: u32,
+    pub pcmblocksize: u32,
+    pub loopstart: i32,
+    pub loopend: i32,
+    pub mode: FMOD_MODE,
+    pub channelmask: FMOD_CHANNELMASK,
+    pub channelorder: FMOD_CHANNELORDER,
+    pub peakvolume: f32
+}
+
+struct FMOD_CODEC_STATE_FUNCTIONS {
+    pub metadata: FMOD_CODEC_METADATA_FUNC,
+    pub alloc: FMOD_CODEC_ALLOC_FUNC,
+    pub free: FMOD_CODEC_FREE_FUNC,
+    pub log: FMOD_CODEC_LOG_FUNC,
+    pub read: FMOD_CODEC_FILE_READ_FUNC,
+    pub seek: FMOD_CODEC_FILE_SEEK_FUNC,
+    pub tell: FMOD_CODEC_FILE_TELL_FUNC,
+    pub size: FMOD_CODEC_FILE_SIZE_FUNC
+}
+
+struct FMOD_CODEC_STATE {
+    pub plugindata: *mut void,
+    pub waveformat: *mut FMOD_CODEC_WAVEFORMAT,
+    pub functions: *mut FMOD_CODEC_STATE_FUNCTIONS,
+    pub numsubsounds: i32
+}

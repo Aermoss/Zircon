@@ -199,12 +199,10 @@ class LLVMLowerer {
         this.declarations[function] = value;
 
         for parameter in function->parameters {
-            if parameter->sret != null {
-                LLVMAddAttributeAtIndex(value, (parameter->index + 1) as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(parameter->sret)));
-            } else if parameter->byval != null {
-                LLVMAddAttributeAtIndex(value, (parameter->index + 1) as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("byval", 5), this.LowerType(parameter->byval)));
-            }
+            this.AddAttributes(value, (parameter->index + 1) as LLVMAttributeIndex, parameter->attributes, false);
         }
+
+        this.AddAttributes(value, LLVMAttributeIndex::LLVMAttributeReturnIndex, function->return_attributes, false);
 
         if this.freestanding {
             let attribute = LLVMCreateStringAttribute(this.context, "no-stack-arg-probe", 18, "", 0);
@@ -543,11 +541,38 @@ class LLVMLowerer {
 
         let result = LLVMBuildCall2(this.builder, _type, callee, arguments.Data(), arguments.Length() as u32, call->name.Data());
 
-        if call->sret != null {
-            LLVMAddCallSiteAttribute(result, 1 as LLVMAttributeIndex, LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(call->sret)));
+        for i in 0..call->attributes.Length() {
+            this.AddAttributes(result, (i + 1) as LLVMAttributeIndex, call->attributes[i], true);
         }
 
+        this.AddAttributes(result, LLVMAttributeIndex::LLVMAttributeReturnIndex, call->return_attributes, true);
         result
+    }
+
+    fn AddAttributes(&mut this, value: LLVMValueRef, index: LLVMAttributeIndex, attributes: &MIRAttributes, call: bool) {
+        let mut lowered = Vector<LLVMAttributeRef>();
+
+        if attributes.sret != null {
+            lowered.PushBack(LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("sret", 4), this.LowerType(attributes.sret)));
+        }
+
+        if attributes.byval != null {
+            lowered.PushBack(LLVMCreateTypeAttribute(this.context, LLVMGetEnumAttributeKindForName("byval", 5), this.LowerType(attributes.byval)));
+        }
+
+        if attributes.extension == MIRExtension::Sign {
+            lowered.PushBack(LLVMCreateEnumAttribute(this.context, LLVMGetEnumAttributeKindForName("signext", 7), 0));
+        } else if attributes.extension == MIRExtension::Zero {
+            lowered.PushBack(LLVMCreateEnumAttribute(this.context, LLVMGetEnumAttributeKindForName("zeroext", 7), 0));
+        }
+
+        if attributes.stack_align != 0 {
+            lowered.PushBack(LLVMCreateEnumAttribute(this.context, LLVMGetEnumAttributeKindForName("alignstack", 10), attributes.stack_align as u64));
+        }
+
+        for attribute in lowered {
+            if call { LLVMAddCallSiteAttribute(value, index, attribute); } else { LLVMAddAttributeAtIndex(value, index, attribute); }
+        }
     }
 
     fn LowerCastInstruction(&mut this, cast: *MIRCastInstruction) -> LLVMValueRef {

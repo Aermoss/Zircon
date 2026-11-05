@@ -76,6 +76,9 @@ class HIRLowerer {
     variant_data: Map<*ASTNode, (*mut HIRVariantDeclaration, *mut Scope)>,
     extend_data: Map<*ASTNode, (*mut HIRExtendDeclaration, *mut Scope)>,
     function_data: Map<*ASTNode, *mut HIRFunctionDeclaration>,
+    pending_types: Map<String, *ASTDeclaration>,
+    lowered_types: Map<*ASTNode, bool>,
+    type_scope: *mut Scope = null,
 
     temporaries: Vector<*HIRExpression>,
     temporary_stack: Vector<Vector<*HIRExpression>>,
@@ -135,10 +138,26 @@ class HIRLowerer {
             declared[declaration] = this.LowerDeclarationFirstPass(declaration);
         }
 
+        this.type_scope = this.scope_manager.current;
+
+        for declaration in module->declarations {
+            let name = match declaration->kind {
+                ASTDeclarationKind::Type => (declaration as *ASTTypeDeclaration)->name,
+                ASTDeclarationKind::Enumeration => (declaration as *ASTEnumerationDeclaration)->name,
+                _ => String()
+            };
+
+            if !name.Empty() && !this.pending_types.Has(name) {
+                this.pending_types[name] = declaration;
+            }
+        }
+
         for declaration in module->declarations {
             this.current_pass = HIRLoweringPass::Second;
             declared[declaration] |= this.LowerDeclarationSecondPass(declaration);
         }
+
+        this.pending_types.Clear();
 
         for declaration in module->declarations {
             this.current_pass = HIRLoweringPass::Third;
@@ -255,8 +274,31 @@ class HIRLowerer {
         true
     }
 
+    fn TakePendingType(&mut this, declaration: *ASTDeclaration, name: &String) -> bool {
+        if this.lowered_types.Has(declaration) { return false; }
+        this.lowered_types[declaration] = true;
+        if this.pending_types.Get(name, null) == declaration { this.pending_types.Remove(name); }
+        true
+    }
+
     fn LowerTypeDeclaration(&mut this, type_definition: *ASTTypeDeclaration) {
+        if !this.TakePendingType(type_definition, type_definition->name) { return; }
         this.scope_manager.current->Set(type_definition->name, this.LowerTypeOrVoid(type_definition->_type), type_definition);
+    }
+
+    fn LowerPendingType(&mut this, path: *ASTPath) {
+        if path->absolute || path->segments.Length() != 1 { return; }
+        let pending = this.pending_types.Get(path->segments[0].name, null);
+        if pending == null || this.type_scope == null { return; }
+        let scope = this.scope_manager.current;
+        this.scope_manager.current = this.type_scope;
+
+        match pending->kind {
+            ASTDeclarationKind::Type => this.LowerTypeDeclaration(pending as *ASTTypeDeclaration),
+            _ => this.LowerEnumerationDeclaration(pending as *ASTEnumerationDeclaration)
+        }
+
+        this.scope_manager.current = scope;
     }
 
     fn LowerDeclarationThirdPass(&mut this, declaration: *ASTDeclaration) -> bool {
@@ -2001,6 +2043,7 @@ class HIRLowerer {
     }
 
     fn LowerEnumerationDeclaration(&mut this, enumeration: *ASTEnumerationDeclaration) {
+        if !this.TakePendingType(enumeration, enumeration->name) { return; }
         let underlying_type = this.LowerType(enumeration->underlying_type);
         if underlying_type == null { return; }
 
@@ -4781,7 +4824,8 @@ class HIRLowerer {
     }
 
     fn LowerForExpression(&mut this, _for: *ASTForExpression) -> *HIRExpression {
-        let (mut start, mut end): (*HIRExpression, *HIRExpression);
+        let mut length: *HIRExpression = null;
+        let (mut start, mut end): (*HIRExpression, *HIRExpression) = (null, null);
         let (mut is_range, mut inclusive) = (false, false);
         let temporary_index = this.temporaries.Length();
 
@@ -4801,11 +4845,10 @@ class HIRLowerer {
                 let index_type = this.context.IntegerPointerType(false);
                 let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->mutable);
                 start = this.builder.Cast(this.builder.AddressOf(this.builder.IndexAccess(iterable, this.builder.IntegerLiteral(0, index_type))), pointer_type);
-                end = this.builder.Binary(HIRBinaryKind::Add, start, this.builder.IntegerLiteral(iterable->_type->Length() as HostUnsigned, index_type), pointer_type);
+                length = this.builder.IntegerLiteral(iterable->_type->Length() as HostUnsigned, index_type);
             } else if iterable->_type->IsSlice() {
-                let pointer_type = this.context.PointerType(iterable->_type->Element(), iterable->_type->IsMutable());
                 start = this.builder.SliceAccess(iterable, HIRSliceField::Data);
-                end = this.builder.Binary(HIRBinaryKind::Add, this.builder.SliceAccess(iterable, HIRSliceField::Data), this.builder.SliceAccess(iterable, HIRSliceField::Length), pointer_type);
+                length = this.builder.SliceAccess(iterable, HIRSliceField::Length);
             } else {
                 let mut values = Vector<*HIRExpression>();
                 values.PushBack(iterable);
@@ -4832,7 +4875,7 @@ class HIRLowerer {
             }
         }
 
-        if *start->_type != *end->_type {
+        if end != null && *start->_type != *end->_type {
             Logger::Log("Start and end expressions of a for loop must have the same type.", _for, LogSeverity::Error);
             return null;
         }
@@ -4849,10 +4892,11 @@ class HIRLowerer {
             return null;
         }
 
-        let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
         let iterator = this.builder.IdentifierPattern("iterator".ToString(), iterator_type, start, true);
-        let (mut item, mut condition, mut step): (*HIRExpression, *HIRExpression, *HIRExpression) = (null, null, null);
         let iterator_reference = this.builder.ReferenceBinding(iterator);
+        if length != null { end = this.builder.Binary(HIRBinaryKind::Add, iterator_reference, length, iterator_type); }
+        let (mut item, mut condition, mut step): (*HIRExpression, *HIRExpression, *HIRExpression) = (null, null, null);
+        let target = this.builder.IdentifierPattern("target".ToString(), iterator_type, end, false);
         let target_reference = this.builder.ReferenceBinding(target);
 
         if is_range {
@@ -5738,6 +5782,7 @@ class HIRLowerer {
         }
 
         let mut generic = false;
+        this.LowerPendingType(path);
         let symbols = this.scope_manager.ResolveType(path, false);
         if symbols.Empty() { return null; }
 

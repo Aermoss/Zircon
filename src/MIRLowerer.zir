@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/map", "std/arena", "src/HIR.zir", "src/MIR.zir", "src/Mangler.zir" : *]
+#[include "std/map", "std/arena", "src/HIR.zir", "src/MIR.zir", "src/Mangler.zir", "src/ABI.zir" : *]
 
 class MIRLowerer {
     pub context: MIRContext,
@@ -34,6 +34,7 @@ class MIRLowerer {
     break_destinations: Vector<*MIRValue>,
     indirect_return: *MIRValue,
     current_return: *HIRType,
+    return_abi: ABIValue,
     module: *mut MIRModule;
 
     MIRLowerer(&mut this, target_info: &TargetInfo) {
@@ -272,30 +273,75 @@ class MIRLowerer {
         _type != null && (_type->HasSpecialMembers() || _type->IsSlice())
     }
 
-    fn IsIndirectAggregate(&mut this, _type: *HIRType) -> bool {
-        if !this.IsAggregate(_type) { return false; }
-        let size = _type->Size();
-        (size != 1 && size != 2 && size != 4 && size != 8) || size > this.target_info.pointer_size || !_type->IsTrivial() || _type->IsSlice()
-    }
-
-    fn LowerReturnType(&mut this, _type: *HIRType) -> *MIRType {
-        if _type->IsUnit() { this.context.VoidType() } else { this.LowerAggregateType(_type) }
-    }
-
     fn UnitConstant(&mut this) -> *MIRValue {
         this.builder.ConstantStruct(Vector<*MIRValue>(), this.context.StructureType(Vector<*MIRType>()))
     }
 
-    fn LowerAggregateType(&mut this, _type: *HIRType) -> *MIRType {
-        let lowered_type = this.LowerType(_type);
+    fn Classify(&mut this, abi: HIRDeclarationABI, _return: *HIRType, parameters: &Vector<*HIRType>, fixed: usize) -> ABIFunction {
+        let mut classifier = ABIClassifier(&mut this.context, this.target_info.abi, this.target_info.pointer_size);
+        let mut result = classifier.Classify(abi, _return, parameters, fixed);
+        result._return = this.ResolveABI(result._return, _return);
 
-        if !this.IsAggregate(_type) {
-            lowered_type
-        } else if this.IsIndirectAggregate(_type) {
-            this.context.PointerType(lowered_type)
-        } else {
-            this.context.IntegerType(_type->Size() as u32 * 8)
+        for i in 0..parameters.Length() {
+            result.parameters[i] = this.ResolveABI(result.parameters[i], parameters[i]);
         }
+
+        result
+    }
+
+    fn ClassifyDeclaration(&mut this, function: *HIRFunctionDeclaration) -> ABIFunction {
+        let mut types = Vector<*HIRType>();
+        for parameter in function->parameters { types.PushBack(parameter->_type); }
+        if function->caller_location != null { types.PushBack(function->caller_location->_type); }
+        this.Classify(function->abi, function->_return, types, types.Length())
+    }
+
+    fn NativeABI(&mut this, _type: *HIRType) -> ABIValue {
+        let mut classifier = ABIClassifier(&mut this.context, this.target_info.abi, this.target_info.pointer_size);
+        this.ResolveABI(classifier.Native(_type), _type)
+    }
+
+    fn ResolveABI(&mut this, value: ABIValue, _type: *HIRType) -> ABIValue {
+        if value.mode != ABIPassMode::Direct || !this.IsAggregate(_type) { return value; }
+        ABIValue(this.LowerType(_type), _type->Size())
+    }
+
+    fn ABIType(&mut this, value: &ABIValue, _type: *HIRType) -> *MIRType {
+        match value.mode {
+            ABIPassMode::Direct => this.LowerType(_type),
+            ABIPassMode::Cast => value.cast,
+            ABIPassMode::Indirect => {
+                let lowered = this.LowerType(_type);
+                if lowered == null { null } else { this.context.PointerType(lowered) }
+            }
+        }
+    }
+
+    fn ABIReturnType(&mut this, abi: &ABIFunction, _type: *HIRType) -> *MIRType {
+        if abi._return.mode == ABIPassMode::Indirect || _type->IsUnit() { this.context.VoidType() } else { this.ABIType(abi._return, _type) }
+    }
+
+    fn ABIAttributes(&mut this, value: &ABIValue, _type: *HIRType) -> MIRAttributes {
+        let mut attributes = MIRAttributes();
+        if value.byval { attributes.byval = this.LowerType(_type); }
+        (attributes.extension, attributes.stack_align) = (value.extension, value.stack_align);
+        attributes
+    }
+
+    fn ABISlot(&mut this, name: String, _type: *HIRType, value: &ABIValue) -> *MIRValue {
+        let lowered = this.LowerType(_type);
+        if lowered == null { return null; }
+        if value.cast_size <= _type->Size() { return this.builder.BuildAlloca(name, lowered); }
+        let alloca = this.builder.BuildAlloca(name, value.cast);
+        this.builder.BuildCast("abi.slot".ToString(), MIRCastKind::Bitcast, alloca, this.context.PointerType(lowered))
+    }
+
+    fn ABICastPointer(&mut this, slot: *MIRValue, value: &ABIValue) -> *MIRValue {
+        this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, slot, this.context.PointerType(value.cast))
+    }
+
+    fn ABIAlignment(&this, _type: *HIRType, value: &ABIValue) -> u32 {
+        if value.cast_size <= _type->Size() { _type->Alignment() as u32 } else { 0 }
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *HIRFunctionDeclaration) {
@@ -308,13 +354,16 @@ class MIRLowerer {
             name = Mangler::MangleFunction(name, function->_type, types, this.namespaces);
         }
 
+        let abi = this.ClassifyDeclaration(function);
         let mut _parameters = Vector<*MIRParameter>();
-        let mut _return = this.LowerReturnType(function->_return);
+        let _return = this.ABIReturnType(abi, function->_return);
         if _return == null { return; }
 
-        if this.IsIndirectAggregate(function->_return) {
-            let lowered_parameter = this.builder.BuildParameter("sret".ToString(), 0, _return);
-            (_return, lowered_parameter->sret) = (this.context.VoidType(), this.LowerType(function->_return));
+        if abi._return.mode == ABIPassMode::Indirect {
+            let lowered_return = this.LowerType(function->_return);
+            if lowered_return == null { return; }
+            let lowered_parameter = this.builder.BuildParameter("sret".ToString(), 0, this.context.PointerType(lowered_return));
+            lowered_parameter->attributes.sret = lowered_return;
             _parameters.PushBack(lowered_parameter);
         }
 
@@ -324,25 +373,26 @@ class MIRLowerer {
             parameters.PushBack(function->caller_location);
         }
 
-        for parameter in parameters {
-            let lowered_type = this.LowerAggregateType(parameter->_type);
+        for i in 0..parameters.Length() {
+            let parameter = parameters[i];
+            let lowered_type = this.ABIType(abi.parameters[i], parameter->_type);
             let lowered_parameter = this.builder.BuildParameter(parameter->name, _parameters.Length() as u32, lowered_type);
+            lowered_parameter->attributes = this.ABIAttributes(abi.parameters[i], parameter->_type);
             _parameters.PushBack(lowered_parameter);
-
-            if this.IsAggregate(parameter->_type) && lowered_type->kind == MIRTypeKind::Pointer && function->abi == HIRDeclarationABI::C {
-                lowered_parameter->byval = this.LowerType(parameter->_type);
-            }
         }
 
-        this.declarations[function] = this.builder.BuildFunction(name, _parameters, _return, this.LowerLinkage(function->linkage), function->_type->IsVariadic());
+        let declaration = this.builder.BuildFunction(name, _parameters, _return, this.LowerLinkage(function->linkage), function->_type->IsVariadic());
+        declaration->return_attributes.extension = abi._return.extension;
+        this.declarations[function] = declaration;
     }
 
     fn LowerFunctionDeclarationSecondPass(&mut this, function: *HIRFunctionDeclaration) {
         if function->body == null { return; }
         this.builder.SetCurrentFunction(this.declarations[function] as *mut MIRFunctionDeclaration);
         this.builder.SetCurrentBlock(this.builder.BuildBlock("entry".ToString()));
-        let indirect_return = this.IsIndirectAggregate(function->_return);
-        this.current_return = function->_return;
+        let abi = this.ClassifyDeclaration(function);
+        (this.current_return, this.return_abi) = (function->_return, abi._return);
+        let indirect_return = abi._return.mode == ABIPassMode::Indirect;
 
         if indirect_return {
             this.indirect_return = this.builder.GetCurrentFunction()->parameters[0];
@@ -359,15 +409,18 @@ class MIRLowerer {
         for i in 0..parameters.Length() {
             let parameter = parameters[i];
             let lowered = this.builder.GetCurrentFunction()->parameters[(if indirect_return { 1 } else { 0 }) + i];
+            let value = abi.parameters[i];
 
-            if this.IsIndirectAggregate(parameter->_type) {
-                this.parameters[parameter] = lowered;
-            } else if this.IsAggregate(parameter->_type) {
-                let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
-                let target = this.context.PointerType(this.LowerAggregateType(parameter->_type));
-                let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
-                this.builder.BuildStore(lowered, pointer)->alignment = parameter->_type->Alignment() as u32;
-                this.parameters[parameter] = alloca;
+            if value.mode == ABIPassMode::Indirect {
+                if this.IsAggregate(parameter->_type) || parameter->addressable {
+                    this.parameters[parameter] = lowered;
+                } else {
+                    this.parameters[parameter] = this.builder.BuildLoad(parameter->name, lowered);
+                }
+            } else if value.mode == ABIPassMode::Cast {
+                let slot = this.ABISlot(parameter->name, parameter->_type, value);
+                this.builder.BuildStore(lowered, this.ABICastPointer(slot, value))->alignment = this.ABIAlignment(parameter->_type, value);
+                this.parameters[parameter] = slot;
             } else if parameter->addressable {
                 let alloca = this.builder.BuildAlloca(parameter->name, this.LowerType(parameter->_type));
                 this.builder.BuildStore(lowered, alloca);
@@ -931,15 +984,12 @@ class MIRLowerer {
             this.LowerExpressionTo(_return->value, this.indirect_return);
             for destructor in _return->destructors { this.LowerExpression(destructor); }
             this.builder.BuildReturn(null);
-        } else if this.IsAggregate(this.current_return) {
-            let _type = this.LowerType(this.current_return);
-            if _type == null { return; }
-            let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), _type);
-            this.LowerExpressionTo(_return->value, alloca);
-            let target = this.context.PointerType(this.LowerAggregateType(this.current_return));
-            let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
-            let load = this.builder.BuildLoad("abi.value".ToString(), pointer);
-            load->alignment = this.current_return->Alignment() as u32;
+        } else if this.return_abi.mode == ABIPassMode::Cast {
+            let slot = this.ABISlot("abi.aggregate".ToString(), this.current_return, this.return_abi);
+            if slot == null { return; }
+            this.LowerExpressionTo(_return->value, slot);
+            let load = this.builder.BuildLoad("abi.value".ToString(), this.ABICastPointer(slot, this.return_abi));
+            load->alignment = this.ABIAlignment(this.current_return, this.return_abi);
             for destructor in _return->destructors { this.LowerExpression(destructor); }
             this.builder.BuildReturn(load);
         } else {
@@ -1324,30 +1374,34 @@ class MIRLowerer {
     }
 
     fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>) -> Vector<*MIRValue> {
+        let mut values = Vector<ABIValue>();
+        for _type in types { values.PushBack(this.NativeABI(_type)); }
+        this.LowerCallArguments(arguments, types, values)
+    }
+
+    fn LowerCallArguments(&mut this, arguments: Vector<*HIRExpression>, types: Vector<*HIRType>, values: &Vector<ABIValue>) -> Vector<*MIRValue> {
         let mut lowered_arguments = Vector<*MIRValue>();
 
         for i in 0..arguments.Length() {
-            let (argument, _type) = (arguments[i], types[i]);
+            let (argument, _type, value) = (arguments[i], types[i], values[i]);
 
-            if this.IsAggregate(_type) {
+            if value.mode == ABIPassMode::Direct {
+                let lowered = this.LowerExpression(argument);
+                if lowered == null { return Vector<*MIRValue>(); }
+                lowered_arguments.PushBack(lowered);
+            } else if value.mode == ABIPassMode::Indirect {
                 let lowered_type = this.LowerType(_type);
                 if lowered_type == null { return Vector<*MIRValue>(); }
                 let alloca = this.builder.BuildAlloca("abi.aggregate".ToString(), lowered_type);
                 this.LowerExpressionTo(argument, alloca);
-
-                if this.IsIndirectAggregate(_type) {
-                    lowered_arguments.PushBack(alloca);
-                } else {
-                    let target = this.context.PointerType(this.LowerAggregateType(_type));
-                    let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, alloca, target);
-                    let load = this.builder.BuildLoad("abi.value".ToString(), pointer);
-                    load->alignment = _type->Alignment() as u32;
-                    lowered_arguments.PushBack(load);
-                }
+                lowered_arguments.PushBack(alloca);
             } else {
-                let value = this.LowerExpression(argument);
-                if value == null { return Vector<*MIRValue>(); }
-                lowered_arguments.PushBack(value);
+                let slot = this.ABISlot("abi.aggregate".ToString(), _type, value);
+                if slot == null { return Vector<*MIRValue>(); }
+                this.LowerExpressionTo(argument, slot);
+                let load = this.builder.BuildLoad("abi.value".ToString(), this.ABICastPointer(slot, value));
+                load->alignment = this.ABIAlignment(_type, value);
+                lowered_arguments.PushBack(load);
             }
         }
 
@@ -1357,6 +1411,7 @@ class MIRLowerer {
     fn LowerCallExpression(&mut this, call: *HIRCallExpression, destination: *MIRValue) -> *MIRValue {
         let _return = call->callee->_type->Return();
         let mut parameters = Vector<*HIRType>(call->callee->_type->Parameters());
+        let fixed = parameters.Length();
         let mut callee = this.LowerExpression(call->callee);
         if callee == null { return null; }
 
@@ -1364,41 +1419,67 @@ class MIRLowerer {
             parameters.PushBack(call->arguments[i]->_type);
         }
 
-        let mut arguments = Vector<*MIRValue>();
-        if this.IsIndirectAggregate(_return) { arguments.PushBack(destination); }
-        arguments += this.LowerCallArguments(call->arguments, parameters);
+        let mut call_arguments = Vector<*HIRExpression>(call->arguments);
 
         if call->location != null {
-            let (mut locations, mut types) = (Vector<*HIRExpression>(), Vector<*HIRType>());
-            locations.PushBack(call->location);
-            types.PushBack(call->location->_type);
-            arguments += this.LowerCallArguments(locations, types);
+            call_arguments.PushBack(call->location);
+            parameters.PushBack(call->location->_type);
         }
 
-        if call->callee->kind == HIRExpressionKind::DeclarationReference && (call->callee as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Function {
-            let function = (call->callee as *HIRDeclarationReference)->declaration as *HIRFunctionDeclaration;
+        let mut function: *HIRFunctionDeclaration = null;
 
-            if function->virtual_index > 0 && !call->direct {
-                let receiver = arguments[if this.IsIndirectAggregate(_return) { 1 } else { 0 }];
-                let _type: *HIRType = function->parameters[0]->_type->Pointee();
-                callee = this.LowerVirtualCallee(receiver, _type, function->virtual_index, callee->_type);
-            }
+        if call->callee->kind == HIRExpressionKind::DeclarationReference && (call->callee as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Function {
+            function = (call->callee as *HIRDeclarationReference)->declaration as *HIRFunctionDeclaration;
+        }
+
+        let abi = this.Classify(if function != null { function->abi } else { HIRDeclarationABI::Native }, _return, parameters, fixed);
+        let indirect_return = abi._return.mode == ABIPassMode::Indirect;
+        let mut arguments = Vector<*MIRValue>();
+        if indirect_return { arguments.PushBack(destination); }
+        arguments += this.LowerCallArguments(call_arguments, parameters, abi.parameters);
+
+        if function != null && function->virtual_index > 0 && !call->direct {
+            let receiver = arguments[if indirect_return { 1 } else { 0 }];
+            let _type: *HIRType = function->parameters[0]->_type->Pointee();
+            callee = this.LowerVirtualCallee(receiver, _type, function->virtual_index, callee->_type);
         }
 
         let result = this.builder.BuildCall("call".ToString(), callee, arguments);
+
+        if indirect_return {
+            let mut attributes = MIRAttributes();
+            attributes.sret = this.LowerType(_return);
+            result->attributes.PushBack(attributes);
+        }
+
+        for i in 0..abi.parameters.Length() {
+            result->attributes.PushBack(this.ABIAttributes(abi.parameters[i], parameters[i]));
+        }
+
+        while !result->attributes.Empty() && result->attributes.Back().Empty() {
+            result->attributes.PopBack();
+        }
+
+        result->return_attributes.extension = abi._return.extension;
 
         if _return.IsNever() {
             this.builder.BuildUnreachable();
             this.builder.SetCurrentBlock(this.builder.BuildBlock("unreachable".ToString()));
         } else if _return.IsUnit() {
             return this.UnitConstant();
-        } else if this.IsIndirectAggregate(_return) {
-            result->sret = this.LowerType(_return);
+        } else if indirect_return {
             return destination;
-        } else if this.IsAggregate(_return) {
-            let target = this.context.PointerType(this.LowerAggregateType(_return));
-            let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, destination, target);
-            this.builder.BuildStore(result, pointer)->alignment = _return.Alignment() as u32;
+        } else if abi._return.mode == ABIPassMode::Cast {
+            if abi._return.cast_size > _return.Size() {
+                let slot = this.builder.BuildAlloca("abi.aggregate".ToString(), abi._return.cast);
+                this.builder.BuildStore(result, slot);
+                let pointer = this.builder.BuildCast("abi.slot".ToString(), MIRCastKind::Bitcast, slot, this.context.PointerType(this.LowerType(_return)));
+                this.builder.BuildStore(this.builder.BuildLoad("abi.value".ToString(), pointer), destination)->alignment = _return.Alignment() as u32;
+            } else {
+                let pointer = this.builder.BuildCast("abi.cast".ToString(), MIRCastKind::Bitcast, destination, this.context.PointerType(abi._return.cast));
+                this.builder.BuildStore(result, pointer)->alignment = _return.Alignment() as u32;
+            }
+
             return destination;
         } else if destination != null {
             this.builder.BuildStore(result, destination);
@@ -2354,17 +2435,20 @@ class MIRLowerer {
             let declaration = this.types.Get(_type, null);
             if declaration != null { declaration->_type } else { null }
         } else if _type->IsFunction() {
+            let types = _type->Parameters();
+            let abi = this.Classify(HIRDeclarationABI::Native, _type->Return(), types, types.Length());
             let mut parameters = Vector<*MIRType>();
-            let mut _return = this.LowerReturnType(_type->Return());
+            let _return = this.ABIReturnType(abi, _type->Return());
             if _return == null { return null; }
 
-            if this.IsIndirectAggregate(_type->Return()) {
-                parameters.PushBack(_return);
-                _return = this.context.VoidType();
+            if abi._return.mode == ABIPassMode::Indirect {
+                let lowered_return = this.LowerType(_type->Return());
+                if lowered_return == null { return null; }
+                parameters.PushBack(this.context.PointerType(lowered_return));
             }
 
-            for parameter in _type->Parameters() {
-                let lowered_parameter = this.LowerAggregateType(parameter);
+            for i in 0..types.Length() {
+                let lowered_parameter = this.ABIType(abi.parameters[i], types[i]);
                 if lowered_parameter == null { return null; }
                 parameters.PushBack(lowered_parameter);
             }

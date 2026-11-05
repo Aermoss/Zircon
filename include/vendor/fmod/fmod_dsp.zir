@@ -1,0 +1,256 @@
+#[include "vendor/fmod/fmod_dsp_effects.zir" : *]
+
+const FMOD_PLUGIN_SDK_VERSION: i32 = 204;
+const FMOD_DSP_GETPARAM_VALUESTR_LENGTH: i32 = 32;
+const FMOD_DSP_COOLDOWN_INFINITE: u32 = 0xFFFFFFFF;
+
+enum FMOD_DSP_MODE: i32 {
+    FMOD_DSP_MODE_FILTER,
+    FMOD_DSP_MODE_GENERATOR
+}
+
+enum FMOD_DSP_PAN_SURROUND_FLAGS: i32 {
+    FMOD_DSP_PAN_SURROUND_DEFAULT = 0,
+    FMOD_DSP_PAN_SURROUND_ROTATION_NOT_BIASED = 1,
+    FMOD_DSP_PAN_SURROUND_FLAGS_FORCEINT = 65536
+}
+
+enum FMOD_DSP_PARAMETER_TYPE: i32 {
+    FMOD_DSP_PARAMETER_TYPE_FLOAT,
+    FMOD_DSP_PARAMETER_TYPE_INT,
+    FMOD_DSP_PARAMETER_TYPE_BOOL,
+    FMOD_DSP_PARAMETER_TYPE_DATA,
+    FMOD_DSP_PARAMETER_TYPE_MAX,
+    FMOD_DSP_PARAMETER_TYPE_FORCEINT = 65536
+}
+
+enum FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE: i32 {
+    FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE_LINEAR,
+    FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE_AUTO,
+    FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE_PIECEWISE_LINEAR,
+    FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE_FORCEINT = 65536
+}
+
+enum FMOD_DSP_PARAMETER_DATA_TYPE: i32 {
+    FMOD_DSP_PARAMETER_DATA_TYPE_USER = 0,
+    FMOD_DSP_PARAMETER_DATA_TYPE_OVERALLGAIN = -1,
+    FMOD_DSP_PARAMETER_DATA_TYPE_3DATTRIBUTES = -2,
+    FMOD_DSP_PARAMETER_DATA_TYPE_SIDECHAIN = -3,
+    FMOD_DSP_PARAMETER_DATA_TYPE_FFT = -4,
+    FMOD_DSP_PARAMETER_DATA_TYPE_3DATTRIBUTES_MULTI = -5,
+    FMOD_DSP_PARAMETER_DATA_TYPE_ATTENUATION_RANGE = -6,
+    FMOD_DSP_PARAMETER_DATA_TYPE_DYNAMIC_RESPONSE = -7,
+    FMOD_DSP_PARAMETER_DATA_TYPE_FINITE_LENGTH = -8
+}
+
+type FMOD_DSP_CREATE_CALLBACK = fn(*mut FMOD_DSP_STATE) -> FMOD_RESULT;
+type FMOD_DSP_RELEASE_CALLBACK = fn(*mut FMOD_DSP_STATE) -> FMOD_RESULT;
+type FMOD_DSP_RESET_CALLBACK = fn(*mut FMOD_DSP_STATE) -> FMOD_RESULT;
+type FMOD_DSP_PROCESS_CALLBACK = fn(*mut FMOD_DSP_STATE, u32, *FMOD_DSP_BUFFER, *FMOD_DSP_BUFFER) -> FMOD_RESULT;
+type FMOD_DSP_SETPOSITION_CALLBACK = fn(*mut FMOD_DSP_STATE, u32) -> FMOD_RESULT;
+type FMOD_DSP_SETPARAM_FLOAT_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, f32) -> FMOD_RESULT;
+type FMOD_DSP_SETPARAM_INT_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, i32) -> FMOD_RESULT;
+type FMOD_DSP_SETPARAM_BOOL_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, FMOD_BOOL) -> FMOD_RESULT;
+type FMOD_DSP_SETPARAM_DATA_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, *mut void, u32) -> FMOD_RESULT;
+type FMOD_DSP_GETPARAM_FLOAT_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, *mut f32, *mut i8) -> FMOD_RESULT;
+type FMOD_DSP_GETPARAM_INT_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, *mut i32, *mut i8) -> FMOD_RESULT;
+type FMOD_DSP_GETPARAM_BOOL_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, *mut FMOD_BOOL, *mut i8) -> FMOD_RESULT;
+type FMOD_DSP_GETPARAM_DATA_CALLBACK = fn(*mut FMOD_DSP_STATE, i32, *mut *mut void, *mut u32, *mut i8) -> FMOD_RESULT;
+type FMOD_DSP_SYSTEM_REGISTER_CALLBACK = fn(*mut FMOD_DSP_STATE) -> FMOD_RESULT;
+type FMOD_DSP_SYSTEM_DEREGISTER_CALLBACK = fn(*mut FMOD_DSP_STATE) -> FMOD_RESULT;
+type FMOD_DSP_SYSTEM_MIX_CALLBACK = fn(*mut FMOD_DSP_STATE, i32) -> FMOD_RESULT;
+type FMOD_DSP_ALLOC_FUNC = fn(u32, FMOD_MEMORY_TYPE, *i8) -> *mut void;
+type FMOD_DSP_REALLOC_FUNC = fn(*mut void, u32, FMOD_MEMORY_TYPE, *i8) -> *mut void;
+type FMOD_DSP_FREE_FUNC = fn(*mut void, FMOD_MEMORY_TYPE, *i8);
+type FMOD_DSP_LOG_FUNC = fn(FMOD_DEBUG_FLAGS, *i8, i32, *i8, *i8, ...);
+type FMOD_DSP_GETSAMPLERATE_FUNC = fn(*mut FMOD_DSP_STATE, *mut i32) -> FMOD_RESULT;
+type FMOD_DSP_GETBLOCKSIZE_FUNC = fn(*mut FMOD_DSP_STATE, *mut u32) -> FMOD_RESULT;
+type FMOD_DSP_GETSPEAKERMODE_FUNC = fn(*mut FMOD_DSP_STATE, *mut FMOD_SPEAKERMODE, *mut FMOD_SPEAKERMODE) -> FMOD_RESULT;
+type FMOD_DSP_GETCLOCK_FUNC = fn(*mut FMOD_DSP_STATE, *mut u64, *mut u32, *mut u32) -> FMOD_RESULT;
+type FMOD_DSP_GETLISTENERATTRIBUTES_FUNC = fn(*mut FMOD_DSP_STATE, *mut i32, *mut FMOD_3D_ATTRIBUTES) -> FMOD_RESULT;
+type FMOD_DSP_GETUSERDATA_FUNC = fn(*mut FMOD_DSP_STATE, *mut *mut void) -> FMOD_RESULT;
+type FMOD_DSP_GETIDLETIME_FUNC = fn(*mut FMOD_DSP_STATE, *mut u32) -> FMOD_RESULT;
+type FMOD_DSP_SETCOOLDOWN_FUNC = fn(*mut FMOD_DSP_STATE, u32) -> FMOD_RESULT;
+type FMOD_DSP_SETBYPASS_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_BOOL) -> FMOD_RESULT;
+type FMOD_DSP_SETSILENCE_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_BOOL) -> FMOD_RESULT;
+type FMOD_DSP_SETOUTPUTFORMAT_FUNC = fn(*mut FMOD_DSP_STATE, i32, FMOD_SPEAKERMODE) -> FMOD_RESULT;
+type FMOD_DSP_DFT_FFTREAL_FUNC = fn(*mut FMOD_DSP_STATE, i32, *f32, *mut FMOD_COMPLEX, *f32, i32) -> FMOD_RESULT;
+type FMOD_DSP_DFT_IFFTREAL_FUNC = fn(*mut FMOD_DSP_STATE, i32, *FMOD_COMPLEX, *mut f32, *f32, i32) -> FMOD_RESULT;
+type FMOD_DSP_PAN_SUMMONOMATRIX_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_SPEAKERMODE, f32, f32, *mut f32) -> FMOD_RESULT;
+type FMOD_DSP_PAN_SUMSTEREOMATRIX_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_SPEAKERMODE, f32, f32, f32, i32, *mut f32) -> FMOD_RESULT;
+type FMOD_DSP_PAN_SUMSURROUNDMATRIX_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_SPEAKERMODE, FMOD_SPEAKERMODE, f32, f32, f32, f32, f32, i32, *mut f32, FMOD_DSP_PAN_SURROUND_FLAGS) -> FMOD_RESULT;
+type FMOD_DSP_PAN_SUMMONOTOSURROUNDMATRIX_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_SPEAKERMODE, f32, f32, f32, f32, i32, *mut f32) -> FMOD_RESULT;
+type FMOD_DSP_PAN_SUMSTEREOTOSURROUNDMATRIX_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_SPEAKERMODE, f32, f32, f32, f32, f32, i32, *mut f32) -> FMOD_RESULT;
+type FMOD_DSP_PAN_GETROLLOFFGAIN_FUNC = fn(*mut FMOD_DSP_STATE, FMOD_DSP_PAN_3D_ROLLOFF_TYPE, f32, f32, f32, *mut f32) -> FMOD_RESULT;
+
+struct FMOD_DSP_BUFFER {
+    pub numchannels: i32,
+    pub buffer: *mut f32,
+    pub speakermode: FMOD_SPEAKERMODE
+}
+
+struct FMOD_COMPLEX {
+    pub real: f32,
+    pub imag: f32
+}
+
+struct FMOD_DSP_PARAMETER_DESC_FLOAT {
+    pub min: f32,
+    pub max: f32,
+    pub defaultval: f32,
+    pub mapping_type: FMOD_DSP_PARAMETER_FLOAT_MAPPING_TYPE,
+    pub mapping_piecewiselinear_numpoints: i32,
+    pub mapping_piecewiselinear_pointparamvalues: *mut f32,
+    pub mapping_piecewiselinear_pointpositions: *mut f32
+}
+
+struct FMOD_DSP_PARAMETER_DESC_INT {
+    pub min: i32,
+    pub max: i32,
+    pub defaultval: i32,
+    pub goestoinf: FMOD_BOOL,
+    pub valuenames: **i8
+}
+
+struct FMOD_DSP_PARAMETER_DESC_BOOL {
+    pub defaultval: FMOD_BOOL,
+    pub valuenames: **i8
+}
+
+struct FMOD_DSP_PARAMETER_DESC_DATA {
+    pub datatype: i32
+}
+
+struct FMOD_DSP_PARAMETER_DESC_0 {
+    pub _data: [u64; 5]
+}
+
+struct FMOD_DSP_PARAMETER_DESC {
+    pub _type: FMOD_DSP_PARAMETER_TYPE,
+    pub name: [i8; 16],
+    pub label: [i8; 16],
+    pub description: *i8,
+    pub _0: FMOD_DSP_PARAMETER_DESC_0
+}
+
+struct FMOD_DSP_PARAMETER_OVERALLGAIN {
+    pub linear_gain: f32,
+    pub linear_gain_additive: f32
+}
+
+struct FMOD_DSP_PARAMETER_3DATTRIBUTES {
+    pub relative: FMOD_3D_ATTRIBUTES,
+    pub absolute: FMOD_3D_ATTRIBUTES
+}
+
+struct FMOD_DSP_PARAMETER_3DATTRIBUTES_MULTI {
+    pub numlisteners: i32,
+    pub relative: [FMOD_3D_ATTRIBUTES; 8],
+    pub weight: [f32; 8],
+    pub absolute: FMOD_3D_ATTRIBUTES
+}
+
+struct FMOD_DSP_PARAMETER_ATTENUATION_RANGE {
+    pub min: f32,
+    pub max: f32
+}
+
+struct FMOD_DSP_PARAMETER_SIDECHAIN {
+    pub sidechainenable: FMOD_BOOL
+}
+
+struct FMOD_DSP_PARAMETER_FFT {
+    pub length: i32,
+    pub numchannels: i32,
+    pub spectrum: [*mut f32; 32]
+}
+
+struct FMOD_DSP_PARAMETER_DYNAMIC_RESPONSE {
+    pub numchannels: i32,
+    pub rms: [f32; 32]
+}
+
+struct FMOD_DSP_PARAMETER_FINITE_LENGTH {
+    pub finite: FMOD_BOOL
+}
+
+struct FMOD_DSP_DESCRIPTION {
+    pub pluginsdkversion: u32,
+    pub name: [i8; 32],
+    pub version: u32,
+    pub mode: FMOD_DSP_MODE,
+    pub defaultcooldown: u32,
+    pub inchannels: i32,
+    pub outchannels: i32,
+    pub create: FMOD_DSP_CREATE_CALLBACK,
+    pub release: FMOD_DSP_RELEASE_CALLBACK,
+    pub reset: FMOD_DSP_RESET_CALLBACK,
+    pub process: FMOD_DSP_PROCESS_CALLBACK,
+    pub setposition: FMOD_DSP_SETPOSITION_CALLBACK,
+    pub numparameters: i32,
+    pub paramdesc: *mut *mut FMOD_DSP_PARAMETER_DESC,
+    pub setparameterfloat: FMOD_DSP_SETPARAM_FLOAT_CALLBACK,
+    pub setparameterint: FMOD_DSP_SETPARAM_INT_CALLBACK,
+    pub setparameterbool: FMOD_DSP_SETPARAM_BOOL_CALLBACK,
+    pub setparameterdata: FMOD_DSP_SETPARAM_DATA_CALLBACK,
+    pub getparameterfloat: FMOD_DSP_GETPARAM_FLOAT_CALLBACK,
+    pub getparameterint: FMOD_DSP_GETPARAM_INT_CALLBACK,
+    pub getparameterbool: FMOD_DSP_GETPARAM_BOOL_CALLBACK,
+    pub getparameterdata: FMOD_DSP_GETPARAM_DATA_CALLBACK,
+    pub userdata: *mut void,
+    pub sys_register: FMOD_DSP_SYSTEM_REGISTER_CALLBACK,
+    pub sys_deregister: FMOD_DSP_SYSTEM_DEREGISTER_CALLBACK,
+    pub sys_mix: FMOD_DSP_SYSTEM_MIX_CALLBACK
+}
+
+struct FMOD_DSP_STATE_DFT_FUNCTIONS {
+    pub fftreal: FMOD_DSP_DFT_FFTREAL_FUNC,
+    pub inversefftreal: FMOD_DSP_DFT_IFFTREAL_FUNC
+}
+
+struct FMOD_DSP_STATE_PAN_FUNCTIONS {
+    pub summonomatrix: FMOD_DSP_PAN_SUMMONOMATRIX_FUNC,
+    pub sumstereomatrix: FMOD_DSP_PAN_SUMSTEREOMATRIX_FUNC,
+    pub sumsurroundmatrix: FMOD_DSP_PAN_SUMSURROUNDMATRIX_FUNC,
+    pub summonotosurroundmatrix: FMOD_DSP_PAN_SUMMONOTOSURROUNDMATRIX_FUNC,
+    pub sumstereotosurroundmatrix: FMOD_DSP_PAN_SUMSTEREOTOSURROUNDMATRIX_FUNC,
+    pub getrolloffgain: FMOD_DSP_PAN_GETROLLOFFGAIN_FUNC
+}
+
+struct FMOD_DSP_STATE_FUNCTIONS {
+    pub alloc: FMOD_DSP_ALLOC_FUNC,
+    pub realloc: FMOD_DSP_REALLOC_FUNC,
+    pub free: FMOD_DSP_FREE_FUNC,
+    pub getsamplerate: FMOD_DSP_GETSAMPLERATE_FUNC,
+    pub getblocksize: FMOD_DSP_GETBLOCKSIZE_FUNC,
+    pub dft: *mut FMOD_DSP_STATE_DFT_FUNCTIONS,
+    pub pan: *mut FMOD_DSP_STATE_PAN_FUNCTIONS,
+    pub getspeakermode: FMOD_DSP_GETSPEAKERMODE_FUNC,
+    pub getclock: FMOD_DSP_GETCLOCK_FUNC,
+    pub getlistenerattributes: FMOD_DSP_GETLISTENERATTRIBUTES_FUNC,
+    pub log: FMOD_DSP_LOG_FUNC,
+    pub getuserdata: FMOD_DSP_GETUSERDATA_FUNC,
+    pub getidletime: FMOD_DSP_GETIDLETIME_FUNC,
+    pub setcooldown: FMOD_DSP_SETCOOLDOWN_FUNC,
+    pub setbypass: FMOD_DSP_SETBYPASS_FUNC,
+    pub setsilence: FMOD_DSP_SETSILENCE_FUNC,
+    pub setoutputformat: FMOD_DSP_SETOUTPUTFORMAT_FUNC
+}
+
+struct FMOD_DSP_STATE {
+    pub instance: *mut void,
+    pub plugindata: *mut void,
+    pub channelmask: FMOD_CHANNELMASK,
+    pub source_speakermode: FMOD_SPEAKERMODE,
+    pub sidechaindata: *mut f32,
+    pub sidechainchannels: i32,
+    pub functions: *mut FMOD_DSP_STATE_FUNCTIONS,
+    pub systemobject: i32
+}
+
+struct FMOD_DSP_METERING_INFO {
+    pub numsamples: i32,
+    pub peaklevel: [f32; 32],
+    pub rmslevel: [f32; 32],
+    pub numchannels: i16
+}
