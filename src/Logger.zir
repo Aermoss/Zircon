@@ -199,12 +199,29 @@ class Logger {
         Logger::Log(file, -1 as u32, -1 as u32, -1 as u32, -1 as u32, message, severity);
     }
 
-    pub fn Log(message: &String, token: Token, severity: LogSeverity) {
-        Logger::Log(token.file.Data(), token.row, token.column, -1 as u32, -1 as u32, message.Data(), severity);
+    pub fn Log(message: *i8, span: SourceSpan, severity: LogSeverity) {
+        let file = Sources()->File(span.file);
+
+        if file == null {
+            Logger::Log(message, severity);
+            return;
+        }
+
+        let line = file->Line(span.start);
+        Logger::Log(file->path.Data(), (line + 1) as u32, file->Column(span.start), -1 as u32, -1 as u32, message, severity);
+        Logger::Snippet(file, line, span, severity);
     }
 
-    pub fn Log(message: *i8, token: Token, severity: LogSeverity) {
-        Logger::Log(token.file.Data(), token.row, token.column, -1 as u32, -1 as u32, message, severity);
+    pub fn Log(message: &String, span: SourceSpan, severity: LogSeverity) {
+        Logger::Log(message.Data(), span, severity);
+    }
+
+    pub fn Log(message: &String, token: &Token, severity: LogSeverity) {
+        Logger::Log(message.Data(), token.span, severity);
+    }
+
+    pub fn Log(message: *i8, token: &Token, severity: LogSeverity) {
+        Logger::Log(message, token.span, severity);
     }
 
     pub fn Log(message: &String, node: *ASTNode, severity: LogSeverity) {
@@ -213,7 +230,7 @@ class Logger {
             return;
         }
 
-        Logger::Log(node->start.file.Data(), node->start.row, node->start.column, node->end.row, node->end.column, message.Data(), severity);
+        Logger::Log(message.Data(), node->span, severity);
     }
 
     pub fn Log(message: *i8, node: *ASTNode, severity: LogSeverity) {
@@ -222,7 +239,41 @@ class Logger {
             return;
         }
 
-        Logger::Log(node->start.file.Data(), node->start.row, node->start.column, node->end.row, node->end.column, message, severity);
+        Logger::Log(message, node->span, severity);
+    }
+
+    fn Snippet(file: *SourceFile, line: usize, span: SourceSpan, severity: LogSeverity) {
+        let text = file->LineText(line);
+        let line_start = file->LineStart(line);
+        let length = text.Length();
+        let mut start = (span.start - line_start) as usize;
+        if start > length { start = length; }
+        let mut end = if span.end > line_start { (span.end - line_start) as usize } else { 0 };
+        if end > length { end = length; }
+        if end < start { end = start; }
+        let mut marker = String();
+
+        for i in 0..start {
+            if text[i] == '\t' { marker += '\t'; } else if (text[i] as u8 & 0xC0) != 0x80 { marker += ' '; }
+        }
+
+        let mut count: usize = 0;
+
+        for i in start..end {
+            if (text[i] as u8 & 0xC0) != 0x80 { count += 1; }
+        }
+
+        marker += match severity {
+            LogSeverity::Warning => "\x1b[35m",
+            LogSeverity::Info => "\x1b[36m",
+            _ => "\x1b[31m"
+        };
+
+        marker += '^' * (if count > 0 { count } else { 1 });
+        marker += "\x1b[0m";
+        let number = String::FromInteger((line + 1) as HostUnsigned);
+        WriteLine("    " + number + " | " + text);
+        WriteLine("    " + (' ' * number.Length()) + " | " + marker);
     }
 
     pub fn Clear() {

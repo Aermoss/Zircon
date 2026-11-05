@@ -17,8 +17,8 @@
 #[include "std/str", "std/vec", "src/Logger.zir", "src/Token.zir" : *]
 
 class Lexer {
-    row: u32, column: u32,
-    text: String, file: String,
+    text: String,
+    file: u32 = 0,
     length: usize, index: usize,
     preprocessor: bool = false,
     assembly: bool = false;
@@ -59,16 +59,11 @@ class Lexer {
     }
 
     fn Advance(&mut this, count: usize) {
-        for _ in 0..count {
-            if this.index < this.length {
-                if this.CurrentChar() == '\n' {
-                    this.row += 1;
-                    this.column = 1;
-                } else {
-                    this.column += 1;
-                } this.index += 1;
-            }
-        }
+        this.index = if this.index + count < this.length { this.index + count } else { this.length };
+    }
+
+    fn Span(&this) -> SourceSpan {
+        SourceSpan { file: this.file, start: this.index as u32, end: this.index as u32 }
     }
 
     fn SkipWhitespace(&mut this) {
@@ -85,7 +80,7 @@ class Lexer {
                 } return true;
             } else if this.PeekChar(1) == '*' {
                 let mut token: Token;
-                (token.row, token.column, token.file) = (this.row, this.column, this.file);
+                token.span = this.Span();
                 this.Advance(2);
 
                 while this.CurrentChar() != '\0' {
@@ -105,7 +100,7 @@ class Lexer {
 
     fn LexString(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token.span = this.Span();
         let quote_char = this.CurrentChar();
         token._type = if quote_char != '"' { TokenType::CHAR } else { TokenType::STRING };
         this.Advance(1);
@@ -211,7 +206,7 @@ class Lexer {
 
     fn LexLabel(&mut this) -> Token {
         let mut token: Token;
-        (token._type, token.row, token.column, token.file) = (TokenType::LABEL, this.row, this.column, this.file);
+        (token._type, token.span) = (TokenType::LABEL, this.Span());
         this.Advance(1);
 
         while this.IsAlphaNum(this.CurrentChar()) {
@@ -224,7 +219,7 @@ class Lexer {
 
     fn LexNumber(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token.span = this.Span();
         token._type = TokenType::INTEGER;
 
         if this.CurrentChar() == '0' {
@@ -319,7 +314,7 @@ class Lexer {
 
     fn LexIdentifier(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token.span = this.Span();
 
         loop {
             let byte = this.CurrentChar() as u8;
@@ -375,7 +370,7 @@ class Lexer {
 
     fn LexSymbol(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token.span = this.Span();
         let current = this.CurrentChar();
         let next = this.PeekChar(1);
         token.value += current;
@@ -600,7 +595,7 @@ class Lexer {
 
     fn LexAssembly(&mut this) -> Token {
         let mut token: Token;
-        (token._type, token.row, token.column, token.file) = (TokenType::ASSEMBLY_TEXT, this.row, this.column, this.file);
+        (token._type, token.span) = (TokenType::ASSEMBLY_TEXT, this.Span());
         let (mut state, mut indent) = (true, 1usize);
         let mut accumulator = String();
         this.Advance(1);
@@ -642,8 +637,8 @@ class Lexer {
     }
 
     pub fn Lex(&mut this, text: &String, file: &String) -> Vector<Token> {
-        (this.index, this.row, this.column) = (0, 1, 1);
-        (this.file, this.text, this.length) = (file, text, text.Size());
+        this.file = Sources()->Add(file, text);
+        (this.index, this.text, this.length) = (0, text, text.Size());
         let mut tokens = Vector<Token>();
 
         while this.CurrentChar() != '\0' {
@@ -664,25 +659,26 @@ class Lexer {
 
             let character = this.CurrentChar();
 
-            if this.IsLabel() {
-                tokens.PushBack(this.LexLabel());
+            let mut token = if this.IsLabel() {
+                this.LexLabel()
             } else if character == '"' || character == '\'' {
-                tokens.PushBack(this.LexString());
+                this.LexString()
             } else if this.IsDigit(character) {
-                tokens.PushBack(this.LexNumber());
+                this.LexNumber()
             } else if this.IsAlpha(character) || (character as u8) > 0x7F {
-                tokens.PushBack(this.LexIdentifier());
+                this.LexIdentifier()
+            } else if this.assembly && character == '{' {
+                this.LexAssembly()
             } else {
-                if this.assembly && character == '{' {
-                    tokens.PushBack(this.LexAssembly());
-                } else {
-                    tokens.PushBack(this.LexSymbol());
-                }
-            }
+                this.LexSymbol()
+            };
+
+            token.span.end = this.index as u32;
+            tokens.PushBack(token);
         }
 
         let mut eof: Token;
-        (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file);
+        (eof._type, eof.span) = (TokenType::EOF, this.Span());
         tokens.PushBack(eof);
         tokens
     }

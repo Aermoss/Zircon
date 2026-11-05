@@ -3921,28 +3921,35 @@ class HIRLowerer {
     }
 
     fn LowerCallerLocation(&mut this, node: *ASTNode) -> *HIRExpression {
+        let mut span = node->span;
+
+        if node->kind == ASTNodeKind::Expression && (node as *ASTExpression)->kind == ASTExpressionKind::Call {
+            let callee = (node as *ASTCallExpression)->expression;
+            span = callee->span;
+
+            if callee->kind == ASTExpressionKind::MemberAccess {
+                span = (callee as *ASTMemberAccessExpression)->member_span;
+            }
+        } else if node->kind == ASTNodeKind::Expression && (node as *ASTExpression)->kind == ASTExpressionKind::IndexAccess {
+            span = (node as *ASTIndexAccessExpression)->bracket;
+        }
+
+        this.LowerLocation(span)
+    }
+
+    fn LowerLocation(&mut this, span: SourceSpan) -> *HIRExpression {
         let function = this.builder.GetCurrentFunction();
 
         if function != null && function->caller_location != null {
             return this.builder.ReferenceDeclaration(function->caller_location, false);
         }
 
-        let mut token = node->start;
-
-        if node->kind == ASTNodeKind::Expression && (node as *ASTExpression)->kind == ASTExpressionKind::Call {
-            let callee = (node as *ASTCallExpression)->expression;
-            token = callee->start;
-
-            if callee->kind == ASTExpressionKind::MemberAccess {
-                token.column += token.value.Length() as u32;
-            }
-        }
-
+        let file = Sources()->File(span.file);
         let _type = this.CallerLocationType();
         let mut elements = Vector<*HIRExpression>();
-        elements.PushBack(this.builder.StringLiteral(token.file, _type->elements[0]));
-        elements.PushBack(this.builder.IntegerLiteral(token.row as HostUnsigned, _type->elements[1]));
-        elements.PushBack(this.builder.IntegerLiteral(token.column as HostUnsigned, _type->elements[2]));
+        elements.PushBack(this.builder.StringLiteral(if file != null { file->path } else { String() }, _type->elements[0]));
+        elements.PushBack(this.builder.IntegerLiteral(if file != null { (file->Line(span.start) + 1) as HostUnsigned } else { 0 }, _type->elements[1]));
+        elements.PushBack(this.builder.IntegerLiteral(if file != null { file->Column(span.start) as HostUnsigned } else { 0 }, _type->elements[2]));
         this.builder.TupleLiteral(elements, _type)
     }
 
@@ -4204,7 +4211,7 @@ class HIRLowerer {
             }
 
             let access = this.builder.IndexAccess(value, index);
-            access->location = this.LowerCallerLocation(index_access);
+            access->location = this.LowerLocation(index_access->span);
             return access;
         }
 
@@ -4309,7 +4316,7 @@ class HIRLowerer {
         }
 
         if !instance->_type->HasFields() {
-            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
+            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->ToString() + "'.", member_access->member_span, LogSeverity::Error);
             return null;
         }
 
@@ -4323,13 +4330,13 @@ class HIRLowerer {
             }
 
             if !field->public && (this.current_type == null || *this.current_type != *instance->_type) {
-                Logger::Log("Field '" + member_access->member + "' is private.", member_access, LogSeverity::Error);
+                Logger::Log("Field '" + member_access->member + "' is private.", member_access->member_span, LogSeverity::Error);
                 return null;
             }
 
             this.builder.FieldAccess(instance, field)
         } else {
-            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access, LogSeverity::Error);
+            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access->member_span, LogSeverity::Error);
             null
         }
     }

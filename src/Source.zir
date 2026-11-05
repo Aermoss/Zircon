@@ -1,0 +1,115 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec" : *]
+
+struct SourceSpan {
+    pub file: u32,
+    pub start: u32,
+    pub end: u32
+}
+
+class SourceFile {
+    pub path: String,
+    pub text: String,
+    lines: Vector<u32>;
+
+    SourceFile(&mut this, path: &String, text: &String) {
+        (this.path, this.text) = (path, text);
+        this.lines.PushBack(0);
+
+        for i in 0..text.Length() {
+            if text[i] == '\n' {
+                this.lines.PushBack((i + 1) as u32);
+            }
+        }
+    }
+
+    pub fn Line(&this, offset: u32) -> usize {
+        let (mut low, mut high) = (0usize, this.lines.Length());
+
+        while high - low > 1 {
+            let middle = (low + high) / 2;
+
+            if this.lines[middle] <= offset {
+                low = middle;
+            } else {
+                high = middle;
+            }
+        }
+
+        low
+    }
+
+    pub fn Column(&this, offset: u32) -> u32 {
+        let start = this.lines[this.Line(offset)] as usize;
+        let mut column: u32 = 1;
+
+        for i in start..(offset as usize) {
+            if i >= this.text.Length() { break; }
+            if (this.text[i] as u8 & 0xC0) != 0x80 { column += 1; }
+        }
+
+        column
+    }
+
+    pub fn LineText(&this, line: usize) -> String {
+        let start = this.lines[line] as usize;
+        let mut end = if line + 1 < this.lines.Length() { this.lines[line + 1] as usize } else { this.text.Length() };
+
+        while end > start && (this.text[end - 1] == '\n' || this.text[end - 1] == '\r') {
+            end -= 1;
+        }
+
+        String(this.text, start, end - start)
+    }
+
+    pub fn LineStart(&this, line: usize) -> u32 {
+        this.lines[line]
+    }
+}
+
+class SourceManager {
+    files: Vector<*mut SourceFile>;
+
+    SourceManager(&mut this) {}
+
+    ~SourceManager(&mut this) {
+        for file in this.files {
+            delete file;
+        }
+    }
+
+    pub fn Add(&mut this, path: &String, text: &String) -> u32 {
+        this.files.PushBack(new SourceFile(path, text));
+        (this.files.Length() - 1) as u32
+    }
+
+    pub fn File(&this, file: u32) -> *SourceFile {
+        if file as usize >= this.files.Length() { return null; }
+        this.files[file as usize]
+    }
+}
+
+static mut source_manager: *mut SourceManager = null;
+
+fn Sources() -> *mut SourceManager {
+    if source_manager == null {
+        source_manager = new SourceManager();
+    }
+
+    source_manager
+}

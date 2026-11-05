@@ -35,11 +35,10 @@ extend ASTNodeKind {
 
 class ASTNode {
     pub kind: ASTNodeKind,
-    pub start: Token,
-    pub end: Token;
+    pub span: SourceSpan;
 
-    ASTNode(&mut this, kind: ASTNodeKind, start: Token) {
-        (this.kind, this.start) = (kind, start);
+    ASTNode(&mut this, kind: ASTNodeKind, span: SourceSpan) {
+        (this.kind, this.span) = (kind, span);
     }
 
     virtual ~ASTNode(&mut this) {}
@@ -60,7 +59,7 @@ class ASTPath : ASTNode {
     pub segments: Vector<ASTPathSegment>,
     pub absolute: bool;
 
-    ASTPath(&mut this, absolute: bool, start: Token) : ASTNode(ASTNodeKind::Path, start) {
+    ASTPath(&mut this, absolute: bool, span: SourceSpan) : ASTNode(ASTNodeKind::Path, span) {
         this.absolute = absolute;
     }
 
@@ -119,7 +118,7 @@ extend ASTTypeKind {
 class ASTType : ASTNode {
     pub kind: ASTTypeKind;
 
-    ASTType(&mut this, kind: ASTTypeKind, start: Token) : ASTNode(ASTNodeKind::Type, start) {
+    ASTType(&mut this, kind: ASTTypeKind, span: SourceSpan) : ASTNode(ASTNodeKind::Type, span) {
         this.kind = kind;
     }
 
@@ -127,7 +126,7 @@ class ASTType : ASTNode {
 }
 
 class ASTNeverType : ASTType {
-    ASTNeverType(&mut this, start: Token) : ASTType(ASTTypeKind::Never, start) {}
+    ASTNeverType(&mut this, span: SourceSpan) : ASTType(ASTTypeKind::Never, span) {}
 
     pub override fn ToString(&this) -> String {
         '!'.ToString()
@@ -137,7 +136,7 @@ class ASTNeverType : ASTType {
 class ASTPathType : ASTType {
     pub path: *ASTPath;
 
-    ASTPathType(&mut this, path: *ASTPath, start: Token) : ASTType(ASTTypeKind::Path, start) {
+    ASTPathType(&mut this, path: *ASTPath, span: SourceSpan) : ASTType(ASTTypeKind::Path, span) {
         this.path = path;
     }
 
@@ -150,7 +149,7 @@ class ASTPointerType : ASTType {
     pub pointee: *ASTType,
     pub mutable: bool;
 
-    ASTPointerType(&mut this, pointee: *ASTType, mutable: bool, start: Token) : ASTType(ASTTypeKind::Pointer, start) {
+    ASTPointerType(&mut this, pointee: *ASTType, mutable: bool, span: SourceSpan) : ASTType(ASTTypeKind::Pointer, span) {
         (this.pointee, this.mutable) = (pointee, mutable);
     }
 
@@ -163,7 +162,7 @@ class ASTReferenceType : ASTType {
     pub pointee: *ASTType,
     pub mutable: bool;
 
-    ASTReferenceType(&mut this, pointee: *ASTType, mutable: bool, start: Token) : ASTType(ASTTypeKind::Reference, start) {
+    ASTReferenceType(&mut this, pointee: *ASTType, mutable: bool, span: SourceSpan) : ASTType(ASTTypeKind::Reference, span) {
         (this.pointee, this.mutable) = (pointee, mutable);
     }
 
@@ -176,7 +175,7 @@ class ASTArrayType : ASTType {
     pub element: *ASTType,
     pub length: *ASTExpression;
 
-    ASTArrayType(&mut this, element: *ASTType, length: *ASTExpression, start: Token) : ASTType(ASTTypeKind::Array, start) {
+    ASTArrayType(&mut this, element: *ASTType, length: *ASTExpression, span: SourceSpan) : ASTType(ASTTypeKind::Array, span) {
         (this.element, this.length) = (element, length);
     }
 
@@ -192,7 +191,7 @@ class ASTArrayType : ASTType {
 class ASTTupleType : ASTType {
     pub elements: Vector<*ASTType>;
 
-    ASTTupleType(&mut this, start: Token) : ASTType(ASTTypeKind::Tuple, start) {}
+    ASTTupleType(&mut this, span: SourceSpan) : ASTType(ASTTypeKind::Tuple, span) {}
 
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
@@ -211,7 +210,7 @@ class ASTFunctionType : ASTType {
     pub parameters: Vector<*ASTType>,
     pub _return: *ASTType = null;
 
-    ASTFunctionType(&mut this, start: Token) : ASTType(ASTTypeKind::Function, start) {}
+    ASTFunctionType(&mut this, span: SourceSpan) : ASTType(ASTTypeKind::Function, span) {}
 
     pub override fn ToString(&this) -> String {
         let mut result = "fn(".ToString();
@@ -260,23 +259,23 @@ extend ASTPatternKind {
 class ASTPattern : ASTNode {
     pub kind: ASTPatternKind;
 
-    ASTPattern(&mut this, kind: ASTPatternKind, start: Token) : ASTNode(ASTNodeKind::Pattern, start) {
+    ASTPattern(&mut this, kind: ASTPatternKind, span: SourceSpan) : ASTNode(ASTNodeKind::Pattern, span) {
         this.kind = kind;
     }
 }
 
 class ASTWildcardPattern : ASTPattern {
-    ASTWildcardPattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Wildcard, start) {}
+    ASTWildcardPattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Wildcard, span) {}
 }
 
 class ASTRestPattern : ASTPattern {
-    ASTRestPattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Rest, start) {}
+    ASTRestPattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Rest, span) {}
 }
 
 class ASTLiteralPattern : ASTPattern {
     pub literal: *ASTExpression;
 
-    ASTLiteralPattern(&mut this, literal: *ASTExpression, start: Token) : ASTPattern(ASTPatternKind::Literal, start) {
+    ASTLiteralPattern(&mut this, literal: *ASTExpression, span: SourceSpan) : ASTPattern(ASTPatternKind::Literal, span) {
         this.literal = literal;
     }
 }
@@ -286,7 +285,7 @@ class ASTRangePattern : ASTPattern {
     pub end: *ASTExpression,
     pub inclusive: bool;
 
-    ASTRangePattern(&mut this, start: *ASTExpression, end: *ASTExpression, inclusive: bool, token: Token) : ASTPattern(ASTPatternKind::Range, token) {
+    ASTRangePattern(&mut this, start: *ASTExpression, end: *ASTExpression, inclusive: bool, span: SourceSpan) : ASTPattern(ASTPatternKind::Range, span) {
         (this.start, this.end, this.inclusive) = (start, end, inclusive);
     }
 }
@@ -296,7 +295,7 @@ class ASTIdentifierPattern : ASTPattern {
     pub mutable: bool,
     pub reference: bool;
 
-    ASTIdentifierPattern(&mut this, name: String, mutable: bool, reference: bool, start: Token) : ASTPattern(ASTPatternKind::Identifier, start) {
+    ASTIdentifierPattern(&mut this, name: String, mutable: bool, reference: bool, span: SourceSpan) : ASTPattern(ASTPatternKind::Identifier, span) {
         (this.name, this.mutable, this.reference) = (name, mutable, reference);
     }
 }
@@ -304,14 +303,14 @@ class ASTIdentifierPattern : ASTPattern {
 class ASTTuplePattern : ASTPattern {
     pub patterns: Vector<*ASTPattern>;
 
-    ASTTuplePattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Tuple, start) {}
+    ASTTuplePattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Tuple, span) {}
 }
 
 class ASTFieldPattern : ASTPattern {
     pub name: String,
     pub pattern: *ASTPattern;
 
-    ASTFieldPattern(&mut this, name: String, pattern: *ASTPattern, start: Token) : ASTPattern(ASTPatternKind::Field, start) {
+    ASTFieldPattern(&mut this, name: String, pattern: *ASTPattern, span: SourceSpan) : ASTPattern(ASTPatternKind::Field, span) {
         (this.name, this.pattern) = (name, pattern);
     }
 }
@@ -320,7 +319,7 @@ class ASTStructurePattern : ASTPattern {
     pub path: *ASTPath,
     pub patterns: Vector<*ASTPattern>;
 
-    ASTStructurePattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Structure, start) {
+    ASTStructurePattern(&mut this, path: *ASTPath, span: SourceSpan) : ASTPattern(ASTPatternKind::Structure, span) {
         this.path = path;
     }
 }
@@ -329,7 +328,7 @@ class ASTVariantPattern : ASTPattern {
     pub path: *ASTPath,
     pub patterns: Vector<*ASTPattern>;
 
-    ASTVariantPattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Variant, start) {
+    ASTVariantPattern(&mut this, path: *ASTPath, span: SourceSpan) : ASTPattern(ASTPatternKind::Variant, span) {
         this.path = path;
     }
 }
@@ -337,7 +336,7 @@ class ASTVariantPattern : ASTPattern {
 class ASTPathPattern : ASTPattern {
     pub path: *ASTPath;
 
-    ASTPathPattern(&mut this, path: *ASTPath, start: Token) : ASTPattern(ASTPatternKind::Path, start) {
+    ASTPathPattern(&mut this, path: *ASTPath, span: SourceSpan) : ASTPattern(ASTPatternKind::Path, span) {
         this.path = path;
     }
 }
@@ -345,7 +344,7 @@ class ASTPathPattern : ASTPattern {
 class ASTOrPattern : ASTPattern {
     pub patterns: Vector<*ASTPattern>;
 
-    ASTOrPattern(&mut this, start: Token) : ASTPattern(ASTPatternKind::Or, start) {}
+    ASTOrPattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Or, span) {}
 }
 
 enum ASTExpressionKind: u8 {
@@ -390,7 +389,7 @@ extend ASTExpressionKind {
 class ASTExpression : ASTNode {
     pub kind: ASTExpressionKind;
 
-    ASTExpression(&mut this, kind: ASTExpressionKind, start: Token) : ASTNode(ASTNodeKind::Expression, start) {
+    ASTExpression(&mut this, kind: ASTExpressionKind, span: SourceSpan) : ASTNode(ASTNodeKind::Expression, span) {
         this.kind = kind;
     }
 
@@ -420,7 +419,7 @@ extend ASTLiteralKind {
 class ASTLiteral : ASTExpression {
     pub kind: ASTLiteralKind;
 
-    ASTLiteral(&mut this, kind: ASTLiteralKind, start: Token) : ASTExpression(ASTExpressionKind::Literal, start) {
+    ASTLiteral(&mut this, kind: ASTLiteralKind, span: SourceSpan) : ASTExpression(ASTExpressionKind::Literal, span) {
         this.kind = kind;
     }
 }
@@ -428,7 +427,7 @@ class ASTLiteral : ASTExpression {
 class ASTBooleanLiteral : ASTLiteral {
     pub value: bool;
 
-    ASTBooleanLiteral(&mut this, value: bool, start: Token) : ASTLiteral(ASTLiteralKind::Boolean, start) {
+    ASTBooleanLiteral(&mut this, value: bool, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Boolean, span) {
         this.value = value;
     }
 
@@ -440,7 +439,7 @@ class ASTBooleanLiteral : ASTLiteral {
 class ASTCharacterLiteral : ASTLiteral {
     pub value: u32;
 
-    ASTCharacterLiteral(&mut this, value: u32, start: Token) : ASTLiteral(ASTLiteralKind::Character, start) {
+    ASTCharacterLiteral(&mut this, value: u32, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Character, span) {
         this.value = value;
     }
 
@@ -453,7 +452,7 @@ class ASTIntegerLiteral : ASTLiteral {
     pub value: HostUnsigned,
     pub suffix: String;
 
-    ASTIntegerLiteral(&mut this, value: HostUnsigned, suffix: String, start: Token) : ASTLiteral(ASTLiteralKind::Integer, start) {
+    ASTIntegerLiteral(&mut this, value: HostUnsigned, suffix: String, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Integer, span) {
         (this.value, this.suffix) = (value, suffix);
     }
 
@@ -467,7 +466,7 @@ class ASTFloatLiteral : ASTLiteral {
     pub value: f64,
     pub suffix: String;
 
-    ASTFloatLiteral(&mut this, value: f64, suffix: String, start: Token) : ASTLiteral(ASTLiteralKind::Float, start) {
+    ASTFloatLiteral(&mut this, value: f64, suffix: String, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Float, span) {
         (this.value, this.suffix) = (value, suffix);
     }
 
@@ -480,7 +479,7 @@ class ASTFloatLiteral : ASTLiteral {
 class ASTStringLiteral : ASTLiteral {
     pub value: String;
 
-    ASTStringLiteral(&mut this, value: String, start: Token) : ASTLiteral(ASTLiteralKind::String, start) {
+    ASTStringLiteral(&mut this, value: String, span: SourceSpan) : ASTLiteral(ASTLiteralKind::String, span) {
         this.value = value;
     }
 
@@ -493,7 +492,7 @@ class ASTArrayLiteral : ASTLiteral {
     pub elements: Vector<*ASTExpression>,
     pub count: *ASTExpression = null;
 
-    ASTArrayLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Array, start) {}
+    ASTArrayLiteral(&mut this, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Array, span) {}
 
     pub override fn ToString(&this) -> String {
         if this.count != null {
@@ -514,7 +513,7 @@ class ASTArrayLiteral : ASTLiteral {
 class ASTTupleLiteral : ASTLiteral {
     pub elements: Vector<*ASTExpression>;
 
-    ASTTupleLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Tuple, start) {}
+    ASTTupleLiteral(&mut this, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Tuple, span) {}
 
     pub override fn ToString(&this) -> String {
         let mut result = '('.ToString();
@@ -532,7 +531,7 @@ class ASTStructureLiteral : ASTLiteral {
     pub target: *ASTExpression,
     pub fields: Map<String, *ASTExpression>;
 
-    ASTStructureLiteral(&mut this, target: *ASTExpression, start: Token) : ASTLiteral(ASTLiteralKind::Structure, start) {
+    ASTStructureLiteral(&mut this, target: *ASTExpression, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Structure, span) {
         this.target = target;
     }
 
@@ -550,7 +549,7 @@ class ASTStructureLiteral : ASTLiteral {
 }
 
 class ASTNullLiteral : ASTLiteral {
-    ASTNullLiteral(&mut this, start: Token) : ASTLiteral(ASTLiteralKind::Null, start) {}
+    ASTNullLiteral(&mut this, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Null, span) {}
 
     pub override fn ToString(&this) -> String {
         "null".ToString()
@@ -560,7 +559,7 @@ class ASTNullLiteral : ASTLiteral {
 class ASTPathExpression : ASTExpression {
     pub path: *ASTPath;
 
-    ASTPathExpression(&mut this, path: *ASTPath, start: Token) : ASTExpression(ASTExpressionKind::Path, start) {
+    ASTPathExpression(&mut this, path: *ASTPath, span: SourceSpan) : ASTExpression(ASTExpressionKind::Path, span) {
         this.path = path;
     }
 
@@ -589,7 +588,7 @@ class ASTUnaryExpression : ASTExpression {
     pub operand: *ASTExpression,
     pub mutable: bool;
 
-    ASTUnaryExpression(&mut this, kind: ASTUnaryKind, operand: *ASTExpression, mutable: bool, start: Token) : ASTExpression(ASTExpressionKind::Unary, start) {
+    ASTUnaryExpression(&mut this, kind: ASTUnaryKind, operand: *ASTExpression, mutable: bool, span: SourceSpan) : ASTExpression(ASTExpressionKind::Unary, span) {
         (this.kind, this.operand, this.mutable) = (kind, operand, mutable);
     }
 
@@ -635,7 +634,7 @@ class ASTBinaryExpression : ASTExpression {
     pub left: *ASTExpression,
     pub right: *ASTExpression;
 
-    ASTBinaryExpression(&mut this, kind: ASTBinaryKind, left: *ASTExpression, right: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Binary, start) {
+    ASTBinaryExpression(&mut this, kind: ASTBinaryKind, left: *ASTExpression, right: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Binary, span) {
         (this.kind, this.left, this.right) = (kind, left, right);
     }
 
@@ -648,7 +647,7 @@ class ASTCallExpression : ASTExpression {
     pub expression: *ASTExpression,
     pub arguments: Vector<*ASTExpression>;
 
-    ASTCallExpression(&mut this, expression: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Call, start) {
+    ASTCallExpression(&mut this, expression: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Call, span) {
         this.expression = expression;
     }
 
@@ -667,7 +666,7 @@ class ASTCallExpression : ASTExpression {
 class ASTPackSplatExpression : ASTExpression {
     pub expression: *ASTExpression;
 
-    ASTPackSplatExpression(&mut this, expression: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::PackSplat, start) {
+    ASTPackSplatExpression(&mut this, expression: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::PackSplat, span) {
         this.expression = expression;
     }
 
@@ -679,11 +678,12 @@ class ASTPackSplatExpression : ASTExpression {
 class ASTMemberAccessExpression : ASTExpression {
     pub expression: *ASTExpression,
     pub member: String,
+    pub member_span: SourceSpan,
     pub types: Vector<*ASTType>,
     pub arrow: bool;
 
-    ASTMemberAccessExpression(&mut this, expression: *ASTExpression, arrow: bool, start: Token) : ASTExpression(ASTExpressionKind::MemberAccess, start) {
-        (this.expression, this.arrow) = (expression, arrow);
+    ASTMemberAccessExpression(&mut this, expression: *ASTExpression, arrow: bool, span: SourceSpan) : ASTExpression(ASTExpressionKind::MemberAccess, span) {
+        (this.expression, this.arrow, this.member_span) = (expression, arrow, span);
     }
 
     pub override fn ToString(&this) -> String {
@@ -696,7 +696,7 @@ class ASTTupleAccessExpression : ASTExpression {
     pub index: usize,
     pub arrow: bool;
 
-    ASTTupleAccessExpression(&mut this, expression: *ASTExpression, index: usize, arrow: bool, start: Token) : ASTExpression(ASTExpressionKind::TupleAccess, start) {
+    ASTTupleAccessExpression(&mut this, expression: *ASTExpression, index: usize, arrow: bool, span: SourceSpan) : ASTExpression(ASTExpressionKind::TupleAccess, span) {
         (this.expression, this.index, this.arrow) = (expression, index, arrow);
     }
 
@@ -707,10 +707,11 @@ class ASTTupleAccessExpression : ASTExpression {
 
 class ASTIndexAccessExpression : ASTExpression {
     pub expression: *ASTExpression,
-    pub index: *ASTExpression;
+    pub index: *ASTExpression,
+    pub bracket: SourceSpan;
 
-    ASTIndexAccessExpression(&mut this, expression: *ASTExpression, index: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::IndexAccess, start) {
-        (this.expression, this.index) = (expression, index);
+    ASTIndexAccessExpression(&mut this, expression: *ASTExpression, index: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::IndexAccess, span) {
+        (this.expression, this.index, this.bracket) = (expression, index, span);
     }
 
     pub override fn ToString(&this) -> String {
@@ -722,7 +723,7 @@ class ASTCastExpression : ASTExpression {
     pub expression: *ASTExpression,
     pub target: *ASTType;
 
-    ASTCastExpression(&mut this, expression: *ASTExpression, target: *ASTType, start: Token) : ASTExpression(ASTExpressionKind::Cast, start) {
+    ASTCastExpression(&mut this, expression: *ASTExpression, target: *ASTType, span: SourceSpan) : ASTExpression(ASTExpressionKind::Cast, span) {
         (this.expression, this.target) = (expression, target);
     }
 
@@ -737,7 +738,7 @@ class ASTNewExpression : ASTExpression {
     pub size: *ASTExpression = null,
     pub initialized: bool = false;
 
-    ASTNewExpression(&mut this, _type: *ASTType, start: Token) : ASTExpression(ASTExpressionKind::New, start) {
+    ASTNewExpression(&mut this, _type: *ASTType, span: SourceSpan) : ASTExpression(ASTExpressionKind::New, span) {
         this._type = _type;
     }
 
@@ -763,7 +764,7 @@ class ASTDeleteExpression : ASTExpression {
     pub expression: *ASTExpression,
     pub array: bool = false;
 
-    ASTDeleteExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Delete, start) {}
+    ASTDeleteExpression(&mut this, span: SourceSpan) : ASTExpression(ASTExpressionKind::Delete, span) {}
 
     pub override fn ToString(&this) -> String {
         (if this.array { "delete[] " } else { "delete " }) + this.expression->ToString()
@@ -800,7 +801,7 @@ class ASTAssignmentExpression : ASTExpression {
     pub right: *ASTExpression,
     pub next: *mut ASTAssignmentExpression = null;
 
-    ASTAssignmentExpression(&mut this, kind: ASTAssignmentKind, left: *ASTExpression, right: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Assignment, start) {
+    ASTAssignmentExpression(&mut this, kind: ASTAssignmentKind, left: *ASTExpression, right: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Assignment, span) {
         (this.kind, this.left, this.right) = (kind, left, right);
     }
 
@@ -833,7 +834,7 @@ class ASTAssignmentExpression : ASTExpression {
 class ASTAwaitExpression : ASTExpression {
     pub expression: *ASTExpression;
 
-    ASTAwaitExpression(&mut this, expression: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Await, start) {
+    ASTAwaitExpression(&mut this, expression: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Await, span) {
         this.expression = expression;
     }
 
@@ -847,7 +848,7 @@ class ASTRangeExpression : ASTExpression {
     pub end: *ASTExpression,
     pub inclusive: bool = false;
 
-    ASTRangeExpression(&mut this, start: *ASTExpression, end: *ASTExpression, _start: Token) : ASTExpression(ASTExpressionKind::Range, _start) {
+    ASTRangeExpression(&mut this, start: *ASTExpression, end: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Range, span) {
         (this.start, this.end) = (start, end);
     }
 
@@ -866,7 +867,7 @@ class ASTBlockExpression : ASTExpression {
     pub tail: *ASTExpression = null,
     pub _unsafe: bool = false;
 
-    ASTBlockExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Block, start) {}
+    ASTBlockExpression(&mut this, span: SourceSpan) : ASTExpression(ASTExpressionKind::Block, span) {}
 
     pub override fn ToString(&this) -> String {
         LabelToString(this.label) + (if this._unsafe { "unsafe { ... }" } else { "{ ... }" })
@@ -899,7 +900,7 @@ class ASTIfExpression : ASTExpression {
     pub body: *ASTBlockExpression,
     pub _else: *ASTExpression;
 
-    ASTIfExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::If, start) {
+    ASTIfExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::If, span) {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 
@@ -914,7 +915,7 @@ class ASTWhileExpression : ASTExpression {
     pub _else: *ASTBlockExpression,
     pub label: String;
 
-    ASTWhileExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::While, start) {
+    ASTWhileExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTBlockExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::While, span) {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 
@@ -927,7 +928,7 @@ class ASTLoopExpression : ASTExpression {
     pub body: *ASTBlockExpression,
     pub label: String;
 
-    ASTLoopExpression(&mut this, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::Loop, start) {
+    ASTLoopExpression(&mut this, body: *ASTBlockExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Loop, span) {
         this.body = body;
     }
 
@@ -942,7 +943,7 @@ class ASTForExpression : ASTExpression {
     pub body: *ASTBlockExpression,
     pub label: String;
 
-    ASTForExpression(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::For, start) {
+    ASTForExpression(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::For, span) {
         (this.pattern, this.iterable, this.body) = (pattern, iterable, body);
     }
 
@@ -965,7 +966,7 @@ class ASTMatchExpression : ASTExpression {
     pub target: *ASTExpression,
     pub arms: Vector<*ASTMatchArm>;
 
-    ASTMatchExpression(&mut this, target: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Match, start) {
+    ASTMatchExpression(&mut this, target: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Match, span) {
         this.target = target;
     }
 
@@ -977,7 +978,7 @@ class ASTMatchExpression : ASTExpression {
 class ASTReturnExpression : ASTExpression {
     pub value: *ASTExpression;
 
-    ASTReturnExpression(&mut this, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Return, start) {
+    ASTReturnExpression(&mut this, value: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Return, span) {
         this.value = value;
     }
 
@@ -994,7 +995,7 @@ class ASTBreakExpression : ASTExpression {
     pub value: *ASTExpression,
     pub label: String;
 
-    ASTBreakExpression(&mut this, label: &String, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Break, start) {
+    ASTBreakExpression(&mut this, label: &String, value: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Break, span) {
         (this.label, this.value) = (label, value);
     }
 
@@ -1009,7 +1010,7 @@ class ASTBreakExpression : ASTExpression {
 class ASTContinueExpression : ASTExpression {
     pub label: String;
 
-    ASTContinueExpression(&mut this, label: &String, start: Token) : ASTExpression(ASTExpressionKind::Continue, start) {
+    ASTContinueExpression(&mut this, label: &String, span: SourceSpan) : ASTExpression(ASTExpressionKind::Continue, span) {
         this.label = label;
     }
 
@@ -1021,7 +1022,7 @@ class ASTContinueExpression : ASTExpression {
 class ASTTryExpression : ASTExpression {
     pub expression: *ASTExpression;
 
-    ASTTryExpression(&mut this, expression: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Try, start) {
+    ASTTryExpression(&mut this, expression: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Try, span) {
         this.expression = expression;
     }
 
@@ -1047,7 +1048,7 @@ extend ASTStatementKind {
 class ASTStatement : ASTNode {
     pub kind: ASTStatementKind;
 
-    ASTStatement(&mut this, kind: ASTStatementKind, start: Token) : ASTNode(ASTNodeKind::Statement, start) {
+    ASTStatement(&mut this, kind: ASTStatementKind, span: SourceSpan) : ASTNode(ASTNodeKind::Statement, span) {
         this.kind = kind;
     }
 }
@@ -1057,7 +1058,7 @@ class ASTLetStatement : ASTStatement {
     pub _type: *ASTType,
     pub initializer: *ASTExpression;
 
-    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Variable, start) {
+    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, span: SourceSpan) : ASTStatement(ASTStatementKind::Variable, span) {
         (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
     }
 }
@@ -1066,7 +1067,7 @@ class ASTExpressionStatement : ASTStatement {
     pub expression: *ASTExpression,
     pub semicolon: bool = true;
 
-    ASTExpressionStatement(&mut this, expression: *ASTExpression, start: Token) : ASTStatement(ASTStatementKind::Expression, start) {
+    ASTExpressionStatement(&mut this, expression: *ASTExpression, span: SourceSpan) : ASTStatement(ASTStatementKind::Expression, span) {
         this.expression = expression;
     }
 }
@@ -1087,7 +1088,7 @@ class ASTAssemblyStatement : ASTStatement {
     pub outputs: Vector<*ASTAssemblyOperand>,
     pub clobbers: Vector<String>;
 
-    ASTAssemblyStatement(&mut this, _volatile: bool, start: Token) : ASTStatement(ASTStatementKind::Assembly, start) {
+    ASTAssemblyStatement(&mut this, _volatile: bool, span: SourceSpan) : ASTStatement(ASTStatementKind::Assembly, span) {
         this._volatile = _volatile;
     }
 }
@@ -1121,7 +1122,7 @@ extend ASTDeclarationKind {
 class ASTDeclaration : ASTNode {
     pub kind: ASTDeclarationKind;
 
-    ASTDeclaration(&mut this, kind: ASTDeclarationKind, start: Token) : ASTNode(ASTNodeKind::Declaration, start) {
+    ASTDeclaration(&mut this, kind: ASTDeclarationKind, span: SourceSpan) : ASTNode(ASTNodeKind::Declaration, span) {
         this.kind = kind;
     }
 }
@@ -1131,7 +1132,7 @@ class ASTParameterDeclaration : ASTDeclaration {
     pub _type: *ASTType,
     pub mutable: bool;
 
-    ASTParameterDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, start: Token) : ASTDeclaration(ASTDeclarationKind::Parameter, start) {
+    ASTParameterDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Parameter, span) {
         (this.name, this._type, this.mutable) = (name, _type, mutable);
     }
 }
@@ -1158,7 +1159,7 @@ class ASTFunctionDeclaration : ASTDeclaration {
     pub types: Vector<String>,
     pub generic: bool = false;
 
-    ASTFunctionDeclaration(&mut this, name: String, public: bool, no_mangle: bool, track_caller: bool, start: Token) : ASTDeclaration(ASTDeclarationKind::Function, start) {
+    ASTFunctionDeclaration(&mut this, name: String, public: bool, no_mangle: bool, track_caller: bool, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Function, span) {
         (this.name, this.public, this.no_mangle, this.track_caller) = (name, public, no_mangle, track_caller);
     }
 }
@@ -1169,7 +1170,7 @@ class ASTFieldDeclaration : ASTDeclaration {
     pub initializer: *ASTExpression,
     pub public: bool;
 
-    ASTFieldDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, public: bool, start: Token) : ASTDeclaration(ASTDeclarationKind::Field, start) {
+    ASTFieldDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, public: bool, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Field, span) {
         (this.name, this._type, this.initializer, this.public) = (name, _type, initializer, public);
     }
 }
@@ -1184,7 +1185,7 @@ class ASTClassDeclaration : ASTDeclaration {
     pub types: Vector<String>,
     pub generic: bool = false;
 
-    ASTClassDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Class, start) {
+    ASTClassDeclaration(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Class, span) {
         this.name = name;
     }
 }
@@ -1196,7 +1197,7 @@ class ASTStructureDeclaration : ASTDeclaration {
     pub types: Vector<String>,
     pub generic: bool = false;
 
-    ASTStructureDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Structure, start) {
+    ASTStructureDeclaration(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Structure, span) {
         this.name = name;
     }
 }
@@ -1205,7 +1206,7 @@ class ASTEnumerationMember : ASTDeclaration {
     pub name: String,
     pub value: *ASTExpression = null;
 
-    ASTEnumerationMember(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::EnumerationMember, start) {
+    ASTEnumerationMember(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::EnumerationMember, span) {
         this.name = name;
     }
 }
@@ -1215,7 +1216,7 @@ class ASTEnumerationDeclaration : ASTDeclaration {
     pub underlying_type: *ASTType = null,
     pub members: Vector<*ASTEnumerationMember>;
 
-    ASTEnumerationDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Enumeration, start) {
+    ASTEnumerationDeclaration(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Enumeration, span) {
         this.name = name;
     }
 }
@@ -1238,7 +1239,7 @@ class ASTVariantMember : ASTDeclaration {
     pub fields: Vector<*ASTVariantField>,
     pub structure: bool = false;
 
-    ASTVariantMember(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::VariantMember, start) {
+    ASTVariantMember(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::VariantMember, span) {
         this.name = name;
     }
 }
@@ -1250,7 +1251,7 @@ class ASTVariantDeclaration : ASTDeclaration {
     pub types: Vector<String>,
     pub generic: bool = false;
 
-    ASTVariantDeclaration(&mut this, name: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Variant, start) {
+    ASTVariantDeclaration(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Variant, span) {
         this.name = name;
     }
 }
@@ -1260,7 +1261,7 @@ class ASTConstantDeclaration : ASTDeclaration {
     pub _type: *ASTType,
     pub initializer: *ASTExpression;
 
-    ASTConstantDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Constant, start) {
+    ASTConstantDeclaration(&mut this, name: String, _type: *ASTType, initializer: *ASTExpression, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Constant, span) {
         (this.name, this._type, this.initializer) = (name, _type, initializer);
     }
 }
@@ -1272,7 +1273,7 @@ class ASTStaticDeclaration : ASTDeclaration {
     pub initializer: *ASTExpression = null,
     pub alignment: *ASTExpression;
 
-    ASTStaticDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, alignment: *ASTExpression, start: Token) : ASTDeclaration(ASTDeclarationKind::Static, start) {
+    ASTStaticDeclaration(&mut this, name: String, _type: *ASTType, mutable: bool, alignment: *ASTExpression, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Static, span) {
         (this.name, this._type, this.mutable, this.alignment) = (name, _type, mutable, alignment);
     }
 }
@@ -1281,7 +1282,7 @@ class ASTExtendDeclaration : ASTDeclaration {
     pub _type: *ASTType,
     pub methods: Vector<*ASTFunctionDeclaration>;
 
-    ASTExtendDeclaration(&mut this, _type: *ASTType, start: Token) : ASTDeclaration(ASTDeclarationKind::Extend, start) {
+    ASTExtendDeclaration(&mut this, _type: *ASTType, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Extend, span) {
         this._type = _type;
     }
 }
@@ -1290,7 +1291,7 @@ class ASTTypeDeclaration : ASTDeclaration {
     pub name: String,
     pub _type: *ASTType;
 
-    ASTTypeDeclaration(&mut this, name: String, _type: *ASTType, start: Token) : ASTDeclaration(ASTDeclarationKind::Type, start) {
+    ASTTypeDeclaration(&mut this, name: String, _type: *ASTType, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Type, span) {
         (this.name, this._type) = (name, _type);
     }
 }
@@ -1299,7 +1300,7 @@ class ASTExternDeclaration : ASTDeclaration {
     pub linkage: String,
     pub declarations: Vector<*ASTDeclaration>;
 
-    ASTExternDeclaration(&mut this, linkage: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Extern, start) {
+    ASTExternDeclaration(&mut this, linkage: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Extern, span) {
         this.linkage = linkage;
     }
 }
@@ -1307,7 +1308,7 @@ class ASTExternDeclaration : ASTDeclaration {
 class ASTAssemblyDeclaration : ASTDeclaration {
     pub text: String;
 
-    ASTAssemblyDeclaration(&mut this, text: String, start: Token) : ASTDeclaration(ASTDeclarationKind::Assembly, start) {
+    ASTAssemblyDeclaration(&mut this, text: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Assembly, span) {
         this.text = text;
     }
 }
