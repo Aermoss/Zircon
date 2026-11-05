@@ -94,6 +94,7 @@ extern "C" {
     fn pthread_cond_signal(cond: *mut pthread_cond_t) -> i32;
     fn pthread_cond_broadcast(cond: *mut pthread_cond_t) -> i32;
     fn pthread_cond_wait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t) -> i32;
+    fn pthread_cond_timedwait(cond: *mut pthread_cond_t, mutex: *mut pthread_mutex_t, deadline: *timespec) -> i32;
     fn pthread_cond_destroy(cond: *mut pthread_cond_t) -> i32;
 
     fn nanosleep(request: *timespec, remaining: *mut timespec) -> i32;
@@ -282,6 +283,19 @@ class ConditionVariable {
         WakeAllConditionVariable(&mut this.condition);
 #[else]
         pthread_cond_broadcast(&mut this.condition);
+#[endif]
+    }
+
+    pub fn Wait(&mut this, mtx: *mut Mutex, timeout: u32) -> bool {
+#[if WINDOWS]
+        SleepConditionVariableSRW(&mut this.condition, mtx->Handle(), timeout, 0) != 0
+#[else]
+        let mut deadline: timespec;
+        if clock_gettime(CLOCK_REALTIME, &mut deadline) != 0 { return false; }
+        let nanoseconds = deadline.tv_nsec + timeout as i64 * 1000000;
+        deadline.tv_sec += nanoseconds / 1000000000;
+        deadline.tv_nsec = nanoseconds % 1000000000;
+        pthread_cond_timedwait(&mut this.condition, mtx->Handle(), &deadline) == 0
 #[endif]
     }
 
