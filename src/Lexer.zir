@@ -154,7 +154,10 @@ class Lexer {
                             Logger::Log("Hexadecimal escape sequence too long.", token, LogSeverity::Error);
                         }
 
-                        token.value += value.ToUnsignedInteger(16).Unwrap() as i8;
+                        if !value.Empty() {
+                            token.value += value.ToUnsignedInteger(16).Unwrap() as i8;
+                        }
+
                         this.index -= 1;
                     } else {
                         let mut value = String();
@@ -170,7 +173,10 @@ class Lexer {
                             Logger::Log("Octal escape sequence too long.", token, LogSeverity::Error);
                         }
 
-                        token.value += value.ToUnsignedInteger(8).Unwrap() as i8;
+                        if !value.Empty() {
+                            token.value += value.ToUnsignedInteger(8).Unwrap() as i8;
+                        }
+
                         this.index -= 1;
                     } this.Advance(1);
                 }
@@ -184,6 +190,33 @@ class Lexer {
             this.Advance(1);
         } else {
             Logger::Log("Unterminated string literal.", token, LogSeverity::Error);
+        }
+
+        token
+    }
+
+    fn IsLabel(&this) -> bool {
+        if this.CurrentChar() != '\'' || !this.IsAlpha(this.PeekChar(1)) {
+            return false;
+        }
+
+        let mut offset: usize = 2;
+
+        while this.IsAlphaNum(this.PeekChar(offset)) {
+            offset += 1;
+        }
+
+        this.PeekChar(offset) != '\''
+    }
+
+    fn LexLabel(&mut this) -> Token {
+        let mut token: Token;
+        (token._type, token.row, token.column, token.file) = (TokenType::LABEL, this.row, this.column, this.file);
+        this.Advance(1);
+
+        while this.IsAlphaNum(this.CurrentChar()) {
+            token.value += this.CurrentChar();
+            this.Advance(1);
         }
 
         token
@@ -631,7 +664,9 @@ class Lexer {
 
             let character = this.CurrentChar();
 
-            if character == '"' || character == '\'' {
+            if this.IsLabel() {
+                tokens.PushBack(this.LexLabel());
+            } else if character == '"' || character == '\'' {
                 tokens.PushBack(this.LexString());
             } else if this.IsDigit(character) {
                 tokens.PushBack(this.LexNumber());

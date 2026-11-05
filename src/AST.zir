@@ -856,7 +856,12 @@ class ASTRangeExpression : ASTExpression {
     }
 }
 
+fn LabelToString(label: &String) -> String {
+    if label.Empty() { String() } else { '\'' + label + ": " }
+}
+
 class ASTBlockExpression : ASTExpression {
+    pub label: String,
     pub statements: Vector<*ASTStatement>,
     pub tail: *ASTExpression = null,
     pub _unsafe: bool = false;
@@ -864,7 +869,7 @@ class ASTBlockExpression : ASTExpression {
     ASTBlockExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Block, start) {}
 
     pub override fn ToString(&this) -> String {
-        (if this._unsafe { "unsafe { ... }" } else { "{ ... }" }).ToString()
+        LabelToString(this.label) + (if this._unsafe { "unsafe { ... }" } else { "{ ... }" })
     }
 }
 
@@ -906,40 +911,43 @@ class ASTIfExpression : ASTExpression {
 class ASTWhileExpression : ASTExpression {
     pub condition: *ASTCondition,
     pub body: *ASTBlockExpression,
-    pub _else: *ASTBlockExpression;
+    pub _else: *ASTBlockExpression,
+    pub label: String;
 
     ASTWhileExpression(&mut this, condition: *ASTCondition, body: *ASTBlockExpression, _else: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::While, start) {
         (this.condition, this.body, this._else) = (condition, body, _else);
     }
 
     pub override fn ToString(&this) -> String {
-        "while " + this.condition->ToString() + " { ... }"
+        LabelToString(this.label) + "while " + this.condition->ToString() + " { ... }"
     }
 }
 
 class ASTLoopExpression : ASTExpression {
-    pub body: *ASTBlockExpression;
+    pub body: *ASTBlockExpression,
+    pub label: String;
 
     ASTLoopExpression(&mut this, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::Loop, start) {
         this.body = body;
     }
 
     pub override fn ToString(&this) -> String {
-        "loop { ... }".ToString()
+        LabelToString(this.label) + "loop { ... }"
     }
 }
 
 class ASTForExpression : ASTExpression {
     pub pattern: *ASTPattern,
     pub iterable: *ASTExpression,
-    pub body: *ASTBlockExpression;
+    pub body: *ASTBlockExpression,
+    pub label: String;
 
     ASTForExpression(&mut this, pattern: *ASTPattern, iterable: *ASTExpression, body: *ASTBlockExpression, start: Token) : ASTExpression(ASTExpressionKind::For, start) {
         (this.pattern, this.iterable, this.body) = (pattern, iterable, body);
     }
 
     pub override fn ToString(&this) -> String {
-        "for ... in " + this.iterable->ToString() + " { ... }"
+        LabelToString(this.label) + "for ... in " + this.iterable->ToString() + " { ... }"
     }
 }
 
@@ -983,26 +991,30 @@ class ASTReturnExpression : ASTExpression {
 }
 
 class ASTBreakExpression : ASTExpression {
-    pub value: *ASTExpression;
+    pub value: *ASTExpression,
+    pub label: String;
 
-    ASTBreakExpression(&mut this, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Break, start) {
-        this.value = value;
+    ASTBreakExpression(&mut this, label: &String, value: *ASTExpression, start: Token) : ASTExpression(ASTExpressionKind::Break, start) {
+        (this.label, this.value) = (label, value);
     }
 
     pub override fn ToString(&this) -> String {
-        if this.value != null {
-            return "break " + this.value->ToString();
-        }
-
-        "break".ToString()
+        let mut result = "break".ToString();
+        if !this.label.Empty() { result += " '" + this.label; }
+        if this.value != null { result += ' ' + this.value->ToString(); }
+        result
     }
 }
 
 class ASTContinueExpression : ASTExpression {
-    ASTContinueExpression(&mut this, start: Token) : ASTExpression(ASTExpressionKind::Continue, start) {}
+    pub label: String;
+
+    ASTContinueExpression(&mut this, label: &String, start: Token) : ASTExpression(ASTExpressionKind::Continue, start) {
+        this.label = label;
+    }
 
     pub override fn ToString(&this) -> String {
-        "continue".ToString()
+        if this.label.Empty() { "continue".ToString() } else { "continue '" + this.label }
     }
 }
 

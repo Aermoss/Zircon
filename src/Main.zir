@@ -230,9 +230,9 @@ fn WriteOutput(path: &String, content: &String) {
 
 fn PrintVersion() {
 #[if ZODIAC]
-    WriteLine("Zircon 8.4 \"Octane\" (zodiac-unknown-zenith)");
+    WriteLine("Zircon 9.0 \"Mantle\" (zodiac-unknown-zenith)");
 #[else]
-    WriteLine("Zircon 8.4 \"Octane\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
+    WriteLine("Zircon 9.0 \"Mantle\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
 #[endif]
     WriteLine("Copyright (c) 2025-2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");

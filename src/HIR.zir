@@ -1979,14 +1979,16 @@ class HIRDeferredExpression : HIRExpression {
 }
 
 class HIRBlockExpression : HIRExpression {
+    pub label: String,
     pub statements: Vector<*HIRStatement>,
+    pub breaks: Vector<*mut HIRBreakExpression>,
     pub destructors: Vector<*HIRExpression>,
     pub tail: *HIRExpression = null;
 
     HIRBlockExpression(&mut this, _type: *HIRType) : HIRExpression(HIRExpressionKind::Block, _type) {}
 
     pub override fn ToString(&this, indent: usize) -> String {
-        let mut result = '{'.ToString();
+        let mut result = (if this.label.Empty() { String() } else { '\'' + this.label + ": " }) + '{';
 
         if this.statements.Empty() && this.tail == null && this.destructors.Empty() {
             return result + '}';
@@ -2797,15 +2799,21 @@ class HIRReturnExpression : HIRExpression {
 }
 
 class HIRBreakExpression : HIRExpression {
+    pub label: String,
     pub value: *HIRExpression,
-    pub destructors: Vector<*HIRExpression>;
+    pub destructors: Vector<*HIRExpression>,
+    pub depth: usize = 0;
 
     HIRBreakExpression(&mut this, value: *HIRExpression, destructors: Vector<*HIRExpression>, _type: *HIRType) : HIRExpression(HIRExpressionKind::Break, _type) {
         (this.value, this.destructors) = (value, destructors);
     }
 
     pub override fn ToString(&this, indent: usize) -> String {
-        let result = DestructorsToString(this.destructors, indent) + "break";
+        let mut result = DestructorsToString(this.destructors, indent) + "break";
+
+        if !this.label.Empty() {
+            result += " '" + this.label;
+        }
 
         if this.value != null {
             return result + ' ' + this.value->ToString(indent);
@@ -2816,14 +2824,16 @@ class HIRBreakExpression : HIRExpression {
 }
 
 class HIRContinueExpression : HIRExpression {
-    pub destructors: Vector<*HIRExpression>;
+    pub label: String,
+    pub destructors: Vector<*HIRExpression>,
+    pub depth: usize = 0;
 
     HIRContinueExpression(&mut this, destructors: Vector<*HIRExpression>, _type: *HIRType) : HIRExpression(HIRExpressionKind::Continue, _type) {
         this.destructors = destructors;
     }
 
     pub override fn ToString(&this, indent: usize) -> String {
-        DestructorsToString(this.destructors, indent) + "continue"
+        DestructorsToString(this.destructors, indent) + "continue" + (if this.label.Empty() { String() } else { " '" + this.label })
     }
 }
 

@@ -19,7 +19,7 @@
 enum TokenType: i32 {
     UNKNOWN, EOF,
 
-    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR, TRUE, FALSE, NULL,
+    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR, LABEL, TRUE, FALSE, NULL,
 
     NEW, DELETE, ASYNC, AWAIT, AS, THIS, OPERATOR,
     IF, ELSE, FOR, IN, WHILE, LOOP, MATCH, RETURN, BREAK, CONTINUE,
@@ -50,6 +50,7 @@ extend TokenType {
             TokenType::FLOAT => "FLOAT",
             TokenType::STRING => "STRING",
             TokenType::CHAR => "CHAR",
+            TokenType::LABEL => "LABEL",
             TokenType::TRUE => "TRUE",
             TokenType::FALSE => "FALSE",
             TokenType::NULL => "NULL",

@@ -328,7 +328,7 @@ class Parser {
                 if !this.ExpectSuccess(TokenType::RPAREN) { return null; }
                 expression
             },
-            TokenType::UNSAFE | TokenType::LBRACE | TokenType::IF | TokenType::WHILE | TokenType::LOOP | TokenType::FOR | TokenType::MATCH => this.ParseBlockLikeExpression(),
+            TokenType::UNSAFE | TokenType::LBRACE | TokenType::IF | TokenType::WHILE | TokenType::LOOP | TokenType::FOR | TokenType::MATCH | TokenType::LABEL => this.ParseBlockLikeExpression(),
             TokenType::RETURN => {
                 this.Advance();
                 let mut value: *ASTExpression = null;
@@ -342,6 +342,7 @@ class Parser {
             },
             TokenType::BREAK => {
                 this.Advance();
+                let label = if this.Current()._type == TokenType::LABEL { this.Advance().value } else { String() };
                 let mut value: *ASTExpression = null;
 
                 if this.StartsExpression() {
@@ -349,11 +350,12 @@ class Parser {
                     if value == null { return null; }
                 }
 
-                this.arena.New<ASTBreakExpression>(value, token)
+                this.arena.New<ASTBreakExpression>(label, value, token)
             },
             TokenType::CONTINUE => {
                 this.Advance();
-                this.arena.New<ASTContinueExpression>(token)
+                let label = if this.Current()._type == TokenType::LABEL { this.Advance().value } else { String() };
+                this.arena.New<ASTContinueExpression>(label, token)
             },
             _ => {
                 this.Advance();
@@ -767,7 +769,9 @@ class Parser {
             if inclusive || this.IsPatternBound() {
                 end = this.ParsePatternBound();
                 if end == null { return null; }
-            } return this.arena.New<ASTRangePattern>(start, end, inclusive, token);
+            }
+
+            return this.arena.New<ASTRangePattern>(start, end, inclusive, token);
         }
 
         this.arena.New<ASTLiteralPattern>(start, token)
@@ -832,6 +836,7 @@ class Parser {
         }
 
         let token = this.Current();
+
         let mut node: *ASTType = if this.Match(TokenType::NOT) {
             this.arena.New<ASTNeverType>(token)
         } else if this.Match(TokenType::FUNCTION) {
@@ -931,7 +936,7 @@ class Parser {
         match token._type {
             TokenType::LET => this.ParseLetStatement(),
             TokenType::ASSEMBLY | TokenType::VOLATILE => this.ParseAssemblyStatement(),
-            TokenType::UNSAFE | TokenType::LBRACE | TokenType::IF | TokenType::WHILE | TokenType::LOOP | TokenType::FOR | TokenType::MATCH => {
+            TokenType::UNSAFE | TokenType::LBRACE | TokenType::IF | TokenType::WHILE | TokenType::LOOP | TokenType::FOR | TokenType::MATCH | TokenType::LABEL => {
                 let mut expression = this.ParseBlockLikeExpression();
                 if expression == null { return null; }
 
@@ -1054,8 +1059,41 @@ class Parser {
         _type != TokenType::SEMICOLON && _type != TokenType::COMMA && _type != TokenType::RBRACE && _type != TokenType::RPAREN && _type != TokenType::RBRACKET && _type != TokenType::EOF
     }
 
+    fn ParseLabeledExpression(&mut this) -> *ASTExpression {
+        let token = this.Advance();
+        if !this.ExpectSuccess(TokenType::COLON) { return null; }
+
+        match this.Current()._type {
+            TokenType::WHILE => {
+                let expression = this.ParseWhileExpression();
+                if expression != null { expression->label = token.value; }
+                expression
+            },
+            TokenType::LOOP => {
+                let expression = this.ParseLoopExpression();
+                if expression != null { expression->label = token.value; }
+                expression
+            },
+            TokenType::FOR => {
+                let expression = this.ParseForExpression();
+                if expression != null { expression->label = token.value; }
+                expression
+            },
+            TokenType::UNSAFE | TokenType::LBRACE => {
+                let expression = this.ParseBlockExpression();
+                if expression != null { expression->label = token.value; }
+                expression
+            },
+            _ => {
+                Logger::Log("Labels can only be applied to loops and blocks.", token, LogSeverity::Error);
+                null
+            }
+        }
+    }
+
     fn ParseBlockLikeExpression(&mut this) -> *ASTExpression {
         match this.Current()._type {
+            TokenType::LABEL => this.ParseLabeledExpression(),
             TokenType::IF => this.ParseIfExpression(),
             TokenType::WHILE => this.ParseWhileExpression(),
             TokenType::LOOP => this.ParseLoopExpression(),
@@ -1087,7 +1125,7 @@ class Parser {
         this.arena.New<ASTIfExpression>(condition, body, _else, token)
     }
 
-    fn ParseWhileExpression(&mut this) -> *ASTWhileExpression {
+    fn ParseWhileExpression(&mut this) -> *mut ASTWhileExpression {
         let token = this.Expect(TokenType::WHILE);
         if token._type == TokenType::UNKNOWN { return null; }
         let condition = this.ParseCondition();
@@ -1104,7 +1142,7 @@ class Parser {
         this.arena.New<ASTWhileExpression>(condition, body, _else, token)
     }
 
-    fn ParseLoopExpression(&mut this) -> *ASTLoopExpression {
+    fn ParseLoopExpression(&mut this) -> *mut ASTLoopExpression {
         let token = this.Expect(TokenType::LOOP);
         if token._type == TokenType::UNKNOWN { return null; }
         let body = this.ParseBlock();
@@ -1129,7 +1167,7 @@ class Parser {
         left
     }
 
-    fn ParseForExpression(&mut this) -> *ASTForExpression {
+    fn ParseForExpression(&mut this) -> *mut ASTForExpression {
         let token = this.Expect(TokenType::FOR);
         if token._type == TokenType::UNKNOWN { return null; }
         let pattern = this.ParsePattern();
@@ -1185,7 +1223,7 @@ class Parser {
         _match
     }
 
-    fn ParseBlockExpression(&mut this) -> *ASTBlockExpression {
+    fn ParseBlockExpression(&mut this) -> *mut ASTBlockExpression {
         let _unsafe = this.Match(TokenType::UNSAFE);
         let block = this.ParseBlock();
         if block == null { return null; }

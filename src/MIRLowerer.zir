@@ -750,6 +750,16 @@ class MIRLowerer {
     }
 
     fn LowerBlockExpression(&mut this, block: *HIRBlockExpression, destination: *MIRValue) {
+        let labeled = !block->label.Empty();
+        let mut end_block: *mut MIRBlock = null;
+
+        if labeled {
+            end_block = this.builder.BuildBlock("block.end".ToString());
+            this.break_blocks.PushBack(end_block);
+            this.continue_blocks.PushBack(end_block);
+            this.break_destinations.PushBack(destination);
+        }
+
         for statement in block->statements {
             if this.builder.GetCurrentBlock()->HasTerminator() { break; }
             this.LowerStatement(statement);
@@ -762,6 +772,18 @@ class MIRLowerer {
         for destructor in block->destructors {
             if this.builder.GetCurrentBlock()->HasTerminator() { break; }
             this.LowerExpression(destructor);
+        }
+
+        if labeled {
+            this.break_destinations.PopBack();
+            this.continue_blocks.PopBack();
+            this.break_blocks.PopBack();
+
+            if !this.builder.GetCurrentBlock()->HasTerminator() {
+                this.builder.BuildBranch(end_block);
+            }
+
+            this.builder.SetCurrentBlock(end_block);
         }
     }
 
@@ -823,6 +845,14 @@ class MIRLowerer {
         let condition_block = this.builder.BuildBlock("while.cond".ToString());
         let body_block = this.builder.BuildBlock("while.body".ToString());
         let end_block = this.builder.BuildBlock("while.end".ToString());
+        let boolean = this.context.IntegerType(1);
+        let mut entered: *MIRValue = null;
+
+        if _while->else_body != null {
+            entered = this.builder.BuildAlloca("while.entered".ToString(), boolean);
+            this.builder.BuildStore(this.builder.ConstantInteger(0, boolean), entered);
+        }
+
         this.builder.BuildBranch(condition_block);
 
         this.builder.SetCurrentBlock(condition_block);
@@ -842,8 +872,13 @@ class MIRLowerer {
             this.LowerExpression(destructor);
         }
 
-        this.builder.BuildConditionalBranch(condition, body_block, end_block);
+        let exit_block = if entered != null { this.builder.BuildBlock("while.exit".ToString()) } else { end_block };
+        this.builder.BuildConditionalBranch(condition, body_block, exit_block);
         this.builder.SetCurrentBlock(body_block);
+
+        if entered != null {
+            this.builder.BuildStore(this.builder.ConstantInteger(1, boolean), entered);
+        }
 
         if _while->condition->pattern != null {
             this.BindPattern(_while->condition->pattern);
@@ -859,6 +894,18 @@ class MIRLowerer {
 
         if !this.builder.GetCurrentBlock()->HasTerminator() {
             this.builder.BuildBranch(condition_block);
+        }
+
+        if entered != null {
+            let else_block = this.builder.BuildBlock("while.else".ToString());
+            this.builder.SetCurrentBlock(exit_block);
+            this.builder.BuildConditionalBranch(this.builder.BuildLoad("while.entered".ToString(), entered), end_block, else_block);
+            this.builder.SetCurrentBlock(else_block);
+            this.LowerBlockExpression(_while->else_body, null);
+
+            if !this.builder.GetCurrentBlock()->HasTerminator() {
+                this.builder.BuildBranch(end_block);
+            }
         }
 
         this.builder.SetCurrentBlock(end_block);
@@ -1013,13 +1060,11 @@ class MIRLowerer {
     }
 
     fn LowerBreakExpression(&mut this, _break: *HIRBreakExpression) {
+        let valid = _break->depth < this.break_blocks.Length();
+        let index = if valid { this.break_blocks.Length() - 1 - _break->depth } else { 0 };
+
         if _break->value != null {
-            let mut destination: *MIRValue = null;
-
-            if !this.break_destinations.Empty() {
-                destination = this.break_destinations.Back();
-            }
-
+            let destination = if valid { this.break_destinations[index] } else { null };
             this.LowerControlExpression(_break->value, destination);
         }
 
@@ -1027,8 +1072,8 @@ class MIRLowerer {
             this.LowerExpression(destructor);
         }
 
-        if !this.break_blocks.Empty() {
-            this.builder.BuildBranch(this.break_blocks.Back());
+        if valid {
+            this.builder.BuildBranch(this.break_blocks[index]);
         }
     }
 
@@ -1037,8 +1082,8 @@ class MIRLowerer {
             this.LowerExpression(destructor);
         }
 
-        if !this.continue_blocks.Empty() {
-            this.builder.BuildBranch(this.continue_blocks.Back());
+        if _continue->depth < this.continue_blocks.Length() {
+            this.builder.BuildBranch(this.continue_blocks[this.continue_blocks.Length() - 1 - _continue->depth]);
         }
     }
 

@@ -30,6 +30,20 @@ enum HIRBlockTail: u8 {
     Value, Discard, Return
 }
 
+class HIRBreakTarget {
+    pub label: String,
+    pub scope: *mut Scope = null,
+    pub _loop: *mut HIRLoopExpression = null,
+    pub block: *mut HIRBlockExpression = null,
+    pub temporaries: usize = 0;
+
+    HIRBreakTarget(&mut this) {}
+
+    HIRBreakTarget(&mut this, label: &String, scope: *mut Scope, _loop: *mut HIRLoopExpression, block: *mut HIRBlockExpression, temporaries: usize) {
+        (this.label, this.scope, this._loop, this.block, this.temporaries) = (label, scope, _loop, block, temporaries);
+    }
+}
+
 class HIRLoweringFrame {
     pub scope: *mut Scope = null,
     pub function: *mut HIRFunctionDeclaration = null,
@@ -41,9 +55,7 @@ class HIRLoweringFrame {
     pub _unsafe: bool = false,
     pub temporaries: Vector<*HIRExpression>,
     pub temporary_stack: Vector<Vector<*HIRExpression>>,
-    pub loop_scopes: Vector<*mut Scope>,
-    pub loop_targets: Vector<*mut HIRLoopExpression>,
-    pub loop_temporaries: Vector<usize>;
+    pub break_targets: Vector<HIRBreakTarget>;
 
     HIRLoweringFrame(&mut this, scope: *mut Scope, generic: *mut GenericDeclaration, _type: *HIRType) {
         (this.scope, this.generic, this._type) = (scope, generic, _type);
@@ -82,9 +94,7 @@ class HIRLowerer {
 
     temporaries: Vector<*HIRExpression>,
     temporary_stack: Vector<Vector<*HIRExpression>>,
-    loop_scopes: Vector<*mut Scope>,
-    loop_targets: Vector<*mut HIRLoopExpression>,
-    loop_temporaries: Vector<usize>,
+    break_targets: Vector<HIRBreakTarget>,
 
     pub abi: HIRDeclarationABI = HIRDeclarationABI::Native,
     pub linkage: HIRDeclarationLinkage = HIRDeclarationLinkage::Internal,
@@ -123,9 +133,44 @@ class HIRLowerer {
         (frame.abi, frame.linkage) = (abi, linkage);
         this.temporaries.Swap(frame.temporaries);
         this.temporary_stack.Swap(frame.temporary_stack);
-        this.loop_scopes.Swap(frame.loop_scopes);
-        this.loop_targets.Swap(frame.loop_targets);
-        this.loop_temporaries.Swap(frame.loop_temporaries);
+        this.break_targets.Swap(frame.break_targets);
+    }
+
+    fn PushBreakTarget(&mut this, label: &String, _loop: *mut HIRLoopExpression, block: *mut HIRBlockExpression, node: *ASTNode) {
+        if !label.Empty() {
+            for target in this.break_targets {
+                if target.label == label {
+                    Logger::Log("Label '" + label + "' is already in use.", node, LogSeverity::Error);
+                    break;
+                }
+            }
+        }
+
+        this.break_targets.PushBack(HIRBreakTarget(label, this.scope_manager.current, _loop, block, this.temporary_stack.Length()));
+    }
+
+    fn FindBreakTarget(&mut this, label: &String, node: *ASTNode, _continue: bool) -> isize {
+        let mut i = this.break_targets.Length();
+
+        while i > 0 {
+            i -= 1;
+
+            if label.Empty() {
+                if this.break_targets[i].block == null { return i as isize; }
+            } else if this.break_targets[i].label == label {
+                return i as isize;
+            }
+        }
+
+        if !label.Empty() {
+            Logger::Log("Label '" + label + "' not found.", node, LogSeverity::Error);
+        } else if _continue {
+            Logger::Log("Continue statement outside of loop.", node, LogSeverity::Error);
+        } else {
+            Logger::Log("Break statement outside of loop.", node, LogSeverity::Error);
+        }
+
+        -1
     }
 
     pub fn Lower(&mut this, module: *ASTModule) -> *HIRModule {
@@ -2541,6 +2586,10 @@ class HIRLowerer {
             HIRExpressionKind::Block => {
                 let block = expression as *HIRBlockExpression;
                 if block->tail != null { branches.PushBack(block->tail); }
+
+                for _break in block->breaks {
+                    if _break->value != null { branches.PushBack(_break->value); }
+                }
             },
             HIRExpressionKind::If => {
                 let _if = expression as *HIRIfExpression;
@@ -2623,10 +2672,21 @@ class HIRLowerer {
         match expression->kind {
             HIRExpressionKind::Block => {
                 let block = branch as *mut HIRBlockExpression;
-                if block->tail == null { return expression; }
-                let value = this.CoerceBranch(block->tail, target, validate, node);
-                if value == null { return null; }
-                block->tail = value;
+                if block->tail == null && block->breaks.Empty() { return expression; }
+
+                if block->tail != null {
+                    let value = this.CoerceBranch(block->tail, target, validate, node);
+                    if value == null { return null; }
+                    block->tail = value;
+                }
+
+                for _break in block->breaks {
+                    if _break->value != null {
+                        let value = this.CoerceBranch(_break->value, target, validate, node);
+                        if value == null { return null; }
+                        _break->value = value;
+                    }
+                }
             },
             HIRExpressionKind::If => {
                 let _if = branch as *mut HIRIfExpression;
@@ -2786,7 +2846,7 @@ class HIRLowerer {
             },
             ASTExpressionKind::Block => {
                 let block = expression as *ASTBlockExpression;
-                if block->_unsafe || !block->statements.Empty() || block->tail == null { return null; }
+                if block->_unsafe || !block->label.Empty() || !block->statements.Empty() || block->tail == null { return null; }
                 this.IsDeferrableExpression(block->tail)
             },
             ASTExpressionKind::If => {
@@ -4622,6 +4682,12 @@ class HIRLowerer {
         let previous_block = this.builder.GetCurrentBlock();
         let result = this.builder.Block();
         this.builder.SetCurrentBlock(result);
+        result->label = block->label;
+
+        if !block->label.Empty() {
+            this.PushBreakTarget(block->label, null, result, block);
+        }
+
         this.temporary_stack.PushBack(this.temporaries);
         this.temporaries.Clear();
 
@@ -4637,18 +4703,81 @@ class HIRLowerer {
             result->destructors += this.GetDestructors(this.scope_manager.current, null);
         }
 
+        let mut diverges = false;
+
         if result->tail == null {
             for statement in result->statements {
                 if statement->kind == HIRStatementKind::Expression && (statement as *HIRExpressionStatement)->expression->_type->IsNever() {
-                    result->_type = this.context.NeverType();
+                    diverges = true;
                     break;
                 }
             }
         }
 
+        if !block->label.Empty() {
+            this.break_targets.PopBack();
+        }
+
+        if !result->breaks.Empty() {
+            this.LowerLabeledBlockType(result, block, diverges);
+        } else if diverges {
+            result->_type = this.context.NeverType();
+        }
+
         this.temporaries = this.temporary_stack.PopBack().Unwrap();
         this.builder.SetCurrentBlock(previous_block);
         result
+    }
+
+    fn LowerLabeledBlockType(&mut this, result: *mut HIRBlockExpression, block: *ASTBlockExpression, diverges: bool) {
+        let mut values: usize = 0;
+
+        for _break in result->breaks {
+            if _break->value != null {
+                values += 1;
+            }
+        }
+
+        if block->tail != null && result->tail == null && !diverges {
+            return;
+        }
+
+        if values == 0 {
+            if result->tail != null && !result->tail->_type->IsUnit() && !result->tail->_type->IsNever() {
+                result->tail = this.Coerce(result->tail);
+                Logger::Log("Incompatible branch types ('" + result->tail->_type->ToString() + "' != '()').", block, LogSeverity::Error);
+                result->_type = result->tail->_type;
+                return;
+            }
+
+            result->_type = this.context.UnitType();
+        } else if values != result->breaks.Length() {
+            Logger::Log("Every 'break' of a labeled block that produces a value must have a value.", block, LogSeverity::Error);
+            this.RecoverBlockType(result);
+        } else if result->tail == null && !diverges {
+            Logger::Log("A labeled block that breaks with a value must also end with a value.", block, LogSeverity::Error);
+            this.RecoverBlockType(result);
+        } else {
+            let _type = this.UnifyBranches(result, block);
+
+            if _type == null {
+                this.RecoverBlockType(result);
+                return;
+            }
+
+            result->_type = _type;
+        }
+    }
+
+    fn RecoverBlockType(&mut this, result: *mut HIRBlockExpression) {
+        for branch in this.Branches(result) {
+            if !branch->_type->IsNever() {
+                result->_type = branch->_type;
+                return;
+            }
+        }
+
+        result->_type = this.context.NeverType();
     }
 
     fn LowerBlockTail(&mut this, expression: *ASTExpression, tail: HIRBlockTail, block: *mut HIRBlockExpression, expected: *HIRType) {
@@ -4766,13 +4895,9 @@ class HIRLowerer {
             condition = this.builder.BuildCondition(expression);
         }
 
-        this.loop_scopes.PushBack(this.scope_manager.current);
-        this.loop_targets.PushBack(null);
-        this.loop_temporaries.PushBack(this.temporary_stack.Length());
+        this.PushBreakTarget(_while->label, null, null, _while);
         let while_body = this.LowerBlockExpression(_while->body, true, HIRBlockTail::Discard, null);
-        this.loop_temporaries.PopBack();
-        this.loop_targets.PopBack();
-        this.loop_scopes.PopBack();
+        this.break_targets.PopBack();
         this.scope_manager.PopScope();
         let mut else_body: *HIRBlockExpression = null;
 
@@ -4788,13 +4913,9 @@ class HIRLowerer {
     fn LowerLoopExpression(&mut this, _loop: *ASTLoopExpression) -> *HIRExpression {
         let result = this.builder.Loop();
         this.scope_manager.PushScope("<loop>".ToString(), false);
-        this.loop_scopes.PushBack(this.scope_manager.current);
-        this.loop_targets.PushBack(result);
-        this.loop_temporaries.PushBack(this.temporary_stack.Length());
+        this.PushBreakTarget(_loop->label, result, null, _loop);
         result->body = this.LowerBlockExpression(_loop->body, true, HIRBlockTail::Discard, null);
-        this.loop_temporaries.PopBack();
-        this.loop_targets.PopBack();
-        this.loop_scopes.PopBack();
+        this.break_targets.PopBack();
         this.scope_manager.PopScope();
 
         if result->breaks.Empty() {
@@ -4927,9 +5048,7 @@ class HIRLowerer {
 
         let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
         this.scope_manager.PushScope("<for>".ToString(), false);
-        this.loop_scopes.PushBack(this.scope_manager.current);
-        this.loop_targets.PushBack(null);
-        this.loop_temporaries.PushBack(this.temporary_stack.Length());
+        this.PushBreakTarget(_for->label, null, null, _for);
         let previous_block = this.builder.GetCurrentBlock();
         let body = this.builder.Block();
         this.builder.SetCurrentBlock(body);
@@ -4957,9 +5076,7 @@ class HIRLowerer {
         body->destructors = this.GetDestructors(this.scope_manager.current, null);
         this.temporaries = this.temporary_stack.PopBack().Unwrap();
         this.builder.SetCurrentBlock(previous_block);
-        this.loop_temporaries.PopBack();
-        this.loop_targets.PopBack();
-        this.loop_scopes.PopBack();
+        this.break_targets.PopBack();
         this.scope_manager.PopScope();
         this.builder.For(iterator, target, condition, step, destructors, body)
     }
@@ -5110,17 +5227,14 @@ class HIRLowerer {
     }
 
     fn LowerBreakExpression(&mut this, _break: *ASTBreakExpression) -> *HIRExpression {
-        if this.loop_scopes.Empty() {
-            Logger::Log("Break statement outside of loop.", _break, LogSeverity::Error);
-            return null;
-        }
-
-        let target = this.loop_targets.Back();
+        let index = this.FindBreakTarget(_break->label, _break, false);
+        if index < 0 { return null; }
+        let target = this.break_targets[index as usize];
         let mut value: *HIRExpression = null;
 
         if _break->value != null {
-            if target == null {
-                Logger::Log("A 'break' with a value is only allowed inside 'loop'.", _break, LogSeverity::Error);
+            if target._loop == null && target.block == null {
+                Logger::Log("A 'break' with a value is only allowed inside 'loop' or a labeled block.", _break, LogSeverity::Error);
                 return null;
             }
 
@@ -5131,27 +5245,36 @@ class HIRLowerer {
         }
 
         let mut destructors = this.GetTemporaryDestructors(value);
-        destructors += this.GetPendingTemporaryDestructors(this.loop_temporaries.Back() + 1);
-        destructors += this.GetDestructors(this.loop_scopes.Back(), null);
+        destructors += this.GetPendingTemporaryDestructors(target.temporaries + 1);
+        destructors += this.GetDestructors(target.scope, null);
         let result = this.builder.Break(value, destructors);
+        (result->label, result->depth) = (_break->label, this.break_targets.Length() - 1 - index as usize);
 
-        if target != null {
-            target->breaks.PushBack(result);
+        if target._loop != null {
+            target._loop->breaks.PushBack(result);
+        } else if target.block != null {
+            target.block->breaks.PushBack(result);
         }
 
         result
     }
 
     fn LowerContinueExpression(&mut this, _continue: *ASTContinueExpression) -> *HIRExpression {
-        if this.loop_scopes.Empty() {
-            Logger::Log("Continue statement outside of loop.", _continue, LogSeverity::Error);
+        let index = this.FindBreakTarget(_continue->label, _continue, true);
+        if index < 0 { return null; }
+        let target = this.break_targets[index as usize];
+
+        if target.block != null {
+            Logger::Log("A 'continue' cannot target the labeled block '" + _continue->label + "'.", _continue, LogSeverity::Error);
             return null;
         }
 
         let mut destructors = this.GetTemporaryDestructors(null);
-        destructors += this.GetPendingTemporaryDestructors(this.loop_temporaries.Back() + 1);
-        destructors += this.GetDestructors(this.loop_scopes.Back(), null);
-        this.builder.Continue(destructors)
+        destructors += this.GetPendingTemporaryDestructors(target.temporaries + 1);
+        destructors += this.GetDestructors(target.scope, null);
+        let result = this.builder.Continue(destructors);
+        (result->label, result->depth) = (_continue->label, this.break_targets.Length() - 1 - index as usize);
+        result
     }
 
     fn LowerTryExpression(&mut this, _try: *ASTTryExpression) -> *HIRExpression {
