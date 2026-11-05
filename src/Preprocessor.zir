@@ -23,6 +23,8 @@ class Preprocessor {
     conditions: Vector<bool>,
     taken: Vector<bool>,
     tokens: Vector<Token>,
+    file: String,
+    recovering: bool = false,
     index: usize;
 
     fn Current(&this) -> Token {
@@ -65,10 +67,11 @@ class Preprocessor {
     fn Expect(&mut this, _type: TokenType) -> Token {
         let token = this.Current();
 
-        if token._type != _type {
-            Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
-        } else {
+        if token._type == _type {
             this.Advance();
+        } else if !this.recovering {
+            Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
+            this.recovering = true;
         }
 
         token
@@ -133,72 +136,89 @@ class Preprocessor {
         this.ProcessOrExpression()
     }
 
+    fn FindModuleIn(&this, directory: &String, name: &String) -> (String, bool) {
+        let mut path = JoinPath(directory, name);
+
+        if !PathExists(path) {
+            return (String(), false);
+        }
+
+        if FolderExists(path) {
+            path = JoinPath(path, String("Entry.zir"));
+
+            if !PathExists(path) {
+                return (String(), true);
+            }
+        }
+
+        (AbsolutePath(path).Unwrap(), false)
+    }
+
+    fn FindModule(&this, name: &String) -> (String, bool) {
+        let (path, mut missing_entry) = this.FindModuleIn(SplitPath(this.file).0, name);
+
+        if !path.Empty() {
+            return (path, false);
+        }
+
+        for include_path in this.include_paths {
+            let (path, missing) = this.FindModuleIn(include_path, name);
+
+            if !path.Empty() {
+                return (path, false);
+            }
+
+            missing_entry |= missing;
+        }
+
+        (String(), missing_entry)
+    }
+
+    fn IncludeModule(&mut this, token: Token, result: &mut Vector<Token>) {
+        let (path, missing_entry) = this.FindModule(token.value);
+
+        if path.Empty() {
+            Logger::Log("Module '" + token.value + (if missing_entry { "' entry point not found." } else { "' not found." }), token, LogSeverity::Error);
+            return;
+        }
+
+        if this.included_paths.Contains(path #[if WINDOWS || DARWIN] .ToLower() #[endif]) {
+            return;
+        }
+
+        let source = match File::ReadText(path) {
+            Result<String, IOError>::Ok(source) => source,
+            Result<String, IOError>::Err(error) => {
+                Logger::Log("Failed to read module '" + token.value + "': " + error.ToString() + ".", token, LogSeverity::Error);
+                return;
+            }
+        };
+
+        let mut taken = Vector<bool>();
+        this.taken.Swap(taken);
+        let mut tokens = Vector<Token>();
+        this.tokens.Swap(tokens);
+        let mut conditions = Vector<bool>();
+        this.conditions.Swap(conditions);
+        let (index, file) = (this.index, this.file);
+
+        let mut lexer: Lexer;
+        result += this.Process(lexer.Lex(source, path), path);
+        result.PopBack();
+
+        (this.index, this.file) = (index, file);
+        this.conditions.Swap(conditions);
+        this.tokens.Swap(tokens);
+        this.taken.Swap(taken);
+    }
+
     fn ProcessInclude(&mut this, result: &mut Vector<Token>) {
         loop {
             let token = this.Expect(TokenType::STRING);
+            if token._type != TokenType::STRING { return; }
 
-            if !this.Condition() {
-                if this.Match(TokenType::COMMA) {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
-            let (mut found, mut missing_entry) = (false, false);
-
-            for include_path in this.include_paths {
-                let mut path = JoinPath(include_path, token.value);
-
-                if !PathExists(path) {
-                    continue;
-                }
-
-                if FolderExists(path) {
-                    path = JoinPath(path, String("Entry.zir"));
-
-                    if !PathExists(path) {
-                        missing_entry = true;
-                        continue;
-                    }
-                }
-
-                (path, found) = (AbsolutePath(path).Unwrap(), true);
-
-                if this.included_paths.Contains(path #[if WINDOWS || DARWIN] .ToLower() #[endif]) {
-                    break;
-                }
-
-                let source = match File::ReadText(path) {
-                    Result<String, IOError>::Ok(source) => source,
-                    Result<String, IOError>::Err(error) => {
-                        Logger::Log("Failed to read module '" + token.value + "': " + error.ToString() + ".", token, LogSeverity::Error);
-                        break;
-                    }
-                };
-
-                let mut taken = Vector<bool>();
-                this.taken.Swap(taken);
-                let mut tokens = Vector<Token>();
-                this.tokens.Swap(tokens);
-                let mut conditions = Vector<bool>();
-                this.conditions.Swap(conditions);
-                let index = this.index;
-
-                let mut lexer: Lexer;
-                result += this.Process(lexer.Lex(source, path), path);
-                result.PopBack();
-
-                this.index = index;
-                this.conditions.Swap(conditions);
-                this.tokens.Swap(tokens);
-                this.taken.Swap(taken);
-                break;
-            }
-
-            if !found {
-                Logger::Log("Module '" + token.value + (if missing_entry { "' entry point not found." } else { "' not found." }), token, LogSeverity::Error);
-                return;
+            if this.Condition() {
+                this.IncludeModule(token, result);
             }
 
             if !this.Match(TokenType::COMMA) {
@@ -247,33 +267,45 @@ class Preprocessor {
                 Logger::Log("Unexpected 'endif' directive.", token, LogSeverity::Error);
             }
         } else if this.Match(TokenType::ERROR) {
-            let message = this.Expect(TokenType::STRING).value;
+            let message = this.Expect(TokenType::STRING);
 
-            if this.Condition() {
-                Logger::Log(message, token, LogSeverity::Error);
+            if message._type == TokenType::STRING && this.Condition() {
+                Logger::Log(message.value, token, LogSeverity::Error);
             }
         } else if this.Match(TokenType::WARNING) {
-            let message = this.Expect(TokenType::STRING).value;
+            let message = this.Expect(TokenType::STRING);
 
-            if this.Condition() {
-                Logger::Log(message, token, LogSeverity::Warning);
+            if message._type == TokenType::STRING && this.Condition() {
+                Logger::Log(message.value, token, LogSeverity::Warning);
             }
         } else {
             Logger::Log("Unknown directive: '" + token.value + "'.", token, LogSeverity::Error);
+            this.recovering = true;
         }
     }
 
     pub fn Process(&mut this, tokens: &Vector<Token>, file: &String) -> Vector<Token> {
-        (this.tokens, this.index) = (tokens, 0);
-        this.included_paths.PushBack(AbsolutePath(file).Unwrap() #[if WINDOWS || DARWIN] .ToLower() #[endif]);
+        (this.tokens, this.index, this.file) = (tokens, 0, AbsolutePath(file).Unwrap());
+        this.included_paths.PushBack(this.file #[if WINDOWS || DARWIN] .ToLower() #[endif]);
         let mut result = Vector<Token>();
 
         loop {
             let token = this.Current();
 
             if this.Match(TokenType::PREPROCESSOR_START) {
+                this.recovering = false;
                 this.ProcessDirective(result);
-                this.Expect(TokenType::PREPROCESSOR_END);
+
+                if this.Current()._type != TokenType::PREPROCESSOR_END {
+                    this.Expect(TokenType::PREPROCESSOR_END);
+
+                    while this.Current()._type != TokenType::PREPROCESSOR_END && this.Current()._type != TokenType::PREPROCESSOR_START && this.Current()._type != TokenType::EOF {
+                        this.Advance();
+                    }
+                }
+
+                this.Match(TokenType::PREPROCESSOR_END);
+                this.recovering = false;
             } else if token._type != TokenType::EOF {
                 if this.Condition() {
                     result.PushBack(token);
