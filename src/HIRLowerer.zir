@@ -360,10 +360,10 @@ class HIRLowerer {
     fn LowerDeclarationFourthPass(&mut this, declaration: *ASTDeclaration) -> bool {
         match declaration->kind {
             ASTDeclarationKind::Function => {
-                let function = declaration as *ASTFunctionDeclaration;
+                let data = this.function_data.Get(declaration, null);
 
-                if !function->generic && function->pack_name.Empty() {
-                    this.LowerFunctionDeclarationSecondPass(this.function_data[declaration], function);
+                if data != null {
+                    this.LowerFunctionDeclarationSecondPass(data, declaration as *ASTFunctionDeclaration);
                 }
             },
             ASTDeclarationKind::Class => {

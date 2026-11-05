@@ -86,7 +86,7 @@ class ScopeManager {
             if !types.Empty() {
                 if symbol->kind != SymbolKind::Generic { continue; }
                 let instance = symbol->generic->Instantiate(types, path);
-                if instance == null { return Vector<*Symbol>(); }
+                if instance == null || instance->symbol == null { return Vector<*Symbol>(); }
                 symbols.PushBack(instance->symbol);
             } else {
                 symbols.PushBack(symbol);
