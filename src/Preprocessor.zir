@@ -70,7 +70,7 @@ class Preprocessor {
         if token._type == _type {
             this.Advance();
         } else if !this.recovering {
-            Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
+            Logger::Log("Expected " + _type.Describe() + ", found " + token.Describe() + ".", token, LogSeverity::Error);
             this.recovering = true;
         }
 
@@ -86,22 +86,22 @@ class Preprocessor {
     }
 
     fn ProcessPrimary(&mut this) -> bool {
-        if this.Match(TokenType::TRUE) {
+        if this.Match(TokenType::True) {
             true
-        } else if this.Match(TokenType::FALSE) {
+        } else if this.Match(TokenType::False) {
             false
-        } else if this.Match(TokenType::LPAREN) {
+        } else if this.Match(TokenType::LeftParen) {
             let result = this.ProcessExpression();
-            this.Expect(TokenType::RPAREN);
+            this.Expect(TokenType::RightParen);
             result
         } else {
-            let name = this.Expect(TokenType::IDENTIFIER).Text();
+            let name = this.Expect(TokenType::Identifier).Text();
             this.defines.Contains(name)
         }
     }
 
     fn ProcessNotExpression(&mut this) -> bool {
-        if this.Match(TokenType::NOT) {
+        if this.Match(TokenType::Not) {
             return !this.ProcessNotExpression();
         }
 
@@ -111,7 +111,7 @@ class Preprocessor {
     fn ProcessAndExpression(&mut this) -> bool {
         let mut result = this.ProcessNotExpression();
 
-        while this.Current()._type == TokenType::AND {
+        while this.Current()._type == TokenType::And {
             this.Advance();
             let right = this.ProcessNotExpression();
             result = result && right;
@@ -123,7 +123,7 @@ class Preprocessor {
     fn ProcessOrExpression(&mut this) -> bool {
         let mut result = this.ProcessAndExpression();
 
-        while this.Current()._type == TokenType::OR {
+        while this.Current()._type == TokenType::Or {
             this.Advance();
             let right = this.ProcessAndExpression();
             result = result || right;
@@ -215,32 +215,32 @@ class Preprocessor {
 
     fn ProcessInclude(&mut this, result: &mut Vector<Token>) {
         loop {
-            let token = this.Expect(TokenType::STRING);
-            if token._type != TokenType::STRING { return; }
+            let token = this.Expect(TokenType::String);
+            if token._type != TokenType::String { return; }
 
             if this.Condition() {
                 this.IncludeModule(token, result);
             }
 
-            if !this.Match(TokenType::COMMA) {
+            if !this.Match(TokenType::Comma) {
                 break;
             }
         }
 
-        this.Expect(TokenType::COLON);
-        this.Expect(TokenType::MUL);
+        this.Expect(TokenType::Colon);
+        this.Expect(TokenType::Mul);
     }
 
     pub fn ProcessDirective(&mut this, result: &mut Vector<Token>) {
         let token = this.Current();
 
-        if this.Match(TokenType::INCLUDE) {
+        if this.Match(TokenType::Include) {
             this.ProcessInclude(result);
-        } else if this.Match(TokenType::IF) {
+        } else if this.Match(TokenType::If) {
             let active = this.ProcessExpression();
             this.conditions.PushBack(active);
             this.taken.PushBack(active);
-        } else if this.Match(TokenType::ELIF) {
+        } else if this.Match(TokenType::Elif) {
             let active = this.ProcessExpression();
 
             if this.conditions.Empty() {
@@ -251,7 +251,7 @@ class Preprocessor {
                 this.conditions[this.conditions.Length() - 1] = active;
                 this.taken[this.taken.Length() - 1] = active;
             }
-        } else if this.Match(TokenType::ELSE) {
+        } else if this.Match(TokenType::Else) {
             if this.conditions.Empty() {
                 Logger::Log("Unexpected 'else' directive.", token, LogSeverity::Error);
             } else if this.taken[this.taken.Length() - 1] {
@@ -260,23 +260,23 @@ class Preprocessor {
                 this.conditions[this.conditions.Length() - 1] = true;
                 this.taken[this.taken.Length() - 1] = true;
             }
-        } else if this.Match(TokenType::ENDIF) {
+        } else if this.Match(TokenType::Endif) {
             if !this.conditions.Empty() {
                 this.conditions.PopBack();
                 this.taken.PopBack();
             } else {
                 Logger::Log("Unexpected 'endif' directive.", token, LogSeverity::Error);
             }
-        } else if this.Match(TokenType::ERROR) {
-            let message = this.Expect(TokenType::STRING);
+        } else if this.Match(TokenType::Error) {
+            let message = this.Expect(TokenType::String);
 
-            if message._type == TokenType::STRING && this.Condition() {
+            if message._type == TokenType::String && this.Condition() {
                 Logger::Log(Lexer::Unescape(message.span), token, LogSeverity::Error);
             }
-        } else if this.Match(TokenType::WARNING) {
-            let message = this.Expect(TokenType::STRING);
+        } else if this.Match(TokenType::Warning) {
+            let message = this.Expect(TokenType::String);
 
-            if message._type == TokenType::STRING && this.Condition() {
+            if message._type == TokenType::String && this.Condition() {
                 Logger::Log(Lexer::Unescape(message.span), token, LogSeverity::Warning);
             }
         } else {
@@ -293,21 +293,21 @@ class Preprocessor {
         loop {
             let token = this.Current();
 
-            if this.Match(TokenType::PREPROCESSOR_START) {
+            if this.Match(TokenType::PreprocessorStart) {
                 this.recovering = false;
                 this.ProcessDirective(result);
 
-                if this.Current()._type != TokenType::PREPROCESSOR_END {
-                    this.Expect(TokenType::PREPROCESSOR_END);
+                if this.Current()._type != TokenType::PreprocessorEnd {
+                    this.Expect(TokenType::PreprocessorEnd);
 
-                    while this.Current()._type != TokenType::PREPROCESSOR_END && this.Current()._type != TokenType::PREPROCESSOR_START && this.Current()._type != TokenType::EOF {
+                    while this.Current()._type != TokenType::PreprocessorEnd && this.Current()._type != TokenType::PreprocessorStart && this.Current()._type != TokenType::EndOfFile {
                         this.Advance();
                     }
                 }
 
-                this.Match(TokenType::PREPROCESSOR_END);
+                this.Match(TokenType::PreprocessorEnd);
                 this.recovering = false;
-            } else if token._type != TokenType::EOF {
+            } else if token._type != TokenType::EndOfFile {
                 if this.Condition() {
                     result.PushBack(token);
                 } this.Advance();

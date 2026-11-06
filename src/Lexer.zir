@@ -212,7 +212,7 @@ class Lexer {
     fn LexString(&mut this) -> Token {
         let mut token: Token;
         token.span = this.Span();
-        token._type = if this.CurrentChar() != '"' { TokenType::CHAR } else { TokenType::STRING };
+        token._type = if this.CurrentChar() != '"' { TokenType::Character } else { TokenType::String };
         this.ScanString(true);
         token
     }
@@ -233,7 +233,7 @@ class Lexer {
 
     fn LexLabel(&mut this) -> Token {
         let mut token: Token;
-        (token._type, token.span) = (TokenType::LABEL, this.Span());
+        (token._type, token.span) = (TokenType::Label, this.Span());
         this.Advance(1);
 
         while this.IsAlphaNum(this.CurrentChar()) {
@@ -246,7 +246,7 @@ class Lexer {
     fn LexNumber(&mut this) -> Token {
         let mut token: Token;
         token.span = this.Span();
-        token._type = TokenType::INTEGER;
+        token._type = TokenType::Integer;
 
         if this.CurrentChar() == '0' {
             this.Advance(1);
@@ -281,7 +281,7 @@ class Lexer {
         }
 
         if this.CurrentChar() == '.' && this.IsDigit(this.PeekChar(1)) {
-            token._type = TokenType::FLOAT;
+            token._type = TokenType::Float;
             this.Advance(1);
 
             while this.IsDigit(this.CurrentChar()) {
@@ -290,7 +290,7 @@ class Lexer {
         }
 
         if this.CurrentChar() == 'e' || this.CurrentChar() == 'E' {
-            token._type = TokenType::FLOAT;
+            token._type = TokenType::Float;
             this.Advance(1);
 
             if this.CurrentChar() == '+' || this.CurrentChar() == '-' {
@@ -309,7 +309,7 @@ class Lexer {
                 this.Advance(1);
             }
         } else if this.CurrentChar() == 'f' {
-            token._type = TokenType::FLOAT;
+            token._type = TokenType::Float;
             this.Advance(1);
 
             while this.IsDigit(this.CurrentChar()) {
@@ -352,13 +352,13 @@ class Lexer {
         } else {
             token._type = StringToKeyword(text);
 
-            if token._type == TokenType::ASSEMBLY {
+            if token._type == TokenType::Assembly {
                 this.assembly = true;
             }
         }
 
-        if token._type == TokenType::UNKNOWN {
-            token._type = TokenType::IDENTIFIER;
+        if token._type == TokenType::Unknown {
+            token._type = TokenType::Identifier;
         }
 
         token
@@ -371,154 +371,154 @@ class Lexer {
         let next = this.PeekChar(1);
 
         if current == '@' {
-            token._type = TokenType::AT;
+            token._type = TokenType::At;
             this.Advance(1);
         } else if current == '#' && next == '[' {
             this.preprocessor = true;
-            token._type = TokenType::PREPROCESSOR_START;
+            token._type = TokenType::PreprocessorStart;
             this.Advance(2);
         } else if current == '+' {
             if next == '=' {
-                token._type = TokenType::PLUS_ASSIGN;
+                token._type = TokenType::PlusAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::PLUS;
+                token._type = TokenType::Plus;
                 this.Advance(1);
             }
         } else if current == '-' {
             if next == '=' {
-                token._type = TokenType::MINUS_ASSIGN;
+                token._type = TokenType::MinusAssign;
                 this.Advance(2);
             } else if next == '>' {
-                token._type = TokenType::ARROW;
+                token._type = TokenType::Arrow;
                 this.Advance(2);
             } else {
-                token._type = TokenType::MINUS;
+                token._type = TokenType::Minus;
                 this.Advance(1);
             }
         } else if current == '*' {
             if next == '=' {
-                token._type = TokenType::MUL_ASSIGN;
+                token._type = TokenType::MulAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::MUL;
+                token._type = TokenType::Mul;
                 this.Advance(1);
             }
         } else if current == '/' {
             if next == '=' {
-                token._type = TokenType::DIV_ASSIGN;
+                token._type = TokenType::DivAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::DIV;
+                token._type = TokenType::Div;
                 this.Advance(1);
             }
         } else if current == '%' {
             if next == '=' {
-                token._type = TokenType::MOD_ASSIGN;
+                token._type = TokenType::ModAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::MOD;
+                token._type = TokenType::Mod;
                 this.Advance(1);
             }
         } else if current == '<' {
             if next == '<' && this.PeekChar(2) == '=' {
-                token._type = TokenType::LSHIFT_ASSIGN;
+                token._type = TokenType::LeftShiftAssign;
                 this.Advance(3);
             } else if next == '=' {
-                token._type = TokenType::LESS_EQUAL;
+                token._type = TokenType::LessEqual;
                 this.Advance(2);
             } else {
-                token._type = TokenType::LESS;
+                token._type = TokenType::Less;
                 this.Advance(1);
             }
         } else if current == '>' {
             if next == '>' && this.PeekChar(2) == '=' {
-                token._type = TokenType::RSHIFT_ASSIGN;
+                token._type = TokenType::RightShiftAssign;
                 this.Advance(3);
             } else if next == '=' {
-                token._type = TokenType::GREATER_EQUAL;
+                token._type = TokenType::GreaterEqual;
                 this.Advance(2);
             } else {
-                token._type = TokenType::GREATER;
+                token._type = TokenType::Greater;
                 this.Advance(1);
             }
         } else if current == '&' {
             if next == '&' {
-                token._type = TokenType::AND;
+                token._type = TokenType::And;
                 this.Advance(2);
             } else if next == '=' {
-                token._type = TokenType::AND_ASSIGN;
+                token._type = TokenType::AndAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::BITWISE_AND;
+                token._type = TokenType::BitwiseAnd;
                 this.Advance(1);
             }
         } else if current == '|' {
             if next == '|' {
-                token._type = TokenType::OR;
+                token._type = TokenType::Or;
                 this.Advance(2);
             } else if next == '=' {
-                token._type = TokenType::OR_ASSIGN;
+                token._type = TokenType::OrAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::BITWISE_OR;
+                token._type = TokenType::BitwiseOr;
                 this.Advance(1);
             }
         } else if current == '^' {
             if next == '=' {
-                token._type = TokenType::XOR_ASSIGN;
+                token._type = TokenType::XorAssign;
                 this.Advance(2);
             } else {
-                token._type = TokenType::BITWISE_XOR;
+                token._type = TokenType::BitwiseXor;
                 this.Advance(1);
             }
         } else if current == '=' {
             if next == '=' {
-                token._type = TokenType::EQUAL;
+                token._type = TokenType::Equal;
                 this.Advance(2);
             } else if next == '>' {
-                token._type = TokenType::FAT_ARROW;
+                token._type = TokenType::FatArrow;
                 this.Advance(2);
             } else {
-                token._type = TokenType::ASSIGN;
+                token._type = TokenType::Assign;
                 this.Advance(1);
             }
         } else if current == '!' {
             if next == '=' {
-                token._type = TokenType::NOT_EQUAL;
+                token._type = TokenType::NotEqual;
                 this.Advance(2);
             } else {
-                token._type = TokenType::NOT;
+                token._type = TokenType::Not;
                 this.Advance(1);
             }
         } else if current == '?' {
-            token._type = TokenType::QUESTION_MARK;
+            token._type = TokenType::QuestionMark;
             this.Advance(1);
         } else if current == '~' {
-            token._type = TokenType::TILDE;
+            token._type = TokenType::Tilde;
             this.Advance(1);
         } else if current == '.' {
             if next == '.' {
                 if this.PeekChar(2) == '.' {
-                    token._type = TokenType::THREE_DOT;
+                    token._type = TokenType::ThreeDot;
                     this.Advance(3);
                 } else {
-                    token._type = TokenType::TWO_DOT;
+                    token._type = TokenType::TwoDot;
                     this.Advance(2);
                 }
             } else {
-                token._type = TokenType::DOT;
+                token._type = TokenType::Dot;
                 this.Advance(1);
             }
         } else if current == ',' {
-            token._type = TokenType::COMMA;
+            token._type = TokenType::Comma;
             this.Advance(1);
         } else if current == ':' {
             if next == ':' {
-                token._type = TokenType::DOUBLE_COLON;
+                token._type = TokenType::DoubleColon;
                 this.Advance(2);
             } else {
-                token._type = TokenType::COLON;
+                token._type = TokenType::Colon;
                 this.Advance(1);
             }
         } else if current == ';' {
@@ -526,34 +526,34 @@ class Lexer {
                 Logger::Log("Expected an assembly block before the semicolon.", token, LogSeverity::Error);
             }
 
-            token._type = TokenType::SEMICOLON;
+            token._type = TokenType::Semicolon;
             this.Advance(1);
         } else if current == '(' {
-            token._type = TokenType::LPAREN;
+            token._type = TokenType::LeftParen;
             this.Advance(1);
         } else if current == ')' {
-            token._type = TokenType::RPAREN;
+            token._type = TokenType::RightParen;
             this.Advance(1);
         } else if current == '[' {
-            token._type = TokenType::LBRACKET;
+            token._type = TokenType::LeftBracket;
             this.Advance(1);
         } else if current == ']' {
             if this.preprocessor {
                 this.preprocessor = false;
-                token._type = TokenType::PREPROCESSOR_END;
+                token._type = TokenType::PreprocessorEnd;
                 this.Advance(1);
             } else {
-                token._type = TokenType::RBRACKET;
+                token._type = TokenType::RightBracket;
                 this.Advance(1);
             }
         } else if current == '{' {
-            token._type = TokenType::LBRACE;
+            token._type = TokenType::LeftBrace;
             this.Advance(1);
         } else if current == '}' {
-            token._type = TokenType::RBRACE;
+            token._type = TokenType::RightBrace;
             this.Advance(1);
         } else if current == '\\' {
-            token._type = TokenType::BACKSLASH;
+            token._type = TokenType::Backslash;
             this.Advance(1);
         } else {
             Logger::Log("Invalid symbol '" + current.ToString() + "'.", token, LogSeverity::Error);
@@ -607,7 +607,7 @@ class Lexer {
 
     fn LexAssembly(&mut this) -> Token {
         let mut token: Token;
-        (token._type, token.span) = (TokenType::ASSEMBLY_TEXT, this.Span());
+        (token._type, token.span) = (TokenType::AssemblyText, this.Span());
         this.ScanAssembly(true);
         token
     }
@@ -654,7 +654,7 @@ class Lexer {
         }
 
         let mut eof: Token;
-        (eof._type, eof.span) = (TokenType::EOF, this.Span());
+        (eof._type, eof.span) = (TokenType::EndOfFile, this.Span());
         tokens.PushBack(eof);
         tokens
     }

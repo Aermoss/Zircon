@@ -17,191 +17,298 @@
 #[include "std/str", "src/Source.zir" : *]
 
 enum TokenType: i32 {
-    UNKNOWN, EOF,
+    Unknown, EndOfFile,
 
-    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR, LABEL, TRUE, FALSE, NULL,
+    Identifier, Integer, Float, String, Character, Label, True, False, Null,
 
-    NEW, DELETE, ASYNC, AWAIT, AS, THIS, OPERATOR,
-    IF, ELSE, FOR, IN, WHILE, LOOP, MATCH, RETURN, BREAK, CONTINUE,
-    FUNCTION, CLASS, STRUCTURE, ENUMERATION, EXTEND, TYPE, EXTERN, LET, MUT, CONST, STATIC,
-    PUBLIC, VIRTUAL, OVERRIDE, ASSEMBLY, ASSEMBLY_TEXT, VOLATILE, UNSAFE,
+    New, Delete, Async, Await, As, This, Operator,
+    If, Else, For, In, While, Loop, Match, Return, Break, Continue,
+    Function, Class, Structure, Enumeration, Extend, Type, Extern, Let, Mut, Const, Static,
+    Public, Virtual, Override, Assembly, AssemblyText, Volatile, Unsafe,
 
-    ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,
-    LSHIFT_ASSIGN, RSHIFT_ASSIGN, AND_ASSIGN, OR_ASSIGN, XOR_ASSIGN,
+    Assign, PlusAssign, MinusAssign, MulAssign, DivAssign, ModAssign,
+    LeftShiftAssign, RightShiftAssign, AndAssign, OrAssign, XorAssign,
 
-    PLUS, MINUS, MUL, DIV, MOD, AND, OR, NOT,
-    BITWISE_AND, BITWISE_OR, BITWISE_XOR, LSHIFT, RSHIFT, TILDE,
-    EQUAL, NOT_EQUAL, GREATER, LESS, GREATER_EQUAL, LESS_EQUAL,
+    Plus, Minus, Mul, Div, Mod, And, Or, Not,
+    BitwiseAnd, BitwiseOr, BitwiseXor, LeftShift, RightShift, Tilde,
+    Equal, NotEqual, Greater, Less, GreaterEqual, LessEqual,
 
-    LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
-    DOT, TWO_DOT, THREE_DOT, COMMA, COLON, DOUBLE_COLON, SEMICOLON,
-    AT, QUESTION_MARK, BACKSLASH, ARROW, FAT_ARROW,
+    LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket,
+    Dot, TwoDot, ThreeDot, Comma, Colon, DoubleColon, Semicolon,
+    At, QuestionMark, Backslash, Arrow, FatArrow,
 
-    PREPROCESSOR_START, PREPROCESSOR_END,
-    ELIF, ENDIF, INCLUDE, ERROR, WARNING
+    PreprocessorStart, PreprocessorEnd,
+    Elif, Endif, Include, Error, Warning
 }
 
 extend TokenType {
     pub fn ToString(this) -> String {
         match this {
-            TokenType::EOF => "EOF",
-            TokenType::IDENTIFIER => "IDENTIFIER",
-            TokenType::INTEGER => "INTEGER",
-            TokenType::FLOAT => "FLOAT",
-            TokenType::STRING => "STRING",
-            TokenType::CHAR => "CHAR",
-            TokenType::LABEL => "LABEL",
-            TokenType::TRUE => "TRUE",
-            TokenType::FALSE => "FALSE",
-            TokenType::NULL => "NULL",
-            TokenType::NEW => "NEW",
-            TokenType::DELETE => "DELETE",
-            TokenType::ASYNC => "ASYNC",
-            TokenType::AWAIT => "AWAIT",
-            TokenType::AS => "AS",
-            TokenType::THIS => "THIS",
-            TokenType::OPERATOR => "OPERATOR",
-            TokenType::IF => "IF",
-            TokenType::ELSE => "ELSE",
-            TokenType::FOR => "FOR",
-            TokenType::IN => "IN",
-            TokenType::WHILE => "WHILE",
-            TokenType::LOOP => "LOOP",
-            TokenType::MATCH => "MATCH",
-            TokenType::RETURN => "RETURN",
-            TokenType::BREAK => "BREAK",
-            TokenType::CONTINUE => "CONTINUE",
-            TokenType::FUNCTION => "FUNCTION",
-            TokenType::CLASS => "CLASS",
-            TokenType::STRUCTURE => "STRUCTURE",
-            TokenType::ENUMERATION => "ENUMERATION",
-            TokenType::EXTEND => "EXTEND",
-            TokenType::TYPE => "TYPE",
-            TokenType::EXTERN => "EXTERN",
-            TokenType::LET => "LET",
-            TokenType::MUT => "MUT",
-            TokenType::CONST => "CONST",
-            TokenType::STATIC => "STATIC",
-            TokenType::PUBLIC => "PUBLIC",
-            TokenType::VIRTUAL => "VIRTUAL",
-            TokenType::OVERRIDE => "OVERRIDE",
-            TokenType::ASSEMBLY => "ASSEMBLY",
-            TokenType::ASSEMBLY_TEXT => "ASSEMBLY_TEXT",
-            TokenType::VOLATILE => "VOLATILE",
-            TokenType::UNSAFE => "UNSAFE",
-            TokenType::ASSIGN => "ASSIGN",
-            TokenType::PLUS_ASSIGN => "PLUS_ASSIGN",
-            TokenType::MINUS_ASSIGN => "MINUS_ASSIGN",
-            TokenType::MUL_ASSIGN => "MUL_ASSIGN",
-            TokenType::DIV_ASSIGN => "DIV_ASSIGN",
-            TokenType::MOD_ASSIGN => "MOD_ASSIGN",
-            TokenType::LSHIFT_ASSIGN => "LSHIFT_ASSIGN",
-            TokenType::RSHIFT_ASSIGN => "RSHIFT_ASSIGN",
-            TokenType::AND_ASSIGN => "AND_ASSIGN",
-            TokenType::OR_ASSIGN => "OR_ASSIGN",
-            TokenType::XOR_ASSIGN => "XOR_ASSIGN",
-            TokenType::PLUS => "PLUS",
-            TokenType::MINUS => "MINUS",
-            TokenType::MUL => "MUL",
-            TokenType::DIV => "DIV",
-            TokenType::MOD => "MOD",
-            TokenType::AND => "AND",
-            TokenType::OR => "OR",
-            TokenType::NOT => "NOT",
-            TokenType::BITWISE_AND => "BITWISE_AND",
-            TokenType::BITWISE_OR => "BITWISE_OR",
-            TokenType::BITWISE_XOR => "BITWISE_XOR",
-            TokenType::LSHIFT => "LSHIFT",
-            TokenType::RSHIFT => "RSHIFT",
-            TokenType::TILDE => "TILDE",
-            TokenType::EQUAL => "EQUAL",
-            TokenType::NOT_EQUAL => "NOT_EQUAL",
-            TokenType::GREATER => "GREATER",
-            TokenType::LESS => "LESS",
-            TokenType::GREATER_EQUAL => "GREATER_EQUAL",
-            TokenType::LESS_EQUAL => "LESS_EQUAL",
-            TokenType::LPAREN => "LPAREN",
-            TokenType::RPAREN => "RPAREN",
-            TokenType::LBRACE => "LBRACE",
-            TokenType::RBRACE => "RBRACE",
-            TokenType::LBRACKET => "LBRACKET",
-            TokenType::RBRACKET => "RBRACKET",
-            TokenType::DOT => "DOT",
-            TokenType::TWO_DOT => "TWO_DOT",
-            TokenType::THREE_DOT => "THREE_DOT",
-            TokenType::COMMA => "COMMA",
-            TokenType::COLON => "COLON",
-            TokenType::DOUBLE_COLON => "DOUBLE_COLON",
-            TokenType::SEMICOLON => "SEMICOLON",
-            TokenType::AT => "AT",
-            TokenType::QUESTION_MARK => "QUESTION_MARK",
-            TokenType::BACKSLASH => "BACKSLASH",
-            TokenType::ARROW => "ARROW",
-            TokenType::FAT_ARROW => "FAT_ARROW",
-            TokenType::PREPROCESSOR_START => "PREPROCESSOR_START",
-            TokenType::PREPROCESSOR_END => "PREPROCESSOR_END",
-            TokenType::ELIF => "ELIF",
-            TokenType::ENDIF => "ENDIF",
-            TokenType::INCLUDE => "INCLUDE",
-            TokenType::ERROR => "ERROR",
-            TokenType::WARNING => "WARNING",
-            _ => "UNKNOWN"
+            TokenType::Unknown => "Unknown",
+            TokenType::EndOfFile => "EndOfFile",
+            TokenType::Identifier => "Identifier",
+            TokenType::Integer => "Integer",
+            TokenType::Float => "Float",
+            TokenType::String => "String",
+            TokenType::Character => "Character",
+            TokenType::Label => "Label",
+            TokenType::True => "True",
+            TokenType::False => "False",
+            TokenType::Null => "Null",
+            TokenType::New => "New",
+            TokenType::Delete => "Delete",
+            TokenType::Async => "Async",
+            TokenType::Await => "Await",
+            TokenType::As => "As",
+            TokenType::This => "This",
+            TokenType::Operator => "Operator",
+            TokenType::If => "If",
+            TokenType::Else => "Else",
+            TokenType::For => "For",
+            TokenType::In => "In",
+            TokenType::While => "While",
+            TokenType::Loop => "Loop",
+            TokenType::Match => "Match",
+            TokenType::Return => "Return",
+            TokenType::Break => "Break",
+            TokenType::Continue => "Continue",
+            TokenType::Function => "Function",
+            TokenType::Class => "Class",
+            TokenType::Structure => "Structure",
+            TokenType::Enumeration => "Enumeration",
+            TokenType::Extend => "Extend",
+            TokenType::Type => "Type",
+            TokenType::Extern => "Extern",
+            TokenType::Let => "Let",
+            TokenType::Mut => "Mut",
+            TokenType::Const => "Const",
+            TokenType::Static => "Static",
+            TokenType::Public => "Public",
+            TokenType::Virtual => "Virtual",
+            TokenType::Override => "Override",
+            TokenType::Assembly => "Assembly",
+            TokenType::AssemblyText => "AssemblyText",
+            TokenType::Volatile => "Volatile",
+            TokenType::Unsafe => "Unsafe",
+            TokenType::Assign => "Assign",
+            TokenType::PlusAssign => "PlusAssign",
+            TokenType::MinusAssign => "MinusAssign",
+            TokenType::MulAssign => "MulAssign",
+            TokenType::DivAssign => "DivAssign",
+            TokenType::ModAssign => "ModAssign",
+            TokenType::LeftShiftAssign => "LeftShiftAssign",
+            TokenType::RightShiftAssign => "RightShiftAssign",
+            TokenType::AndAssign => "AndAssign",
+            TokenType::OrAssign => "OrAssign",
+            TokenType::XorAssign => "XorAssign",
+            TokenType::Plus => "Plus",
+            TokenType::Minus => "Minus",
+            TokenType::Mul => "Mul",
+            TokenType::Div => "Div",
+            TokenType::Mod => "Mod",
+            TokenType::And => "And",
+            TokenType::Or => "Or",
+            TokenType::Not => "Not",
+            TokenType::BitwiseAnd => "BitwiseAnd",
+            TokenType::BitwiseOr => "BitwiseOr",
+            TokenType::BitwiseXor => "BitwiseXor",
+            TokenType::LeftShift => "LeftShift",
+            TokenType::RightShift => "RightShift",
+            TokenType::Tilde => "Tilde",
+            TokenType::Equal => "Equal",
+            TokenType::NotEqual => "NotEqual",
+            TokenType::Greater => "Greater",
+            TokenType::Less => "Less",
+            TokenType::GreaterEqual => "GreaterEqual",
+            TokenType::LessEqual => "LessEqual",
+            TokenType::LeftParen => "LeftParen",
+            TokenType::RightParen => "RightParen",
+            TokenType::LeftBrace => "LeftBrace",
+            TokenType::RightBrace => "RightBrace",
+            TokenType::LeftBracket => "LeftBracket",
+            TokenType::RightBracket => "RightBracket",
+            TokenType::Dot => "Dot",
+            TokenType::TwoDot => "TwoDot",
+            TokenType::ThreeDot => "ThreeDot",
+            TokenType::Comma => "Comma",
+            TokenType::Colon => "Colon",
+            TokenType::DoubleColon => "DoubleColon",
+            TokenType::Semicolon => "Semicolon",
+            TokenType::At => "At",
+            TokenType::QuestionMark => "QuestionMark",
+            TokenType::Backslash => "Backslash",
+            TokenType::Arrow => "Arrow",
+            TokenType::FatArrow => "FatArrow",
+            TokenType::PreprocessorStart => "PreprocessorStart",
+            TokenType::PreprocessorEnd => "PreprocessorEnd",
+            TokenType::Elif => "Elif",
+            TokenType::Endif => "Endif",
+            TokenType::Include => "Include",
+            TokenType::Error => "Error",
+            TokenType::Warning => "Warning"
+        }.ToString()
+    }
+
+    pub fn Describe(this) -> String {
+        match this {
+            TokenType::Unknown => "unknown token",
+            TokenType::EndOfFile => "end of file",
+            TokenType::Identifier => "identifier",
+            TokenType::Integer => "integer literal",
+            TokenType::Float => "float literal",
+            TokenType::String => "string literal",
+            TokenType::Character => "character literal",
+            TokenType::Label => "label",
+            TokenType::True => "'true'",
+            TokenType::False => "'false'",
+            TokenType::Null => "'null'",
+            TokenType::New => "'new'",
+            TokenType::Delete => "'delete'",
+            TokenType::Async => "'async'",
+            TokenType::Await => "'await'",
+            TokenType::As => "'as'",
+            TokenType::This => "'this'",
+            TokenType::Operator => "'operator'",
+            TokenType::If => "'if'",
+            TokenType::Else => "'else'",
+            TokenType::For => "'for'",
+            TokenType::In => "'in'",
+            TokenType::While => "'while'",
+            TokenType::Loop => "'loop'",
+            TokenType::Match => "'match'",
+            TokenType::Return => "'return'",
+            TokenType::Break => "'break'",
+            TokenType::Continue => "'continue'",
+            TokenType::Function => "'fn'",
+            TokenType::Class => "'class'",
+            TokenType::Structure => "'struct'",
+            TokenType::Enumeration => "'enum'",
+            TokenType::Extend => "'extend'",
+            TokenType::Type => "'type'",
+            TokenType::Extern => "'extern'",
+            TokenType::Let => "'let'",
+            TokenType::Mut => "'mut'",
+            TokenType::Const => "'const'",
+            TokenType::Static => "'static'",
+            TokenType::Public => "'pub'",
+            TokenType::Virtual => "'virtual'",
+            TokenType::Override => "'override'",
+            TokenType::Assembly => "'asm'",
+            TokenType::AssemblyText => "assembly block",
+            TokenType::Volatile => "'volatile'",
+            TokenType::Unsafe => "'unsafe'",
+            TokenType::Assign => "'='",
+            TokenType::PlusAssign => "'+='",
+            TokenType::MinusAssign => "'-='",
+            TokenType::MulAssign => "'*='",
+            TokenType::DivAssign => "'/='",
+            TokenType::ModAssign => "'%='",
+            TokenType::LeftShiftAssign => "'<<='",
+            TokenType::RightShiftAssign => "'>>='",
+            TokenType::AndAssign => "'&='",
+            TokenType::OrAssign => "'|='",
+            TokenType::XorAssign => "'^='",
+            TokenType::Plus => "'+'",
+            TokenType::Minus => "'-'",
+            TokenType::Mul => "'*'",
+            TokenType::Div => "'/'",
+            TokenType::Mod => "'%'",
+            TokenType::And => "'&&'",
+            TokenType::Or => "'||'",
+            TokenType::Not => "'!'",
+            TokenType::BitwiseAnd => "'&'",
+            TokenType::BitwiseOr => "'|'",
+            TokenType::BitwiseXor => "'^'",
+            TokenType::LeftShift => "'<<'",
+            TokenType::RightShift => "'>>'",
+            TokenType::Tilde => "'~'",
+            TokenType::Equal => "'=='",
+            TokenType::NotEqual => "'!='",
+            TokenType::Greater => "'>'",
+            TokenType::Less => "'<'",
+            TokenType::GreaterEqual => "'>='",
+            TokenType::LessEqual => "'<='",
+            TokenType::LeftParen => "'('",
+            TokenType::RightParen => "')'",
+            TokenType::LeftBrace => "'{'",
+            TokenType::RightBrace => "'}'",
+            TokenType::LeftBracket => "'['",
+            TokenType::RightBracket => "']'",
+            TokenType::Dot => "'.'",
+            TokenType::TwoDot => "'..'",
+            TokenType::ThreeDot => "'...'",
+            TokenType::Comma => "','",
+            TokenType::Colon => "':'",
+            TokenType::DoubleColon => "'::'",
+            TokenType::Semicolon => "';'",
+            TokenType::At => "'@'",
+            TokenType::QuestionMark => "'?'",
+            TokenType::Backslash => "'\\'",
+            TokenType::Arrow => "'->'",
+            TokenType::FatArrow => "'=>'",
+            TokenType::PreprocessorStart => "'#['",
+            TokenType::PreprocessorEnd => "']'",
+            TokenType::Elif => "'elif'",
+            TokenType::Endif => "'endif'",
+            TokenType::Include => "'include'",
+            TokenType::Error => "'error'",
+            TokenType::Warning => "'warning'"
         }.ToString()
     }
 }
 
 fn StringToKeyword(string: &String) -> TokenType {
-    if string == "true" { TokenType::TRUE }
-    else if string == "false" { TokenType::FALSE }
-    else if string == "null" { TokenType::NULL }
-    else if string == "new" { TokenType::NEW }
-    else if string == "delete" { TokenType::DELETE }
-    else if string == "async" { TokenType::ASYNC }
-    else if string == "await" { TokenType::AWAIT }
-    else if string == "as" { TokenType::AS }
-    else if string == "this" { TokenType::THIS }
-    else if string == "operator" { TokenType::OPERATOR }
-    else if string == "if" { TokenType::IF }
-    else if string == "else" { TokenType::ELSE }
-    else if string == "for" { TokenType::FOR }
-    else if string == "in" { TokenType::IN }
-    else if string == "while" { TokenType::WHILE }
-    else if string == "loop" { TokenType::LOOP }
-    else if string == "match" { TokenType::MATCH }
-    else if string == "return" { TokenType::RETURN }
-    else if string == "break" { TokenType::BREAK }
-    else if string == "continue" { TokenType::CONTINUE }
-    else if string == "fn" { TokenType::FUNCTION }
-    else if string == "class" { TokenType::CLASS }
-    else if string == "struct" { TokenType::STRUCTURE }
-    else if string == "enum" { TokenType::ENUMERATION }
-    else if string == "extend" { TokenType::EXTEND }
-    else if string == "type" { TokenType::TYPE }
-    else if string == "extern" { TokenType::EXTERN }
-    else if string == "let" { TokenType::LET }
-    else if string == "mut" { TokenType::MUT }
-    else if string == "const" { TokenType::CONST }
-    else if string == "static" { TokenType::STATIC }
-    else if string == "pub" { TokenType::PUBLIC }
-    else if string == "virtual" { TokenType::VIRTUAL }
-    else if string == "override" { TokenType::OVERRIDE }
-    else if string == "asm" { TokenType::ASSEMBLY }
-    else if string == "volatile" { TokenType::VOLATILE }
-    else if string == "unsafe" { TokenType::UNSAFE }
-    else { TokenType::UNKNOWN }
+    if string == "true" { TokenType::True }
+    else if string == "false" { TokenType::False }
+    else if string == "null" { TokenType::Null }
+    else if string == "new" { TokenType::New }
+    else if string == "delete" { TokenType::Delete }
+    else if string == "async" { TokenType::Async }
+    else if string == "await" { TokenType::Await }
+    else if string == "as" { TokenType::As }
+    else if string == "this" { TokenType::This }
+    else if string == "operator" { TokenType::Operator }
+    else if string == "if" { TokenType::If }
+    else if string == "else" { TokenType::Else }
+    else if string == "for" { TokenType::For }
+    else if string == "in" { TokenType::In }
+    else if string == "while" { TokenType::While }
+    else if string == "loop" { TokenType::Loop }
+    else if string == "match" { TokenType::Match }
+    else if string == "return" { TokenType::Return }
+    else if string == "break" { TokenType::Break }
+    else if string == "continue" { TokenType::Continue }
+    else if string == "fn" { TokenType::Function }
+    else if string == "class" { TokenType::Class }
+    else if string == "struct" { TokenType::Structure }
+    else if string == "enum" { TokenType::Enumeration }
+    else if string == "extend" { TokenType::Extend }
+    else if string == "type" { TokenType::Type }
+    else if string == "extern" { TokenType::Extern }
+    else if string == "let" { TokenType::Let }
+    else if string == "mut" { TokenType::Mut }
+    else if string == "const" { TokenType::Const }
+    else if string == "static" { TokenType::Static }
+    else if string == "pub" { TokenType::Public }
+    else if string == "virtual" { TokenType::Virtual }
+    else if string == "override" { TokenType::Override }
+    else if string == "asm" { TokenType::Assembly }
+    else if string == "volatile" { TokenType::Volatile }
+    else if string == "unsafe" { TokenType::Unsafe }
+    else { TokenType::Unknown }
 }
 
 fn StringToDirective(string: &String) -> TokenType {
-    if string == "true" { TokenType::TRUE }
-    else if string == "false" { TokenType::FALSE }
-    else if string == "if" { TokenType::IF }
-    else if string == "elif" { TokenType::ELIF }
-    else if string == "else" { TokenType::ELSE }
-    else if string == "endif" { TokenType::ENDIF }
-    else if string == "include" { TokenType::INCLUDE }
-    else if string == "error" { TokenType::ERROR }
-    else if string == "warning" { TokenType::WARNING }
-    else { TokenType::UNKNOWN }
+    if string == "true" { TokenType::True }
+    else if string == "false" { TokenType::False }
+    else if string == "if" { TokenType::If }
+    else if string == "elif" { TokenType::Elif }
+    else if string == "else" { TokenType::Else }
+    else if string == "endif" { TokenType::Endif }
+    else if string == "include" { TokenType::Include }
+    else if string == "error" { TokenType::Error }
+    else if string == "warning" { TokenType::Warning }
+    else { TokenType::Unknown }
 }
 
 class Token {
@@ -212,5 +319,13 @@ class Token {
         let file = Sources()->File(this.span.file);
         if file == null { return String(); }
         String(file->text, this.span.start as usize, (this.span.end - this.span.start) as usize)
+    }
+
+    pub fn Describe(&this) -> String {
+        match this._type {
+            TokenType::EndOfFile => "end of file".ToString(),
+            TokenType::AssemblyText => "assembly block".ToString(),
+            _ => "'" + this.Text() + "'"
+        }
     }
 }
