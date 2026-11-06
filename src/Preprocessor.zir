@@ -95,7 +95,7 @@ class Preprocessor {
             this.Expect(TokenType::RPAREN);
             result
         } else {
-            let name = this.Expect(TokenType::IDENTIFIER).value;
+            let name = this.Expect(TokenType::IDENTIFIER).Text();
             this.defines.Contains(name)
         }
     }
@@ -175,10 +175,11 @@ class Preprocessor {
     }
 
     fn IncludeModule(&mut this, token: Token, result: &mut Vector<Token>) {
-        let (path, missing_entry) = this.FindModule(token.value);
+        let name = Lexer::Unescape(token.span);
+        let (path, missing_entry) = this.FindModule(name);
 
         if path.Empty() {
-            Logger::Log("Module '" + token.value + (if missing_entry { "' entry point not found." } else { "' not found." }), token, LogSeverity::Error);
+            Logger::Log("Module '" + name + (if missing_entry { "' entry point not found." } else { "' not found." }), token, LogSeverity::Error);
             return;
         }
 
@@ -189,7 +190,7 @@ class Preprocessor {
         let source = match File::ReadText(path) {
             Result<String, IOError>::Ok(source) => source,
             Result<String, IOError>::Err(error) => {
-                Logger::Log("Failed to read module '" + token.value + "': " + error.ToString() + ".", token, LogSeverity::Error);
+                Logger::Log("Failed to read module '" + name + "': " + error.ToString() + ".", token, LogSeverity::Error);
                 return;
             }
         };
@@ -270,16 +271,16 @@ class Preprocessor {
             let message = this.Expect(TokenType::STRING);
 
             if message._type == TokenType::STRING && this.Condition() {
-                Logger::Log(message.value, token, LogSeverity::Error);
+                Logger::Log(Lexer::Unescape(message.span), token, LogSeverity::Error);
             }
         } else if this.Match(TokenType::WARNING) {
             let message = this.Expect(TokenType::STRING);
 
             if message._type == TokenType::STRING && this.Condition() {
-                Logger::Log(message.value, token, LogSeverity::Warning);
+                Logger::Log(Lexer::Unescape(message.span), token, LogSeverity::Warning);
             }
         } else {
-            Logger::Log("Unknown directive: '" + token.value + "'.", token, LogSeverity::Error);
+            Logger::Log("Unknown directive: '" + token.Text() + "'.", token, LogSeverity::Error);
             this.recovering = true;
         }
     }

@@ -206,6 +206,11 @@ fn StringToDirective(string: &String) -> TokenType {
 
 class Token {
     pub _type: TokenType,
-    pub value: String,
-    pub span: SourceSpan
+    pub span: SourceSpan;
+
+    pub fn Text(&this) -> String {
+        let file = Sources()->File(this.span.file);
+        if file == null { return String(); }
+        String(file->text, this.span.start as usize, (this.span.end - this.span.start) as usize)
+    }
 }

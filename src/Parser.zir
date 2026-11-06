@@ -109,11 +109,12 @@ class Parser {
 
     fn ReportExpected(&this, _type: TokenType, token: &Token) {
         let span = this.ExpectedAt(token);
+        let text = token.Text();
 
         if token._type == TokenType::EOF {
             Logger::Log("Expected '" + _type.ToString() + "', but reached end of file.", span, LogSeverity::Error);
-        } else if !token.value.Empty() && token.value != token._type.ToString() {
-            Logger::Log("Expected '" + _type.ToString() + "', found '" + token.value + "' (" + token._type.ToString() + ").", span, LogSeverity::Error);
+        } else if !text.Empty() && text != token._type.ToString() {
+            Logger::Log("Expected '" + _type.ToString() + "', found '" + text + "' (" + token._type.ToString() + ").", span, LogSeverity::Error);
         } else {
             Logger::Log("Expected '" + _type.ToString() + "', found '" + token._type.ToString() + "'.", span, LogSeverity::Error);
         }
@@ -182,7 +183,7 @@ class Parser {
                 let mut _identifier = "operator".ToString();
 
                 while this.Current()._type != TokenType::LPAREN && this.Current()._type != TokenType::LESS {
-                    _identifier += this.Current().value;
+                    _identifier += this.Current().Text();
                     this.Advance();
                 }
 
@@ -190,7 +191,7 @@ class Parser {
             } else {
                 let _identifier = this.Expect(if this.Current()._type != TokenType::THIS { TokenType::IDENTIFIER } else { TokenType::THIS });
                 if _identifier._type == TokenType::UNKNOWN { return null; }
-                let mut segment = ASTPathSegment(_identifier.value);
+                let mut segment = ASTPathSegment(_identifier.Text());
 
                 if this.IsTypeApplication() {
                     this.Advance();
@@ -225,28 +226,30 @@ class Parser {
             },
             TokenType::CHAR => {
                 this.Advance();
+                let value = Lexer::Unescape(token.span);
 
-                if !(token.value.Size() == 2 && token.value[1] == '\0') && !(token.value.Size() == 1 && token.value[0] == '\0') {
-                    Logger::Log("Invalid character literal '" + token.value + "'.", token, LogSeverity::Error);
+                if !(value.Size() == 2 && value[1] == '\0') && !(value.Size() == 1 && value[0] == '\0') {
+                    Logger::Log("Invalid character literal '" + value + "'.", token, LogSeverity::Error);
                     return null;
                 }
 
-                this.New<ASTCharacterLiteral>(token.value[0] as u32, token.span)
+                this.New<ASTCharacterLiteral>(value[0] as u32, token.span)
             },
             TokenType::INTEGER => {
                 this.Advance();
+                let text = token.Text();
                 let (mut value, mut suffix, mut base): (String, String, HostUnsigned) = (String(), String(), 10);
-                let mut index = token.value.Find('u');
+                let mut index = text.Find('u');
 
                 if index.IsNone() {
-                    index = token.value.Find('i');
+                    index = text.Find('i');
                 }
 
                 if let Option<usize>::Some(index) = index {
-                    value = token.value.SubString(0, index);
-                    suffix = token.value.SubString(index);
+                    value = text.SubString(0, index);
+                    suffix = text.SubString(index);
                 } else {
-                    value = token.value;
+                    value = text;
                 }
 
                 if value.StartsWith("0x") || value.StartsWith("0X") {
@@ -260,7 +263,7 @@ class Parser {
                 match value.ToUnsignedInteger(base) {
                     Option<HostUnsigned>::Some(value) => this.New<ASTIntegerLiteral>(value, suffix, token.span),
                     Option<HostUnsigned>::None => {
-                        Logger::Log("Invalid integer literal '" + token.value + "'.", token, LogSeverity::Error);
+                        Logger::Log("Invalid integer literal '" + text + "'.", token, LogSeverity::Error);
                         null
                     }
                 }
@@ -273,18 +276,19 @@ class Parser {
 #[else]
                 this.Advance();
                 let (mut value, mut suffix) = (String(), String());
+                let text = token.Text();
 
-                if let Option<usize>::Some(index) = token.value.Find('f') {
-                    value = token.value.SubString(0, index);
-                    suffix = token.value.SubString(index);
+                if let Option<usize>::Some(index) = text.Find('f') {
+                    value = text.SubString(0, index);
+                    suffix = text.SubString(index);
                 } else {
-                    value = token.value;
+                    value = text;
                 }
 
                 match value.ToFloat() {
                     Option<f64>::Some(value) => this.New<ASTFloatLiteral>(value, suffix, token.span),
                     Option<f64>::None => {
-                        Logger::Log("Invalid float literal '" + token.value + "'.", token, LogSeverity::Error);
+                        Logger::Log("Invalid float literal '" + text + "'.", token, LogSeverity::Error);
                         null
                     }
                 }
@@ -292,7 +296,7 @@ class Parser {
             },
             TokenType::STRING => {
                 this.Advance();
-                this.New<ASTStringLiteral>(token.value, token.span)
+                this.New<ASTStringLiteral>(Lexer::Unescape(token.span), token.span)
             },
             TokenType::NULL => {
                 this.Advance();
@@ -372,7 +376,7 @@ class Parser {
             },
             TokenType::BREAK => {
                 this.Advance();
-                let label = if this.Current()._type == TokenType::LABEL { this.Advance().value } else { String() };
+                let label = if this.Current()._type == TokenType::LABEL { this.Advance().Text().SubString(1) } else { String() };
                 let mut value: *ASTExpression = null;
 
                 if this.StartsExpression() {
@@ -384,12 +388,12 @@ class Parser {
             },
             TokenType::CONTINUE => {
                 this.Advance();
-                let label = if this.Current()._type == TokenType::LABEL { this.Advance().value } else { String() };
+                let label = if this.Current()._type == TokenType::LABEL { this.Advance().Text().SubString(1) } else { String() };
                 this.New<ASTContinueExpression>(label, token.span)
             },
             _ => {
                 this.Advance();
-                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+                Logger::Log("Unexpected token '" + token.Text() + "'.", token, LogSeverity::Error);
                 null
             }
         }
@@ -431,7 +435,7 @@ class Parser {
                     this.Advance();
 
                     if this.Current()._type == TokenType::INTEGER {
-                        let value = this.Advance().value;
+                        let value = this.Advance().Text();
 
                         match value.ToUnsignedInteger() {
                             Option<HostUnsigned>::Some(index) => {
@@ -453,13 +457,13 @@ class Parser {
                         member_access->member += "operator";
 
                         while this.Current()._type != TokenType::LPAREN && this.Current()._type != TokenType::LESS {
-                            member_access->member += this.Current().value;
+                            member_access->member += this.Current().Text();
                             this.Advance();
                         }
                     } else {
                         let identifier = this.Expect(TokenType::IDENTIFIER);
                         if identifier._type == TokenType::UNKNOWN { return null; }
-                        member_access->member += identifier.value;
+                        member_access->member += identifier.Text();
                     }
 
                     member_access->member_span = SourceSpan { file: member_start.file, start: member_start.start, end: this.previous.end };
@@ -520,7 +524,7 @@ class Parser {
                         if !this.ExpectSuccess(TokenType::COLON) { return null; }
                         let expression = this.ParseExpression();
                         if expression == null { return null; }
-                        structure->fields[field_identifier.value] = expression;
+                        structure->fields[field_identifier.Text()] = expression;
                         if !this.Match(TokenType::COMMA) { break; }
                     }
 
@@ -708,7 +712,7 @@ class Parser {
     fn ParsePrimaryPattern(&mut this) -> *ASTPattern {
         let token = this.Current();
 
-        if token._type == TokenType::IDENTIFIER && token.value == "_" {
+        if token._type == TokenType::IDENTIFIER && token.Text() == "_" {
             this.Advance();
             return this.New<ASTWildcardPattern>(token.span);
         }
@@ -741,18 +745,18 @@ class Parser {
             let mutable = this.Match(TokenType::MUT);
             let identifier = this.Expect(TokenType::IDENTIFIER);
             if identifier._type == TokenType::UNKNOWN { return null; }
-            return this.New<ASTIdentifierPattern>(identifier.value, mutable, true, token.span);
+            return this.New<ASTIdentifierPattern>(identifier.Text(), mutable, true, token.span);
         }
 
         if this.Match(TokenType::MUT) {
             let identifier = this.Expect(TokenType::IDENTIFIER);
             if identifier._type == TokenType::UNKNOWN { return null; }
-            return this.New<ASTIdentifierPattern>(identifier.value, true, false, token.span);
+            return this.New<ASTIdentifierPattern>(identifier.Text(), true, false, token.span);
         }
 
         if token._type == TokenType::IDENTIFIER && this.Peek(1)._type != TokenType::DOUBLE_COLON && this.Peek(1)._type != TokenType::LPAREN && this.Peek(1)._type != TokenType::LBRACE && this.Peek(1)._type != TokenType::LESS {
             this.Advance();
-            return this.New<ASTIdentifierPattern>(token.value, false, false, token.span);
+            return this.New<ASTIdentifierPattern>(token.Text(), false, false, token.span);
         }
 
         if token._type == TokenType::IDENTIFIER || token._type == TokenType::DOUBLE_COLON {
@@ -777,10 +781,10 @@ class Parser {
                         field = this.ParsePattern();
                         if field == null { return null; }
                     } else {
-                        field = this.New<ASTIdentifierPattern>(field_identifier.value, false, false, field_identifier.span);
+                        field = this.New<ASTIdentifierPattern>(field_identifier.Text(), false, false, field_identifier.span);
                     }
 
-                    structure->patterns.PushBack(this.New<ASTFieldPattern>(field_identifier.value, field, field_identifier.span));
+                    structure->patterns.PushBack(this.New<ASTFieldPattern>(field_identifier.Text(), field, field_identifier.span));
                     if !this.Match(TokenType::COMMA) { break; }
                 }
 
@@ -1116,26 +1120,27 @@ class Parser {
     fn ParseLabeledExpression(&mut this) -> *ASTExpression {
         let token = this.Advance();
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
+        let label = token.Text().SubString(1);
 
         match this.Current()._type {
             TokenType::WHILE => {
                 let expression = this.ParseWhileExpression();
-                if expression != null { (expression->label, expression->span.start) = (token.value, token.span.start); }
+                if expression != null { (expression->label, expression->span.start) = (label, token.span.start); }
                 expression
             },
             TokenType::LOOP => {
                 let expression = this.ParseLoopExpression();
-                if expression != null { (expression->label, expression->span.start) = (token.value, token.span.start); }
+                if expression != null { (expression->label, expression->span.start) = (label, token.span.start); }
                 expression
             },
             TokenType::FOR => {
                 let expression = this.ParseForExpression();
-                if expression != null { (expression->label, expression->span.start) = (token.value, token.span.start); }
+                if expression != null { (expression->label, expression->span.start) = (label, token.span.start); }
                 expression
             },
             TokenType::UNSAFE | TokenType::LBRACE => {
                 let expression = this.ParseBlockExpression();
-                if expression != null { (expression->label, expression->span.start) = (token.value, token.span.start); }
+                if expression != null { (expression->label, expression->span.start) = (label, token.span.start); }
                 expression
             },
             _ => {
@@ -1296,7 +1301,7 @@ class Parser {
 
         if this.Match(TokenType::COLON) {
             while this.Current()._type == TokenType::IDENTIFIER {
-                let name = this.Advance().value;
+                let name = this.Advance().Text();
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
@@ -1309,11 +1314,11 @@ class Parser {
 
         let text = this.Expect(TokenType::ASSEMBLY_TEXT);
         if text._type == TokenType::UNKNOWN { return null; }
-        node->text = text.value;
+        node->text = Lexer::AssemblyCode(text.span);
 
         if this.Match(TokenType::ARROW) {
             while this.Current()._type == TokenType::IDENTIFIER {
-                let name = this.Advance().value;
+                let name = this.Advance().Text();
                 if !this.ExpectSuccess(TokenType::LPAREN) { return null; }
                 let expression = this.ParseExpression();
                 if expression == null || !this.ExpectSuccess(TokenType::RPAREN) { return null; }
@@ -1324,7 +1329,7 @@ class Parser {
 
         if this.Match(TokenType::COLON) {
             while this.Current()._type == TokenType::IDENTIFIER {
-                node->clobbers.PushBack(this.Advance().value);
+                node->clobbers.PushBack(this.Advance().Text());
                 if !this.Match(TokenType::COMMA) { break; }
             }
         }
@@ -1396,7 +1401,7 @@ class Parser {
             let mut pair = (String(), Vector<*ASTNode>());
             let identifier = this.Expect(TokenType::IDENTIFIER);
             if identifier._type == TokenType::UNKNOWN { return attributes; }
-            pair.0 = identifier.value;
+            pair.0 = identifier.Text();
 
             if this.Match(TokenType::LPAREN) {
                 if !this.Match(TokenType::RPAREN) {
@@ -1498,10 +1503,10 @@ class Parser {
                 name += '~';
                 let identifier = this.Expect(TokenType::IDENTIFIER);
                 if identifier._type == TokenType::UNKNOWN { return null; }
-                name += identifier.value;
+                name += identifier.Text();
                 public = true;
             } else if !_virtual && this.Match(TokenType::IDENTIFIER) {
-                name += token.value;
+                name += token.Text();
                 public = true;
             } else if !this.ExpectSuccess(TokenType::FUNCTION) {
                 return null;
@@ -1513,13 +1518,13 @@ class Parser {
                 name += "operator";
 
                 while this.Current()._type != TokenType::LPAREN {
-                    name += this.Current().value;
+                    name += this.Current().Text();
                     this.Advance();
                 }
             } else {
                 let identifier = this.Expect(TokenType::IDENTIFIER);
                 if identifier._type == TokenType::UNKNOWN { return null; }
-                name += identifier.value;
+                name += identifier.Text();
             }
         } else if track_caller {
             Logger::Log("Attribute 'track_caller' cannot be used on constructors or destructors.", token, LogSeverity::Error);
@@ -1535,7 +1540,7 @@ class Parser {
             while this.Current()._type != TokenType::GREATER {
                 let type_identifier = this.Expect(TokenType::IDENTIFIER);
                 if type_identifier._type == TokenType::UNKNOWN { return null; }
-                function->types.PushBack(type_identifier.value);
+                function->types.PushBack(type_identifier.Text());
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1566,7 +1571,7 @@ class Parser {
                     if this.Peek(1)._type == TokenType::THREE_DOT {
                         let pack_identifier = this.Expect(TokenType::IDENTIFIER);
                         if pack_identifier._type == TokenType::UNKNOWN { return null; }
-                        function->pack_name = pack_identifier.value;
+                        function->pack_name = pack_identifier.Text();
                         this.Advance();
                         break;
                     }
@@ -1632,7 +1637,7 @@ class Parser {
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
         let _type = this.ParseType();
         if _type == null { return null; }
-        this.New<ASTParameterDeclaration>(token.value, _type, mutable, token.span)
+        this.New<ASTParameterDeclaration>(token.Text(), _type, mutable, token.span)
     }
 
     fn ParseClassDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTClassDeclaration {
@@ -1646,7 +1651,7 @@ class Parser {
 
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let _class = this.New<ASTClassDeclaration>(identifier.value, token.span);
+        let _class = this.New<ASTClassDeclaration>(identifier.Text(), token.span);
 
         if this.Match(TokenType::LESS) {
             _class->generic = true;
@@ -1654,7 +1659,7 @@ class Parser {
             while this.Current()._type != TokenType::GREATER {
                 let type_identifier = this.Expect(TokenType::IDENTIFIER);
                 if type_identifier._type == TokenType::UNKNOWN { return null; }
-                _class->types.PushBack(type_identifier.value);
+                _class->types.PushBack(type_identifier.Text());
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1736,7 +1741,7 @@ class Parser {
 
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let structure = this.New<ASTStructureDeclaration>(identifier.value, token.span);
+        let structure = this.New<ASTStructureDeclaration>(identifier.Text(), token.span);
 
         if this.Match(TokenType::LESS) {
             structure->generic = true;
@@ -1744,7 +1749,7 @@ class Parser {
             while this.Current()._type != TokenType::GREATER {
                 let type_identifier = this.Expect(TokenType::IDENTIFIER);
                 if type_identifier._type == TokenType::UNKNOWN { return null; }
-                structure->types.PushBack(type_identifier.value);
+                structure->types.PushBack(type_identifier.Text());
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1806,7 +1811,7 @@ class Parser {
             if initializer == null { return null; }
         }
 
-        this.New<ASTFieldDeclaration>(token.value, _type, initializer, public, token.span)
+        this.New<ASTFieldDeclaration>(token.Text(), _type, initializer, public, token.span)
     }
 
     fn ParseEnumerationDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTEnumerationDeclaration {
@@ -1820,7 +1825,7 @@ class Parser {
 
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let enumeration = this.New<ASTEnumerationDeclaration>(identifier.value, token.span);
+        let enumeration = this.New<ASTEnumerationDeclaration>(identifier.Text(), token.span);
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
         enumeration->underlying_type = this.ParseType();
         if enumeration->underlying_type == null { return null; }
@@ -1829,7 +1834,7 @@ class Parser {
         while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
             let member_identifier = this.Expect(TokenType::IDENTIFIER);
             if member_identifier._type == TokenType::UNKNOWN { return null; }
-            let member = this.New<ASTEnumerationMember>(member_identifier.value, member_identifier.span);
+            let member = this.New<ASTEnumerationMember>(member_identifier.Text(), member_identifier.span);
 
             if this.Match(TokenType::ASSIGN) {
                 member->value = this.ParseExpression();
@@ -1858,7 +1863,7 @@ class Parser {
 
         let identifier = this.Expect(TokenType::IDENTIFIER);
         if identifier._type == TokenType::UNKNOWN { return null; }
-        let variant = this.New<ASTVariantDeclaration>(identifier.value, token.span);
+        let variant = this.New<ASTVariantDeclaration>(identifier.Text(), token.span);
 
         if this.Match(TokenType::LESS) {
             variant->generic = true;
@@ -1866,7 +1871,7 @@ class Parser {
             while this.Current()._type != TokenType::GREATER {
                 let type_identifier = this.Expect(TokenType::IDENTIFIER);
                 if type_identifier._type == TokenType::UNKNOWN { return null; }
-                variant->types.PushBack(type_identifier.value);
+                variant->types.PushBack(type_identifier.Text());
                 if !this.Match(TokenType::COMMA) { break; }
             }
 
@@ -1882,7 +1887,7 @@ class Parser {
         while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
             let member_identifier = this.Expect(TokenType::IDENTIFIER);
             if member_identifier._type == TokenType::UNKNOWN { return null; }
-            let member = this.New<ASTVariantMember>(member_identifier.value, member_identifier.span);
+            let member = this.New<ASTVariantMember>(member_identifier.Text(), member_identifier.span);
 
             if this.Match(TokenType::LPAREN) {
                 while this.Current()._type != TokenType::RPAREN && this.Current()._type != TokenType::EOF {
@@ -1902,7 +1907,7 @@ class Parser {
                     if !this.ExpectSuccess(TokenType::COLON) { return null; }
                     let field_type = this.ParseType();
                     if field_type == null { return null; }
-                    member->fields.PushBack(this.arena.New<ASTVariantField>(field_identifier.value, field_type));
+                    member->fields.PushBack(this.arena.New<ASTVariantField>(field_identifier.Text(), field_type));
                     if !this.Match(TokenType::COMMA) { break; }
                 }
 
@@ -1953,7 +1958,7 @@ class Parser {
         if extern_token._type == TokenType::UNKNOWN { return null; }
         let linkage_token = this.Expect(TokenType::STRING);
         if linkage_token._type == TokenType::UNKNOWN { return null; }
-        let extern_block = this.New<ASTExternDeclaration>(linkage_token.value, extern_token.span);
+        let extern_block = this.New<ASTExternDeclaration>(Lexer::Unescape(linkage_token.span), extern_token.span);
         if !this.ExpectSuccess(TokenType::LBRACE) { return null; }
 
         while this.Current()._type != TokenType::RBRACE && this.Current()._type != TokenType::EOF {
@@ -2003,7 +2008,7 @@ class Parser {
         if !this.ExpectSuccess(TokenType::ASSIGN) { return null; }
         let initializer = this.ParseExpression();
         if initializer == null || !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
-        this.New<ASTConstantDeclaration>(identifier.value, _type, initializer, token.span)
+        this.New<ASTConstantDeclaration>(identifier.Text(), _type, initializer, token.span)
     }
 
     fn ParseStaticDeclaration(&mut this, attributes: &Vector<(String, Vector<*ASTNode>)>) -> *ASTStaticDeclaration {
@@ -2036,7 +2041,7 @@ class Parser {
         if !this.ExpectSuccess(TokenType::COLON) { return null; }
         let _type = this.ParseType();
         if _type == null { return null; }
-        let _static = this.New<ASTStaticDeclaration>(identifier.value, _type, mutable, alignment, token.span);
+        let _static = this.New<ASTStaticDeclaration>(identifier.Text(), _type, mutable, alignment, token.span);
 
         if this.Match(TokenType::ASSIGN) {
             _static->initializer = this.ParseExpression();
@@ -2055,7 +2060,7 @@ class Parser {
         if !this.ExpectSuccess(TokenType::ASSIGN) { return null; }
         let _type = this.ParseType();
         if _type == null { return null; }
-        let type_definition = this.New<ASTTypeDeclaration>(identifier.value, _type, token.span);
+        let type_definition = this.New<ASTTypeDeclaration>(identifier.Text(), _type, token.span);
         if !this.ExpectSuccess(TokenType::SEMICOLON) { return null; }
         type_definition
     }
@@ -2065,7 +2070,7 @@ class Parser {
         if token._type == TokenType::UNKNOWN { return null; }
         let code = this.Expect(TokenType::ASSEMBLY_TEXT);
         if code._type == TokenType::UNKNOWN { return null; }
-        this.New<ASTAssemblyDeclaration>(code.value, token.span)
+        this.New<ASTAssemblyDeclaration>(Lexer::AssemblyCode(code.span), token.span)
     }
 
     pub fn Parse(&mut this, tokens: &Vector<Token>) -> *ASTModule {
