@@ -31,6 +31,16 @@ extern "C" {
 
         loop {}
     }
+
+    fn ZenithExecute(path: *i8, command_line: *i8, status: *mut i32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(22), a0(path), a1(command_line), a2(status) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
 #[elif WINDOWS]
     fn ExitProcess(uExitCode: u32) -> !;
 #[else]
