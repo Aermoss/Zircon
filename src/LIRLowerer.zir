@@ -91,7 +91,7 @@ class LIRLowerer {
     fn Unsupported(&mut this, feature: *i8) -> *LIROperand {
         let function = this.builder.GetCurrentFunction();
         let location = if function != null { " (in '" + function->name + "')" } else { String() };
-        Logger::Log(feature.ToString() + " is not supported by the Zodiac backend" + location + '.', LogSeverity::Error);
+        Logger::Log(feature.ToString() + " is not supported by the Svarog backend" + location + '.', LogSeverity::Error);
         null
     }
 
@@ -166,7 +166,7 @@ class LIRLowerer {
         } else if result.symbol.Empty() {
             this.WriteInteger(global, offset, result.value as HostUnsigned, this.SizeOf(value->_type));
         } else if result.value != 0 {
-            Logger::Log("Global '" + global->name + "' has an initializer with a symbol offset, which is not supported by the Zodiac backend.", LogSeverity::Error);
+            Logger::Log("Global '" + global->name + "' has an initializer with a symbol offset, which is not supported by the Svarog backend.", LogSeverity::Error);
         } else {
             global->relocations.PushBack(LIRRelocation(offset, result.symbol));
         }

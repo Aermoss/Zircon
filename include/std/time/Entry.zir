@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#[if ZENITH]
-const ZENITH_MS_COUNTER: u32 = 0xFFEC;
+#[if TRIGLAV]
+const TRIGLAV_MS_COUNTER: u32 = 0xFFEC;
 
-fn ZenithUptimeMilliseconds() -> u32 {
+fn TriglavUptimeMilliseconds() -> u32 {
     let mut milliseconds: u32 = 0;
 
-    volatile asm : a0(ZENITH_MS_COUNTER) -> {
+    volatile asm : a0(TRIGLAV_MS_COUNTER) -> {
         lw a0, 0(a0)
     } -> a0(milliseconds) : memory;
 
@@ -32,12 +32,12 @@ class Instant {
 
     pub fn Now() -> Instant {
         let mut instant: Instant;
-        instant.milliseconds = ZenithUptimeMilliseconds();
+        instant.milliseconds = TriglavUptimeMilliseconds();
         instant
     }
 
     pub fn ElapsedMilliseconds(&this) -> u32 {
-        ZenithUptimeMilliseconds() - this.milliseconds
+        TriglavUptimeMilliseconds() - this.milliseconds
     }
 }
 #[else]

@@ -17,8 +17,8 @@
 #[include "std/str", "std/vec", "std/std" : *]
 
 extern "C" {
-#[if ZENITH]
-    fn ZenithCommandLine(buffer: *mut i8, capacity: usize) -> usize {
+#[if TRIGLAV]
+    fn TriglavCommandLine(buffer: *mut i8, capacity: usize) -> usize {
         let mut result: usize = 0;
 
         volatile asm : a7(11), a0(buffer), a1(capacity) -> {
@@ -30,7 +30,7 @@ extern "C" {
 
     fn _start() {
         let mut raw_cmd: [i8; 128];
-        ZenithCommandLine(&mut raw_cmd[0] as *mut i8, 128);
+        TriglavCommandLine(&mut raw_cmd[0] as *mut i8, 128);
         let mut args = Vector<String>();
         let mut ptr = &mut raw_cmd[0] as *mut i8;
         let mut start_ptr = ptr;

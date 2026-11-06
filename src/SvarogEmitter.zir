@@ -16,13 +16,13 @@
 
 #[include "std/str", "std/vec", "src/LIR.zir", "src/Logger.zir" : *]
 
-class ZodiacEmitter {
+class SvarogEmitter {
     output: String,
     function: *LIRFunction = null,
     function_index: u32 = 0,
     has_frame: bool = false;
 
-    ZodiacEmitter(&mut this) {}
+    SvarogEmitter(&mut this) {}
 
     pub fn Emit(&mut this, module: *LIRModule) -> String {
         this.output = String();

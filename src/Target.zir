@@ -16,19 +16,19 @@
 
 #[include "std/str" : *]
 
-#[if !ZODIAC]
+#[if !SVAROG]
 #[include "std/io", "std/std", "vendor/llvm-c/Core.zir", "vendor/llvm-c/Target.zir", "vendor/llvm-c/TargetMachine.zir", "src/Logger.zir" : *]
 #[endif]
 
 enum TargetABI: u8 {
-    Zodiac, Win64, SysV64, AAPCS64, DarwinPCS64, WinARM64
+    Svarog, Win64, SysV64, AAPCS64, DarwinPCS64, WinARM64
 }
 
 class TargetInfo {
     pub pointer_size: usize,
     pub pointer_align: usize,
     pub stack_align: usize,
-    pub abi: TargetABI = TargetABI::Zodiac;
+    pub abi: TargetABI = TargetABI::Svarog;
 
     TargetInfo(&mut this) {}
 
@@ -45,18 +45,18 @@ class TargetInfo {
         } else if triple.StartsWith("aarch64") || triple.StartsWith("arm64") {
             if windows { TargetABI::WinARM64 } else if darwin { TargetABI::DarwinPCS64 } else { TargetABI::AAPCS64 }
         } else {
-            TargetABI::Zodiac
+            TargetABI::Svarog
         }
     }
 }
 
 enum TargetBackend: u8 {
-    LLVM, Zodiac
+    LLVM, Svarog
 }
 
-#[if ZODIAC]
+#[if SVAROG]
 class Target {
-    pub backend: TargetBackend = TargetBackend::Zodiac,
+    pub backend: TargetBackend = TargetBackend::Svarog,
     pub triple: String;
 
     Target(&mut this, triple: &String) {
@@ -83,8 +83,8 @@ class Target {
         (this.triple, this.arch, this.code_model, this.features) = (triple, arch, code_model, features);
         if this.triple.Empty() { this.triple = LLVMGetDefaultTargetTriple(); }
 
-        if this.triple.StartsWith("zodiac") {
-            this.backend = TargetBackend::Zodiac;
+        if this.triple.StartsWith("svarog") {
+            this.backend = TargetBackend::Svarog;
             return;
         }
 
@@ -126,7 +126,7 @@ class Target {
     }
 
     pub fn Info(&this) -> TargetInfo {
-        if this.backend == TargetBackend::Zodiac {
+        if this.backend == TargetBackend::Svarog {
             return TargetInfo(4, 4, 4);
         }
 

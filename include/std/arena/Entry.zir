@@ -17,7 +17,7 @@
 #[include "std/mem" : *]
 
 const ARENA_DEFAULT_ALIGNMENT: usize = 16;
-#[if ZODIAC]
+#[if SVAROG]
 const ARENA_DEFAULT_CHUNK_SIZE: usize = 32768;
 #[else]
 const ARENA_DEFAULT_CHUNK_SIZE: usize = 1048576;

@@ -15,9 +15,9 @@
  */
 
 #[include "std/io", "std/file", "std/time", "std/std", "src/Lexer.zir", "src/Preprocessor.zir", "src/Parser.zir", "src/Target.zir",
-    "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/ZodiacEmitter.zir", "src/Logger.zir" : *]
+    "src/HIRLowerer.zir", "src/MIRLowerer.zir", "src/MIRPasses.zir", "src/LIRLowerer.zir", "src/LIRAllocator.zir", "src/SvarogEmitter.zir", "src/Logger.zir" : *]
 
-#[if !ZODIAC]
+#[if !SVAROG]
 #[include "vendor/llvm-c/Core.zir", "vendor/llvm-c/IRReader.zir", "vendor/llvm-c/BitReader.zir", "vendor/llvm-c/BitWriter.zir", "vendor/llvm-c/Transforms/PassBuilder.zir", "src/LLVMLowerer.zir", "src/Assembler.zir" : *]
 #[endif]
 
@@ -55,7 +55,7 @@ class PROCESS_INFORMATION {
 }
 
 type LPPROCESS_INFORMATION = *mut PROCESS_INFORMATION;
-#[elif !ZENITH]
+#[elif !TRIGLAV]
 class _SHArgs {
     pub sh: *i8,
     pub flag: *i8,
@@ -64,7 +64,7 @@ class _SHArgs {
 }
 #[endif]
 
-#[if !ZENITH]
+#[if !TRIGLAV]
 extern "C" {
 #[if WINDOWS]
     fn CreateProcessA(lpApplicationName: *i8, lpCommandLine: *i8, lpProcessAttributes: *mut void, lpThreadAttributes: *mut void, bInheritHandles: i32, dwCreationFlags: u32, lpEnvironment: *mut void, lpCurrentDirectory: *i8, lpStartupInfo: LPSTARTUPINFOA, lpProcessInformation: LPPROCESS_INFORMATION) -> i32;
@@ -90,16 +90,16 @@ fn ProgramName(command: *i8) -> String {
 }
 
 fn Execute(command: *i8) -> HostUnsigned {
-#[if ZENITH]
+#[if TRIGLAV]
     let path = ProgramName(command);
     let mut status = 0;
-    let error = ZenithExecute(path.Data(), command, &mut status);
+    let error = TriglavExecute(path.Data(), command, &mut status);
 
     if error != 0 {
         let reason = match error {
             20 => "it crashed".ToString(),
             21 => "it was killed".ToString(),
-            _ => ZenithError(error).ToString()
+            _ => TriglavError(error).ToString()
         };
 
         WriteLine("\x1b[31mFailed to create process: " + reason + ".\x1b[0m");
@@ -259,8 +259,8 @@ fn WriteOutput(path: &String, content: &String) {
 }
 
 fn PrintVersion() {
-#[if ZODIAC]
-    WriteLine("Zircon 9.1 \"Mantle\" (zodiac-unknown-zenith)");
+#[if SVAROG]
+    WriteLine("Zircon 9.1 \"Mantle\" (svarog-unknown-triglav)");
 #[else]
     WriteLine("Zircon 9.1 \"Mantle\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
 #[endif]
@@ -300,14 +300,14 @@ fn PrintUsage(executable: &String) {
     WriteLine("  -h, --help               Display this help message");
 }
 
-#[if !ZODIAC]
+#[if !SVAROG]
 fn FatalErrorHandler(reason: *i8) {
     Logger::Log("LLVM", reason, LogSeverity::Fatal);
 }
 #[endif]
 
 fn FormatElapsedSeconds(start: &Instant) -> String {
-#[if ZENITH]
+#[if TRIGLAV]
     let milliseconds = start.ElapsedMilliseconds();
     let fraction = String::FromInteger(1000 + milliseconds % 1000);
     String::FromInteger(milliseconds / 1000) + "." + fraction.SubString(1)
@@ -325,7 +325,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     LLVMEnablePrettyStackTrace();
     LLVMInstallFatalErrorHandler(FatalErrorHandler);
 
@@ -348,7 +348,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     include_paths.PushBack(".".ToString());
     include_paths.PushBack("include".ToString());
-#[if ZODIAC]
+#[if SVAROG]
     include_paths.PushBack("/include".ToString());
 #[else]
     let root = SplitPath(SplitPath(ExecutablePath().Unwrap()).0).0;
@@ -359,8 +359,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
 #[endif]
 
     let mut features = String();
-#[if ZODIAC]
-    let mut triple = "zodiac-unknown-zenith".ToString();
+#[if SVAROG]
+    let mut triple = "svarog-unknown-triglav".ToString();
 #[else]
     let mut triple = LLVMGetDefaultTargetTriple().ToString();
     let mut opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
@@ -415,19 +415,19 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "-r" || arg == "--run" {
             run = true;
         } else if arg == "-O0" {
-#[if !ZODIAC]
+#[if !SVAROG]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelNone;
 #[endif]
         } else if arg == "-O1" {
-#[if !ZODIAC]
+#[if !SVAROG]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelLess;
 #[endif]
         } else if arg == "-O2" || arg == "-O" {
-#[if !ZODIAC]
+#[if !SVAROG]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault;
 #[endif]
         } else if arg == "-O3" {
-#[if !ZODIAC]
+#[if !SVAROG]
             opt_level = LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive;
 #[endif]
         } else if arg == "-o" {
@@ -549,8 +549,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    if triple.Contains("zenith") {
-        defines.PushBack("ZENITH".ToString());
+    if triple.Contains("triglav") {
+        defines.PushBack("TRIGLAV".ToString());
     } else if triple.Contains("windows") {
         defines.PushBack("WINDOWS".ToString());
     } else if triple.Contains("darwin") || triple.Contains("apple") {
@@ -559,8 +559,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
         defines.PushBack("LINUX".ToString());
     }
 
-    if triple.StartsWith("zodiac") {
-        defines.PushBack("ZODIAC".ToString());
+    if triple.StartsWith("svarog") {
+        defines.PushBack("SVAROG".ToString());
     } else if triple.Contains("x86_64") || triple.Contains("amd64") {
         defines.PushBack("AMD64".ToString());
     } else if triple.Contains("aarch64") || triple.Contains("arm64") {
@@ -575,10 +575,11 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut objects = Vector<String>();
     let mut temp_files = Vector<String>();
     let temp_path = TemporaryPath().UnwrapOr(String());
+    let tool_prefix = triple.SubString(0, triple.Find('-').UnwrapOr(triple.Length()));
 #[if WINDOWS]
-    let (zas_exe, zld_exe) = ("zas.exe".ToString(), "zld.exe".ToString());
+    let (assembler_exe, linker_exe) = (tool_prefix + "-as.exe", tool_prefix + "-ld.exe");
 #[else]
-    let (zas_exe, zld_exe) = ("zas".ToString(), "zld".ToString());
+    let (assembler_exe, linker_exe) = (tool_prefix + "-as", tool_prefix + "-ld");
 #[endif]
     let mut entry_included = false;
     let mut failed = false;
@@ -587,7 +588,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let (name, extension) = SplitExtension(input_file);
         let mut asm_input = String();
 
-#[if ZODIAC]
+#[if SVAROG]
         let target = Target(triple);
 #[else]
         let mut module: LLVMModuleRef = null;
@@ -648,7 +649,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 hir_lowerer.context.arena.Reset();
                 WriteLine("MIR module lowered in " + FormatElapsedSeconds(mir_start) + " seconds.");
 
-                if target.backend == TargetBackend::Zodiac {
+                if target.backend == TargetBackend::Svarog {
                     let mut pass_manager = MIRPassManager(&mut mir_lowerer.context);
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
@@ -659,7 +660,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
                 if emit_mir { WriteOutput(name + ".mir", mir_module->ToString()); }
 
-                if target.backend == TargetBackend::Zodiac {
+                if target.backend == TargetBackend::Svarog {
                     let mut lir_lowerer = LIRLowerer();
                     let lir_start = Instant::Now();
                     let lir_module = lir_lowerer.Lower(mir_module);
@@ -673,7 +674,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     WriteLine("LIR module allocated in " + FormatElapsedSeconds(allocator_start) + " seconds.");
                     if emit_lir { WriteOutput(name + ".physical.lir", lir_module->ToString()); }
 
-                    let mut emitter = ZodiacEmitter();
+                    let mut emitter = SvarogEmitter();
                     let assembly = emitter.Emit(lir_module);
 
                     if !Logger::HasError() {
@@ -691,7 +692,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                             WriteOutput(asm_input, assembly);
                         }
                     }
-#[if !ZODIAC]
+#[if !SVAROG]
                 } else {
                     let llvm_start = Instant::Now();
                     module = llvm_lowerer.Lower(mir_module);
@@ -699,7 +700,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 #[endif]
                 }
             }
-#[if !ZODIAC]
+#[if !SVAROG]
         } else if target.backend == TargetBackend::LLVM && (extension == ".ll" || extension == ".bc") {
             if verbose {
                 Logger::Log("Compiling: '" + input_file + "'.", LogSeverity::Info);
@@ -762,9 +763,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 continue;
             }
 
-            if target.backend == TargetBackend::Zodiac {
+            if target.backend == TargetBackend::Svarog {
                 asm_input = input_file;
-#[if !ZODIAC]
+#[if !SVAROG]
             } else {
                 if verbose {
                     Logger::Log("Assembling: '" + input_file + "'.", LogSeverity::Info);
@@ -795,7 +796,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
         failed |= Logger::HasError();
 
-#[if !ZODIAC]
+#[if !SVAROG]
         if target.backend == TargetBackend::LLVM && !check {
             failed |= module == null;
         }
@@ -817,12 +818,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
             object_name = output_file;
         }
 
-        if target.backend == TargetBackend::Zodiac {
+        if target.backend == TargetBackend::Svarog {
             if asm_input.Empty() {
                 continue;
             }
 
-            let command = zas_exe + " " + asm_input + " -o " + object_name;
+            let command = assembler_exe + " " + asm_input + " -o " + object_name;
 
             if verbose {
                 Logger::Log("Assembling: '" + command + "'.", LogSeverity::Info);
@@ -846,7 +847,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             continue;
         }
 
-#[if !ZODIAC]
+#[if !SVAROG]
         if opt_level != LLVMCodeGenOptLevel::LLVMCodeGenLevelNone && extension == ".zir" {
             let mut passes = String();
 
@@ -947,9 +948,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut command = String();
     let arm64 = triple.Contains("aarch64") || triple.Contains("arm64");
 
-    if triple.StartsWith("zodiac") {
-        command = zld_exe + " -o " + output_file;
-        if triple.Contains("zenith") { command += " --format=exe"; }
+    if triple.StartsWith("svarog") {
+        command = linker_exe + " -o " + output_file;
+        if triple.Contains("triglav") { command += " --format=exe"; }
 
         for object in objects {
             command += " " + object;
@@ -1058,7 +1059,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     if run {
-#[if !WINDOWS && !ZENITH]
+#[if !WINDOWS && !TRIGLAV]
         if SplitPath(output_file).0.Empty() { output_file = JoinPath(String("."), output_file); }
 #[endif]
         WriteLine("Program finished with exit code: " + String::FromInteger(Execute(output_file.Data())) + ".");

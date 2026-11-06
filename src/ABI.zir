@@ -74,7 +74,7 @@ class ABIClassifier {
     }
 
     pub fn Classify(&mut this, abi: HIRDeclarationABI, _return: *HIRType, parameters: &Vector<*HIRType>, fixed: usize) -> ABIFunction {
-        let native = abi == HIRDeclarationABI::Native && this.abi != TargetABI::Zodiac;
+        let native = abi == HIRDeclarationABI::Native && this.abi != TargetABI::Svarog;
         let mut result = ABIFunction();
         result._return = this.ClassifyValue(_return, true, false, native);
         (this.integer_registers, this.sse_registers) = (6, 8);
@@ -90,7 +90,7 @@ class ABIClassifier {
     }
 
     pub fn Native(&mut this, _type: *HIRType) -> ABIValue {
-        if this.abi == TargetABI::Zodiac { this.ClassifyZodiac(_type, false) } else { this.ClassifyNative(_type, false) }
+        if this.abi == TargetABI::Svarog { this.ClassifySvarog(_type, false) } else { this.ClassifyNative(_type, false) }
     }
 
     fn ClassifyValue(&mut this, _type: *HIRType, _return: bool, variadic: bool, native: bool) -> ABIValue {
@@ -100,7 +100,7 @@ class ABIClassifier {
             TargetABI::Win64 => this.ClassifyWin64(_type, _return),
             TargetABI::SysV64 => this.ClassifySysV64(_type, _return),
             TargetABI::AAPCS64 | TargetABI::DarwinPCS64 | TargetABI::WinARM64 => this.ClassifyAArch64(_type, _return, variadic),
-            TargetABI::Zodiac => this.ClassifyZodiac(_type, _return)
+            TargetABI::Svarog => this.ClassifySvarog(_type, _return)
         }
     }
 
@@ -271,7 +271,7 @@ class ABIClassifier {
         }
     }
 
-    fn ClassifyZodiac(&mut this, _type: *HIRType, _return: bool) -> ABIValue {
+    fn ClassifySvarog(&mut this, _type: *HIRType, _return: bool) -> ABIValue {
         if !this.IsAggregate(_type) {
             let mut value = ABIValue();
             value.extension = this.Extension(_type);

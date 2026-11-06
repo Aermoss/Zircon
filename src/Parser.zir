@@ -260,9 +260,9 @@ class Parser {
                 }
             },
             TokenType::Float => {
-#[if ZODIAC]
+#[if SVAROG]
                 this.Advance();
-                Logger::Log("Floating point literals are not supported by the Zodiac compiler.", token, LogSeverity::Error);
+                Logger::Log("Floating point literals are not supported by the Svarog compiler.", token, LogSeverity::Error);
                 null
 #[else]
                 this.Advance();

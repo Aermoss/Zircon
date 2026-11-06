@@ -17,8 +17,8 @@
 #[include "std/str" : *]
 
 extern "C" {
-#[if ZENITH]
-    fn ZenithConsoleRead(buffer: *mut i8, length: usize) -> isize {
+#[if TRIGLAV]
+    fn TriglavConsoleRead(buffer: *mut i8, length: usize) -> isize {
         let mut result: isize = 0;
 
         volatile asm : a7(3), a0(buffer), a1(length) -> {
@@ -28,7 +28,7 @@ extern "C" {
         result
     }
 
-    fn ZenithConsoleWrite(buffer: *i8, length: usize) -> isize {
+    fn TriglavConsoleWrite(buffer: *i8, length: usize) -> isize {
         let mut result: isize = 0;
 
         volatile asm : a7(4), a0(buffer), a1(length) -> {
@@ -64,8 +64,8 @@ fn ReadLine() -> Option<String> {
     let mut character: i8 = 0;
 
     loop {
-#[if ZENITH]
-        let count = ZenithConsoleRead(&mut character, 1);
+#[if TRIGLAV]
+        let count = TriglavConsoleRead(&mut character, 1);
 #[elif WINDOWS]
         let mut count: u32 = 0;
         ReadFile(GetStdHandle(STD_INPUT_HANDLE), &mut character, 1, &mut count, null);
@@ -81,8 +81,8 @@ fn ReadLine() -> Option<String> {
 }
 
 fn Write(text: &String) {
-#[if ZENITH]
-    ZenithConsoleWrite(text.Data(), text.Length());
+#[if TRIGLAV]
+    TriglavConsoleWrite(text.Data(), text.Length());
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text.Data(), text.Length() as u32, null, null);
 #[else]
@@ -91,8 +91,8 @@ fn Write(text: &String) {
 }
 
 fn Write(text: *i8) {
-#[if ZENITH]
-    ZenithConsoleWrite(text, strlen(text));
+#[if TRIGLAV]
+    TriglavConsoleWrite(text, strlen(text));
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, strlen(text) as u32, null, null);
 #[else]
@@ -102,8 +102,8 @@ fn Write(text: *i8) {
 
 fn WriteLine(text: &String) {
     Write(text);
-#[if ZENITH]
-    ZenithConsoleWrite("\n", 1);
+#[if TRIGLAV]
+    TriglavConsoleWrite("\n", 1);
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
@@ -113,8 +113,8 @@ fn WriteLine(text: &String) {
 
 fn WriteLine(text: *i8) {
     Write(text);
-#[if ZENITH]
-    ZenithConsoleWrite("\n", 1);
+#[if TRIGLAV]
+    TriglavConsoleWrite("\n", 1);
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), "\n", 1, null, null);
 #[else]
@@ -123,8 +123,8 @@ fn WriteLine(text: *i8) {
 }
 
 fn WriteError(text: &String) {
-#[if ZENITH]
-    ZenithConsoleWrite(text.Data(), text.Length());
+#[if TRIGLAV]
+    TriglavConsoleWrite(text.Data(), text.Length());
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), text.Data(), text.Length() as u32, null, null);
 #[else]
@@ -133,8 +133,8 @@ fn WriteError(text: &String) {
 }
 
 fn WriteError(text: *i8) {
-#[if ZENITH]
-    ZenithConsoleWrite(text, strlen(text));
+#[if TRIGLAV]
+    TriglavConsoleWrite(text, strlen(text));
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), text, strlen(text) as u32, null, null);
 #[else]
@@ -144,8 +144,8 @@ fn WriteError(text: *i8) {
 
 fn WriteErrorLine(text: &String) {
     WriteError(text);
-#[if ZENITH]
-    ZenithConsoleWrite("\n", 1);
+#[if TRIGLAV]
+    TriglavConsoleWrite("\n", 1);
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
 #[else]
@@ -155,8 +155,8 @@ fn WriteErrorLine(text: &String) {
 
 fn WriteErrorLine(text: *i8) {
     WriteError(text);
-#[if ZENITH]
-    ZenithConsoleWrite("\n", 1);
+#[if TRIGLAV]
+    TriglavConsoleWrite("\n", 1);
 #[elif WINDOWS]
     WriteFile(GetStdHandle(STD_ERROR_HANDLE), "\n", 1, null, null);
 #[else]

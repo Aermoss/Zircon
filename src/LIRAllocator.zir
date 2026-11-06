@@ -392,7 +392,7 @@ class LIRAllocator {
         function->frame_size = ((function->frame_size + 4 + 3) / 4) * 4;
 
         if function->frame_size > 32768 {
-            Logger::Log("Stack frame of '" + function->name + "' is too large for the Zodiac backend.", LogSeverity::Error);
+            Logger::Log("Stack frame of '" + function->name + "' is too large for the Svarog backend.", LogSeverity::Error);
         }
 
         this.intervals[register as usize].spilled = true;

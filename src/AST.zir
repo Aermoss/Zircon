@@ -461,7 +461,7 @@ class ASTIntegerLiteral : ASTLiteral {
     }
 }
 
-#[if !ZODIAC]
+#[if !SVAROG]
 class ASTFloatLiteral : ASTLiteral {
     pub value: f64,
     pub suffix: String;

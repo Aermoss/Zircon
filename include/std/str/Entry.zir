@@ -58,7 +58,7 @@ extern "C" {
     } #[endif]
 }
 
-#[if !ZODIAC]
+#[if !SVAROG]
 fn _BigMultiplyAdd(value: &mut Vector<u32>, multiplier: u32, addend: u32) {
     let mut carry = addend as HostUnsigned;
 
@@ -415,7 +415,7 @@ class String {
         String::FromInteger(value, 10)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn FromFloat(mut value: f64, precision: usize) -> String {
         if value != value { "nan".ToString() }
         else if value == (1.0 / 0.0) { "inf".ToString() }
@@ -542,7 +542,7 @@ class String {
         this.ToInteger(10)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn ToFloat(&this) -> Option<f64> {
         if this == "nan" { return Option<f64>::Some(0.0 / 0.0); }
         if this == "inf" || this == "+inf" { return Option<f64>::Some(1.0 / 0.0); }
@@ -1002,7 +1002,7 @@ class String {
     }
 
     pub fn Hash(&this) -> HostUnsigned {
-#[if ZODIAC]
+#[if SVAROG]
         let mut hash: HostUnsigned = 0x811c9dc5;
 #[else]
         let mut hash: HostUnsigned = 0xcbf29ce484222325;
@@ -1011,7 +1011,7 @@ class String {
         for i in 0..this.length {
             let character = this.data[i];
             hash = hash ^ (character as HostUnsigned & 0xFF);
-#[if ZODIAC]
+#[if SVAROG]
             hash = hash * 0x01000193;
 #[else]
             hash = hash * 0x100000001b3;

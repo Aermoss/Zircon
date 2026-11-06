@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[if ZODIAC]
+#[if SVAROG]
 type HostUnsigned = u32;
 type HostSigned = i32;
 #[else]
@@ -23,8 +23,8 @@ type HostSigned = i64;
 #[endif]
 
 extern "C" {
-#[if ZENITH]
-    fn ZenithExit(status: i32) -> ! {
+#[if TRIGLAV]
+    fn TriglavExit(status: i32) -> ! {
         volatile asm : a7(0), a0(status) -> {
             ecall
         } : memory;
@@ -32,7 +32,7 @@ extern "C" {
         loop {}
     }
 
-    fn ZenithExecute(path: *i8, command_line: *i8, status: *mut i32) -> u32 {
+    fn TriglavExecute(path: *i8, command_line: *i8, status: *mut i32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(22), a0(path), a1(command_line), a2(status) -> {
@@ -49,8 +49,8 @@ extern "C" {
 }
 
 fn Exit(status: i32) -> ! {
-#[if ZENITH]
-    ZenithExit(status);
+#[if TRIGLAV]
+    TriglavExit(status);
 #[elif WINDOWS]
     ExitProcess(status as u32);
 #[else]

@@ -1310,7 +1310,7 @@ class MIRLowerer {
             HIRLiteralKind::Boolean => this.builder.ConstantInteger(if (literal as *HIRBooleanLiteral)->value { 1 } else { 0 }, _type),
             HIRLiteralKind::Character => this.builder.ConstantInteger((literal as *HIRCharacterLiteral)->value as HostUnsigned, _type),
             HIRLiteralKind::Integer => this.builder.ConstantInteger((literal as *HIRIntegerLiteral)->value, _type),
-#[if !ZODIAC]
+#[if !SVAROG]
             HIRLiteralKind::Float => this.builder.ConstantFloat((literal as *HIRFloatLiteral)->value, _type),
 #[endif]
             HIRLiteralKind::String => {

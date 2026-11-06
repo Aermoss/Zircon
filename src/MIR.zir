@@ -216,7 +216,7 @@ class MIRConstantInteger : MIRConstant {
     }
 }
 
-#[if !ZODIAC]
+#[if !SVAROG]
 class MIRConstantFloat : MIRConstant {
     pub value: f64;
 
@@ -1200,7 +1200,7 @@ class MIRBuilder {
         this.context->arena.New<MIRConstantInteger>(value, _type)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn ConstantFloat(&mut this, value: f64, _type: *MIRType) -> *mut MIRConstantFloat {
         this.context->arena.New<MIRConstantFloat>(value, _type)
     }

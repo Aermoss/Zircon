@@ -55,21 +55,21 @@ class FolderEntry {
 
 const FILE_BUFFER_SIZE: usize = 4096;
 
-#[if ZENITH]
+#[if TRIGLAV]
 const PATH_SEPARATOR: i8 = '/';
-const ZENITH_PATH_MAX: usize = 2048;
+const TRIGLAV_PATH_MAX: usize = 2048;
 
-const ZENITH_NO_SPACE: u32 = 5;
-const ZENITH_FOLDER: u32 = 2;
+const TRIGLAV_NO_SPACE: u32 = 5;
+const TRIGLAV_FOLDER: u32 = 2;
 
-class ZenithFolderRecord {
+class TriglavFolderRecord {
     pub name: [i8; 32],
     pub kind: u32,
     pub size: u32
 }
 
 extern "C" {
-    fn ZenithPathKind(path: *i8) -> u32 {
+    fn TriglavPathKind(path: *i8) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(5), a0(path) -> {
@@ -79,7 +79,7 @@ extern "C" {
         result
     }
 
-    fn ZenithCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32 {
+    fn TriglavCanonicalPath(path: *i8, buffer: *mut i8, capacity: usize) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(6), a0(path), a1(buffer), a2(capacity) -> {
@@ -89,7 +89,7 @@ extern "C" {
         result
     }
 
-    fn ZenithRemoveFile(path: *i8) -> u32 {
+    fn TriglavRemoveFile(path: *i8) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(9), a0(path) -> {
@@ -99,7 +99,7 @@ extern "C" {
         result
     }
 
-    fn ZenithOpen(path: *i8, mode: u32, handle: *mut u32) -> u32 {
+    fn TriglavOpen(path: *i8, mode: u32, handle: *mut u32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(12), a0(path), a1(mode), a2(handle) -> {
@@ -109,7 +109,7 @@ extern "C" {
         result
     }
 
-    fn ZenithClose(handle: u32) -> u32 {
+    fn TriglavClose(handle: u32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(13), a0(handle) -> {
@@ -119,7 +119,7 @@ extern "C" {
         result
     }
 
-    fn ZenithRead(handle: u32, buffer: *mut u8, count: usize, read: *mut usize) -> u32 {
+    fn TriglavRead(handle: u32, buffer: *mut u8, count: usize, read: *mut usize) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(14), a0(handle), a1(buffer), a2(count), a3(read) -> {
@@ -129,7 +129,7 @@ extern "C" {
         result
     }
 
-    fn ZenithWrite(handle: u32, data: *u8, count: usize) -> u32 {
+    fn TriglavWrite(handle: u32, data: *u8, count: usize) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(15), a0(handle), a1(data), a2(count) -> {
@@ -139,7 +139,7 @@ extern "C" {
         result
     }
 
-    fn ZenithSeek(handle: u32, offset: i32, origin: u32, position: *mut u32) -> u32 {
+    fn TriglavSeek(handle: u32, offset: i32, origin: u32, position: *mut u32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(16), a0(handle), a1(offset), a2(origin), a3(position) -> {
@@ -149,7 +149,7 @@ extern "C" {
         result
     }
 
-    fn ZenithSize(handle: u32, size: *mut u32) -> u32 {
+    fn TriglavSize(handle: u32, size: *mut u32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(17), a0(handle), a1(size) -> {
@@ -159,7 +159,7 @@ extern "C" {
         result
     }
 
-    fn ZenithListFolder(path: *i8, buffer: *mut ZenithFolderRecord, capacity: u32, count: *mut u32) -> u32 {
+    fn TriglavListFolder(path: *i8, buffer: *mut TriglavFolderRecord, capacity: u32, count: *mut u32) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(18), a0(path), a1(buffer), a2(capacity), a3(count) -> {
@@ -169,7 +169,7 @@ extern "C" {
         result
     }
 
-    fn ZenithCreateFolder(path: *i8) -> u32 {
+    fn TriglavCreateFolder(path: *i8) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(19), a0(path) -> {
@@ -179,7 +179,7 @@ extern "C" {
         result
     }
 
-    fn ZenithRemoveFolder(path: *i8) -> u32 {
+    fn TriglavRemoveFolder(path: *i8) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(20), a0(path) -> {
@@ -189,7 +189,7 @@ extern "C" {
         result
     }
 
-    fn ZenithRename(source: *i8, destination: *i8) -> u32 {
+    fn TriglavRename(source: *i8, destination: *i8) -> u32 {
         let mut result: u32 = 0;
 
         volatile asm : a7(21), a0(source), a1(destination) -> {
@@ -200,7 +200,7 @@ extern "C" {
     }
 }
 
-fn ZenithError(code: u32) -> IOError {
+fn TriglavError(code: u32) -> IOError {
     match code {
         2 => IOError::NotFound,
         3 | 11 | 13 | 17 => IOError::InvalidInput,
@@ -214,45 +214,45 @@ fn ZenithError(code: u32) -> IOError {
     }
 }
 
-fn ZenithResult(code: u32) -> Result<(), IOError> {
-    if code != 0 { return Result<(), IOError>::Err(ZenithError(code)); }
+fn TriglavResult(code: u32) -> Result<(), IOError> {
+    if code != 0 { return Result<(), IOError>::Err(TriglavError(code)); }
     Result<(), IOError>::Ok(())
 }
 
-fn PathExists(path: &String) -> bool { ZenithPathKind(path.Data()) != 0 }
-fn FileExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 1 }
-fn FolderExists(path: &String) -> bool { ZenithPathKind(path.Data()) == 2 }
+fn PathExists(path: &String) -> bool { TriglavPathKind(path.Data()) != 0 }
+fn FileExists(path: &String) -> bool { TriglavPathKind(path.Data()) == 1 }
+fn FolderExists(path: &String) -> bool { TriglavPathKind(path.Data()) == 2 }
 
-fn CreateFolder(path: &String) -> Result<(), IOError> { ZenithResult(ZenithCreateFolder(path.Data())) }
-fn RemoveFile(path: &String) -> Result<(), IOError> { ZenithResult(ZenithRemoveFile(path.Data())) }
-fn RemoveFolder(path: &String) -> Result<(), IOError> { ZenithResult(ZenithRemoveFolder(path.Data())) }
-fn RenamePath(source: &String, destination: &String) -> Result<(), IOError> { ZenithResult(ZenithRename(source.Data(), destination.Data())) }
+fn CreateFolder(path: &String) -> Result<(), IOError> { TriglavResult(TriglavCreateFolder(path.Data())) }
+fn RemoveFile(path: &String) -> Result<(), IOError> { TriglavResult(TriglavRemoveFile(path.Data())) }
+fn RemoveFolder(path: &String) -> Result<(), IOError> { TriglavResult(TriglavRemoveFolder(path.Data())) }
+fn RenamePath(source: &String, destination: &String) -> Result<(), IOError> { TriglavResult(TriglavRename(source.Data(), destination.Data())) }
 
 fn ListFolder(path: &String) -> Result<Vector<FolderEntry>, IOError> {
     let mut entries = Vector<FolderEntry>();
     let mut count: u32 = 0;
-    let mut result = ZenithListFolder(path.Data(), null, 0, &mut count);
-    if result != 0 { return Result<Vector<FolderEntry>, IOError>::Err(ZenithError(result)); }
+    let mut result = TriglavListFolder(path.Data(), null, 0, &mut count);
+    if result != 0 { return Result<Vector<FolderEntry>, IOError>::Err(TriglavError(result)); }
 
     while count != 0 {
         let capacity = count;
-        let records = new ZenithFolderRecord[capacity as usize];
-        result = ZenithListFolder(path.Data(), records, capacity, &mut count);
+        let records = new TriglavFolderRecord[capacity as usize];
+        result = TriglavListFolder(path.Data(), records, capacity, &mut count);
 
-        if result == ZENITH_NO_SPACE {
+        if result == TRIGLAV_NO_SPACE {
             delete[] records;
             continue;
         }
 
         if result != 0 {
             delete[] records;
-            return Result<Vector<FolderEntry>, IOError>::Err(ZenithError(result));
+            return Result<Vector<FolderEntry>, IOError>::Err(TriglavError(result));
         }
 
         for i in 0..count {
             let mut entry: FolderEntry;
             entry.name = String(&records[i as usize].name[0] as *i8);
-            entry.kind = if records[i as usize].kind == ZENITH_FOLDER { EntryKind::Folder } else { EntryKind::File };
+            entry.kind = if records[i as usize].kind == TRIGLAV_FOLDER { EntryKind::Folder } else { EntryKind::File };
             entry.size = records[i as usize].size as usize;
             entries.PushBack(entry);
         }
@@ -265,12 +265,12 @@ fn ListFolder(path: &String) -> Result<Vector<FolderEntry>, IOError> {
 }
 
 fn AbsolutePath(path: &String) -> Result<String, IOError> {
-    let buffer = new i8[ZENITH_PATH_MAX];
-    let result = ZenithCanonicalPath(path.Data(), buffer, ZENITH_PATH_MAX);
+    let buffer = new i8[TRIGLAV_PATH_MAX];
+    let result = TriglavCanonicalPath(path.Data(), buffer, TRIGLAV_PATH_MAX);
 
     if result != 0 {
         delete[] buffer;
-        return Result<String, IOError>::Err(ZenithError(result));
+        return Result<String, IOError>::Err(TriglavError(result));
     }
 
     let canonical = String(buffer);
@@ -711,10 +711,10 @@ class FileHandle {
 
     pub fn Open(path: &String, mode: FileMode) -> Result<FileHandle, IOError> {
         let mut handle: FileHandle;
-#[if ZENITH]
+#[if TRIGLAV]
         let mut value: u32 = 0;
-        let result = ZenithOpen(path.Data(), mode as u32, &mut value);
-        if result != 0 { return Result<FileHandle, IOError>::Err(ZenithError(result)); }
+        let result = TriglavOpen(path.Data(), mode as u32, &mut value);
+        if result != 0 { return Result<FileHandle, IOError>::Err(TriglavError(result)); }
         handle.value = value as usize;
 #[elif WINDOWS]
         let (mut access, mut share, mut disposition) = (GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING);
@@ -757,8 +757,8 @@ class FileHandle {
     }
 
     pub fn Close(&this) -> Result<(), IOError> {
-#[if ZENITH]
-        ZenithResult(ZenithClose(this.value as u32))
+#[if TRIGLAV]
+        TriglavResult(TriglavClose(this.value as u32))
 #[elif WINDOWS]
         WindowsResult(CloseHandle(this.value as *mut void))
 #[else]
@@ -767,10 +767,10 @@ class FileHandle {
     }
 
     pub fn Read(&this, buffer: *mut u8, count: usize) -> Result<usize, IOError> {
-#[if ZENITH]
+#[if TRIGLAV]
         let mut length: usize = 0;
-        let result = ZenithRead(this.value as u32, buffer, count, &mut length);
-        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        let result = TriglavRead(this.value as u32, buffer, count, &mut length);
+        if result != 0 { return Result<usize, IOError>::Err(TriglavError(result)); }
         Result<usize, IOError>::Ok(length)
 #[elif WINDOWS]
         let chunk = if count > MAX_TRANSFER { MAX_TRANSFER } else { count };
@@ -785,9 +785,9 @@ class FileHandle {
     }
 
     pub fn Write(&this, data: *u8, count: usize) -> Result<usize, IOError> {
-#[if ZENITH]
-        let result = ZenithWrite(this.value as u32, data, count);
-        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+#[if TRIGLAV]
+        let result = TriglavWrite(this.value as u32, data, count);
+        if result != 0 { return Result<usize, IOError>::Err(TriglavError(result)); }
         Result<usize, IOError>::Ok(count)
 #[elif WINDOWS]
         let chunk = if count > MAX_TRANSFER { MAX_TRANSFER } else { count };
@@ -802,10 +802,10 @@ class FileHandle {
     }
 
     pub fn Seek(&this, offset: isize, origin: SeekOrigin) -> Result<usize, IOError> {
-#[if ZENITH]
+#[if TRIGLAV]
         let mut position: u32 = 0;
-        let result = ZenithSeek(this.value as u32, offset as i32, origin as u32, &mut position);
-        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        let result = TriglavSeek(this.value as u32, offset as i32, origin as u32, &mut position);
+        if result != 0 { return Result<usize, IOError>::Err(TriglavError(result)); }
         Result<usize, IOError>::Ok(position as usize)
 #[elif WINDOWS]
         let mut position: i64 = 0;
@@ -819,10 +819,10 @@ class FileHandle {
     }
 
     pub fn Size(&this) -> Result<usize, IOError> {
-#[if ZENITH]
+#[if TRIGLAV]
         let mut size: u32 = 0;
-        let result = ZenithSize(this.value as u32, &mut size);
-        if result != 0 { return Result<usize, IOError>::Err(ZenithError(result)); }
+        let result = TriglavSize(this.value as u32, &mut size);
+        if result != 0 { return Result<usize, IOError>::Err(TriglavError(result)); }
         Result<usize, IOError>::Ok(size as usize)
 #[elif WINDOWS]
         let mut size: i64 = 0;
@@ -1105,7 +1105,7 @@ class File {
         Result<u32, IOError>::Ok((bytes[0] as u32) | ((bytes[1] as u32) << 8) | ((bytes[2] as u32) << 16) | ((bytes[3] as u32) << 24))
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn ReadU64(&mut this) -> Result<u64, IOError> {
         let mut bytes: [u8; 8];
         if let Result<(), IOError>::Err(error) = this.ReadExact(&mut bytes[0], 8) { return Result<u64, IOError>::Err(error); }
@@ -1141,7 +1141,7 @@ class File {
         this.Write(&bytes[0], 4)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn WriteU64(&mut this, value: u64) -> Result<(), IOError> {
         let mut bytes: [u8; 8];
 

@@ -2838,7 +2838,7 @@ class HIRLowerer {
 
                 match literal->kind {
                     ASTLiteralKind::Integer if (literal as *ASTIntegerLiteral)->suffix.Empty() => this.context.IntegerLiteralType(),
-#[if !ZODIAC]
+#[if !SVAROG]
                     ASTLiteralKind::Float if (literal as *ASTFloatLiteral)->suffix.Empty() => this.context.FloatLiteralType(),
 #[endif]
                     _ => null
@@ -3040,9 +3040,9 @@ class HIRLowerer {
                         let width = suffix.ToUnsignedInteger().Unwrap() as u32;
 
                         if width == 128 || width == 64 || width == 32 || width == 16 || width == 8 {
-#[if ZODIAC]
+#[if SVAROG]
                             if width > 32 {
-                                Logger::Log("Integer widths above 32 bits are not supported by the Zodiac compiler.", literal, LogSeverity::Error);
+                                Logger::Log("Integer widths above 32 bits are not supported by the Svarog compiler.", literal, LogSeverity::Error);
                                 return null;
                             }
 #[endif]
@@ -3057,8 +3057,8 @@ class HIRLowerer {
                 this.builder.IntegerLiteral(integer->value, _type)
             },
             ASTLiteralKind::Float => {
-#[if ZODIAC]
-                Logger::Log("Floating point literals are not supported by the Zodiac compiler.", literal, LogSeverity::Error);
+#[if SVAROG]
+                Logger::Log("Floating point literals are not supported by the Svarog compiler.", literal, LogSeverity::Error);
                 null
 #[else]
                 let float = literal as *ASTFloatLiteral;
@@ -3517,8 +3517,8 @@ class HIRLowerer {
                     }
 
                     if path->segments[0].name == "typeid" {
-#[if ZODIAC]
-                        Logger::Log("The typeid intrinsic requires a 64-bit integer and is not supported by the Zodiac compiler.", call, LogSeverity::Error);
+#[if SVAROG]
+                        Logger::Log("The typeid intrinsic requires a 64-bit integer and is not supported by the Svarog compiler.", call, LogSeverity::Error);
                         return null;
 #[else]
                         return this.builder.IntegerLiteral(_type->ToString().Hash(), this.context.IntegerType(64, false));
@@ -5028,9 +5028,9 @@ class HIRLowerer {
         let target_reference = this.builder.ReferenceBinding(target);
 
         if is_range {
-#[if ZODIAC]
+#[if SVAROG]
             if iterator_type->IsFloat() {
-                Logger::Log("Floating point ranges are not supported by the Zodiac compiler.", _for, LogSeverity::Error);
+                Logger::Log("Floating point ranges are not supported by the Svarog compiler.", _for, LogSeverity::Error);
                 return null;
             }
 
@@ -5886,17 +5886,17 @@ class HIRLowerer {
                         return null;
                     }
 
-#[if ZODIAC]
+#[if SVAROG]
                     if width > 32 {
-                        Logger::Log("Integer widths above 32 bits are not supported by the Zodiac compiler.", path, LogSeverity::Error);
+                        Logger::Log("Integer widths above 32 bits are not supported by the Svarog compiler.", path, LogSeverity::Error);
                         return null;
                     }
 #[endif]
                     return this.context.IntegerType(width, signed);
                 }
             } else if name.StartsWith('f') {
-#[if ZODIAC]
-                Logger::Log("Floating point types are not supported by the Zodiac compiler.", path, LogSeverity::Error);
+#[if SVAROG]
+                Logger::Log("Floating point types are not supported by the Svarog compiler.", path, LogSeverity::Error);
                 return null;
 #[else]
                 let width = name.SubString(1).ToUnsignedInteger().Unwrap() as u32;

@@ -1331,7 +1331,7 @@ class HIRIntegerLiteral : HIRLiteral {
     }
 }
 
-#[if !ZODIAC]
+#[if !SVAROG]
 class HIRFloatLiteral : HIRLiteral {
     pub value: f64;
 
@@ -3657,7 +3657,7 @@ class HIRBuilder {
         this.context->arena.New<HIRIntegerLiteral>(value, _type)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     pub fn FloatLiteral(&mut this, value: f64, _type: *HIRType) -> *mut HIRFloatLiteral {
         this.context->arena.New<HIRFloatLiteral>(value, _type)
     }
@@ -3757,7 +3757,7 @@ class HIRBuilder {
         value & ((1 as HostUnsigned << width) - 1)
     }
 
-#[if !ZODIAC]
+#[if !SVAROG]
     fn SaturateToInteger(&this, value: f64, target: *HIRType) -> HostUnsigned {
         let width = target->Width();
         let limit = (1 as HostUnsigned << (width - 1)) - 1;
@@ -3790,7 +3790,7 @@ class HIRBuilder {
             HIRUnaryKind::Negate => {
                 match operand->kind {
                     HIRLiteralKind::Integer => this.IntegerLiteral(this.MaskToWidth(0 as HostUnsigned - (operand as *HIRIntegerLiteral)->value, _type->Width()), _type),
-#[if !ZODIAC]
+#[if !SVAROG]
                     HIRLiteralKind::Float => this.FloatLiteral(-(operand as *HIRFloatLiteral)->value, _type),
 #[endif]
                     _ => null
@@ -3855,7 +3855,7 @@ class HIRBuilder {
                     _ => null
                 }
             },
-#[if !ZODIAC]
+#[if !SVAROG]
             HIRLiteralKind::Float if right->kind == HIRLiteralKind::Float => {
                 let left = (left as *HIRFloatLiteral)->value;
                 let right = (right as *HIRFloatLiteral)->value;
@@ -3913,7 +3913,7 @@ class HIRBuilder {
             return null;
         }
 
-#[if ZODIAC]
+#[if SVAROG]
         if target->IsFloat() {
             return null;
         }
@@ -3929,7 +3929,7 @@ class HIRBuilder {
                     (value as *HIRIntegerLiteral)->value
                 };
 
-#[if !ZODIAC]
+#[if !SVAROG]
                 if target->IsFloat() {
                     this.FloatLiteral(if value->_type->IsInteger() && value->_type->IsSigned() { this.SignExtend(raw, value->_type->Width()) as f64 } else { raw as f64 }, target)
                 } else {
@@ -3941,11 +3941,11 @@ class HIRBuilder {
                     }
 
                     this.IntegerLiteral(this.MaskToWidth(converted, target->Width()), target)
-#[if !ZODIAC]
+#[if !SVAROG]
                 }
 #[endif]
             },
-#[if !ZODIAC]
+#[if !SVAROG]
             HIRLiteralKind::Float => {
                 let value = (value as *HIRFloatLiteral)->value;
 

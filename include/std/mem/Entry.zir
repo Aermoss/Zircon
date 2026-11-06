@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#[if ZENITH]
-static mut _zenith_bins: [*mut u8; 32];
-static mut _zenith_chunk_ptr: *mut u8 = null;
-static mut _zenith_chunk_end: *mut u8 = null;
+#[if TRIGLAV]
+static mut _triglav_bins: [*mut u8; 32];
+static mut _triglav_chunk_ptr: *mut u8 = null;
+static mut _triglav_chunk_end: *mut u8 = null;
 #[endif]
 
 extern "C" {
-#[if ZENITH || WINDOWS]
-#[if ZENITH]
-    fn ZenithAllocate(size: usize) -> *mut void {
+#[if TRIGLAV || WINDOWS]
+#[if TRIGLAV]
+    fn TriglavAllocate(size: usize) -> *mut void {
         let mut result: *mut void = null;
 
         volatile asm : a7(1), a0(size) -> {
@@ -33,13 +33,13 @@ extern "C" {
         result
     }
 
-    fn ZenithFree(ptr: *mut void) {
+    fn TriglavFree(ptr: *mut void) {
         volatile asm : a7(2), a0(ptr) -> {
             ecall
         } : memory;
     }
 
-    fn ZenithOutOfMemory() -> ! {
+    fn TriglavOutOfMemory() -> ! {
         let message = "Out of memory.\n";
 
         volatile asm : a7(4), a0(message), a1(15) -> {
@@ -65,37 +65,37 @@ extern "C" {
 #[endif]
 
     fn malloc(size: usize) -> *mut void {
-#[if ZENITH]
+#[if TRIGLAV]
         if size > (-1 as usize) - 16 { return null; }
         let aligned = if size <= 8 { 8usize } else { (size + 7) & !7usize };
 
         if aligned <= 256 {
             let bin = (aligned >> 3) - 1;
-            let cached = _zenith_bins[bin];
+            let cached = _triglav_bins[bin];
 
             if cached != null {
-                _zenith_bins[bin] = *(cached as **mut u8);
+                _triglav_bins[bin] = *(cached as **mut u8);
                 return cached as *mut void;
             }
 
             let total = aligned + 8;
 
-            if _zenith_chunk_ptr == null || (_zenith_chunk_end as usize) - (_zenith_chunk_ptr as usize) < total {
-                let chunk = ZenithAllocate(32768) as *mut u8;
-                if chunk == null { ZenithOutOfMemory(); }
-                _zenith_chunk_ptr = chunk;
-                _zenith_chunk_end = chunk + 32768;
+            if _triglav_chunk_ptr == null || (_triglav_chunk_end as usize) - (_triglav_chunk_ptr as usize) < total {
+                let chunk = TriglavAllocate(32768) as *mut u8;
+                if chunk == null { TriglavOutOfMemory(); }
+                _triglav_chunk_ptr = chunk;
+                _triglav_chunk_end = chunk + 32768;
             }
 
-            let header = _zenith_chunk_ptr as *mut usize;
-            _zenith_chunk_ptr = _zenith_chunk_ptr + total;
+            let header = _triglav_chunk_ptr as *mut usize;
+            _triglav_chunk_ptr = _triglav_chunk_ptr + total;
             header[0] = aligned;
             header[1] = bin;
             return (header as *mut u8 + 8) as *mut void;
         }
 
-        let header = ZenithAllocate(aligned + 8) as *mut usize;
-        if header == null { ZenithOutOfMemory(); }
+        let header = TriglavAllocate(aligned + 8) as *mut usize;
+        if header == null { TriglavOutOfMemory(); }
         header[0] = aligned;
         header[1] = 0xFFFFFFFF;
         return (header as *mut u8 + 8) as *mut void;
@@ -106,17 +106,17 @@ extern "C" {
 
     fn free(ptr: *mut void) {
         if ptr == null { return; }
-#[if ZENITH]
+#[if TRIGLAV]
         let header = ((ptr as *mut u8) - 8) as *mut usize;
         let bin = header[1];
 
         if bin < 32 {
-            *(ptr as *mut *mut u8) = _zenith_bins[bin];
-            _zenith_bins[bin] = ptr as *mut u8;
+            *(ptr as *mut *mut u8) = _triglav_bins[bin];
+            _triglav_bins[bin] = ptr as *mut u8;
             return;
         }
 
-        ZenithFree(header as *mut void);
+        TriglavFree(header as *mut void);
 #[else]
         HeapFree(GetProcessHeap(), 0, ptr);
 #[endif]
@@ -124,7 +124,7 @@ extern "C" {
 
     fn memcpy(dst: *mut void, src: *void, size: usize) -> *mut void {
         if size == 0 || dst == null || src == null { return dst; }
-#[if ZENITH]
+#[if TRIGLAV]
         let mut i: usize = 0;
 
         if (((dst as usize) | (src as usize)) & 3) == 0 {
@@ -150,7 +150,7 @@ extern "C" {
 
     fn memmove(dst: *mut void, src: *void, size: usize) -> *mut void {
         if size == 0 || dst == null || src == null { return dst; }
-#[if ZENITH]
+#[if TRIGLAV]
         if (dst as usize) <= (src as usize) {
             for i in 0..size {
                 (dst as *mut u8)[i] = (src as *u8)[i];
@@ -171,7 +171,7 @@ extern "C" {
 
     fn memset(ptr: *mut void, value: i32, num: usize) -> *mut void {
         if num == 0 || ptr == null { return ptr; }
-#[if ZENITH]
+#[if TRIGLAV]
         for i in 0..num {
             (ptr as *mut u8)[i] = value as u8;
         }
@@ -182,7 +182,7 @@ extern "C" {
     }
 
     fn calloc(nmemb: usize, size: usize) -> *mut void {
-#[if ZENITH]
+#[if TRIGLAV]
         if size != 0 && nmemb > (-1 as usize) / size { return null; }
 #[endif]
         let total = nmemb * size;
@@ -195,7 +195,7 @@ extern "C" {
     fn realloc(ptr: *mut void, size: usize) -> *mut void {
         if ptr == null { return malloc(size); }
         if size == 0 { free(ptr); return null; }
-#[if ZENITH]
+#[if TRIGLAV]
         let header = ((ptr as *mut u8) - 8) as *usize;
         let old_size = header[0];
 #[else]
