@@ -117,7 +117,7 @@ class LIRLowerer {
                     this.WriteInteger(global, offset, (constant as *MIRConstantInteger)->value, this.SizeOf(constant->_type));
                     return;
                 },
-                MIRConstantKind::Null => {
+                MIRConstantKind::Null | MIRConstantKind::Undef => {
                     return;
                 },
                 MIRConstantKind::String => {
@@ -693,10 +693,16 @@ class LIRLowerer {
         }
     }
 
+    fn IsEmptyConstant(&this, value: *MIRValue) -> bool {
+        if value->kind != MIRValueKind::Constant { return false; }
+        let kind = (value as *MIRConstant)->kind;
+        kind == MIRConstantKind::Null || kind == MIRConstantKind::Undef
+    }
+
     fn LowerConstant(&mut this, constant: *MIRConstant) -> *LIROperand {
         match constant->kind {
             MIRConstantKind::Integer => this.Immediate(this.TruncateValue((constant as *MIRConstantInteger)->value as HostSigned, this.IntegerWidth(constant->_type))),
-            MIRConstantKind::Null | MIRConstantKind::Undef => this.Immediate(0),
+            MIRConstantKind::Null | MIRConstantKind::Undef if !this.IsAggregate(constant->_type) => this.Immediate(0),
             MIRConstantKind::Float => this.Unsupported("Floating point"),
             MIRConstantKind::Expression => {
                 let result = this.EvaluateConstant(constant);
@@ -1020,6 +1026,18 @@ class LIRLowerer {
         }
     }
 
+    fn ZeroMemory(&mut this, destination: *LIRMemoryOperand, size: u32, alignment: u32) {
+        let unit: u32 = if alignment >= 4 && size % 4 == 0 { 4 } else if alignment >= 2 && size % 2 == 0 { 2 } else { 1 };
+        let store = if unit == 4 { LIROpcode::Sw } else if unit == 2 { LIROpcode::Sh } else { LIROpcode::Sb };
+        let legal_destination = this.LegalMemory(destination, size);
+        let mut offset: u32 = 0;
+
+        while offset < size {
+            this.Emit(store, null, this.Zero(), this.builder.MemoryOperand(legal_destination->base, legal_destination->offset + offset as i32));
+            offset += unit;
+        }
+    }
+
     fn LoadOpcode(&this, size: u32) -> LIROpcode {
         if size == 1 { LIROpcode::Lbu } else if size == 2 { LIROpcode::Lhu } else { LIROpcode::Lw }
     }
@@ -1069,11 +1087,19 @@ class LIRLowerer {
     }
 
     fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> *LIROperand {
+        let _type = store->value->_type;
+        let (size, alignment) = (this.SizeOf(_type), this.AlignOf(_type));
+
+        if this.IsAggregate(_type) && this.IsEmptyConstant(store->value) {
+            let pointer = this.LowerValue(store->pointer);
+            if pointer == null { return null; }
+            this.ZeroMemory(this.EnsureMemory(pointer), size, alignment);
+            return null;
+        }
+
         let value = this.LowerValue(store->value);
         let pointer = this.LowerValue(store->pointer);
         if value == null || pointer == null { return null; }
-        let _type = store->value->_type;
-        let (size, alignment) = (this.SizeOf(_type), this.AlignOf(_type));
 
         if this.IsAggregate(_type) {
             this.CopyMemory(this.EnsureMemory(pointer), this.EnsureMemory(value), size, alignment);

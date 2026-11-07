@@ -15,7 +15,7 @@
  */
 
 #[if TRIGLAV]
-static mut _triglav_bins: [*mut u8; 32];
+static mut _triglav_bins: [*mut u8; 36];
 static mut _triglav_chunk_ptr: *mut u8 = null;
 static mut _triglav_chunk_end: *mut u8 = null;
 #[endif]
@@ -69,8 +69,19 @@ extern "C" {
         if size > (-1 as usize) - 16 { return null; }
         let aligned = if size <= 8 { 8usize } else { (size + 7) & !7usize };
 
-        if aligned <= 256 {
-            let bin = (aligned >> 3) - 1;
+        if aligned <= 4096 {
+            let (bin, capacity) = if aligned <= 256 {
+                ((aligned >> 3) - 1, aligned)
+            } else if aligned <= 512 {
+                (32usize, 512usize)
+            } else if aligned <= 1024 {
+                (33usize, 1024usize)
+            } else if aligned <= 2048 {
+                (34usize, 2048usize)
+            } else {
+                (35usize, 4096usize)
+            };
+
             let cached = _triglav_bins[bin];
 
             if cached != null {
@@ -78,7 +89,7 @@ extern "C" {
                 return cached as *mut void;
             }
 
-            let total = aligned + 8;
+            let total = capacity + 8;
 
             if _triglav_chunk_ptr == null || (_triglav_chunk_end as usize) - (_triglav_chunk_ptr as usize) < total {
                 let chunk = TriglavAllocate(32768) as *mut u8;
@@ -89,7 +100,7 @@ extern "C" {
 
             let header = _triglav_chunk_ptr as *mut usize;
             _triglav_chunk_ptr = _triglav_chunk_ptr + total;
-            header[0] = aligned;
+            header[0] = capacity;
             header[1] = bin;
             return (header as *mut u8 + 8) as *mut void;
         }
@@ -110,7 +121,7 @@ extern "C" {
         let header = ((ptr as *mut u8) - 8) as *mut usize;
         let bin = header[1];
 
-        if bin < 32 {
+        if bin < 36 {
             *(ptr as *mut *mut u8) = _triglav_bins[bin];
             _triglav_bins[bin] = ptr as *mut u8;
             return;

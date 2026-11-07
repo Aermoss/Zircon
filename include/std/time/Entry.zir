@@ -15,14 +15,12 @@
  */
 
 #[if TRIGLAV]
-const TRIGLAV_MS_COUNTER: u32 = 0xFFEC;
-
 fn TriglavUptimeMilliseconds() -> u32 {
     let mut milliseconds: u32 = 0;
 
-    volatile asm : a0(TRIGLAV_MS_COUNTER) -> {
-        lw a0, 0(a0)
-    } -> a0(milliseconds) : memory;
+    volatile asm {
+        rdtime a0
+    } -> a0(milliseconds);
 
     milliseconds
 }
