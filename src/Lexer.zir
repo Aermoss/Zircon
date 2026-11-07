@@ -570,7 +570,13 @@ class Lexer {
         this.Advance(1);
 
         while this.CurrentChar() != '\0' {
-            let character = this.CurrentChar();
+            let mut character = this.CurrentChar();
+
+            if character == '\r' {
+                if this.PeekChar(1) == '\n' {
+                    this.Advance(1);
+                } character = '\n';
+            }
 
             if character == '{' {
                 indent += 1;
@@ -582,7 +588,7 @@ class Lexer {
                 }
             }
 
-            if character != ' ' && character != '\t' && character != '\n' && character != '\r' {
+            if character != ' ' && character != '\t' && character != '\n' {
                 if !accumulator.Empty() {
                     value += accumulator;
                     accumulator.Clear();
@@ -591,7 +597,7 @@ class Lexer {
                 state = false;
                 value += character;
             } else if !state {
-                state = character == '\n' || character == '\r';
+                state = character == '\n';
                 accumulator += character;
             } this.Advance(1);
         }
