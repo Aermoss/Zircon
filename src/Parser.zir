@@ -21,7 +21,8 @@ class Parser {
     pub arena: Arena,
     tokens: Vector<Token>,
     previous: SourceSpan,
-    index: usize;
+    index: usize,
+    type_arguments: usize = 0;
 
     fn New<T>(&mut this, args...) -> *mut T {
         let node = this.arena.New<T>(args...);
@@ -67,6 +68,13 @@ class Parser {
         } else {
             this.tokens[index]
         }
+    }
+
+    fn IsShift(&this, offset: usize) -> bool {
+        let (first, second) = (this.Peek(offset), this.Peek(offset + 1));
+
+        (first._type == TokenType::Greater || first._type == TokenType::Less) && second._type == first._type
+            && second.span.file == first.span.file && second.span.start == first.span.end
     }
 
     fn PeekBack(&this, offset: usize) -> Token {
@@ -155,6 +163,7 @@ class Parser {
             }
 
             if depth == 0 {
+                if this.type_arguments == 0 && this.IsShift(index - 1) { return false; }
                 let next = this.Peek(index);
 
                 return next._type != TokenType::Identifier && next._type != TokenType::Integer && next._type != TokenType::Float && next._type != TokenType::String
@@ -163,6 +172,23 @@ class Parser {
         }
 
         false
+    }
+
+    fn TryParseTypeArguments(&mut this, types: &mut Vector<*ASTType>) -> bool {
+        if !this.IsTypeApplication() { return true; }
+        this.Advance();
+        this.type_arguments += 1;
+        let mut success = true;
+
+        while this.Current()._type != TokenType::Greater {
+            let _type = this.ParseType();
+            if _type == null { success = false; break; }
+            types.PushBack(_type);
+            if !this.Match(TokenType::Comma) { break; }
+        }
+
+        this.type_arguments -= 1;
+        success && this.ExpectSuccess(TokenType::Greater)
     }
 
     fn ParsePath(&mut this) -> *ASTPath {
@@ -183,19 +209,8 @@ class Parser {
                 let _identifier = this.Expect(if this.Current()._type != TokenType::This { TokenType::Identifier } else { TokenType::This });
                 if _identifier._type == TokenType::Unknown { return null; }
                 let mut segment = ASTPathSegment(_identifier.Text());
-
-                if this.IsTypeApplication() {
-                    this.Advance();
-
-                    while this.Current()._type != TokenType::Greater {
-                        let _type = this.ParseType();
-                        if _type == null { return null; }
-                        segment.types.PushBack(_type);
-                        if !this.Match(TokenType::Comma) { break; }
-                    }
-
-                    if !this.ExpectSuccess(TokenType::Greater) { return null; }
-                } path->segments.PushBack(segment);
+                if !this.TryParseTypeArguments(&mut segment.types) { return null; }
+                path->segments.PushBack(segment);
             }
 
             if !this.Match(TokenType::DoubleColon) {
@@ -458,20 +473,7 @@ class Parser {
                     }
 
                     member_access->member_span = SourceSpan { file: member_start.file, start: member_start.start, end: this.previous.end };
-
-                    if this.IsTypeApplication() {
-                        this.Advance();
-
-                        while this.Current()._type != TokenType::Greater {
-                            let _type = this.ParseType();
-                            if _type == null { return null; }
-                            member_access->types.PushBack(_type);
-                            if !this.Match(TokenType::Comma) { break; }
-                        }
-
-                        if !this.ExpectSuccess(TokenType::Greater) { return null; }
-                    }
-
+                    if !this.TryParseTypeArguments(&mut member_access->types) { return null; }
                     this.Finish(member_access);
                     expression = member_access;
                 },
@@ -665,22 +667,16 @@ class Parser {
 
         loop {
             let mut token = this.Current();
+            let shift = this.IsShift(0);
 
-            if this.Peek(1)._type == token._type {
-                if token._type == TokenType::Greater {
-                    token._type = TokenType::RightShift;
-                    this.Advance();
-                }
-
-                if token._type == TokenType::Less {
-                    token._type = TokenType::LeftShift;
-                    this.Advance();
-                }
+            if shift {
+                token._type = if token._type == TokenType::Greater { TokenType::RightShift } else { TokenType::LeftShift };
             }
 
             let precedence = this.GetBinaryPrecedence(token._type);
             if precedence < min_precedence { break; }
             this.Advance();
+            if shift { this.Advance(); }
 
             if token._type == TokenType::As {
                 let _type = this.ParseType();
