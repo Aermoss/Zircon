@@ -63,7 +63,7 @@ const TRIGLAV_NO_SPACE: u32 = 5;
 const TRIGLAV_FOLDER: u32 = 2;
 
 class TriglavFolderRecord {
-    pub name: [i8; 32],
+    pub name: [i8; 256],
     pub kind: u32,
     pub size: u32
 }
