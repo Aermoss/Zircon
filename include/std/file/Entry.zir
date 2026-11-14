@@ -192,7 +192,7 @@ extern "C" {
     fn TriglavRename(source: *i8, destination: *i8) -> u32 {
         let mut result: u32 = 0;
 
-        volatile asm : a7(21), a0(source), a1(destination) -> {
+        volatile asm : a7(22), a0(source), a1(destination) -> {
             ecall
         } -> a0(result) : memory;
 
