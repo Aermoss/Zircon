@@ -1,0 +1,171 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_guid.zir", "vendor/sdl3/SDL_iostream.zir", "vendor/sdl3/SDL_joystick.zir", "vendor/sdl3/SDL_power.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_sensor.zir" : *]
+
+struct SDL_Gamepad {}
+
+enum SDL_GamepadType: i32 {
+    SDL_GAMEPAD_TYPE_UNKNOWN = 0,
+    SDL_GAMEPAD_TYPE_STANDARD,
+    SDL_GAMEPAD_TYPE_XBOX360,
+    SDL_GAMEPAD_TYPE_XBOXONE,
+    SDL_GAMEPAD_TYPE_PS3,
+    SDL_GAMEPAD_TYPE_PS4,
+    SDL_GAMEPAD_TYPE_PS5,
+    SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO,
+    SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT,
+    SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT,
+    SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR,
+    SDL_GAMEPAD_TYPE_GAMECUBE,
+    SDL_GAMEPAD_TYPE_COUNT
+}
+
+enum SDL_GamepadButton: i32 {
+    SDL_GAMEPAD_BUTTON_INVALID = -1,
+    SDL_GAMEPAD_BUTTON_SOUTH,
+    SDL_GAMEPAD_BUTTON_EAST,
+    SDL_GAMEPAD_BUTTON_WEST,
+    SDL_GAMEPAD_BUTTON_NORTH,
+    SDL_GAMEPAD_BUTTON_BACK,
+    SDL_GAMEPAD_BUTTON_GUIDE,
+    SDL_GAMEPAD_BUTTON_START,
+    SDL_GAMEPAD_BUTTON_LEFT_STICK,
+    SDL_GAMEPAD_BUTTON_RIGHT_STICK,
+    SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,
+    SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,
+    SDL_GAMEPAD_BUTTON_DPAD_UP,
+    SDL_GAMEPAD_BUTTON_DPAD_DOWN,
+    SDL_GAMEPAD_BUTTON_DPAD_LEFT,
+    SDL_GAMEPAD_BUTTON_DPAD_RIGHT,
+    SDL_GAMEPAD_BUTTON_MISC1,
+    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,
+    SDL_GAMEPAD_BUTTON_LEFT_PADDLE1,
+    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2,
+    SDL_GAMEPAD_BUTTON_LEFT_PADDLE2,
+    SDL_GAMEPAD_BUTTON_TOUCHPAD,
+    SDL_GAMEPAD_BUTTON_MISC2,
+    SDL_GAMEPAD_BUTTON_MISC3,
+    SDL_GAMEPAD_BUTTON_MISC4,
+    SDL_GAMEPAD_BUTTON_MISC5,
+    SDL_GAMEPAD_BUTTON_MISC6,
+    SDL_GAMEPAD_BUTTON_COUNT
+}
+
+enum SDL_GamepadButtonLabel: i32 {
+    SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN,
+    SDL_GAMEPAD_BUTTON_LABEL_A,
+    SDL_GAMEPAD_BUTTON_LABEL_B,
+    SDL_GAMEPAD_BUTTON_LABEL_X,
+    SDL_GAMEPAD_BUTTON_LABEL_Y,
+    SDL_GAMEPAD_BUTTON_LABEL_CROSS,
+    SDL_GAMEPAD_BUTTON_LABEL_CIRCLE,
+    SDL_GAMEPAD_BUTTON_LABEL_SQUARE,
+    SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE
+}
+
+enum SDL_GamepadAxis: i32 {
+    SDL_GAMEPAD_AXIS_INVALID = -1,
+    SDL_GAMEPAD_AXIS_LEFTX,
+    SDL_GAMEPAD_AXIS_LEFTY,
+    SDL_GAMEPAD_AXIS_RIGHTX,
+    SDL_GAMEPAD_AXIS_RIGHTY,
+    SDL_GAMEPAD_AXIS_LEFT_TRIGGER,
+    SDL_GAMEPAD_AXIS_RIGHT_TRIGGER,
+    SDL_GAMEPAD_AXIS_COUNT
+}
+
+enum SDL_GamepadBindingType: i32 {
+    SDL_GAMEPAD_BINDTYPE_NONE = 0,
+    SDL_GAMEPAD_BINDTYPE_BUTTON,
+    SDL_GAMEPAD_BINDTYPE_AXIS,
+    SDL_GAMEPAD_BINDTYPE_HAT
+}
+
+struct SDL_GamepadBinding_input {
+    pub _data: [u32; 3]
+}
+
+struct SDL_GamepadBinding_output {
+    pub _data: [u32; 3]
+}
+
+struct SDL_GamepadBinding {
+    pub input_type: SDL_GamepadBindingType,
+    pub input: SDL_GamepadBinding_input,
+    pub output_type: SDL_GamepadBindingType,
+    pub output: SDL_GamepadBinding_output
+}
+
+extern "C" {
+    fn SDL_AddGamepadMapping(mapping: *i8) -> i32;
+    fn SDL_AddGamepadMappingsFromIO(src: *mut SDL_IOStream, closeio: bool) -> i32;
+    fn SDL_AddGamepadMappingsFromFile(file: *i8) -> i32;
+    fn SDL_ReloadGamepadMappings() -> bool;
+    fn SDL_GetGamepadMappings(count: *mut i32) -> *mut *mut i8;
+    fn SDL_GetGamepadMappingForGUID(guid: SDL_GUID) -> *mut i8;
+    fn SDL_GetGamepadMapping(gamepad: *mut SDL_Gamepad) -> *mut i8;
+    fn SDL_SetGamepadMapping(instance_id: SDL_JoystickID, mapping: *i8) -> bool;
+    fn SDL_HasGamepad() -> bool;
+    fn SDL_GetGamepads(count: *mut i32) -> *mut SDL_JoystickID;
+    fn SDL_IsGamepad(instance_id: SDL_JoystickID) -> bool;
+    fn SDL_GetGamepadNameForID(instance_id: SDL_JoystickID) -> *i8;
+    fn SDL_GetGamepadPathForID(instance_id: SDL_JoystickID) -> *i8;
+    fn SDL_GetGamepadPlayerIndexForID(instance_id: SDL_JoystickID) -> i32;
+    fn SDL_GetGamepadGUIDForID(instance_id: SDL_JoystickID) -> SDL_GUID;
+    fn SDL_GetGamepadVendorForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetGamepadProductForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetGamepadProductVersionForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetGamepadTypeForID(instance_id: SDL_JoystickID) -> SDL_GamepadType;
+    fn SDL_GetRealGamepadTypeForID(instance_id: SDL_JoystickID) -> SDL_GamepadType;
+    fn SDL_GetGamepadMappingForID(instance_id: SDL_JoystickID) -> *mut i8;
+    fn SDL_OpenGamepad(instance_id: SDL_JoystickID) -> *mut SDL_Gamepad;
+    fn SDL_GetGamepadFromID(instance_id: SDL_JoystickID) -> *mut SDL_Gamepad;
+    fn SDL_GetGamepadFromPlayerIndex(player_index: i32) -> *mut SDL_Gamepad;
+    fn SDL_GetGamepadProperties(gamepad: *mut SDL_Gamepad) -> SDL_PropertiesID;
+    fn SDL_GetGamepadID(gamepad: *mut SDL_Gamepad) -> SDL_JoystickID;
+    fn SDL_GetGamepadName(gamepad: *mut SDL_Gamepad) -> *i8;
+    fn SDL_GetGamepadPath(gamepad: *mut SDL_Gamepad) -> *i8;
+    fn SDL_GetGamepadType(gamepad: *mut SDL_Gamepad) -> SDL_GamepadType;
+    fn SDL_GetRealGamepadType(gamepad: *mut SDL_Gamepad) -> SDL_GamepadType;
+    fn SDL_GetGamepadPlayerIndex(gamepad: *mut SDL_Gamepad) -> i32;
+    fn SDL_SetGamepadPlayerIndex(gamepad: *mut SDL_Gamepad, player_index: i32) -> bool;
+    fn SDL_GetGamepadVendor(gamepad: *mut SDL_Gamepad) -> Uint16;
+    fn SDL_GetGamepadProduct(gamepad: *mut SDL_Gamepad) -> Uint16;
+    fn SDL_GetGamepadProductVersion(gamepad: *mut SDL_Gamepad) -> Uint16;
+    fn SDL_GetGamepadFirmwareVersion(gamepad: *mut SDL_Gamepad) -> Uint16;
+    fn SDL_GetGamepadSerial(gamepad: *mut SDL_Gamepad) -> *i8;
+    fn SDL_GetGamepadSteamHandle(gamepad: *mut SDL_Gamepad) -> Uint64;
+    fn SDL_GetGamepadConnectionState(gamepad: *mut SDL_Gamepad) -> SDL_JoystickConnectionState;
+    fn SDL_GetGamepadPowerInfo(gamepad: *mut SDL_Gamepad, percent: *mut i32) -> SDL_PowerState;
+    fn SDL_GamepadConnected(gamepad: *mut SDL_Gamepad) -> bool;
+    fn SDL_GetGamepadJoystick(gamepad: *mut SDL_Gamepad) -> *mut SDL_Joystick;
+    fn SDL_SetGamepadEventsEnabled(enabled: bool);
+    fn SDL_GamepadEventsEnabled() -> bool;
+    fn SDL_GetGamepadBindings(gamepad: *mut SDL_Gamepad, count: *mut i32) -> *mut *mut SDL_GamepadBinding;
+    fn SDL_UpdateGamepads();
+    fn SDL_GetGamepadTypeFromString(str: *i8) -> SDL_GamepadType;
+    fn SDL_GetGamepadStringForType(_type: SDL_GamepadType) -> *i8;
+    fn SDL_GetGamepadAxisFromString(str: *i8) -> SDL_GamepadAxis;
+    fn SDL_GetGamepadStringForAxis(axis: SDL_GamepadAxis) -> *i8;
+    fn SDL_GamepadHasAxis(gamepad: *mut SDL_Gamepad, axis: SDL_GamepadAxis) -> bool;
+    fn SDL_GetGamepadAxis(gamepad: *mut SDL_Gamepad, axis: SDL_GamepadAxis) -> Sint16;
+    fn SDL_GetGamepadButtonFromString(str: *i8) -> SDL_GamepadButton;
+    fn SDL_GetGamepadStringForButton(button: SDL_GamepadButton) -> *i8;
+    fn SDL_GamepadHasButton(gamepad: *mut SDL_Gamepad, button: SDL_GamepadButton) -> bool;
+    fn SDL_GetGamepadButton(gamepad: *mut SDL_Gamepad, button: SDL_GamepadButton) -> bool;
+    fn SDL_GetGamepadButtonLabelForType(_type: SDL_GamepadType, button: SDL_GamepadButton) -> SDL_GamepadButtonLabel;
+    fn SDL_GetGamepadButtonLabel(gamepad: *mut SDL_Gamepad, button: SDL_GamepadButton) -> SDL_GamepadButtonLabel;
+    fn SDL_GetNumGamepadTouchpads(gamepad: *mut SDL_Gamepad) -> i32;
+    fn SDL_GetNumGamepadTouchpadFingers(gamepad: *mut SDL_Gamepad, touchpad: i32) -> i32;
+    fn SDL_GetGamepadTouchpadFinger(gamepad: *mut SDL_Gamepad, touchpad: i32, finger: i32, down: *mut bool, x: *mut f32, y: *mut f32, pressure: *mut f32) -> bool;
+    fn SDL_GamepadHasSensor(gamepad: *mut SDL_Gamepad, _type: SDL_SensorType) -> bool;
+    fn SDL_SetGamepadSensorEnabled(gamepad: *mut SDL_Gamepad, _type: SDL_SensorType, enabled: bool) -> bool;
+    fn SDL_GamepadSensorEnabled(gamepad: *mut SDL_Gamepad, _type: SDL_SensorType) -> bool;
+    fn SDL_GetGamepadSensorDataRate(gamepad: *mut SDL_Gamepad, _type: SDL_SensorType) -> f32;
+    fn SDL_GetGamepadSensorData(gamepad: *mut SDL_Gamepad, _type: SDL_SensorType, data: *mut f32, num_values: i32) -> bool;
+    fn SDL_RumbleGamepad(gamepad: *mut SDL_Gamepad, low_frequency_rumble: Uint16, high_frequency_rumble: Uint16, duration_ms: Uint32) -> bool;
+    fn SDL_RumbleGamepadTriggers(gamepad: *mut SDL_Gamepad, left_rumble: Uint16, right_rumble: Uint16, duration_ms: Uint32) -> bool;
+    fn SDL_SetGamepadLED(gamepad: *mut SDL_Gamepad, red: Uint8, green: Uint8, blue: Uint8) -> bool;
+    fn SDL_SendGamepadEffect(gamepad: *mut SDL_Gamepad, data: *void, size: i32) -> bool;
+    fn SDL_CloseGamepad(gamepad: *mut SDL_Gamepad);
+    fn SDL_GetGamepadAppleSFSymbolsNameForButton(gamepad: *mut SDL_Gamepad, button: SDL_GamepadButton) -> *i8;
+    fn SDL_GetGamepadAppleSFSymbolsNameForAxis(gamepad: *mut SDL_Gamepad, axis: SDL_GamepadAxis) -> *i8;
+}

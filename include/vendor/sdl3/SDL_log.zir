@@ -1,0 +1,59 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+enum SDL_LogCategory: i32 {
+    SDL_LOG_CATEGORY_APPLICATION,
+    SDL_LOG_CATEGORY_ERROR,
+    SDL_LOG_CATEGORY_ASSERT,
+    SDL_LOG_CATEGORY_SYSTEM,
+    SDL_LOG_CATEGORY_AUDIO,
+    SDL_LOG_CATEGORY_VIDEO,
+    SDL_LOG_CATEGORY_RENDER,
+    SDL_LOG_CATEGORY_INPUT,
+    SDL_LOG_CATEGORY_TEST,
+    SDL_LOG_CATEGORY_GPU,
+    SDL_LOG_CATEGORY_RESERVED2,
+    SDL_LOG_CATEGORY_RESERVED3,
+    SDL_LOG_CATEGORY_RESERVED4,
+    SDL_LOG_CATEGORY_RESERVED5,
+    SDL_LOG_CATEGORY_RESERVED6,
+    SDL_LOG_CATEGORY_RESERVED7,
+    SDL_LOG_CATEGORY_RESERVED8,
+    SDL_LOG_CATEGORY_RESERVED9,
+    SDL_LOG_CATEGORY_RESERVED10,
+    SDL_LOG_CATEGORY_CUSTOM
+}
+
+enum SDL_LogPriority: i32 {
+    SDL_LOG_PRIORITY_INVALID,
+    SDL_LOG_PRIORITY_TRACE,
+    SDL_LOG_PRIORITY_VERBOSE,
+    SDL_LOG_PRIORITY_DEBUG,
+    SDL_LOG_PRIORITY_INFO,
+    SDL_LOG_PRIORITY_WARN,
+    SDL_LOG_PRIORITY_ERROR,
+    SDL_LOG_PRIORITY_CRITICAL,
+    SDL_LOG_PRIORITY_COUNT
+}
+
+type SDL_LogOutputFunction = fn(*mut void, i32, SDL_LogPriority, *i8);
+
+extern "C" {
+    fn SDL_SetLogPriorities(priority: SDL_LogPriority);
+    fn SDL_SetLogPriority(category: i32, priority: SDL_LogPriority);
+    fn SDL_GetLogPriority(category: i32) -> SDL_LogPriority;
+    fn SDL_ResetLogPriorities();
+    fn SDL_SetLogPriorityPrefix(priority: SDL_LogPriority, prefix: *i8) -> bool;
+    fn SDL_Log(fmt: *i8, ...);
+    fn SDL_LogTrace(category: i32, fmt: *i8, ...);
+    fn SDL_LogVerbose(category: i32, fmt: *i8, ...);
+    fn SDL_LogDebug(category: i32, fmt: *i8, ...);
+    fn SDL_LogInfo(category: i32, fmt: *i8, ...);
+    fn SDL_LogWarn(category: i32, fmt: *i8, ...);
+    fn SDL_LogError(category: i32, fmt: *i8, ...);
+    fn SDL_LogCritical(category: i32, fmt: *i8, ...);
+    fn SDL_LogMessage(category: i32, priority: SDL_LogPriority, fmt: *i8, ...);
+    fn SDL_LogMessageV(category: i32, priority: SDL_LogPriority, fmt: *i8, ap: *mut i8);
+    fn SDL_GetDefaultLogOutputFunction() -> SDL_LogOutputFunction;
+    fn SDL_GetLogOutputFunction(callback: *mut SDL_LogOutputFunction, userdata: *mut *mut void);
+    fn SDL_SetLogOutputFunction(callback: SDL_LogOutputFunction, userdata: *mut void);
+}

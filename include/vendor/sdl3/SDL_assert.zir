@@ -1,0 +1,35 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+const SDL_ASSERT_LEVEL: i32 = 1;
+const SDL_LINE: i32 = 54;
+const SDL_NULL_WHILE_LOOP_CONDITION: i32 = 0;
+
+enum SDL_AssertState: i32 {
+    SDL_ASSERTION_RETRY,
+    SDL_ASSERTION_BREAK,
+    SDL_ASSERTION_ABORT,
+    SDL_ASSERTION_IGNORE,
+    SDL_ASSERTION_ALWAYS_IGNORE
+}
+
+struct SDL_AssertData {
+    pub always_ignore: bool,
+    pub trigger_count: u32,
+    pub condition: *i8,
+    pub filename: *i8,
+    pub linenum: i32,
+    pub function: *i8,
+    pub next: *SDL_AssertData
+}
+
+type SDL_AssertionHandler = fn(*SDL_AssertData, *mut void) -> SDL_AssertState;
+
+extern "C" {
+    fn __debugbreak();
+    fn SDL_ReportAssertion(data: *mut SDL_AssertData, func: *i8, file: *i8, line: i32) -> SDL_AssertState;
+    fn SDL_SetAssertionHandler(handler: SDL_AssertionHandler, userdata: *mut void);
+    fn SDL_GetDefaultAssertionHandler() -> SDL_AssertionHandler;
+    fn SDL_GetAssertionHandler(puserdata: *mut *mut void) -> SDL_AssertionHandler;
+    fn SDL_GetAssertionReport() -> *SDL_AssertData;
+    fn SDL_ResetAssertionReport();
+}

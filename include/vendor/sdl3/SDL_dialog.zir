@@ -1,0 +1,30 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+const SDL_PROP_FILE_DIALOG_FILTERS_POINTER: *i8 = "SDL.filedialog.filters";
+const SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER: *i8 = "SDL.filedialog.nfilters";
+const SDL_PROP_FILE_DIALOG_WINDOW_POINTER: *i8 = "SDL.filedialog.window";
+const SDL_PROP_FILE_DIALOG_LOCATION_STRING: *i8 = "SDL.filedialog.location";
+const SDL_PROP_FILE_DIALOG_MANY_BOOLEAN: *i8 = "SDL.filedialog.many";
+const SDL_PROP_FILE_DIALOG_TITLE_STRING: *i8 = "SDL.filedialog.title";
+const SDL_PROP_FILE_DIALOG_ACCEPT_STRING: *i8 = "SDL.filedialog.accept";
+const SDL_PROP_FILE_DIALOG_CANCEL_STRING: *i8 = "SDL.filedialog.cancel";
+
+struct SDL_DialogFileFilter {
+    pub name: *i8,
+    pub pattern: *i8
+}
+
+type SDL_DialogFileCallback = fn(*mut void, **i8, i32);
+
+enum SDL_FileDialogType: i32 {
+    SDL_FILEDIALOG_OPENFILE,
+    SDL_FILEDIALOG_SAVEFILE,
+    SDL_FILEDIALOG_OPENFOLDER
+}
+
+extern "C" {
+    fn SDL_ShowOpenFileDialog(callback: SDL_DialogFileCallback, userdata: *mut void, window: *mut SDL_Window, filters: *SDL_DialogFileFilter, nfilters: i32, default_location: *i8, allow_many: bool);
+    fn SDL_ShowSaveFileDialog(callback: SDL_DialogFileCallback, userdata: *mut void, window: *mut SDL_Window, filters: *SDL_DialogFileFilter, nfilters: i32, default_location: *i8);
+    fn SDL_ShowOpenFolderDialog(callback: SDL_DialogFileCallback, userdata: *mut void, window: *mut SDL_Window, default_location: *i8, allow_many: bool);
+    fn SDL_ShowFileDialogWithProperties(_type: SDL_FileDialogType, callback: SDL_DialogFileCallback, userdata: *mut void, props: SDL_PropertiesID);
+}

@@ -1,0 +1,9 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+extern "C" {
+    fn SDL_SetError(fmt: *i8, ...) -> bool;
+    fn SDL_SetErrorV(fmt: *i8, ap: *mut i8) -> bool;
+    fn SDL_OutOfMemory() -> bool;
+    fn SDL_GetError() -> *i8;
+    fn SDL_ClearError() -> bool;
+}

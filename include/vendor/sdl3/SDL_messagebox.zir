@@ -1,0 +1,52 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+const SDL_MESSAGEBOX_ERROR: u32 = 0x00000010;
+const SDL_MESSAGEBOX_WARNING: u32 = 0x00000020;
+const SDL_MESSAGEBOX_INFORMATION: u32 = 0x00000040;
+const SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT: u32 = 0x00000080;
+const SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT: u32 = 0x00000100;
+const SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT: u32 = 0x00000001;
+const SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT: u32 = 0x00000002;
+
+type SDL_MessageBoxFlags = Uint32;
+type SDL_MessageBoxButtonFlags = Uint32;
+
+struct SDL_MessageBoxButtonData {
+    pub flags: SDL_MessageBoxButtonFlags,
+    pub buttonID: i32,
+    pub text: *i8
+}
+
+struct SDL_MessageBoxColor {
+    pub r: Uint8,
+    pub g: Uint8,
+    pub b: Uint8
+}
+
+enum SDL_MessageBoxColorType: i32 {
+    SDL_MESSAGEBOX_COLOR_BACKGROUND,
+    SDL_MESSAGEBOX_COLOR_TEXT,
+    SDL_MESSAGEBOX_COLOR_BUTTON_BORDER,
+    SDL_MESSAGEBOX_COLOR_BUTTON_BACKGROUND,
+    SDL_MESSAGEBOX_COLOR_BUTTON_SELECTED,
+    SDL_MESSAGEBOX_COLOR_COUNT
+}
+
+struct SDL_MessageBoxColorScheme {
+    pub colors: [SDL_MessageBoxColor; 5]
+}
+
+struct SDL_MessageBoxData {
+    pub flags: SDL_MessageBoxFlags,
+    pub window: *mut SDL_Window,
+    pub title: *i8,
+    pub message: *i8,
+    pub numbuttons: i32,
+    pub buttons: *SDL_MessageBoxButtonData,
+    pub colorScheme: *SDL_MessageBoxColorScheme
+}
+
+extern "C" {
+    fn SDL_ShowMessageBox(messageboxdata: *SDL_MessageBoxData, buttonid: *mut i32) -> bool;
+    fn SDL_ShowSimpleMessageBox(flags: SDL_MessageBoxFlags, title: *i8, message: *i8, window: *mut SDL_Window) -> bool;
+}

@@ -1,0 +1,38 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+struct SDL_Point {
+    pub x: i32,
+    pub y: i32
+}
+
+struct SDL_FPoint {
+    pub x: f32,
+    pub y: f32
+}
+
+struct SDL_Rect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32
+}
+
+struct SDL_FRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32
+}
+
+extern "C" {
+    fn SDL_HasRectIntersection(A: *SDL_Rect, B: *SDL_Rect) -> bool;
+    fn SDL_GetRectIntersection(A: *SDL_Rect, B: *SDL_Rect, result: *mut SDL_Rect) -> bool;
+    fn SDL_GetRectUnion(A: *SDL_Rect, B: *SDL_Rect, result: *mut SDL_Rect) -> bool;
+    fn SDL_GetRectEnclosingPoints(points: *SDL_Point, count: i32, clip: *SDL_Rect, result: *mut SDL_Rect) -> bool;
+    fn SDL_GetRectAndLineIntersection(rect: *SDL_Rect, X1: *mut i32, Y1: *mut i32, X2: *mut i32, Y2: *mut i32) -> bool;
+    fn SDL_HasRectIntersectionFloat(A: *SDL_FRect, B: *SDL_FRect) -> bool;
+    fn SDL_GetRectIntersectionFloat(A: *SDL_FRect, B: *SDL_FRect, result: *mut SDL_FRect) -> bool;
+    fn SDL_GetRectUnionFloat(A: *SDL_FRect, B: *SDL_FRect, result: *mut SDL_FRect) -> bool;
+    fn SDL_GetRectEnclosingPointsFloat(points: *SDL_FPoint, count: i32, clip: *SDL_FRect, result: *mut SDL_FRect) -> bool;
+    fn SDL_GetRectAndLineIntersectionFloat(rect: *SDL_FRect, X1: *mut f32, Y1: *mut f32, X2: *mut f32, Y2: *mut f32) -> bool;
+}

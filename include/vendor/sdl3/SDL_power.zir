@@ -1,0 +1,14 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+enum SDL_PowerState: i32 {
+    SDL_POWERSTATE_ERROR = -1,
+    SDL_POWERSTATE_UNKNOWN,
+    SDL_POWERSTATE_ON_BATTERY,
+    SDL_POWERSTATE_NO_BATTERY,
+    SDL_POWERSTATE_CHARGING,
+    SDL_POWERSTATE_CHARGED
+}
+
+extern "C" {
+    fn SDL_GetPowerInfo(seconds: *mut i32, percent: *mut i32) -> SDL_PowerState;
+}

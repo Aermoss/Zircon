@@ -1,0 +1,41 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+const SDL_PROP_NAME_STRING: *i8 = "SDL.name";
+
+type SDL_PropertiesID = Uint32;
+
+enum SDL_PropertyType: i32 {
+    SDL_PROPERTY_TYPE_INVALID,
+    SDL_PROPERTY_TYPE_POINTER,
+    SDL_PROPERTY_TYPE_STRING,
+    SDL_PROPERTY_TYPE_NUMBER,
+    SDL_PROPERTY_TYPE_FLOAT,
+    SDL_PROPERTY_TYPE_BOOLEAN
+}
+
+type SDL_CleanupPropertyCallback = fn(*mut void, *mut void);
+type SDL_EnumeratePropertiesCallback = fn(*mut void, SDL_PropertiesID, *i8);
+
+extern "C" {
+    fn SDL_GetGlobalProperties() -> SDL_PropertiesID;
+    fn SDL_CreateProperties() -> SDL_PropertiesID;
+    fn SDL_CopyProperties(src: SDL_PropertiesID, dst: SDL_PropertiesID) -> bool;
+    fn SDL_LockProperties(props: SDL_PropertiesID) -> bool;
+    fn SDL_UnlockProperties(props: SDL_PropertiesID);
+    fn SDL_SetPointerPropertyWithCleanup(props: SDL_PropertiesID, name: *i8, value: *mut void, cleanup: SDL_CleanupPropertyCallback, userdata: *mut void) -> bool;
+    fn SDL_SetPointerProperty(props: SDL_PropertiesID, name: *i8, value: *mut void) -> bool;
+    fn SDL_SetStringProperty(props: SDL_PropertiesID, name: *i8, value: *i8) -> bool;
+    fn SDL_SetNumberProperty(props: SDL_PropertiesID, name: *i8, value: Sint64) -> bool;
+    fn SDL_SetFloatProperty(props: SDL_PropertiesID, name: *i8, value: f32) -> bool;
+    fn SDL_SetBooleanProperty(props: SDL_PropertiesID, name: *i8, value: bool) -> bool;
+    fn SDL_HasProperty(props: SDL_PropertiesID, name: *i8) -> bool;
+    fn SDL_GetPropertyType(props: SDL_PropertiesID, name: *i8) -> SDL_PropertyType;
+    fn SDL_GetPointerProperty(props: SDL_PropertiesID, name: *i8, default_value: *mut void) -> *mut void;
+    fn SDL_GetStringProperty(props: SDL_PropertiesID, name: *i8, default_value: *i8) -> *i8;
+    fn SDL_GetNumberProperty(props: SDL_PropertiesID, name: *i8, default_value: Sint64) -> Sint64;
+    fn SDL_GetFloatProperty(props: SDL_PropertiesID, name: *i8, default_value: f32) -> f32;
+    fn SDL_GetBooleanProperty(props: SDL_PropertiesID, name: *i8, default_value: bool) -> bool;
+    fn SDL_ClearProperty(props: SDL_PropertiesID, name: *i8) -> bool;
+    fn SDL_EnumerateProperties(props: SDL_PropertiesID, callback: SDL_EnumeratePropertiesCallback, userdata: *mut void) -> bool;
+    fn SDL_DestroyProperties(props: SDL_PropertiesID);
+}

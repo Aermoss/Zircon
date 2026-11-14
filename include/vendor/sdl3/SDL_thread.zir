@@ -1,0 +1,43 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_atomic.zir" : *]
+
+const SDL_PROP_THREAD_CREATE_ENTRY_FUNCTION_POINTER: *i8 = "SDL.thread.create.entry_function";
+const SDL_PROP_THREAD_CREATE_NAME_STRING: *i8 = "SDL.thread.create.name";
+const SDL_PROP_THREAD_CREATE_USERDATA_POINTER: *i8 = "SDL.thread.create.userdata";
+const SDL_PROP_THREAD_CREATE_STACKSIZE_NUMBER: *i8 = "SDL.thread.create.stacksize";
+
+struct SDL_Thread {}
+
+type SDL_ThreadID = Uint64;
+type SDL_TLSID = SDL_AtomicInt;
+
+enum SDL_ThreadPriority: i32 {
+    SDL_THREAD_PRIORITY_LOW,
+    SDL_THREAD_PRIORITY_NORMAL,
+    SDL_THREAD_PRIORITY_HIGH,
+    SDL_THREAD_PRIORITY_TIME_CRITICAL
+}
+
+enum SDL_ThreadState: i32 {
+    SDL_THREAD_UNKNOWN,
+    SDL_THREAD_ALIVE,
+    SDL_THREAD_DETACHED,
+    SDL_THREAD_COMPLETE
+}
+
+type SDL_ThreadFunction = fn(*mut void) -> i32;
+type SDL_TLSDestructorCallback = fn(*mut void);
+
+extern "C" {
+    fn SDL_CreateThreadRuntime(_fn: SDL_ThreadFunction, name: *i8, data: *mut void, pfnBeginThread: SDL_FunctionPointer, pfnEndThread: SDL_FunctionPointer) -> *mut SDL_Thread;
+    fn SDL_CreateThreadWithPropertiesRuntime(props: SDL_PropertiesID, pfnBeginThread: SDL_FunctionPointer, pfnEndThread: SDL_FunctionPointer) -> *mut SDL_Thread;
+    fn SDL_GetThreadName(thread: *mut SDL_Thread) -> *i8;
+    fn SDL_GetCurrentThreadID() -> SDL_ThreadID;
+    fn SDL_GetThreadID(thread: *mut SDL_Thread) -> SDL_ThreadID;
+    fn SDL_SetCurrentThreadPriority(priority: SDL_ThreadPriority) -> bool;
+    fn SDL_WaitThread(thread: *mut SDL_Thread, status: *mut i32);
+    fn SDL_GetThreadState(thread: *mut SDL_Thread) -> SDL_ThreadState;
+    fn SDL_DetachThread(thread: *mut SDL_Thread);
+    fn SDL_GetTLS(id: *mut SDL_TLSID) -> *mut void;
+    fn SDL_SetTLS(id: *mut SDL_TLSID, value: *void, destructor: SDL_TLSDestructorCallback) -> bool;
+    fn SDL_CleanupTLS();
+}

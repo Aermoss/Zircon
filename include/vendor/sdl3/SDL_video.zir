@@ -1,0 +1,354 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_pixels.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_rect.zir", "vendor/sdl3/SDL_surface.zir" : *]
+
+const SDL_PROP_GLOBAL_VIDEO_WAYLAND_WL_DISPLAY_POINTER: *i8 = "SDL.video.wayland.wl_display";
+const SDL_WINDOWPOS_UNDEFINED_MASK: u32 = 0x1FFF0000;
+const SDL_WINDOWPOS_CENTERED_MASK: u32 = 0x2FFF0000;
+const SDL_GL_CONTEXT_PROFILE_CORE: i32 = 0x0001;
+const SDL_GL_CONTEXT_PROFILE_COMPATIBILITY: i32 = 0x0002;
+const SDL_GL_CONTEXT_PROFILE_ES: i32 = 0x0004;
+const SDL_GL_CONTEXT_DEBUG_FLAG: i32 = 0x0001;
+const SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG: i32 = 0x0002;
+const SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG: i32 = 0x0004;
+const SDL_GL_CONTEXT_RESET_ISOLATION_FLAG: i32 = 0x0008;
+const SDL_GL_CONTEXT_RELEASE_BEHAVIOR_NONE: i32 = 0x0000;
+const SDL_GL_CONTEXT_RELEASE_BEHAVIOR_FLUSH: i32 = 0x0001;
+const SDL_GL_CONTEXT_RESET_NO_NOTIFICATION: i32 = 0x0000;
+const SDL_GL_CONTEXT_RESET_LOSE_CONTEXT: i32 = 0x0001;
+const SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN: *i8 = "SDL.display.HDR_enabled";
+const SDL_PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER: *i8 = "SDL.display.KMSDRM.panel_orientation";
+const SDL_PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER: *i8 = "SDL.display.wayland.wl_output";
+const SDL_PROP_DISPLAY_WINDOWS_HMONITOR_POINTER: *i8 = "SDL.display.windows.hmonitor";
+const SDL_PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN: *i8 = "SDL.window.create.always_on_top";
+const SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN: *i8 = "SDL.window.create.borderless";
+const SDL_PROP_WINDOW_CREATE_CONSTRAIN_POPUP_BOOLEAN: *i8 = "SDL.window.create.constrain_popup";
+const SDL_PROP_WINDOW_CREATE_FOCUSABLE_BOOLEAN: *i8 = "SDL.window.create.focusable";
+const SDL_PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN: *i8 = "SDL.window.create.external_graphics_context";
+const SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER: *i8 = "SDL.window.create.flags";
+const SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN: *i8 = "SDL.window.create.fullscreen";
+const SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER: *i8 = "SDL.window.create.height";
+const SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN: *i8 = "SDL.window.create.hidden";
+const SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN: *i8 = "SDL.window.create.high_pixel_density";
+const SDL_PROP_WINDOW_CREATE_MAXIMIZED_BOOLEAN: *i8 = "SDL.window.create.maximized";
+const SDL_PROP_WINDOW_CREATE_MENU_BOOLEAN: *i8 = "SDL.window.create.menu";
+const SDL_PROP_WINDOW_CREATE_METAL_BOOLEAN: *i8 = "SDL.window.create.metal";
+const SDL_PROP_WINDOW_CREATE_MINIMIZED_BOOLEAN: *i8 = "SDL.window.create.minimized";
+const SDL_PROP_WINDOW_CREATE_MODAL_BOOLEAN: *i8 = "SDL.window.create.modal";
+const SDL_PROP_WINDOW_CREATE_MOUSE_GRABBED_BOOLEAN: *i8 = "SDL.window.create.mouse_grabbed";
+const SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN: *i8 = "SDL.window.create.opengl";
+const SDL_PROP_WINDOW_CREATE_PARENT_POINTER: *i8 = "SDL.window.create.parent";
+const SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN: *i8 = "SDL.window.create.resizable";
+const SDL_PROP_WINDOW_CREATE_TITLE_STRING: *i8 = "SDL.window.create.title";
+const SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN: *i8 = "SDL.window.create.transparent";
+const SDL_PROP_WINDOW_CREATE_TOOLTIP_BOOLEAN: *i8 = "SDL.window.create.tooltip";
+const SDL_PROP_WINDOW_CREATE_UTILITY_BOOLEAN: *i8 = "SDL.window.create.utility";
+const SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN: *i8 = "SDL.window.create.vulkan";
+const SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER: *i8 = "SDL.window.create.width";
+const SDL_PROP_WINDOW_CREATE_X_NUMBER: *i8 = "SDL.window.create.x";
+const SDL_PROP_WINDOW_CREATE_Y_NUMBER: *i8 = "SDL.window.create.y";
+const SDL_PROP_WINDOW_CREATE_COCOA_WINDOW_POINTER: *i8 = "SDL.window.create.cocoa.window";
+const SDL_PROP_WINDOW_CREATE_COCOA_VIEW_POINTER: *i8 = "SDL.window.create.cocoa.view";
+const SDL_PROP_WINDOW_CREATE_WINDOWSCENE_POINTER: *i8 = "SDL.window.create.uikit.windowscene";
+const SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN: *i8 = "SDL.window.create.wayland.surface_role_custom";
+const SDL_PROP_WINDOW_CREATE_WAYLAND_CREATE_EGL_WINDOW_BOOLEAN: *i8 = "SDL.window.create.wayland.create_egl_window";
+const SDL_PROP_WINDOW_CREATE_WAYLAND_WL_SURFACE_POINTER: *i8 = "SDL.window.create.wayland.wl_surface";
+const SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER: *i8 = "SDL.window.create.win32.hwnd";
+const SDL_PROP_WINDOW_CREATE_WIN32_PIXEL_FORMAT_HWND_POINTER: *i8 = "SDL.window.create.win32.pixel_format_hwnd";
+const SDL_PROP_WINDOW_CREATE_X11_WINDOW_NUMBER: *i8 = "SDL.window.create.x11.window";
+const SDL_PROP_WINDOW_CREATE_EMSCRIPTEN_CANVAS_ID_STRING: *i8 = "SDL.window.create.emscripten.canvas_id";
+const SDL_PROP_WINDOW_CREATE_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING: *i8 = "SDL.window.create.emscripten.keyboard_element";
+const SDL_PROP_WINDOW_SHAPE_POINTER: *i8 = "SDL.window.shape";
+const SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN: *i8 = "SDL.window.HDR_enabled";
+const SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT: *i8 = "SDL.window.SDR_white_level";
+const SDL_PROP_WINDOW_HDR_HEADROOM_FLOAT: *i8 = "SDL.window.HDR_headroom";
+const SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER: *i8 = "SDL.window.android.window";
+const SDL_PROP_WINDOW_ANDROID_SURFACE_POINTER: *i8 = "SDL.window.android.surface";
+const SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER: *i8 = "SDL.window.uikit.window";
+const SDL_PROP_WINDOW_UIKIT_METAL_VIEW_TAG_NUMBER: *i8 = "SDL.window.uikit.metal_view_tag";
+const SDL_PROP_WINDOW_UIKIT_OPENGL_FRAMEBUFFER_NUMBER: *i8 = "SDL.window.uikit.opengl.framebuffer";
+const SDL_PROP_WINDOW_UIKIT_OPENGL_RENDERBUFFER_NUMBER: *i8 = "SDL.window.uikit.opengl.renderbuffer";
+const SDL_PROP_WINDOW_UIKIT_OPENGL_RESOLVE_FRAMEBUFFER_NUMBER: *i8 = "SDL.window.uikit.opengl.resolve_framebuffer";
+const SDL_PROP_WINDOW_KMSDRM_DEVICE_INDEX_NUMBER: *i8 = "SDL.window.kmsdrm.dev_index";
+const SDL_PROP_WINDOW_KMSDRM_DRM_FD_NUMBER: *i8 = "SDL.window.kmsdrm.drm_fd";
+const SDL_PROP_WINDOW_KMSDRM_GBM_DEVICE_POINTER: *i8 = "SDL.window.kmsdrm.gbm_dev";
+const SDL_PROP_WINDOW_COCOA_WINDOW_POINTER: *i8 = "SDL.window.cocoa.window";
+const SDL_PROP_WINDOW_COCOA_METAL_VIEW_TAG_NUMBER: *i8 = "SDL.window.cocoa.metal_view_tag";
+const SDL_PROP_WINDOW_OPENVR_OVERLAY_ID_NUMBER: *i8 = "SDL.window.openvr.overlay_id";
+const SDL_PROP_WINDOW_VIVANTE_DISPLAY_POINTER: *i8 = "SDL.window.vivante.display";
+const SDL_PROP_WINDOW_VIVANTE_WINDOW_POINTER: *i8 = "SDL.window.vivante.window";
+const SDL_PROP_WINDOW_VIVANTE_SURFACE_POINTER: *i8 = "SDL.window.vivante.surface";
+const SDL_PROP_WINDOW_WIN32_HWND_POINTER: *i8 = "SDL.window.win32.hwnd";
+const SDL_PROP_WINDOW_WIN32_HDC_POINTER: *i8 = "SDL.window.win32.hdc";
+const SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER: *i8 = "SDL.window.win32.instance";
+const SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER: *i8 = "SDL.window.wayland.display";
+const SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER: *i8 = "SDL.window.wayland.surface";
+const SDL_PROP_WINDOW_WAYLAND_VIEWPORT_POINTER: *i8 = "SDL.window.wayland.viewport";
+const SDL_PROP_WINDOW_WAYLAND_EGL_WINDOW_POINTER: *i8 = "SDL.window.wayland.egl_window";
+const SDL_PROP_WINDOW_WAYLAND_XDG_SURFACE_POINTER: *i8 = "SDL.window.wayland.xdg_surface";
+const SDL_PROP_WINDOW_WAYLAND_XDG_TOPLEVEL_POINTER: *i8 = "SDL.window.wayland.xdg_toplevel";
+const SDL_PROP_WINDOW_WAYLAND_XDG_TOPLEVEL_EXPORT_HANDLE_STRING: *i8 = "SDL.window.wayland.xdg_toplevel_export_handle";
+const SDL_PROP_WINDOW_WAYLAND_XDG_POPUP_POINTER: *i8 = "SDL.window.wayland.xdg_popup";
+const SDL_PROP_WINDOW_WAYLAND_XDG_POSITIONER_POINTER: *i8 = "SDL.window.wayland.xdg_positioner";
+const SDL_PROP_WINDOW_X11_DISPLAY_POINTER: *i8 = "SDL.window.x11.display";
+const SDL_PROP_WINDOW_X11_SCREEN_NUMBER: *i8 = "SDL.window.x11.screen";
+const SDL_PROP_WINDOW_X11_WINDOW_NUMBER: *i8 = "SDL.window.x11.window";
+const SDL_PROP_WINDOW_EMSCRIPTEN_CANVAS_ID_STRING: *i8 = "SDL.window.emscripten.canvas_id";
+const SDL_PROP_WINDOW_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING: *i8 = "SDL.window.emscripten.keyboard_element";
+const SDL_WINDOW_SURFACE_VSYNC_DISABLED: i32 = 0;
+const SDL_WINDOW_FULLSCREEN: u64 = 1;
+const SDL_WINDOW_OPENGL: u64 = 2;
+const SDL_WINDOW_OCCLUDED: u64 = 4;
+const SDL_WINDOW_HIDDEN: u64 = 8;
+const SDL_WINDOW_BORDERLESS: u64 = 16;
+const SDL_WINDOW_RESIZABLE: u64 = 32;
+const SDL_WINDOW_MINIMIZED: u64 = 64;
+const SDL_WINDOW_MAXIMIZED: u64 = 128;
+const SDL_WINDOW_MOUSE_GRABBED: u64 = 256;
+const SDL_WINDOW_INPUT_FOCUS: u64 = 512;
+const SDL_WINDOW_MOUSE_FOCUS: u64 = 1024;
+const SDL_WINDOW_EXTERNAL: u64 = 2048;
+const SDL_WINDOW_MODAL: u64 = 4096;
+const SDL_WINDOW_HIGH_PIXEL_DENSITY: u64 = 8192;
+const SDL_WINDOW_MOUSE_CAPTURE: u64 = 16384;
+const SDL_WINDOW_MOUSE_RELATIVE_MODE: u64 = 32768;
+const SDL_WINDOW_ALWAYS_ON_TOP: u64 = 65536;
+const SDL_WINDOW_UTILITY: u64 = 131072;
+const SDL_WINDOW_TOOLTIP: u64 = 262144;
+const SDL_WINDOW_POPUP_MENU: u64 = 524288;
+const SDL_WINDOW_KEYBOARD_GRABBED: u64 = 1048576;
+const SDL_WINDOW_FILL_DOCUMENT: u64 = 2097152;
+const SDL_WINDOW_VULKAN: u64 = 268435456;
+const SDL_WINDOW_METAL: u64 = 536870912;
+const SDL_WINDOW_TRANSPARENT: u64 = 1073741824;
+const SDL_WINDOW_NOT_FOCUSABLE: u64 = 2147483648;
+const SDL_WINDOWPOS_UNDEFINED: u32 = 536805376;
+const SDL_WINDOWPOS_CENTERED: u32 = 805240832;
+const SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE: i32 = -1;
+
+type SDL_DisplayID = Uint32;
+type SDL_WindowID = Uint32;
+
+enum SDL_SystemTheme: i32 {
+    SDL_SYSTEM_THEME_UNKNOWN,
+    SDL_SYSTEM_THEME_LIGHT,
+    SDL_SYSTEM_THEME_DARK
+}
+
+struct SDL_DisplayModeData {}
+
+struct SDL_DisplayMode {
+    pub displayID: SDL_DisplayID,
+    pub format: SDL_PixelFormat,
+    pub w: i32,
+    pub h: i32,
+    pub pixel_density: f32,
+    pub refresh_rate: f32,
+    pub refresh_rate_numerator: i32,
+    pub refresh_rate_denominator: i32,
+    pub internal: *mut SDL_DisplayModeData
+}
+
+enum SDL_DisplayOrientation: i32 {
+    SDL_ORIENTATION_UNKNOWN,
+    SDL_ORIENTATION_LANDSCAPE,
+    SDL_ORIENTATION_LANDSCAPE_FLIPPED,
+    SDL_ORIENTATION_PORTRAIT,
+    SDL_ORIENTATION_PORTRAIT_FLIPPED
+}
+
+struct SDL_Window {}
+
+type SDL_WindowFlags = Uint64;
+
+enum SDL_FlashOperation: i32 {
+    SDL_FLASH_CANCEL,
+    SDL_FLASH_BRIEFLY,
+    SDL_FLASH_UNTIL_FOCUSED
+}
+
+enum SDL_ProgressState: i32 {
+    SDL_PROGRESS_STATE_INVALID = -1,
+    SDL_PROGRESS_STATE_NONE,
+    SDL_PROGRESS_STATE_INDETERMINATE,
+    SDL_PROGRESS_STATE_NORMAL,
+    SDL_PROGRESS_STATE_PAUSED,
+    SDL_PROGRESS_STATE_ERROR
+}
+
+struct SDL_GLContextState {}
+
+type SDL_GLContext = *mut SDL_GLContextState;
+type SDL_EGLDisplay = *mut void;
+type SDL_EGLConfig = *mut void;
+type SDL_EGLSurface = *mut void;
+type SDL_EGLAttrib = isize;
+type SDL_EGLint = i32;
+type SDL_EGLAttribArrayCallback = fn(*mut void) -> *mut SDL_EGLAttrib;
+type SDL_EGLIntArrayCallback = fn(*mut void, SDL_EGLDisplay, SDL_EGLConfig) -> *mut SDL_EGLint;
+
+enum SDL_GLAttr: i32 {
+    SDL_GL_RED_SIZE,
+    SDL_GL_GREEN_SIZE,
+    SDL_GL_BLUE_SIZE,
+    SDL_GL_ALPHA_SIZE,
+    SDL_GL_BUFFER_SIZE,
+    SDL_GL_DOUBLEBUFFER,
+    SDL_GL_DEPTH_SIZE,
+    SDL_GL_STENCIL_SIZE,
+    SDL_GL_ACCUM_RED_SIZE,
+    SDL_GL_ACCUM_GREEN_SIZE,
+    SDL_GL_ACCUM_BLUE_SIZE,
+    SDL_GL_ACCUM_ALPHA_SIZE,
+    SDL_GL_STEREO,
+    SDL_GL_MULTISAMPLEBUFFERS,
+    SDL_GL_MULTISAMPLESAMPLES,
+    SDL_GL_ACCELERATED_VISUAL,
+    SDL_GL_RETAINED_BACKING,
+    SDL_GL_CONTEXT_MAJOR_VERSION,
+    SDL_GL_CONTEXT_MINOR_VERSION,
+    SDL_GL_CONTEXT_FLAGS,
+    SDL_GL_CONTEXT_PROFILE_MASK,
+    SDL_GL_SHARE_WITH_CURRENT_CONTEXT,
+    SDL_GL_FRAMEBUFFER_SRGB_CAPABLE,
+    SDL_GL_CONTEXT_RELEASE_BEHAVIOR,
+    SDL_GL_CONTEXT_RESET_NOTIFICATION,
+    SDL_GL_CONTEXT_NO_ERROR,
+    SDL_GL_FLOATBUFFERS,
+    SDL_GL_EGL_PLATFORM
+}
+
+type SDL_GLProfile = Uint32;
+type SDL_GLContextFlag = Uint32;
+type SDL_GLContextReleaseFlag = Uint32;
+type SDL_GLContextResetNotification = Uint32;
+
+enum SDL_HitTestResult: i32 {
+    SDL_HITTEST_NORMAL,
+    SDL_HITTEST_DRAGGABLE,
+    SDL_HITTEST_RESIZE_TOPLEFT,
+    SDL_HITTEST_RESIZE_TOP,
+    SDL_HITTEST_RESIZE_TOPRIGHT,
+    SDL_HITTEST_RESIZE_RIGHT,
+    SDL_HITTEST_RESIZE_BOTTOMRIGHT,
+    SDL_HITTEST_RESIZE_BOTTOM,
+    SDL_HITTEST_RESIZE_BOTTOMLEFT,
+    SDL_HITTEST_RESIZE_LEFT
+}
+
+type SDL_HitTest = fn(*mut SDL_Window, *SDL_Point, *mut void) -> SDL_HitTestResult;
+
+extern "C" {
+    fn SDL_GetNumVideoDrivers() -> i32;
+    fn SDL_GetVideoDriver(index: i32) -> *i8;
+    fn SDL_GetCurrentVideoDriver() -> *i8;
+    fn SDL_GetSystemTheme() -> SDL_SystemTheme;
+    fn SDL_GetDisplays(count: *mut i32) -> *mut SDL_DisplayID;
+    fn SDL_GetPrimaryDisplay() -> SDL_DisplayID;
+    fn SDL_GetDisplayProperties(displayID: SDL_DisplayID) -> SDL_PropertiesID;
+    fn SDL_GetDisplayName(displayID: SDL_DisplayID) -> *i8;
+    fn SDL_GetDisplayBounds(displayID: SDL_DisplayID, rect: *mut SDL_Rect) -> bool;
+    fn SDL_GetDisplayUsableBounds(displayID: SDL_DisplayID, rect: *mut SDL_Rect) -> bool;
+    fn SDL_GetNaturalDisplayOrientation(displayID: SDL_DisplayID) -> SDL_DisplayOrientation;
+    fn SDL_GetCurrentDisplayOrientation(displayID: SDL_DisplayID) -> SDL_DisplayOrientation;
+    fn SDL_GetDisplayContentScale(displayID: SDL_DisplayID) -> f32;
+    fn SDL_GetFullscreenDisplayModes(displayID: SDL_DisplayID, count: *mut i32) -> *mut *mut SDL_DisplayMode;
+    fn SDL_GetClosestFullscreenDisplayMode(displayID: SDL_DisplayID, w: i32, h: i32, refresh_rate: f32, include_high_density_modes: bool, closest: *mut SDL_DisplayMode) -> bool;
+    fn SDL_GetDesktopDisplayMode(displayID: SDL_DisplayID) -> *SDL_DisplayMode;
+    fn SDL_GetCurrentDisplayMode(displayID: SDL_DisplayID) -> *SDL_DisplayMode;
+    fn SDL_GetDisplayForPoint(point: *SDL_Point) -> SDL_DisplayID;
+    fn SDL_GetDisplayForRect(rect: *SDL_Rect) -> SDL_DisplayID;
+    fn SDL_GetDisplayForWindow(window: *mut SDL_Window) -> SDL_DisplayID;
+    fn SDL_GetWindowPixelDensity(window: *mut SDL_Window) -> f32;
+    fn SDL_GetWindowDisplayScale(window: *mut SDL_Window) -> f32;
+    fn SDL_SetWindowFullscreenMode(window: *mut SDL_Window, mode: *SDL_DisplayMode) -> bool;
+    fn SDL_GetWindowFullscreenMode(window: *mut SDL_Window) -> *SDL_DisplayMode;
+    fn SDL_GetWindowICCProfile(window: *mut SDL_Window, size: *mut usize) -> *mut void;
+    fn SDL_GetWindowPixelFormat(window: *mut SDL_Window) -> SDL_PixelFormat;
+    fn SDL_GetWindows(count: *mut i32) -> *mut *mut SDL_Window;
+    fn SDL_CreateWindow(title: *i8, w: i32, h: i32, flags: SDL_WindowFlags) -> *mut SDL_Window;
+    fn SDL_CreatePopupWindow(parent: *mut SDL_Window, offset_x: i32, offset_y: i32, w: i32, h: i32, flags: SDL_WindowFlags) -> *mut SDL_Window;
+    fn SDL_CreateWindowWithProperties(props: SDL_PropertiesID) -> *mut SDL_Window;
+    fn SDL_GetWindowID(window: *mut SDL_Window) -> SDL_WindowID;
+    fn SDL_GetWindowFromID(id: SDL_WindowID) -> *mut SDL_Window;
+    fn SDL_GetWindowParent(window: *mut SDL_Window) -> *mut SDL_Window;
+    fn SDL_GetWindowProperties(window: *mut SDL_Window) -> SDL_PropertiesID;
+    fn SDL_GetWindowFlags(window: *mut SDL_Window) -> SDL_WindowFlags;
+    fn SDL_SetWindowTitle(window: *mut SDL_Window, title: *i8) -> bool;
+    fn SDL_GetWindowTitle(window: *mut SDL_Window) -> *i8;
+    fn SDL_SetWindowIcon(window: *mut SDL_Window, icon: *mut SDL_Surface) -> bool;
+    fn SDL_SetWindowPosition(window: *mut SDL_Window, x: i32, y: i32) -> bool;
+    fn SDL_GetWindowPosition(window: *mut SDL_Window, x: *mut i32, y: *mut i32) -> bool;
+    fn SDL_SetWindowSize(window: *mut SDL_Window, w: i32, h: i32) -> bool;
+    fn SDL_GetWindowSize(window: *mut SDL_Window, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_GetWindowSafeArea(window: *mut SDL_Window, rect: *mut SDL_Rect) -> bool;
+    fn SDL_SetWindowAspectRatio(window: *mut SDL_Window, min_aspect: f32, max_aspect: f32) -> bool;
+    fn SDL_GetWindowAspectRatio(window: *mut SDL_Window, min_aspect: *mut f32, max_aspect: *mut f32) -> bool;
+    fn SDL_GetWindowBordersSize(window: *mut SDL_Window, top: *mut i32, left: *mut i32, bottom: *mut i32, right: *mut i32) -> bool;
+    fn SDL_GetWindowSizeInPixels(window: *mut SDL_Window, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_SetWindowMinimumSize(window: *mut SDL_Window, min_w: i32, min_h: i32) -> bool;
+    fn SDL_GetWindowMinimumSize(window: *mut SDL_Window, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_SetWindowMaximumSize(window: *mut SDL_Window, max_w: i32, max_h: i32) -> bool;
+    fn SDL_GetWindowMaximumSize(window: *mut SDL_Window, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_SetWindowBordered(window: *mut SDL_Window, bordered: bool) -> bool;
+    fn SDL_SetWindowResizable(window: *mut SDL_Window, resizable: bool) -> bool;
+    fn SDL_SetWindowAlwaysOnTop(window: *mut SDL_Window, on_top: bool) -> bool;
+    fn SDL_SetWindowFillDocument(window: *mut SDL_Window, fill: bool) -> bool;
+    fn SDL_ShowWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_HideWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_RaiseWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_MaximizeWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_MinimizeWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_RestoreWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_SetWindowFullscreen(window: *mut SDL_Window, fullscreen: bool) -> bool;
+    fn SDL_SyncWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_WindowHasSurface(window: *mut SDL_Window) -> bool;
+    fn SDL_GetWindowSurface(window: *mut SDL_Window) -> *mut SDL_Surface;
+    fn SDL_SetWindowSurfaceVSync(window: *mut SDL_Window, vsync: i32) -> bool;
+    fn SDL_GetWindowSurfaceVSync(window: *mut SDL_Window, vsync: *mut i32) -> bool;
+    fn SDL_UpdateWindowSurface(window: *mut SDL_Window) -> bool;
+    fn SDL_UpdateWindowSurfaceRects(window: *mut SDL_Window, rects: *SDL_Rect, numrects: i32) -> bool;
+    fn SDL_DestroyWindowSurface(window: *mut SDL_Window) -> bool;
+    fn SDL_SetWindowKeyboardGrab(window: *mut SDL_Window, grabbed: bool) -> bool;
+    fn SDL_SetWindowMouseGrab(window: *mut SDL_Window, grabbed: bool) -> bool;
+    fn SDL_GetWindowKeyboardGrab(window: *mut SDL_Window) -> bool;
+    fn SDL_GetWindowMouseGrab(window: *mut SDL_Window) -> bool;
+    fn SDL_GetGrabbedWindow() -> *mut SDL_Window;
+    fn SDL_SetWindowMouseRect(window: *mut SDL_Window, rect: *SDL_Rect) -> bool;
+    fn SDL_GetWindowMouseRect(window: *mut SDL_Window) -> *SDL_Rect;
+    fn SDL_SetWindowOpacity(window: *mut SDL_Window, opacity: f32) -> bool;
+    fn SDL_GetWindowOpacity(window: *mut SDL_Window) -> f32;
+    fn SDL_SetWindowParent(window: *mut SDL_Window, parent: *mut SDL_Window) -> bool;
+    fn SDL_SetWindowModal(window: *mut SDL_Window, modal: bool) -> bool;
+    fn SDL_SetWindowFocusable(window: *mut SDL_Window, focusable: bool) -> bool;
+    fn SDL_ShowWindowSystemMenu(window: *mut SDL_Window, x: i32, y: i32) -> bool;
+    fn SDL_SetWindowHitTest(window: *mut SDL_Window, callback: SDL_HitTest, callback_data: *mut void) -> bool;
+    fn SDL_SetWindowShape(window: *mut SDL_Window, shape: *mut SDL_Surface) -> bool;
+    fn SDL_FlashWindow(window: *mut SDL_Window, operation: SDL_FlashOperation) -> bool;
+    fn SDL_SetWindowProgressState(window: *mut SDL_Window, state: SDL_ProgressState) -> bool;
+    fn SDL_GetWindowProgressState(window: *mut SDL_Window) -> SDL_ProgressState;
+    fn SDL_SetWindowProgressValue(window: *mut SDL_Window, value: f32) -> bool;
+    fn SDL_GetWindowProgressValue(window: *mut SDL_Window) -> f32;
+    fn SDL_DestroyWindow(window: *mut SDL_Window);
+    fn SDL_ScreenSaverEnabled() -> bool;
+    fn SDL_EnableScreenSaver() -> bool;
+    fn SDL_DisableScreenSaver() -> bool;
+    fn SDL_GL_LoadLibrary(path: *i8) -> bool;
+    fn SDL_GL_GetProcAddress(proc: *i8) -> SDL_FunctionPointer;
+    fn SDL_EGL_GetProcAddress(proc: *i8) -> SDL_FunctionPointer;
+    fn SDL_GL_UnloadLibrary();
+    fn SDL_GL_ExtensionSupported(extension: *i8) -> bool;
+    fn SDL_GL_ResetAttributes();
+    fn SDL_GL_SetAttribute(attr: SDL_GLAttr, value: i32) -> bool;
+    fn SDL_GL_GetAttribute(attr: SDL_GLAttr, value: *mut i32) -> bool;
+    fn SDL_GL_CreateContext(window: *mut SDL_Window) -> SDL_GLContext;
+    fn SDL_GL_MakeCurrent(window: *mut SDL_Window, context: SDL_GLContext) -> bool;
+    fn SDL_GL_GetCurrentWindow() -> *mut SDL_Window;
+    fn SDL_GL_GetCurrentContext() -> SDL_GLContext;
+    fn SDL_EGL_GetCurrentDisplay() -> SDL_EGLDisplay;
+    fn SDL_EGL_GetCurrentConfig() -> SDL_EGLConfig;
+    fn SDL_EGL_GetWindowSurface(window: *mut SDL_Window) -> SDL_EGLSurface;
+    fn SDL_EGL_SetAttributeCallbacks(platformAttribCallback: SDL_EGLAttribArrayCallback, surfaceAttribCallback: SDL_EGLIntArrayCallback, contextAttribCallback: SDL_EGLIntArrayCallback, userdata: *mut void);
+    fn SDL_GL_SetSwapInterval(interval: i32) -> bool;
+    fn SDL_GL_GetSwapInterval(interval: *mut i32) -> bool;
+    fn SDL_GL_SwapWindow(window: *mut SDL_Window) -> bool;
+    fn SDL_GL_DestroyContext(context: SDL_GLContext) -> bool;
+}

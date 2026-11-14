@@ -1,0 +1,28 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_mouse.zir" : *]
+
+const SDL_TOUCH_MOUSEID: u32 = 4294967295;
+const SDL_MOUSE_TOUCHID: u64 = 18446744073709551615;
+
+type SDL_TouchID = Uint64;
+type SDL_FingerID = Uint64;
+
+enum SDL_TouchDeviceType: i32 {
+    SDL_TOUCH_DEVICE_INVALID = -1,
+    SDL_TOUCH_DEVICE_DIRECT,
+    SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE,
+    SDL_TOUCH_DEVICE_INDIRECT_RELATIVE
+}
+
+struct SDL_Finger {
+    pub id: SDL_FingerID,
+    pub x: f32,
+    pub y: f32,
+    pub pressure: f32
+}
+
+extern "C" {
+    fn SDL_GetTouchDevices(count: *mut i32) -> *mut SDL_TouchID;
+    fn SDL_GetTouchDeviceName(touchID: SDL_TouchID) -> *i8;
+    fn SDL_GetTouchDeviceType(touchID: SDL_TouchID) -> SDL_TouchDeviceType;
+    fn SDL_GetTouchFingers(touchID: SDL_TouchID, count: *mut i32) -> *mut *mut SDL_Finger;
+}

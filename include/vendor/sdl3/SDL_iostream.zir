@@ -1,0 +1,89 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_properties.zir" : *]
+
+const SDL_PROP_IOSTREAM_WINDOWS_HANDLE_POINTER: *i8 = "SDL.iostream.windows.handle";
+const SDL_PROP_IOSTREAM_STDIO_FILE_POINTER: *i8 = "SDL.iostream.stdio.file";
+const SDL_PROP_IOSTREAM_FILE_DESCRIPTOR_NUMBER: *i8 = "SDL.iostream.file_descriptor";
+const SDL_PROP_IOSTREAM_ANDROID_AASSET_POINTER: *i8 = "SDL.iostream.android.aasset";
+const SDL_PROP_IOSTREAM_MEMORY_POINTER: *i8 = "SDL.iostream.memory.base";
+const SDL_PROP_IOSTREAM_MEMORY_SIZE_NUMBER: *i8 = "SDL.iostream.memory.size";
+const SDL_PROP_IOSTREAM_MEMORY_FREE_FUNC_POINTER: *i8 = "SDL.iostream.memory.free";
+const SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER: *i8 = "SDL.iostream.dynamic.memory";
+const SDL_PROP_IOSTREAM_DYNAMIC_CHUNKSIZE_NUMBER: *i8 = "SDL.iostream.dynamic.chunksize";
+
+enum SDL_IOStatus: i32 {
+    SDL_IO_STATUS_READY,
+    SDL_IO_STATUS_ERROR,
+    SDL_IO_STATUS_EOF,
+    SDL_IO_STATUS_NOT_READY,
+    SDL_IO_STATUS_READONLY,
+    SDL_IO_STATUS_WRITEONLY
+}
+
+enum SDL_IOWhence: i32 {
+    SDL_IO_SEEK_SET,
+    SDL_IO_SEEK_CUR,
+    SDL_IO_SEEK_END
+}
+
+struct SDL_IOStreamInterface {
+    pub version: Uint32,
+    pub size: fn(*mut void) -> Sint64,
+    pub seek: fn(*mut void, Sint64, SDL_IOWhence) -> Sint64,
+    pub read: fn(*mut void, *mut void, usize, *mut SDL_IOStatus) -> usize,
+    pub write: fn(*mut void, *void, usize, *mut SDL_IOStatus) -> usize,
+    pub flush: fn(*mut void, *mut SDL_IOStatus) -> bool,
+    pub close: fn(*mut void) -> bool
+}
+
+struct SDL_IOStream {}
+
+extern "C" {
+    fn SDL_IOFromFile(file: *i8, mode: *i8) -> *mut SDL_IOStream;
+    fn SDL_IOFromMem(mem: *mut void, size: usize) -> *mut SDL_IOStream;
+    fn SDL_IOFromConstMem(mem: *void, size: usize) -> *mut SDL_IOStream;
+    fn SDL_IOFromDynamicMem() -> *mut SDL_IOStream;
+    fn SDL_OpenIO(iface: *SDL_IOStreamInterface, userdata: *mut void) -> *mut SDL_IOStream;
+    fn SDL_CloseIO(context: *mut SDL_IOStream) -> bool;
+    fn SDL_GetIOProperties(context: *mut SDL_IOStream) -> SDL_PropertiesID;
+    fn SDL_GetIOStatus(context: *mut SDL_IOStream) -> SDL_IOStatus;
+    fn SDL_GetIOSize(context: *mut SDL_IOStream) -> Sint64;
+    fn SDL_SeekIO(context: *mut SDL_IOStream, offset: Sint64, whence: SDL_IOWhence) -> Sint64;
+    fn SDL_TellIO(context: *mut SDL_IOStream) -> Sint64;
+    fn SDL_ReadIO(context: *mut SDL_IOStream, ptr: *mut void, size: usize) -> usize;
+    fn SDL_WriteIO(context: *mut SDL_IOStream, ptr: *void, size: usize) -> usize;
+    fn SDL_IOprintf(context: *mut SDL_IOStream, fmt: *i8, ...) -> usize;
+    fn SDL_IOvprintf(context: *mut SDL_IOStream, fmt: *i8, ap: *mut i8) -> usize;
+    fn SDL_FlushIO(context: *mut SDL_IOStream) -> bool;
+    fn SDL_LoadFile_IO(src: *mut SDL_IOStream, datasize: *mut usize, closeio: bool) -> *mut void;
+    fn SDL_LoadFile(file: *i8, datasize: *mut usize) -> *mut void;
+    fn SDL_SaveFile_IO(src: *mut SDL_IOStream, data: *void, datasize: usize, closeio: bool) -> bool;
+    fn SDL_SaveFile(file: *i8, data: *void, datasize: usize) -> bool;
+    fn SDL_ReadU8(src: *mut SDL_IOStream, value: *mut Uint8) -> bool;
+    fn SDL_ReadS8(src: *mut SDL_IOStream, value: *mut Sint8) -> bool;
+    fn SDL_ReadU16LE(src: *mut SDL_IOStream, value: *mut Uint16) -> bool;
+    fn SDL_ReadS16LE(src: *mut SDL_IOStream, value: *mut Sint16) -> bool;
+    fn SDL_ReadU16BE(src: *mut SDL_IOStream, value: *mut Uint16) -> bool;
+    fn SDL_ReadS16BE(src: *mut SDL_IOStream, value: *mut Sint16) -> bool;
+    fn SDL_ReadU32LE(src: *mut SDL_IOStream, value: *mut Uint32) -> bool;
+    fn SDL_ReadS32LE(src: *mut SDL_IOStream, value: *mut Sint32) -> bool;
+    fn SDL_ReadU32BE(src: *mut SDL_IOStream, value: *mut Uint32) -> bool;
+    fn SDL_ReadS32BE(src: *mut SDL_IOStream, value: *mut Sint32) -> bool;
+    fn SDL_ReadU64LE(src: *mut SDL_IOStream, value: *mut Uint64) -> bool;
+    fn SDL_ReadS64LE(src: *mut SDL_IOStream, value: *mut Sint64) -> bool;
+    fn SDL_ReadU64BE(src: *mut SDL_IOStream, value: *mut Uint64) -> bool;
+    fn SDL_ReadS64BE(src: *mut SDL_IOStream, value: *mut Sint64) -> bool;
+    fn SDL_WriteU8(dst: *mut SDL_IOStream, value: Uint8) -> bool;
+    fn SDL_WriteS8(dst: *mut SDL_IOStream, value: Sint8) -> bool;
+    fn SDL_WriteU16LE(dst: *mut SDL_IOStream, value: Uint16) -> bool;
+    fn SDL_WriteS16LE(dst: *mut SDL_IOStream, value: Sint16) -> bool;
+    fn SDL_WriteU16BE(dst: *mut SDL_IOStream, value: Uint16) -> bool;
+    fn SDL_WriteS16BE(dst: *mut SDL_IOStream, value: Sint16) -> bool;
+    fn SDL_WriteU32LE(dst: *mut SDL_IOStream, value: Uint32) -> bool;
+    fn SDL_WriteS32LE(dst: *mut SDL_IOStream, value: Sint32) -> bool;
+    fn SDL_WriteU32BE(dst: *mut SDL_IOStream, value: Uint32) -> bool;
+    fn SDL_WriteS32BE(dst: *mut SDL_IOStream, value: Sint32) -> bool;
+    fn SDL_WriteU64LE(dst: *mut SDL_IOStream, value: Uint64) -> bool;
+    fn SDL_WriteS64LE(dst: *mut SDL_IOStream, value: Sint64) -> bool;
+    fn SDL_WriteU64BE(dst: *mut SDL_IOStream, value: Uint64) -> bool;
+    fn SDL_WriteS64BE(dst: *mut SDL_IOStream, value: Sint64) -> bool;
+}

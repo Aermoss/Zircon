@@ -1,0 +1,9 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+struct SDL_SharedObject {}
+
+extern "C" {
+    fn SDL_LoadObject(sofile: *i8) -> *mut SDL_SharedObject;
+    fn SDL_LoadFunction(handle: *mut SDL_SharedObject, name: *i8) -> SDL_FunctionPointer;
+    fn SDL_UnloadObject(handle: *mut SDL_SharedObject);
+}

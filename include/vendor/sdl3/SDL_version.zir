@@ -1,0 +1,11 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+const SDL_MAJOR_VERSION: i32 = 3;
+const SDL_MINOR_VERSION: i32 = 4;
+const SDL_MICRO_VERSION: i32 = 8;
+const SDL_VERSION: i32 = 3004008;
+
+extern "C" {
+    fn SDL_GetVersion() -> i32;
+    fn SDL_GetRevision() -> *i8;
+}

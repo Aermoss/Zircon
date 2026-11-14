@@ -1,0 +1,24 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+const SDL_MS_PER_SECOND: i32 = 1000;
+const SDL_US_PER_SECOND: i32 = 1000000;
+const SDL_NS_PER_SECOND: i64 = 1000000000;
+const SDL_NS_PER_MS: i32 = 1000000;
+const SDL_NS_PER_US: i32 = 1000;
+
+type SDL_TimerID = Uint32;
+type SDL_TimerCallback = fn(*mut void, SDL_TimerID, Uint32) -> Uint32;
+type SDL_NSTimerCallback = fn(*mut void, SDL_TimerID, Uint64) -> Uint64;
+
+extern "C" {
+    fn SDL_GetTicks() -> Uint64;
+    fn SDL_GetTicksNS() -> Uint64;
+    fn SDL_GetPerformanceCounter() -> Uint64;
+    fn SDL_GetPerformanceFrequency() -> Uint64;
+    fn SDL_Delay(ms: Uint32);
+    fn SDL_DelayNS(ns: Uint64);
+    fn SDL_DelayPrecise(ns: Uint64);
+    fn SDL_AddTimer(interval: Uint32, callback: SDL_TimerCallback, userdata: *mut void) -> SDL_TimerID;
+    fn SDL_AddTimerNS(interval: Uint64, callback: SDL_NSTimerCallback, userdata: *mut void) -> SDL_TimerID;
+    fn SDL_RemoveTimer(id: SDL_TimerID) -> bool;
+}

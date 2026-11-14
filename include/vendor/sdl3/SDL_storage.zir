@@ -1,0 +1,38 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_filesystem.zir", "vendor/sdl3/SDL_properties.zir" : *]
+
+struct SDL_StorageInterface {
+    pub version: Uint32,
+    pub close: fn(*mut void) -> bool,
+    pub ready: fn(*mut void) -> bool,
+    pub enumerate: fn(*mut void, *i8, SDL_EnumerateDirectoryCallback, *mut void) -> bool,
+    pub info: fn(*mut void, *i8, *mut SDL_PathInfo) -> bool,
+    pub read_file: fn(*mut void, *i8, *mut void, Uint64) -> bool,
+    pub write_file: fn(*mut void, *i8, *void, Uint64) -> bool,
+    pub mkdir: fn(*mut void, *i8) -> bool,
+    pub remove: fn(*mut void, *i8) -> bool,
+    pub rename: fn(*mut void, *i8, *i8) -> bool,
+    pub copy: fn(*mut void, *i8, *i8) -> bool,
+    pub space_remaining: fn(*mut void) -> Uint64
+}
+
+struct SDL_Storage {}
+
+extern "C" {
+    fn SDL_OpenTitleStorage(_override: *i8, props: SDL_PropertiesID) -> *mut SDL_Storage;
+    fn SDL_OpenUserStorage(org: *i8, app: *i8, props: SDL_PropertiesID) -> *mut SDL_Storage;
+    fn SDL_OpenFileStorage(path: *i8) -> *mut SDL_Storage;
+    fn SDL_OpenStorage(iface: *SDL_StorageInterface, userdata: *mut void) -> *mut SDL_Storage;
+    fn SDL_CloseStorage(storage: *mut SDL_Storage) -> bool;
+    fn SDL_StorageReady(storage: *mut SDL_Storage) -> bool;
+    fn SDL_GetStorageFileSize(storage: *mut SDL_Storage, path: *i8, length: *mut Uint64) -> bool;
+    fn SDL_ReadStorageFile(storage: *mut SDL_Storage, path: *i8, destination: *mut void, length: Uint64) -> bool;
+    fn SDL_WriteStorageFile(storage: *mut SDL_Storage, path: *i8, source: *void, length: Uint64) -> bool;
+    fn SDL_CreateStorageDirectory(storage: *mut SDL_Storage, path: *i8) -> bool;
+    fn SDL_EnumerateStorageDirectory(storage: *mut SDL_Storage, path: *i8, callback: SDL_EnumerateDirectoryCallback, userdata: *mut void) -> bool;
+    fn SDL_RemoveStoragePath(storage: *mut SDL_Storage, path: *i8) -> bool;
+    fn SDL_RenameStoragePath(storage: *mut SDL_Storage, oldpath: *i8, newpath: *i8) -> bool;
+    fn SDL_CopyStorageFile(storage: *mut SDL_Storage, oldpath: *i8, newpath: *i8) -> bool;
+    fn SDL_GetStoragePathInfo(storage: *mut SDL_Storage, path: *i8, info: *mut SDL_PathInfo) -> bool;
+    fn SDL_GetStorageSpaceRemaining(storage: *mut SDL_Storage) -> Uint64;
+    fn SDL_GlobStorageDirectory(storage: *mut SDL_Storage, path: *i8, pattern: *i8, flags: SDL_GlobFlags, count: *mut i32) -> *mut *mut i8;
+}

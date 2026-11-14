@@ -1,0 +1,10 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+struct SDL_Locale {
+    pub language: *i8,
+    pub country: *i8
+}
+
+extern "C" {
+    fn SDL_GetPreferredLocales(count: *mut i32) -> *mut *mut SDL_Locale;
+}

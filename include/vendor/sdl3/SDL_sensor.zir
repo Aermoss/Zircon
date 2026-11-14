@@ -1,0 +1,36 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_properties.zir" : *]
+
+const SDL_STANDARD_GRAVITY: f32 = 9.80665;
+
+struct SDL_Sensor {}
+
+type SDL_SensorID = Uint32;
+
+enum SDL_SensorType: i32 {
+    SDL_SENSOR_INVALID = -1,
+    SDL_SENSOR_UNKNOWN,
+    SDL_SENSOR_ACCEL,
+    SDL_SENSOR_GYRO,
+    SDL_SENSOR_ACCEL_L,
+    SDL_SENSOR_GYRO_L,
+    SDL_SENSOR_ACCEL_R,
+    SDL_SENSOR_GYRO_R,
+    SDL_SENSOR_COUNT
+}
+
+extern "C" {
+    fn SDL_GetSensors(count: *mut i32) -> *mut SDL_SensorID;
+    fn SDL_GetSensorNameForID(instance_id: SDL_SensorID) -> *i8;
+    fn SDL_GetSensorTypeForID(instance_id: SDL_SensorID) -> SDL_SensorType;
+    fn SDL_GetSensorNonPortableTypeForID(instance_id: SDL_SensorID) -> i32;
+    fn SDL_OpenSensor(instance_id: SDL_SensorID) -> *mut SDL_Sensor;
+    fn SDL_GetSensorFromID(instance_id: SDL_SensorID) -> *mut SDL_Sensor;
+    fn SDL_GetSensorProperties(sensor: *mut SDL_Sensor) -> SDL_PropertiesID;
+    fn SDL_GetSensorName(sensor: *mut SDL_Sensor) -> *i8;
+    fn SDL_GetSensorType(sensor: *mut SDL_Sensor) -> SDL_SensorType;
+    fn SDL_GetSensorNonPortableType(sensor: *mut SDL_Sensor) -> i32;
+    fn SDL_GetSensorID(sensor: *mut SDL_Sensor) -> SDL_SensorID;
+    fn SDL_GetSensorData(sensor: *mut SDL_Sensor, data: *mut f32, num_values: i32) -> bool;
+    fn SDL_CloseSensor(sensor: *mut SDL_Sensor);
+    fn SDL_UpdateSensors();
+}

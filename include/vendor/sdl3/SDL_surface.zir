@@ -1,0 +1,107 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_blendmode.zir", "vendor/sdl3/SDL_pixels.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_rect.zir", "vendor/sdl3/SDL_iostream.zir" : *]
+
+const SDL_SURFACE_PREALLOCATED: u32 = 0x00000001;
+const SDL_SURFACE_LOCK_NEEDED: u32 = 0x00000002;
+const SDL_SURFACE_LOCKED: u32 = 0x00000004;
+const SDL_SURFACE_SIMD_ALIGNED: u32 = 0x00000008;
+const SDL_PROP_SURFACE_SDR_WHITE_POINT_FLOAT: *i8 = "SDL.surface.SDR_white_point";
+const SDL_PROP_SURFACE_HDR_HEADROOM_FLOAT: *i8 = "SDL.surface.HDR_headroom";
+const SDL_PROP_SURFACE_TONEMAP_OPERATOR_STRING: *i8 = "SDL.surface.tonemap";
+const SDL_PROP_SURFACE_HOTSPOT_X_NUMBER: *i8 = "SDL.surface.hotspot.x";
+const SDL_PROP_SURFACE_HOTSPOT_Y_NUMBER: *i8 = "SDL.surface.hotspot.y";
+const SDL_PROP_SURFACE_ROTATION_FLOAT: *i8 = "SDL.surface.rotation";
+
+type SDL_SurfaceFlags = Uint32;
+
+enum SDL_ScaleMode: i32 {
+    SDL_SCALEMODE_INVALID = -1,
+    SDL_SCALEMODE_NEAREST,
+    SDL_SCALEMODE_LINEAR,
+    SDL_SCALEMODE_PIXELART
+}
+
+enum SDL_FlipMode: i32 {
+    SDL_FLIP_NONE,
+    SDL_FLIP_HORIZONTAL,
+    SDL_FLIP_VERTICAL,
+    SDL_FLIP_HORIZONTAL_AND_VERTICAL = (SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL)
+}
+
+struct SDL_Surface {
+    pub flags: SDL_SurfaceFlags,
+    pub format: SDL_PixelFormat,
+    pub w: i32,
+    pub h: i32,
+    pub pitch: i32,
+    pub pixels: *mut void,
+    pub refcount: i32,
+    pub reserved: *mut void
+}
+
+extern "C" {
+    fn SDL_CreateSurface(width: i32, height: i32, format: SDL_PixelFormat) -> *mut SDL_Surface;
+    fn SDL_CreateSurfaceFrom(width: i32, height: i32, format: SDL_PixelFormat, pixels: *mut void, pitch: i32) -> *mut SDL_Surface;
+    fn SDL_DestroySurface(surface: *mut SDL_Surface);
+    fn SDL_GetSurfaceProperties(surface: *mut SDL_Surface) -> SDL_PropertiesID;
+    fn SDL_SetSurfaceColorspace(surface: *mut SDL_Surface, colorspace: SDL_Colorspace) -> bool;
+    fn SDL_GetSurfaceColorspace(surface: *mut SDL_Surface) -> SDL_Colorspace;
+    fn SDL_CreateSurfacePalette(surface: *mut SDL_Surface) -> *mut SDL_Palette;
+    fn SDL_SetSurfacePalette(surface: *mut SDL_Surface, palette: *mut SDL_Palette) -> bool;
+    fn SDL_GetSurfacePalette(surface: *mut SDL_Surface) -> *mut SDL_Palette;
+    fn SDL_AddSurfaceAlternateImage(surface: *mut SDL_Surface, image: *mut SDL_Surface) -> bool;
+    fn SDL_SurfaceHasAlternateImages(surface: *mut SDL_Surface) -> bool;
+    fn SDL_GetSurfaceImages(surface: *mut SDL_Surface, count: *mut i32) -> *mut *mut SDL_Surface;
+    fn SDL_RemoveSurfaceAlternateImages(surface: *mut SDL_Surface);
+    fn SDL_LockSurface(surface: *mut SDL_Surface) -> bool;
+    fn SDL_UnlockSurface(surface: *mut SDL_Surface);
+    fn SDL_LoadSurface_IO(src: *mut SDL_IOStream, closeio: bool) -> *mut SDL_Surface;
+    fn SDL_LoadSurface(file: *i8) -> *mut SDL_Surface;
+    fn SDL_LoadBMP_IO(src: *mut SDL_IOStream, closeio: bool) -> *mut SDL_Surface;
+    fn SDL_LoadBMP(file: *i8) -> *mut SDL_Surface;
+    fn SDL_SaveBMP_IO(surface: *mut SDL_Surface, dst: *mut SDL_IOStream, closeio: bool) -> bool;
+    fn SDL_SaveBMP(surface: *mut SDL_Surface, file: *i8) -> bool;
+    fn SDL_LoadPNG_IO(src: *mut SDL_IOStream, closeio: bool) -> *mut SDL_Surface;
+    fn SDL_LoadPNG(file: *i8) -> *mut SDL_Surface;
+    fn SDL_SavePNG_IO(surface: *mut SDL_Surface, dst: *mut SDL_IOStream, closeio: bool) -> bool;
+    fn SDL_SavePNG(surface: *mut SDL_Surface, file: *i8) -> bool;
+    fn SDL_SetSurfaceRLE(surface: *mut SDL_Surface, enabled: bool) -> bool;
+    fn SDL_SurfaceHasRLE(surface: *mut SDL_Surface) -> bool;
+    fn SDL_SetSurfaceColorKey(surface: *mut SDL_Surface, enabled: bool, key: Uint32) -> bool;
+    fn SDL_SurfaceHasColorKey(surface: *mut SDL_Surface) -> bool;
+    fn SDL_GetSurfaceColorKey(surface: *mut SDL_Surface, key: *mut Uint32) -> bool;
+    fn SDL_SetSurfaceColorMod(surface: *mut SDL_Surface, r: Uint8, g: Uint8, b: Uint8) -> bool;
+    fn SDL_GetSurfaceColorMod(surface: *mut SDL_Surface, r: *mut Uint8, g: *mut Uint8, b: *mut Uint8) -> bool;
+    fn SDL_SetSurfaceAlphaMod(surface: *mut SDL_Surface, alpha: Uint8) -> bool;
+    fn SDL_GetSurfaceAlphaMod(surface: *mut SDL_Surface, alpha: *mut Uint8) -> bool;
+    fn SDL_SetSurfaceBlendMode(surface: *mut SDL_Surface, blendMode: SDL_BlendMode) -> bool;
+    fn SDL_GetSurfaceBlendMode(surface: *mut SDL_Surface, blendMode: *mut SDL_BlendMode) -> bool;
+    fn SDL_SetSurfaceClipRect(surface: *mut SDL_Surface, rect: *SDL_Rect) -> bool;
+    fn SDL_GetSurfaceClipRect(surface: *mut SDL_Surface, rect: *mut SDL_Rect) -> bool;
+    fn SDL_FlipSurface(surface: *mut SDL_Surface, flip: SDL_FlipMode) -> bool;
+    fn SDL_RotateSurface(surface: *mut SDL_Surface, angle: f32) -> *mut SDL_Surface;
+    fn SDL_DuplicateSurface(surface: *mut SDL_Surface) -> *mut SDL_Surface;
+    fn SDL_ScaleSurface(surface: *mut SDL_Surface, width: i32, height: i32, scaleMode: SDL_ScaleMode) -> *mut SDL_Surface;
+    fn SDL_ConvertSurface(surface: *mut SDL_Surface, format: SDL_PixelFormat) -> *mut SDL_Surface;
+    fn SDL_ConvertSurfaceAndColorspace(surface: *mut SDL_Surface, format: SDL_PixelFormat, palette: *mut SDL_Palette, colorspace: SDL_Colorspace, props: SDL_PropertiesID) -> *mut SDL_Surface;
+    fn SDL_ConvertPixels(width: i32, height: i32, src_format: SDL_PixelFormat, src: *void, src_pitch: i32, dst_format: SDL_PixelFormat, dst: *mut void, dst_pitch: i32) -> bool;
+    fn SDL_ConvertPixelsAndColorspace(width: i32, height: i32, src_format: SDL_PixelFormat, src_colorspace: SDL_Colorspace, src_properties: SDL_PropertiesID, src: *void, src_pitch: i32, dst_format: SDL_PixelFormat, dst_colorspace: SDL_Colorspace, dst_properties: SDL_PropertiesID, dst: *mut void, dst_pitch: i32) -> bool;
+    fn SDL_PremultiplyAlpha(width: i32, height: i32, src_format: SDL_PixelFormat, src: *void, src_pitch: i32, dst_format: SDL_PixelFormat, dst: *mut void, dst_pitch: i32, linear: bool) -> bool;
+    fn SDL_PremultiplySurfaceAlpha(surface: *mut SDL_Surface, linear: bool) -> bool;
+    fn SDL_ClearSurface(surface: *mut SDL_Surface, r: f32, g: f32, b: f32, a: f32) -> bool;
+    fn SDL_FillSurfaceRect(dst: *mut SDL_Surface, rect: *SDL_Rect, color: Uint32) -> bool;
+    fn SDL_FillSurfaceRects(dst: *mut SDL_Surface, rects: *SDL_Rect, count: i32, color: Uint32) -> bool;
+    fn SDL_BlitSurface(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect) -> bool;
+    fn SDL_BlitSurfaceUnchecked(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect) -> bool;
+    fn SDL_BlitSurfaceScaled(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect, scaleMode: SDL_ScaleMode) -> bool;
+    fn SDL_BlitSurfaceUncheckedScaled(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect, scaleMode: SDL_ScaleMode) -> bool;
+    fn SDL_StretchSurface(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect, scaleMode: SDL_ScaleMode) -> bool;
+    fn SDL_BlitSurfaceTiled(src: *mut SDL_Surface, srcrect: *SDL_Rect, dst: *mut SDL_Surface, dstrect: *SDL_Rect) -> bool;
+    fn SDL_BlitSurfaceTiledWithScale(src: *mut SDL_Surface, srcrect: *SDL_Rect, scale: f32, scaleMode: SDL_ScaleMode, dst: *mut SDL_Surface, dstrect: *SDL_Rect) -> bool;
+    fn SDL_BlitSurface9Grid(src: *mut SDL_Surface, srcrect: *SDL_Rect, left_width: i32, right_width: i32, top_height: i32, bottom_height: i32, scale: f32, scaleMode: SDL_ScaleMode, dst: *mut SDL_Surface, dstrect: *SDL_Rect) -> bool;
+    fn SDL_MapSurfaceRGB(surface: *mut SDL_Surface, r: Uint8, g: Uint8, b: Uint8) -> Uint32;
+    fn SDL_MapSurfaceRGBA(surface: *mut SDL_Surface, r: Uint8, g: Uint8, b: Uint8, a: Uint8) -> Uint32;
+    fn SDL_ReadSurfacePixel(surface: *mut SDL_Surface, x: i32, y: i32, r: *mut Uint8, g: *mut Uint8, b: *mut Uint8, a: *mut Uint8) -> bool;
+    fn SDL_ReadSurfacePixelFloat(surface: *mut SDL_Surface, x: i32, y: i32, r: *mut f32, g: *mut f32, b: *mut f32, a: *mut f32) -> bool;
+    fn SDL_WriteSurfacePixel(surface: *mut SDL_Surface, x: i32, y: i32, r: Uint8, g: Uint8, b: Uint8, a: Uint8) -> bool;
+    fn SDL_WriteSurfacePixelFloat(surface: *mut SDL_Surface, x: i32, y: i32, r: f32, g: f32, b: f32, a: f32) -> bool;
+}

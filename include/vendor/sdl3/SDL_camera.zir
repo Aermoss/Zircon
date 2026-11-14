@@ -1,0 +1,44 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_pixels.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_surface.zir" : *]
+
+type SDL_CameraID = Uint32;
+
+struct SDL_Camera {}
+
+struct SDL_CameraSpec {
+    pub format: SDL_PixelFormat,
+    pub colorspace: SDL_Colorspace,
+    pub width: i32,
+    pub height: i32,
+    pub framerate_numerator: i32,
+    pub framerate_denominator: i32
+}
+
+enum SDL_CameraPosition: i32 {
+    SDL_CAMERA_POSITION_UNKNOWN,
+    SDL_CAMERA_POSITION_FRONT_FACING,
+    SDL_CAMERA_POSITION_BACK_FACING
+}
+
+enum SDL_CameraPermissionState: i32 {
+    SDL_CAMERA_PERMISSION_STATE_DENIED = -1,
+    SDL_CAMERA_PERMISSION_STATE_PENDING,
+    SDL_CAMERA_PERMISSION_STATE_APPROVED
+}
+
+extern "C" {
+    fn SDL_GetNumCameraDrivers() -> i32;
+    fn SDL_GetCameraDriver(index: i32) -> *i8;
+    fn SDL_GetCurrentCameraDriver() -> *i8;
+    fn SDL_GetCameras(count: *mut i32) -> *mut SDL_CameraID;
+    fn SDL_GetCameraSupportedFormats(instance_id: SDL_CameraID, count: *mut i32) -> *mut *mut SDL_CameraSpec;
+    fn SDL_GetCameraName(instance_id: SDL_CameraID) -> *i8;
+    fn SDL_GetCameraPosition(instance_id: SDL_CameraID) -> SDL_CameraPosition;
+    fn SDL_OpenCamera(instance_id: SDL_CameraID, spec: *SDL_CameraSpec) -> *mut SDL_Camera;
+    fn SDL_GetCameraPermissionState(camera: *mut SDL_Camera) -> SDL_CameraPermissionState;
+    fn SDL_GetCameraID(camera: *mut SDL_Camera) -> SDL_CameraID;
+    fn SDL_GetCameraProperties(camera: *mut SDL_Camera) -> SDL_PropertiesID;
+    fn SDL_GetCameraFormat(camera: *mut SDL_Camera, spec: *mut SDL_CameraSpec) -> bool;
+    fn SDL_AcquireCameraFrame(camera: *mut SDL_Camera, timestampNS: *mut Uint64) -> *mut SDL_Surface;
+    fn SDL_ReleaseCameraFrame(camera: *mut SDL_Camera, frame: *mut SDL_Surface);
+    fn SDL_CloseCamera(camera: *mut SDL_Camera);
+}

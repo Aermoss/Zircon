@@ -1,0 +1,30 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+type SDL_SpinLock = i32;
+
+struct SDL_AtomicInt {
+    pub value: i32
+}
+
+struct SDL_AtomicU32 {
+    pub value: Uint32
+}
+
+extern "C" {
+    fn SDL_TryLockSpinlock(lock: *mut SDL_SpinLock) -> bool;
+    fn SDL_LockSpinlock(lock: *mut SDL_SpinLock);
+    fn SDL_UnlockSpinlock(lock: *mut SDL_SpinLock);
+    fn SDL_MemoryBarrierReleaseFunction();
+    fn SDL_MemoryBarrierAcquireFunction();
+    fn SDL_CompareAndSwapAtomicInt(a: *mut SDL_AtomicInt, oldval: i32, newval: i32) -> bool;
+    fn SDL_SetAtomicInt(a: *mut SDL_AtomicInt, v: i32) -> i32;
+    fn SDL_GetAtomicInt(a: *mut SDL_AtomicInt) -> i32;
+    fn SDL_AddAtomicInt(a: *mut SDL_AtomicInt, v: i32) -> i32;
+    fn SDL_CompareAndSwapAtomicU32(a: *mut SDL_AtomicU32, oldval: Uint32, newval: Uint32) -> bool;
+    fn SDL_SetAtomicU32(a: *mut SDL_AtomicU32, v: Uint32) -> Uint32;
+    fn SDL_GetAtomicU32(a: *mut SDL_AtomicU32) -> Uint32;
+    fn SDL_AddAtomicU32(a: *mut SDL_AtomicU32, v: i32) -> Uint32;
+    fn SDL_CompareAndSwapAtomicPointer(a: *mut *mut void, oldval: *mut void, newval: *mut void) -> bool;
+    fn SDL_SetAtomicPointer(a: *mut *mut void, v: *mut void) -> *mut void;
+    fn SDL_GetAtomicPointer(a: *mut *mut void) -> *mut void;
+}

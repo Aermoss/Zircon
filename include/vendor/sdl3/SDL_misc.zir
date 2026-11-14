@@ -1,0 +1,5 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+extern "C" {
+    fn SDL_OpenURL(url: *i8) -> bool;
+}

@@ -1,0 +1,42 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+struct SDL_AsyncIO {}
+
+enum SDL_AsyncIOTaskType: i32 {
+    SDL_ASYNCIO_TASK_READ,
+    SDL_ASYNCIO_TASK_WRITE,
+    SDL_ASYNCIO_TASK_CLOSE
+}
+
+enum SDL_AsyncIOResult: i32 {
+    SDL_ASYNCIO_COMPLETE,
+    SDL_ASYNCIO_FAILURE,
+    SDL_ASYNCIO_CANCELED
+}
+
+struct SDL_AsyncIOOutcome {
+    pub asyncio: *mut SDL_AsyncIO,
+    pub _type: SDL_AsyncIOTaskType,
+    pub result: SDL_AsyncIOResult,
+    pub buffer: *mut void,
+    pub offset: Uint64,
+    pub bytes_requested: Uint64,
+    pub bytes_transferred: Uint64,
+    pub userdata: *mut void
+}
+
+struct SDL_AsyncIOQueue {}
+
+extern "C" {
+    fn SDL_AsyncIOFromFile(file: *i8, mode: *i8) -> *mut SDL_AsyncIO;
+    fn SDL_GetAsyncIOSize(asyncio: *mut SDL_AsyncIO) -> Sint64;
+    fn SDL_ReadAsyncIO(asyncio: *mut SDL_AsyncIO, ptr: *mut void, offset: Uint64, size: Uint64, queue: *mut SDL_AsyncIOQueue, userdata: *mut void) -> bool;
+    fn SDL_WriteAsyncIO(asyncio: *mut SDL_AsyncIO, ptr: *mut void, offset: Uint64, size: Uint64, queue: *mut SDL_AsyncIOQueue, userdata: *mut void) -> bool;
+    fn SDL_CloseAsyncIO(asyncio: *mut SDL_AsyncIO, flush: bool, queue: *mut SDL_AsyncIOQueue, userdata: *mut void) -> bool;
+    fn SDL_CreateAsyncIOQueue() -> *mut SDL_AsyncIOQueue;
+    fn SDL_DestroyAsyncIOQueue(queue: *mut SDL_AsyncIOQueue);
+    fn SDL_GetAsyncIOResult(queue: *mut SDL_AsyncIOQueue, outcome: *mut SDL_AsyncIOOutcome) -> bool;
+    fn SDL_WaitAsyncIOResult(queue: *mut SDL_AsyncIOQueue, outcome: *mut SDL_AsyncIOOutcome, timeoutMS: Sint32) -> bool;
+    fn SDL_SignalAsyncIOQueue(queue: *mut SDL_AsyncIOQueue);
+    fn SDL_LoadFileAsync(file: *i8, queue: *mut SDL_AsyncIOQueue, userdata: *mut void) -> bool;
+}

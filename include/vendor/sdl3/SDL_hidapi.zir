@@ -1,0 +1,57 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_properties.zir" : *]
+
+const SDL_PROP_HIDAPI_LIBUSB_DEVICE_HANDLE_POINTER: *i8 = "SDL.hidapi.libusb.device.handle";
+
+struct SDL_hid_device {}
+
+enum SDL_hid_bus_type: i32 {
+    SDL_HID_API_BUS_UNKNOWN = 0x00,
+    SDL_HID_API_BUS_USB = 0x01,
+    SDL_HID_API_BUS_BLUETOOTH = 0x02,
+    SDL_HID_API_BUS_I2C = 0x03,
+    SDL_HID_API_BUS_SPI = 0x04
+}
+
+struct SDL_hid_device_info {
+    pub path: *mut i8,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub serial_number: *mut u16,
+    pub release_number: u16,
+    pub manufacturer_string: *mut u16,
+    pub product_string: *mut u16,
+    pub usage_page: u16,
+    pub usage: u16,
+    pub interface_number: i32,
+    pub interface_class: i32,
+    pub interface_subclass: i32,
+    pub interface_protocol: i32,
+    pub bus_type: SDL_hid_bus_type,
+    pub next: *mut SDL_hid_device_info
+}
+
+extern "C" {
+    fn SDL_hid_init() -> i32;
+    fn SDL_hid_exit() -> i32;
+    fn SDL_hid_device_change_count() -> Uint32;
+    fn SDL_hid_enumerate(vendor_id: u16, product_id: u16) -> *mut SDL_hid_device_info;
+    fn SDL_hid_free_enumeration(devs: *mut SDL_hid_device_info);
+    fn SDL_hid_open(vendor_id: u16, product_id: u16, serial_number: *u16) -> *mut SDL_hid_device;
+    fn SDL_hid_open_path(path: *i8) -> *mut SDL_hid_device;
+    fn SDL_hid_get_properties(dev: *mut SDL_hid_device) -> SDL_PropertiesID;
+    fn SDL_hid_write(dev: *mut SDL_hid_device, data: *u8, length: usize) -> i32;
+    fn SDL_hid_read_timeout(dev: *mut SDL_hid_device, data: *mut u8, length: usize, milliseconds: i32) -> i32;
+    fn SDL_hid_read(dev: *mut SDL_hid_device, data: *mut u8, length: usize) -> i32;
+    fn SDL_hid_set_nonblocking(dev: *mut SDL_hid_device, nonblock: i32) -> i32;
+    fn SDL_hid_send_feature_report(dev: *mut SDL_hid_device, data: *u8, length: usize) -> i32;
+    fn SDL_hid_get_feature_report(dev: *mut SDL_hid_device, data: *mut u8, length: usize) -> i32;
+    fn SDL_hid_get_input_report(dev: *mut SDL_hid_device, data: *mut u8, length: usize) -> i32;
+    fn SDL_hid_close(dev: *mut SDL_hid_device) -> i32;
+    fn SDL_hid_get_manufacturer_string(dev: *mut SDL_hid_device, string: *mut u16, maxlen: usize) -> i32;
+    fn SDL_hid_get_product_string(dev: *mut SDL_hid_device, string: *mut u16, maxlen: usize) -> i32;
+    fn SDL_hid_get_serial_number_string(dev: *mut SDL_hid_device, string: *mut u16, maxlen: usize) -> i32;
+    fn SDL_hid_get_indexed_string(dev: *mut SDL_hid_device, string_index: i32, string: *mut u16, maxlen: usize) -> i32;
+    fn SDL_hid_get_device_info(dev: *mut SDL_hid_device) -> *mut SDL_hid_device_info;
+    fn SDL_hid_get_report_descriptor(dev: *mut SDL_hid_device, buf: *mut u8, buf_size: usize) -> i32;
+    fn SDL_hid_ble_scan(active: bool);
+}

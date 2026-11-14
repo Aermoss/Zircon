@@ -1,0 +1,42 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_surface.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+const SDL_TRAYENTRY_BUTTON: u32 = 0x00000001;
+const SDL_TRAYENTRY_CHECKBOX: u32 = 0x00000002;
+const SDL_TRAYENTRY_SUBMENU: u32 = 0x00000004;
+const SDL_TRAYENTRY_DISABLED: u32 = 0x80000000;
+const SDL_TRAYENTRY_CHECKED: u32 = 0x40000000;
+
+struct SDL_Tray {}
+
+struct SDL_TrayMenu {}
+
+struct SDL_TrayEntry {}
+
+type SDL_TrayEntryFlags = Uint32;
+type SDL_TrayCallback = fn(*mut void, *mut SDL_TrayEntry);
+
+extern "C" {
+    fn SDL_CreateTray(icon: *mut SDL_Surface, tooltip: *i8) -> *mut SDL_Tray;
+    fn SDL_SetTrayIcon(tray: *mut SDL_Tray, icon: *mut SDL_Surface);
+    fn SDL_SetTrayTooltip(tray: *mut SDL_Tray, tooltip: *i8);
+    fn SDL_CreateTrayMenu(tray: *mut SDL_Tray) -> *mut SDL_TrayMenu;
+    fn SDL_CreateTraySubmenu(entry: *mut SDL_TrayEntry) -> *mut SDL_TrayMenu;
+    fn SDL_GetTrayMenu(tray: *mut SDL_Tray) -> *mut SDL_TrayMenu;
+    fn SDL_GetTraySubmenu(entry: *mut SDL_TrayEntry) -> *mut SDL_TrayMenu;
+    fn SDL_GetTrayEntries(menu: *mut SDL_TrayMenu, count: *mut i32) -> *mut *SDL_TrayEntry;
+    fn SDL_RemoveTrayEntry(entry: *mut SDL_TrayEntry);
+    fn SDL_InsertTrayEntryAt(menu: *mut SDL_TrayMenu, pos: i32, label: *i8, flags: SDL_TrayEntryFlags) -> *mut SDL_TrayEntry;
+    fn SDL_SetTrayEntryLabel(entry: *mut SDL_TrayEntry, label: *i8);
+    fn SDL_GetTrayEntryLabel(entry: *mut SDL_TrayEntry) -> *i8;
+    fn SDL_SetTrayEntryChecked(entry: *mut SDL_TrayEntry, checked: bool);
+    fn SDL_GetTrayEntryChecked(entry: *mut SDL_TrayEntry) -> bool;
+    fn SDL_SetTrayEntryEnabled(entry: *mut SDL_TrayEntry, enabled: bool);
+    fn SDL_GetTrayEntryEnabled(entry: *mut SDL_TrayEntry) -> bool;
+    fn SDL_SetTrayEntryCallback(entry: *mut SDL_TrayEntry, callback: SDL_TrayCallback, userdata: *mut void);
+    fn SDL_ClickTrayEntry(entry: *mut SDL_TrayEntry);
+    fn SDL_DestroyTray(tray: *mut SDL_Tray);
+    fn SDL_GetTrayEntryParent(entry: *mut SDL_TrayEntry) -> *mut SDL_TrayMenu;
+    fn SDL_GetTrayMenuParentEntry(menu: *mut SDL_TrayMenu) -> *mut SDL_TrayEntry;
+    fn SDL_GetTrayMenuParentTray(menu: *mut SDL_TrayMenu) -> *mut SDL_Tray;
+    fn SDL_UpdateTrays();
+}

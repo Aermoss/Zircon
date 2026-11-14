@@ -1,0 +1,35 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_keyboard.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+struct tagMSG {}
+
+type MSG = tagMSG;
+type SDL_WindowsMessageHook = fn(*mut void, *mut MSG) -> bool;
+
+struct _XEvent {}
+
+type XEvent = _XEvent;
+type SDL_X11EventHook = fn(*mut void, *mut XEvent) -> bool;
+
+enum SDL_Sandbox: i32 {
+    SDL_SANDBOX_NONE = 0,
+    SDL_SANDBOX_UNKNOWN_CONTAINER,
+    SDL_SANDBOX_FLATPAK,
+    SDL_SANDBOX_SNAP,
+    SDL_SANDBOX_MACOS
+}
+
+extern "C" {
+    fn SDL_SetWindowsMessageHook(callback: SDL_WindowsMessageHook, userdata: *mut void);
+    fn SDL_GetDirect3D9AdapterIndex(displayID: SDL_DisplayID) -> i32;
+    fn SDL_GetDXGIOutputInfo(displayID: SDL_DisplayID, adapterIndex: *mut i32, outputIndex: *mut i32) -> bool;
+    fn SDL_SetX11EventHook(callback: SDL_X11EventHook, userdata: *mut void);
+    fn SDL_IsTablet() -> bool;
+    fn SDL_IsTV() -> bool;
+    fn SDL_GetSandbox() -> SDL_Sandbox;
+    fn SDL_OnApplicationWillTerminate();
+    fn SDL_OnApplicationDidReceiveMemoryWarning();
+    fn SDL_OnApplicationWillEnterBackground();
+    fn SDL_OnApplicationDidEnterBackground();
+    fn SDL_OnApplicationWillEnterForeground();
+    fn SDL_OnApplicationDidEnterForeground();
+}

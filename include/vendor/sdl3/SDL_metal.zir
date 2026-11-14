@@ -1,0 +1,9 @@
+#[include "vendor/sdl3/SDL_video.zir" : *]
+
+type SDL_MetalView = *mut void;
+
+extern "C" {
+    fn SDL_Metal_CreateView(window: *mut SDL_Window) -> SDL_MetalView;
+    fn SDL_Metal_DestroyView(view: SDL_MetalView);
+    fn SDL_Metal_GetLayer(view: SDL_MetalView) -> *mut void;
+}

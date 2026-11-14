@@ -1,0 +1,99 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_mutex.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_iostream.zir" : *]
+
+const SDL_PROP_AUDIOSTREAM_AUTO_CLEANUP_BOOLEAN: *i8 = "SDL.audiostream.auto_cleanup";
+const SDL_AUDIO_MASK_BITSIZE: u32 = 255;
+const SDL_AUDIO_MASK_FLOAT: u32 = 256;
+const SDL_AUDIO_MASK_BIG_ENDIAN: u32 = 4096;
+const SDL_AUDIO_MASK_SIGNED: u32 = 32768;
+const SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK: u32 = 4294967295;
+const SDL_AUDIO_DEVICE_DEFAULT_RECORDING: u32 = 4294967294;
+
+enum SDL_AudioFormat: i32 {
+    SDL_AUDIO_UNKNOWN = 0x0000,
+    SDL_AUDIO_U8 = 0x0008,
+    SDL_AUDIO_S8 = 0x8008,
+    SDL_AUDIO_S16LE = 0x8010,
+    SDL_AUDIO_S16BE = 0x9010,
+    SDL_AUDIO_S32LE = 0x8020,
+    SDL_AUDIO_S32BE = 0x9020,
+    SDL_AUDIO_F32LE = 0x8120,
+    SDL_AUDIO_F32BE = 0x9120,
+    SDL_AUDIO_S16 = SDL_AUDIO_S16LE,
+    SDL_AUDIO_S32 = SDL_AUDIO_S32LE,
+    SDL_AUDIO_F32 = SDL_AUDIO_F32LE
+}
+
+type SDL_AudioDeviceID = Uint32;
+
+struct SDL_AudioSpec {
+    pub format: SDL_AudioFormat,
+    pub channels: i32,
+    pub freq: i32
+}
+
+struct SDL_AudioStream {}
+
+type SDL_AudioStreamDataCompleteCallback = fn(*mut void, *void, i32);
+type SDL_AudioStreamCallback = fn(*mut void, *mut SDL_AudioStream, i32, i32);
+type SDL_AudioPostmixCallback = fn(*mut void, *SDL_AudioSpec, *mut f32, i32);
+
+extern "C" {
+    fn SDL_GetNumAudioDrivers() -> i32;
+    fn SDL_GetAudioDriver(index: i32) -> *i8;
+    fn SDL_GetCurrentAudioDriver() -> *i8;
+    fn SDL_GetAudioPlaybackDevices(count: *mut i32) -> *mut SDL_AudioDeviceID;
+    fn SDL_GetAudioRecordingDevices(count: *mut i32) -> *mut SDL_AudioDeviceID;
+    fn SDL_GetAudioDeviceName(devid: SDL_AudioDeviceID) -> *i8;
+    fn SDL_GetAudioDeviceFormat(devid: SDL_AudioDeviceID, spec: *mut SDL_AudioSpec, sample_frames: *mut i32) -> bool;
+    fn SDL_GetAudioDeviceChannelMap(devid: SDL_AudioDeviceID, count: *mut i32) -> *mut i32;
+    fn SDL_OpenAudioDevice(devid: SDL_AudioDeviceID, spec: *SDL_AudioSpec) -> SDL_AudioDeviceID;
+    fn SDL_IsAudioDevicePhysical(devid: SDL_AudioDeviceID) -> bool;
+    fn SDL_IsAudioDevicePlayback(devid: SDL_AudioDeviceID) -> bool;
+    fn SDL_PauseAudioDevice(devid: SDL_AudioDeviceID) -> bool;
+    fn SDL_ResumeAudioDevice(devid: SDL_AudioDeviceID) -> bool;
+    fn SDL_AudioDevicePaused(devid: SDL_AudioDeviceID) -> bool;
+    fn SDL_GetAudioDeviceGain(devid: SDL_AudioDeviceID) -> f32;
+    fn SDL_SetAudioDeviceGain(devid: SDL_AudioDeviceID, gain: f32) -> bool;
+    fn SDL_CloseAudioDevice(devid: SDL_AudioDeviceID);
+    fn SDL_BindAudioStreams(devid: SDL_AudioDeviceID, streams: **mut SDL_AudioStream, num_streams: i32) -> bool;
+    fn SDL_BindAudioStream(devid: SDL_AudioDeviceID, stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_UnbindAudioStreams(streams: **mut SDL_AudioStream, num_streams: i32);
+    fn SDL_UnbindAudioStream(stream: *mut SDL_AudioStream);
+    fn SDL_GetAudioStreamDevice(stream: *mut SDL_AudioStream) -> SDL_AudioDeviceID;
+    fn SDL_CreateAudioStream(src_spec: *SDL_AudioSpec, dst_spec: *SDL_AudioSpec) -> *mut SDL_AudioStream;
+    fn SDL_GetAudioStreamProperties(stream: *mut SDL_AudioStream) -> SDL_PropertiesID;
+    fn SDL_GetAudioStreamFormat(stream: *mut SDL_AudioStream, src_spec: *mut SDL_AudioSpec, dst_spec: *mut SDL_AudioSpec) -> bool;
+    fn SDL_SetAudioStreamFormat(stream: *mut SDL_AudioStream, src_spec: *SDL_AudioSpec, dst_spec: *SDL_AudioSpec) -> bool;
+    fn SDL_GetAudioStreamFrequencyRatio(stream: *mut SDL_AudioStream) -> f32;
+    fn SDL_SetAudioStreamFrequencyRatio(stream: *mut SDL_AudioStream, ratio: f32) -> bool;
+    fn SDL_GetAudioStreamGain(stream: *mut SDL_AudioStream) -> f32;
+    fn SDL_SetAudioStreamGain(stream: *mut SDL_AudioStream, gain: f32) -> bool;
+    fn SDL_GetAudioStreamInputChannelMap(stream: *mut SDL_AudioStream, count: *mut i32) -> *mut i32;
+    fn SDL_GetAudioStreamOutputChannelMap(stream: *mut SDL_AudioStream, count: *mut i32) -> *mut i32;
+    fn SDL_SetAudioStreamInputChannelMap(stream: *mut SDL_AudioStream, chmap: *i32, count: i32) -> bool;
+    fn SDL_SetAudioStreamOutputChannelMap(stream: *mut SDL_AudioStream, chmap: *i32, count: i32) -> bool;
+    fn SDL_PutAudioStreamData(stream: *mut SDL_AudioStream, buf: *void, len: i32) -> bool;
+    fn SDL_PutAudioStreamDataNoCopy(stream: *mut SDL_AudioStream, buf: *void, len: i32, callback: SDL_AudioStreamDataCompleteCallback, userdata: *mut void) -> bool;
+    fn SDL_PutAudioStreamPlanarData(stream: *mut SDL_AudioStream, channel_buffers: **void, num_channels: i32, num_samples: i32) -> bool;
+    fn SDL_GetAudioStreamData(stream: *mut SDL_AudioStream, buf: *mut void, len: i32) -> i32;
+    fn SDL_GetAudioStreamAvailable(stream: *mut SDL_AudioStream) -> i32;
+    fn SDL_GetAudioStreamQueued(stream: *mut SDL_AudioStream) -> i32;
+    fn SDL_FlushAudioStream(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_ClearAudioStream(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_PauseAudioStreamDevice(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_ResumeAudioStreamDevice(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_AudioStreamDevicePaused(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_LockAudioStream(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_UnlockAudioStream(stream: *mut SDL_AudioStream) -> bool;
+    fn SDL_SetAudioStreamGetCallback(stream: *mut SDL_AudioStream, callback: SDL_AudioStreamCallback, userdata: *mut void) -> bool;
+    fn SDL_SetAudioStreamPutCallback(stream: *mut SDL_AudioStream, callback: SDL_AudioStreamCallback, userdata: *mut void) -> bool;
+    fn SDL_DestroyAudioStream(stream: *mut SDL_AudioStream);
+    fn SDL_OpenAudioDeviceStream(devid: SDL_AudioDeviceID, spec: *SDL_AudioSpec, callback: SDL_AudioStreamCallback, userdata: *mut void) -> *mut SDL_AudioStream;
+    fn SDL_SetAudioPostmixCallback(devid: SDL_AudioDeviceID, callback: SDL_AudioPostmixCallback, userdata: *mut void) -> bool;
+    fn SDL_LoadWAV_IO(src: *mut SDL_IOStream, closeio: bool, spec: *mut SDL_AudioSpec, audio_buf: *mut *mut Uint8, audio_len: *mut Uint32) -> bool;
+    fn SDL_LoadWAV(path: *i8, spec: *mut SDL_AudioSpec, audio_buf: *mut *mut Uint8, audio_len: *mut Uint32) -> bool;
+    fn SDL_MixAudio(dst: *mut Uint8, src: *Uint8, format: SDL_AudioFormat, len: Uint32, volume: f32) -> bool;
+    fn SDL_ConvertAudioSamples(src_spec: *SDL_AudioSpec, src_data: *Uint8, src_len: i32, dst_spec: *SDL_AudioSpec, dst_data: *mut *mut Uint8, dst_len: *mut i32) -> bool;
+    fn SDL_GetAudioFormatName(format: SDL_AudioFormat) -> *i8;
+    fn SDL_GetSilenceValueForFormat(format: SDL_AudioFormat) -> i32;
+}

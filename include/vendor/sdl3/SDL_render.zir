@@ -1,0 +1,260 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_blendmode.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_events.zir", "vendor/sdl3/SDL_pixels.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_rect.zir", "vendor/sdl3/SDL_surface.zir", "vendor/sdl3/SDL_video.zir", "vendor/sdl3/SDL_gpu.zir" : *]
+
+const SDL_SOFTWARE_RENDERER: *i8 = "software";
+const SDL_GPU_RENDERER: *i8 = "gpu";
+const SDL_PROP_RENDERER_CREATE_NAME_STRING: *i8 = "SDL.renderer.create.name";
+const SDL_PROP_RENDERER_CREATE_WINDOW_POINTER: *i8 = "SDL.renderer.create.window";
+const SDL_PROP_RENDERER_CREATE_SURFACE_POINTER: *i8 = "SDL.renderer.create.surface";
+const SDL_PROP_RENDERER_CREATE_OUTPUT_COLORSPACE_NUMBER: *i8 = "SDL.renderer.create.output_colorspace";
+const SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER: *i8 = "SDL.renderer.create.present_vsync";
+const SDL_PROP_RENDERER_CREATE_GPU_DEVICE_POINTER: *i8 = "SDL.renderer.create.gpu.device";
+const SDL_PROP_RENDERER_CREATE_GPU_SHADERS_SPIRV_BOOLEAN: *i8 = "SDL.renderer.create.gpu.shaders_spirv";
+const SDL_PROP_RENDERER_CREATE_GPU_SHADERS_DXIL_BOOLEAN: *i8 = "SDL.renderer.create.gpu.shaders_dxil";
+const SDL_PROP_RENDERER_CREATE_GPU_SHADERS_MSL_BOOLEAN: *i8 = "SDL.renderer.create.gpu.shaders_msl";
+const SDL_PROP_RENDERER_CREATE_VULKAN_INSTANCE_POINTER: *i8 = "SDL.renderer.create.vulkan.instance";
+const SDL_PROP_RENDERER_CREATE_VULKAN_SURFACE_NUMBER: *i8 = "SDL.renderer.create.vulkan.surface";
+const SDL_PROP_RENDERER_CREATE_VULKAN_PHYSICAL_DEVICE_POINTER: *i8 = "SDL.renderer.create.vulkan.physical_device";
+const SDL_PROP_RENDERER_CREATE_VULKAN_DEVICE_POINTER: *i8 = "SDL.renderer.create.vulkan.device";
+const SDL_PROP_RENDERER_CREATE_VULKAN_GRAPHICS_QUEUE_FAMILY_INDEX_NUMBER: *i8 = "SDL.renderer.create.vulkan.graphics_queue_family_index";
+const SDL_PROP_RENDERER_CREATE_VULKAN_PRESENT_QUEUE_FAMILY_INDEX_NUMBER: *i8 = "SDL.renderer.create.vulkan.present_queue_family_index";
+const SDL_PROP_RENDERER_NAME_STRING: *i8 = "SDL.renderer.name";
+const SDL_PROP_RENDERER_WINDOW_POINTER: *i8 = "SDL.renderer.window";
+const SDL_PROP_RENDERER_SURFACE_POINTER: *i8 = "SDL.renderer.surface";
+const SDL_PROP_RENDERER_VSYNC_NUMBER: *i8 = "SDL.renderer.vsync";
+const SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER: *i8 = "SDL.renderer.max_texture_size";
+const SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER: *i8 = "SDL.renderer.texture_formats";
+const SDL_PROP_RENDERER_TEXTURE_WRAPPING_BOOLEAN: *i8 = "SDL.renderer.texture_wrapping";
+const SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER: *i8 = "SDL.renderer.output_colorspace";
+const SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN: *i8 = "SDL.renderer.HDR_enabled";
+const SDL_PROP_RENDERER_SDR_WHITE_POINT_FLOAT: *i8 = "SDL.renderer.SDR_white_point";
+const SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT: *i8 = "SDL.renderer.HDR_headroom";
+const SDL_PROP_RENDERER_D3D9_DEVICE_POINTER: *i8 = "SDL.renderer.d3d9.device";
+const SDL_PROP_RENDERER_D3D11_DEVICE_POINTER: *i8 = "SDL.renderer.d3d11.device";
+const SDL_PROP_RENDERER_D3D11_SWAPCHAIN_POINTER: *i8 = "SDL.renderer.d3d11.swap_chain";
+const SDL_PROP_RENDERER_D3D12_DEVICE_POINTER: *i8 = "SDL.renderer.d3d12.device";
+const SDL_PROP_RENDERER_D3D12_SWAPCHAIN_POINTER: *i8 = "SDL.renderer.d3d12.swap_chain";
+const SDL_PROP_RENDERER_D3D12_COMMAND_QUEUE_POINTER: *i8 = "SDL.renderer.d3d12.command_queue";
+const SDL_PROP_RENDERER_VULKAN_INSTANCE_POINTER: *i8 = "SDL.renderer.vulkan.instance";
+const SDL_PROP_RENDERER_VULKAN_SURFACE_NUMBER: *i8 = "SDL.renderer.vulkan.surface";
+const SDL_PROP_RENDERER_VULKAN_PHYSICAL_DEVICE_POINTER: *i8 = "SDL.renderer.vulkan.physical_device";
+const SDL_PROP_RENDERER_VULKAN_DEVICE_POINTER: *i8 = "SDL.renderer.vulkan.device";
+const SDL_PROP_RENDERER_VULKAN_GRAPHICS_QUEUE_FAMILY_INDEX_NUMBER: *i8 = "SDL.renderer.vulkan.graphics_queue_family_index";
+const SDL_PROP_RENDERER_VULKAN_PRESENT_QUEUE_FAMILY_INDEX_NUMBER: *i8 = "SDL.renderer.vulkan.present_queue_family_index";
+const SDL_PROP_RENDERER_VULKAN_SWAPCHAIN_IMAGE_COUNT_NUMBER: *i8 = "SDL.renderer.vulkan.swapchain_image_count";
+const SDL_PROP_RENDERER_GPU_DEVICE_POINTER: *i8 = "SDL.renderer.gpu.device";
+const SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER: *i8 = "SDL.texture.create.colorspace";
+const SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER: *i8 = "SDL.texture.create.format";
+const SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER: *i8 = "SDL.texture.create.access";
+const SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER: *i8 = "SDL.texture.create.width";
+const SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER: *i8 = "SDL.texture.create.height";
+const SDL_PROP_TEXTURE_CREATE_PALETTE_POINTER: *i8 = "SDL.texture.create.palette";
+const SDL_PROP_TEXTURE_CREATE_SDR_WHITE_POINT_FLOAT: *i8 = "SDL.texture.create.SDR_white_point";
+const SDL_PROP_TEXTURE_CREATE_HDR_HEADROOM_FLOAT: *i8 = "SDL.texture.create.HDR_headroom";
+const SDL_PROP_TEXTURE_CREATE_D3D11_TEXTURE_POINTER: *i8 = "SDL.texture.create.d3d11.texture";
+const SDL_PROP_TEXTURE_CREATE_D3D11_TEXTURE_U_POINTER: *i8 = "SDL.texture.create.d3d11.texture_u";
+const SDL_PROP_TEXTURE_CREATE_D3D11_TEXTURE_V_POINTER: *i8 = "SDL.texture.create.d3d11.texture_v";
+const SDL_PROP_TEXTURE_CREATE_D3D12_TEXTURE_POINTER: *i8 = "SDL.texture.create.d3d12.texture";
+const SDL_PROP_TEXTURE_CREATE_D3D12_TEXTURE_U_POINTER: *i8 = "SDL.texture.create.d3d12.texture_u";
+const SDL_PROP_TEXTURE_CREATE_D3D12_TEXTURE_V_POINTER: *i8 = "SDL.texture.create.d3d12.texture_v";
+const SDL_PROP_TEXTURE_CREATE_METAL_PIXELBUFFER_POINTER: *i8 = "SDL.texture.create.metal.pixelbuffer";
+const SDL_PROP_TEXTURE_CREATE_OPENGL_TEXTURE_NUMBER: *i8 = "SDL.texture.create.opengl.texture";
+const SDL_PROP_TEXTURE_CREATE_OPENGL_TEXTURE_UV_NUMBER: *i8 = "SDL.texture.create.opengl.texture_uv";
+const SDL_PROP_TEXTURE_CREATE_OPENGL_TEXTURE_U_NUMBER: *i8 = "SDL.texture.create.opengl.texture_u";
+const SDL_PROP_TEXTURE_CREATE_OPENGL_TEXTURE_V_NUMBER: *i8 = "SDL.texture.create.opengl.texture_v";
+const SDL_PROP_TEXTURE_CREATE_OPENGLES2_TEXTURE_NUMBER: *i8 = "SDL.texture.create.opengles2.texture";
+const SDL_PROP_TEXTURE_CREATE_OPENGLES2_TEXTURE_UV_NUMBER: *i8 = "SDL.texture.create.opengles2.texture_uv";
+const SDL_PROP_TEXTURE_CREATE_OPENGLES2_TEXTURE_U_NUMBER: *i8 = "SDL.texture.create.opengles2.texture_u";
+const SDL_PROP_TEXTURE_CREATE_OPENGLES2_TEXTURE_V_NUMBER: *i8 = "SDL.texture.create.opengles2.texture_v";
+const SDL_PROP_TEXTURE_CREATE_VULKAN_TEXTURE_NUMBER: *i8 = "SDL.texture.create.vulkan.texture";
+const SDL_PROP_TEXTURE_CREATE_VULKAN_LAYOUT_NUMBER: *i8 = "SDL.texture.create.vulkan.layout";
+const SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER: *i8 = "SDL.texture.create.gpu.texture";
+const SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_UV_POINTER: *i8 = "SDL.texture.create.gpu.texture_uv";
+const SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_U_POINTER: *i8 = "SDL.texture.create.gpu.texture_u";
+const SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_V_POINTER: *i8 = "SDL.texture.create.gpu.texture_v";
+const SDL_PROP_TEXTURE_COLORSPACE_NUMBER: *i8 = "SDL.texture.colorspace";
+const SDL_PROP_TEXTURE_FORMAT_NUMBER: *i8 = "SDL.texture.format";
+const SDL_PROP_TEXTURE_ACCESS_NUMBER: *i8 = "SDL.texture.access";
+const SDL_PROP_TEXTURE_WIDTH_NUMBER: *i8 = "SDL.texture.width";
+const SDL_PROP_TEXTURE_HEIGHT_NUMBER: *i8 = "SDL.texture.height";
+const SDL_PROP_TEXTURE_SDR_WHITE_POINT_FLOAT: *i8 = "SDL.texture.SDR_white_point";
+const SDL_PROP_TEXTURE_HDR_HEADROOM_FLOAT: *i8 = "SDL.texture.HDR_headroom";
+const SDL_PROP_TEXTURE_D3D11_TEXTURE_POINTER: *i8 = "SDL.texture.d3d11.texture";
+const SDL_PROP_TEXTURE_D3D11_TEXTURE_U_POINTER: *i8 = "SDL.texture.d3d11.texture_u";
+const SDL_PROP_TEXTURE_D3D11_TEXTURE_V_POINTER: *i8 = "SDL.texture.d3d11.texture_v";
+const SDL_PROP_TEXTURE_D3D12_TEXTURE_POINTER: *i8 = "SDL.texture.d3d12.texture";
+const SDL_PROP_TEXTURE_D3D12_TEXTURE_U_POINTER: *i8 = "SDL.texture.d3d12.texture_u";
+const SDL_PROP_TEXTURE_D3D12_TEXTURE_V_POINTER: *i8 = "SDL.texture.d3d12.texture_v";
+const SDL_PROP_TEXTURE_OPENGL_TEXTURE_NUMBER: *i8 = "SDL.texture.opengl.texture";
+const SDL_PROP_TEXTURE_OPENGL_TEXTURE_UV_NUMBER: *i8 = "SDL.texture.opengl.texture_uv";
+const SDL_PROP_TEXTURE_OPENGL_TEXTURE_U_NUMBER: *i8 = "SDL.texture.opengl.texture_u";
+const SDL_PROP_TEXTURE_OPENGL_TEXTURE_V_NUMBER: *i8 = "SDL.texture.opengl.texture_v";
+const SDL_PROP_TEXTURE_OPENGL_TEXTURE_TARGET_NUMBER: *i8 = "SDL.texture.opengl.target";
+const SDL_PROP_TEXTURE_OPENGL_TEX_W_FLOAT: *i8 = "SDL.texture.opengl.tex_w";
+const SDL_PROP_TEXTURE_OPENGL_TEX_H_FLOAT: *i8 = "SDL.texture.opengl.tex_h";
+const SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_NUMBER: *i8 = "SDL.texture.opengles2.texture";
+const SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_UV_NUMBER: *i8 = "SDL.texture.opengles2.texture_uv";
+const SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_U_NUMBER: *i8 = "SDL.texture.opengles2.texture_u";
+const SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_V_NUMBER: *i8 = "SDL.texture.opengles2.texture_v";
+const SDL_PROP_TEXTURE_OPENGLES2_TEXTURE_TARGET_NUMBER: *i8 = "SDL.texture.opengles2.target";
+const SDL_PROP_TEXTURE_VULKAN_TEXTURE_NUMBER: *i8 = "SDL.texture.vulkan.texture";
+const SDL_PROP_TEXTURE_GPU_TEXTURE_POINTER: *i8 = "SDL.texture.gpu.texture";
+const SDL_PROP_TEXTURE_GPU_TEXTURE_UV_POINTER: *i8 = "SDL.texture.gpu.texture_uv";
+const SDL_PROP_TEXTURE_GPU_TEXTURE_U_POINTER: *i8 = "SDL.texture.gpu.texture_u";
+const SDL_PROP_TEXTURE_GPU_TEXTURE_V_POINTER: *i8 = "SDL.texture.gpu.texture_v";
+const SDL_RENDERER_VSYNC_DISABLED: i32 = 0;
+const SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE: i32 = 8;
+const SDL_RENDERER_VSYNC_ADAPTIVE: i32 = -1;
+
+struct SDL_Vertex {
+    pub position: SDL_FPoint,
+    pub color: SDL_FColor,
+    pub tex_coord: SDL_FPoint
+}
+
+enum SDL_TextureAccess: i32 {
+    SDL_TEXTUREACCESS_STATIC,
+    SDL_TEXTUREACCESS_STREAMING,
+    SDL_TEXTUREACCESS_TARGET
+}
+
+enum SDL_TextureAddressMode: i32 {
+    SDL_TEXTURE_ADDRESS_INVALID = -1,
+    SDL_TEXTURE_ADDRESS_AUTO,
+    SDL_TEXTURE_ADDRESS_CLAMP,
+    SDL_TEXTURE_ADDRESS_WRAP
+}
+
+enum SDL_RendererLogicalPresentation: i32 {
+    SDL_LOGICAL_PRESENTATION_DISABLED,
+    SDL_LOGICAL_PRESENTATION_STRETCH,
+    SDL_LOGICAL_PRESENTATION_LETTERBOX,
+    SDL_LOGICAL_PRESENTATION_OVERSCAN,
+    SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
+}
+
+struct SDL_Renderer {}
+
+struct SDL_Texture {
+    pub format: SDL_PixelFormat,
+    pub w: i32,
+    pub h: i32,
+    pub refcount: i32
+}
+
+struct SDL_GPURenderStateCreateInfo {
+    pub fragment_shader: *mut SDL_GPUShader,
+    pub num_sampler_bindings: Sint32,
+    pub sampler_bindings: *SDL_GPUTextureSamplerBinding,
+    pub num_storage_textures: Sint32,
+    pub storage_textures: **mut SDL_GPUTexture,
+    pub num_storage_buffers: Sint32,
+    pub storage_buffers: **mut SDL_GPUBuffer,
+    pub props: SDL_PropertiesID
+}
+
+struct SDL_GPURenderState {}
+
+extern "C" {
+    fn SDL_GetNumRenderDrivers() -> i32;
+    fn SDL_GetRenderDriver(index: i32) -> *i8;
+    fn SDL_CreateWindowAndRenderer(title: *i8, width: i32, height: i32, window_flags: SDL_WindowFlags, window: *mut *mut SDL_Window, renderer: *mut *mut SDL_Renderer) -> bool;
+    fn SDL_CreateRenderer(window: *mut SDL_Window, name: *i8) -> *mut SDL_Renderer;
+    fn SDL_CreateRendererWithProperties(props: SDL_PropertiesID) -> *mut SDL_Renderer;
+    fn SDL_CreateGPURenderer(device: *mut SDL_GPUDevice, window: *mut SDL_Window) -> *mut SDL_Renderer;
+    fn SDL_GetGPURendererDevice(renderer: *mut SDL_Renderer) -> *mut SDL_GPUDevice;
+    fn SDL_CreateSoftwareRenderer(surface: *mut SDL_Surface) -> *mut SDL_Renderer;
+    fn SDL_GetRenderer(window: *mut SDL_Window) -> *mut SDL_Renderer;
+    fn SDL_GetRenderWindow(renderer: *mut SDL_Renderer) -> *mut SDL_Window;
+    fn SDL_GetRendererName(renderer: *mut SDL_Renderer) -> *i8;
+    fn SDL_GetRendererProperties(renderer: *mut SDL_Renderer) -> SDL_PropertiesID;
+    fn SDL_GetRenderOutputSize(renderer: *mut SDL_Renderer, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_GetCurrentRenderOutputSize(renderer: *mut SDL_Renderer, w: *mut i32, h: *mut i32) -> bool;
+    fn SDL_CreateTexture(renderer: *mut SDL_Renderer, format: SDL_PixelFormat, access: SDL_TextureAccess, w: i32, h: i32) -> *mut SDL_Texture;
+    fn SDL_CreateTextureFromSurface(renderer: *mut SDL_Renderer, surface: *mut SDL_Surface) -> *mut SDL_Texture;
+    fn SDL_CreateTextureWithProperties(renderer: *mut SDL_Renderer, props: SDL_PropertiesID) -> *mut SDL_Texture;
+    fn SDL_GetTextureProperties(texture: *mut SDL_Texture) -> SDL_PropertiesID;
+    fn SDL_GetRendererFromTexture(texture: *mut SDL_Texture) -> *mut SDL_Renderer;
+    fn SDL_GetTextureSize(texture: *mut SDL_Texture, w: *mut f32, h: *mut f32) -> bool;
+    fn SDL_SetTexturePalette(texture: *mut SDL_Texture, palette: *mut SDL_Palette) -> bool;
+    fn SDL_GetTexturePalette(texture: *mut SDL_Texture) -> *mut SDL_Palette;
+    fn SDL_SetTextureColorMod(texture: *mut SDL_Texture, r: Uint8, g: Uint8, b: Uint8) -> bool;
+    fn SDL_SetTextureColorModFloat(texture: *mut SDL_Texture, r: f32, g: f32, b: f32) -> bool;
+    fn SDL_GetTextureColorMod(texture: *mut SDL_Texture, r: *mut Uint8, g: *mut Uint8, b: *mut Uint8) -> bool;
+    fn SDL_GetTextureColorModFloat(texture: *mut SDL_Texture, r: *mut f32, g: *mut f32, b: *mut f32) -> bool;
+    fn SDL_SetTextureAlphaMod(texture: *mut SDL_Texture, alpha: Uint8) -> bool;
+    fn SDL_SetTextureAlphaModFloat(texture: *mut SDL_Texture, alpha: f32) -> bool;
+    fn SDL_GetTextureAlphaMod(texture: *mut SDL_Texture, alpha: *mut Uint8) -> bool;
+    fn SDL_GetTextureAlphaModFloat(texture: *mut SDL_Texture, alpha: *mut f32) -> bool;
+    fn SDL_SetTextureBlendMode(texture: *mut SDL_Texture, blendMode: SDL_BlendMode) -> bool;
+    fn SDL_GetTextureBlendMode(texture: *mut SDL_Texture, blendMode: *mut SDL_BlendMode) -> bool;
+    fn SDL_SetTextureScaleMode(texture: *mut SDL_Texture, scaleMode: SDL_ScaleMode) -> bool;
+    fn SDL_GetTextureScaleMode(texture: *mut SDL_Texture, scaleMode: *mut SDL_ScaleMode) -> bool;
+    fn SDL_UpdateTexture(texture: *mut SDL_Texture, rect: *SDL_Rect, pixels: *void, pitch: i32) -> bool;
+    fn SDL_UpdateYUVTexture(texture: *mut SDL_Texture, rect: *SDL_Rect, Yplane: *Uint8, Ypitch: i32, Uplane: *Uint8, Upitch: i32, Vplane: *Uint8, Vpitch: i32) -> bool;
+    fn SDL_UpdateNVTexture(texture: *mut SDL_Texture, rect: *SDL_Rect, Yplane: *Uint8, Ypitch: i32, UVplane: *Uint8, UVpitch: i32) -> bool;
+    fn SDL_LockTexture(texture: *mut SDL_Texture, rect: *SDL_Rect, pixels: *mut *mut void, pitch: *mut i32) -> bool;
+    fn SDL_LockTextureToSurface(texture: *mut SDL_Texture, rect: *SDL_Rect, surface: *mut *mut SDL_Surface) -> bool;
+    fn SDL_UnlockTexture(texture: *mut SDL_Texture);
+    fn SDL_SetRenderTarget(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture) -> bool;
+    fn SDL_GetRenderTarget(renderer: *mut SDL_Renderer) -> *mut SDL_Texture;
+    fn SDL_SetRenderLogicalPresentation(renderer: *mut SDL_Renderer, w: i32, h: i32, mode: SDL_RendererLogicalPresentation) -> bool;
+    fn SDL_GetRenderLogicalPresentation(renderer: *mut SDL_Renderer, w: *mut i32, h: *mut i32, mode: *mut SDL_RendererLogicalPresentation) -> bool;
+    fn SDL_GetRenderLogicalPresentationRect(renderer: *mut SDL_Renderer, rect: *mut SDL_FRect) -> bool;
+    fn SDL_RenderCoordinatesFromWindow(renderer: *mut SDL_Renderer, window_x: f32, window_y: f32, x: *mut f32, y: *mut f32) -> bool;
+    fn SDL_RenderCoordinatesToWindow(renderer: *mut SDL_Renderer, x: f32, y: f32, window_x: *mut f32, window_y: *mut f32) -> bool;
+    fn SDL_ConvertEventToRenderCoordinates(renderer: *mut SDL_Renderer, event: *mut SDL_Event) -> bool;
+    fn SDL_SetRenderViewport(renderer: *mut SDL_Renderer, rect: *SDL_Rect) -> bool;
+    fn SDL_GetRenderViewport(renderer: *mut SDL_Renderer, rect: *mut SDL_Rect) -> bool;
+    fn SDL_RenderViewportSet(renderer: *mut SDL_Renderer) -> bool;
+    fn SDL_GetRenderSafeArea(renderer: *mut SDL_Renderer, rect: *mut SDL_Rect) -> bool;
+    fn SDL_SetRenderClipRect(renderer: *mut SDL_Renderer, rect: *SDL_Rect) -> bool;
+    fn SDL_GetRenderClipRect(renderer: *mut SDL_Renderer, rect: *mut SDL_Rect) -> bool;
+    fn SDL_RenderClipEnabled(renderer: *mut SDL_Renderer) -> bool;
+    fn SDL_SetRenderScale(renderer: *mut SDL_Renderer, scaleX: f32, scaleY: f32) -> bool;
+    fn SDL_GetRenderScale(renderer: *mut SDL_Renderer, scaleX: *mut f32, scaleY: *mut f32) -> bool;
+    fn SDL_SetRenderDrawColor(renderer: *mut SDL_Renderer, r: Uint8, g: Uint8, b: Uint8, a: Uint8) -> bool;
+    fn SDL_SetRenderDrawColorFloat(renderer: *mut SDL_Renderer, r: f32, g: f32, b: f32, a: f32) -> bool;
+    fn SDL_GetRenderDrawColor(renderer: *mut SDL_Renderer, r: *mut Uint8, g: *mut Uint8, b: *mut Uint8, a: *mut Uint8) -> bool;
+    fn SDL_GetRenderDrawColorFloat(renderer: *mut SDL_Renderer, r: *mut f32, g: *mut f32, b: *mut f32, a: *mut f32) -> bool;
+    fn SDL_SetRenderColorScale(renderer: *mut SDL_Renderer, scale: f32) -> bool;
+    fn SDL_GetRenderColorScale(renderer: *mut SDL_Renderer, scale: *mut f32) -> bool;
+    fn SDL_SetRenderDrawBlendMode(renderer: *mut SDL_Renderer, blendMode: SDL_BlendMode) -> bool;
+    fn SDL_GetRenderDrawBlendMode(renderer: *mut SDL_Renderer, blendMode: *mut SDL_BlendMode) -> bool;
+    fn SDL_RenderClear(renderer: *mut SDL_Renderer) -> bool;
+    fn SDL_RenderPoint(renderer: *mut SDL_Renderer, x: f32, y: f32) -> bool;
+    fn SDL_RenderPoints(renderer: *mut SDL_Renderer, points: *SDL_FPoint, count: i32) -> bool;
+    fn SDL_RenderLine(renderer: *mut SDL_Renderer, x1: f32, y1: f32, x2: f32, y2: f32) -> bool;
+    fn SDL_RenderLines(renderer: *mut SDL_Renderer, points: *SDL_FPoint, count: i32) -> bool;
+    fn SDL_RenderRect(renderer: *mut SDL_Renderer, rect: *SDL_FRect) -> bool;
+    fn SDL_RenderRects(renderer: *mut SDL_Renderer, rects: *SDL_FRect, count: i32) -> bool;
+    fn SDL_RenderFillRect(renderer: *mut SDL_Renderer, rect: *SDL_FRect) -> bool;
+    fn SDL_RenderFillRects(renderer: *mut SDL_Renderer, rects: *SDL_FRect, count: i32) -> bool;
+    fn SDL_RenderTexture(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, dstrect: *SDL_FRect) -> bool;
+    fn SDL_RenderTextureRotated(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, dstrect: *SDL_FRect, angle: f64, center: *SDL_FPoint, flip: SDL_FlipMode) -> bool;
+    fn SDL_RenderTextureAffine(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, origin: *SDL_FPoint, right: *SDL_FPoint, down: *SDL_FPoint) -> bool;
+    fn SDL_RenderTextureTiled(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, scale: f32, dstrect: *SDL_FRect) -> bool;
+    fn SDL_RenderTexture9Grid(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, left_width: f32, right_width: f32, top_height: f32, bottom_height: f32, scale: f32, dstrect: *SDL_FRect) -> bool;
+    fn SDL_RenderTexture9GridTiled(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, srcrect: *SDL_FRect, left_width: f32, right_width: f32, top_height: f32, bottom_height: f32, scale: f32, dstrect: *SDL_FRect, tileScale: f32) -> bool;
+    fn SDL_RenderGeometry(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, vertices: *SDL_Vertex, num_vertices: i32, indices: *i32, num_indices: i32) -> bool;
+    fn SDL_RenderGeometryRaw(renderer: *mut SDL_Renderer, texture: *mut SDL_Texture, xy: *f32, xy_stride: i32, color: *SDL_FColor, color_stride: i32, uv: *f32, uv_stride: i32, num_vertices: i32, indices: *void, num_indices: i32, size_indices: i32) -> bool;
+    fn SDL_SetRenderTextureAddressMode(renderer: *mut SDL_Renderer, u_mode: SDL_TextureAddressMode, v_mode: SDL_TextureAddressMode) -> bool;
+    fn SDL_GetRenderTextureAddressMode(renderer: *mut SDL_Renderer, u_mode: *mut SDL_TextureAddressMode, v_mode: *mut SDL_TextureAddressMode) -> bool;
+    fn SDL_RenderReadPixels(renderer: *mut SDL_Renderer, rect: *SDL_Rect) -> *mut SDL_Surface;
+    fn SDL_RenderPresent(renderer: *mut SDL_Renderer) -> bool;
+    fn SDL_DestroyTexture(texture: *mut SDL_Texture);
+    fn SDL_DestroyRenderer(renderer: *mut SDL_Renderer);
+    fn SDL_FlushRenderer(renderer: *mut SDL_Renderer) -> bool;
+    fn SDL_GetRenderMetalLayer(renderer: *mut SDL_Renderer) -> *mut void;
+    fn SDL_GetRenderMetalCommandEncoder(renderer: *mut SDL_Renderer) -> *mut void;
+    fn SDL_AddVulkanRenderSemaphores(renderer: *mut SDL_Renderer, wait_stage_mask: Uint32, wait_semaphore: Sint64, signal_semaphore: Sint64) -> bool;
+    fn SDL_SetRenderVSync(renderer: *mut SDL_Renderer, vsync: i32) -> bool;
+    fn SDL_GetRenderVSync(renderer: *mut SDL_Renderer, vsync: *mut i32) -> bool;
+    fn SDL_RenderDebugText(renderer: *mut SDL_Renderer, x: f32, y: f32, str: *i8) -> bool;
+    fn SDL_RenderDebugTextFormat(renderer: *mut SDL_Renderer, x: f32, y: f32, fmt: *i8, ...) -> bool;
+    fn SDL_SetDefaultTextureScaleMode(renderer: *mut SDL_Renderer, scale_mode: SDL_ScaleMode) -> bool;
+    fn SDL_GetDefaultTextureScaleMode(renderer: *mut SDL_Renderer, scale_mode: *mut SDL_ScaleMode) -> bool;
+    fn SDL_CreateGPURenderState(renderer: *mut SDL_Renderer, createinfo: *SDL_GPURenderStateCreateInfo) -> *mut SDL_GPURenderState;
+    fn SDL_SetGPURenderStateFragmentUniforms(state: *mut SDL_GPURenderState, slot_index: Uint32, data: *void, length: Uint32) -> bool;
+    fn SDL_SetGPURenderState(renderer: *mut SDL_Renderer, state: *mut SDL_GPURenderState) -> bool;
+    fn SDL_DestroyGPURenderState(state: *mut SDL_GPURenderState);
+}

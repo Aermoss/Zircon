@@ -1,0 +1,556 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_audio.zir", "vendor/sdl3/SDL_camera.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_gamepad.zir", "vendor/sdl3/SDL_joystick.zir", "vendor/sdl3/SDL_keyboard.zir", "vendor/sdl3/SDL_keycode.zir", "vendor/sdl3/SDL_mouse.zir", "vendor/sdl3/SDL_pen.zir", "vendor/sdl3/SDL_power.zir", "vendor/sdl3/SDL_sensor.zir", "vendor/sdl3/SDL_scancode.zir", "vendor/sdl3/SDL_touch.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+enum SDL_EventType: i32 {
+    SDL_EVENT_FIRST = 0,
+    SDL_EVENT_QUIT = 0x100,
+    SDL_EVENT_TERMINATING,
+    SDL_EVENT_LOW_MEMORY,
+    SDL_EVENT_WILL_ENTER_BACKGROUND,
+    SDL_EVENT_DID_ENTER_BACKGROUND,
+    SDL_EVENT_WILL_ENTER_FOREGROUND,
+    SDL_EVENT_DID_ENTER_FOREGROUND,
+    SDL_EVENT_LOCALE_CHANGED,
+    SDL_EVENT_SYSTEM_THEME_CHANGED,
+    SDL_EVENT_DISPLAY_ORIENTATION = 0x151,
+    SDL_EVENT_DISPLAY_ADDED,
+    SDL_EVENT_DISPLAY_REMOVED,
+    SDL_EVENT_DISPLAY_MOVED,
+    SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED,
+    SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED,
+    SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED,
+    SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED,
+    SDL_EVENT_DISPLAY_FIRST = SDL_EVENT_DISPLAY_ORIENTATION,
+    SDL_EVENT_DISPLAY_LAST = SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED,
+    SDL_EVENT_WINDOW_SHOWN = 0x202,
+    SDL_EVENT_WINDOW_HIDDEN,
+    SDL_EVENT_WINDOW_EXPOSED,
+    SDL_EVENT_WINDOW_MOVED,
+    SDL_EVENT_WINDOW_RESIZED,
+    SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED,
+    SDL_EVENT_WINDOW_METAL_VIEW_RESIZED,
+    SDL_EVENT_WINDOW_MINIMIZED,
+    SDL_EVENT_WINDOW_MAXIMIZED,
+    SDL_EVENT_WINDOW_RESTORED,
+    SDL_EVENT_WINDOW_MOUSE_ENTER,
+    SDL_EVENT_WINDOW_MOUSE_LEAVE,
+    SDL_EVENT_WINDOW_FOCUS_GAINED,
+    SDL_EVENT_WINDOW_FOCUS_LOST,
+    SDL_EVENT_WINDOW_CLOSE_REQUESTED,
+    SDL_EVENT_WINDOW_HIT_TEST,
+    SDL_EVENT_WINDOW_ICCPROF_CHANGED,
+    SDL_EVENT_WINDOW_DISPLAY_CHANGED,
+    SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED,
+    SDL_EVENT_WINDOW_SAFE_AREA_CHANGED,
+    SDL_EVENT_WINDOW_OCCLUDED,
+    SDL_EVENT_WINDOW_ENTER_FULLSCREEN,
+    SDL_EVENT_WINDOW_LEAVE_FULLSCREEN,
+    SDL_EVENT_WINDOW_DESTROYED,
+    SDL_EVENT_WINDOW_HDR_STATE_CHANGED,
+    SDL_EVENT_WINDOW_FIRST = SDL_EVENT_WINDOW_SHOWN,
+    SDL_EVENT_WINDOW_LAST = SDL_EVENT_WINDOW_HDR_STATE_CHANGED,
+    SDL_EVENT_KEY_DOWN = 0x300,
+    SDL_EVENT_KEY_UP,
+    SDL_EVENT_TEXT_EDITING,
+    SDL_EVENT_TEXT_INPUT,
+    SDL_EVENT_KEYMAP_CHANGED,
+    SDL_EVENT_KEYBOARD_ADDED,
+    SDL_EVENT_KEYBOARD_REMOVED,
+    SDL_EVENT_TEXT_EDITING_CANDIDATES,
+    SDL_EVENT_SCREEN_KEYBOARD_SHOWN,
+    SDL_EVENT_SCREEN_KEYBOARD_HIDDEN,
+    SDL_EVENT_MOUSE_MOTION = 0x400,
+    SDL_EVENT_MOUSE_BUTTON_DOWN,
+    SDL_EVENT_MOUSE_BUTTON_UP,
+    SDL_EVENT_MOUSE_WHEEL,
+    SDL_EVENT_MOUSE_ADDED,
+    SDL_EVENT_MOUSE_REMOVED,
+    SDL_EVENT_JOYSTICK_AXIS_MOTION = 0x600,
+    SDL_EVENT_JOYSTICK_BALL_MOTION,
+    SDL_EVENT_JOYSTICK_HAT_MOTION,
+    SDL_EVENT_JOYSTICK_BUTTON_DOWN,
+    SDL_EVENT_JOYSTICK_BUTTON_UP,
+    SDL_EVENT_JOYSTICK_ADDED,
+    SDL_EVENT_JOYSTICK_REMOVED,
+    SDL_EVENT_JOYSTICK_BATTERY_UPDATED,
+    SDL_EVENT_JOYSTICK_UPDATE_COMPLETE,
+    SDL_EVENT_GAMEPAD_AXIS_MOTION = 0x650,
+    SDL_EVENT_GAMEPAD_BUTTON_DOWN,
+    SDL_EVENT_GAMEPAD_BUTTON_UP,
+    SDL_EVENT_GAMEPAD_ADDED,
+    SDL_EVENT_GAMEPAD_REMOVED,
+    SDL_EVENT_GAMEPAD_REMAPPED,
+    SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN,
+    SDL_EVENT_GAMEPAD_TOUCHPAD_MOTION,
+    SDL_EVENT_GAMEPAD_TOUCHPAD_UP,
+    SDL_EVENT_GAMEPAD_SENSOR_UPDATE,
+    SDL_EVENT_GAMEPAD_UPDATE_COMPLETE,
+    SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED,
+    SDL_EVENT_FINGER_DOWN = 0x700,
+    SDL_EVENT_FINGER_UP,
+    SDL_EVENT_FINGER_MOTION,
+    SDL_EVENT_FINGER_CANCELED,
+    SDL_EVENT_PINCH_BEGIN = 0x710,
+    SDL_EVENT_PINCH_UPDATE,
+    SDL_EVENT_PINCH_END,
+    SDL_EVENT_CLIPBOARD_UPDATE = 0x900,
+    SDL_EVENT_DROP_FILE = 0x1000,
+    SDL_EVENT_DROP_TEXT,
+    SDL_EVENT_DROP_BEGIN,
+    SDL_EVENT_DROP_COMPLETE,
+    SDL_EVENT_DROP_POSITION,
+    SDL_EVENT_AUDIO_DEVICE_ADDED = 0x1100,
+    SDL_EVENT_AUDIO_DEVICE_REMOVED,
+    SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED,
+    SDL_EVENT_SENSOR_UPDATE = 0x1200,
+    SDL_EVENT_PEN_PROXIMITY_IN = 0x1300,
+    SDL_EVENT_PEN_PROXIMITY_OUT,
+    SDL_EVENT_PEN_DOWN,
+    SDL_EVENT_PEN_UP,
+    SDL_EVENT_PEN_BUTTON_DOWN,
+    SDL_EVENT_PEN_BUTTON_UP,
+    SDL_EVENT_PEN_MOTION,
+    SDL_EVENT_PEN_AXIS,
+    SDL_EVENT_CAMERA_DEVICE_ADDED = 0x1400,
+    SDL_EVENT_CAMERA_DEVICE_REMOVED,
+    SDL_EVENT_CAMERA_DEVICE_APPROVED,
+    SDL_EVENT_CAMERA_DEVICE_DENIED,
+    SDL_EVENT_RENDER_TARGETS_RESET = 0x2000,
+    SDL_EVENT_RENDER_DEVICE_RESET,
+    SDL_EVENT_RENDER_DEVICE_LOST,
+    SDL_EVENT_PRIVATE0 = 0x4000,
+    SDL_EVENT_PRIVATE1,
+    SDL_EVENT_PRIVATE2,
+    SDL_EVENT_PRIVATE3,
+    SDL_EVENT_POLL_SENTINEL = 0x7F00,
+    SDL_EVENT_USER = 0x8000,
+    SDL_EVENT_LAST = 0xFFFF,
+    SDL_EVENT_ENUM_PADDING = 0x7FFFFFFF
+}
+
+struct SDL_CommonEvent {
+    pub _type: Uint32,
+    pub reserved: Uint32,
+    pub timestamp: Uint64
+}
+
+struct SDL_DisplayEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub displayID: SDL_DisplayID,
+    pub data1: Sint32,
+    pub data2: Sint32
+}
+
+struct SDL_WindowEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub data1: Sint32,
+    pub data2: Sint32
+}
+
+struct SDL_KeyboardDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_KeyboardID
+}
+
+struct SDL_KeyboardEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_KeyboardID,
+    pub scancode: SDL_Scancode,
+    pub key: SDL_Keycode,
+    pub mod: SDL_Keymod,
+    pub raw: Uint16,
+    pub down: bool,
+    pub repeat: bool
+}
+
+struct SDL_TextEditingEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub text: *i8,
+    pub start: Sint32,
+    pub length: Sint32
+}
+
+struct SDL_TextEditingCandidatesEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub candidates: **i8,
+    pub num_candidates: Sint32,
+    pub selected_candidate: Sint32,
+    pub horizontal: bool,
+    pub padding1: Uint8,
+    pub padding2: Uint8,
+    pub padding3: Uint8
+}
+
+struct SDL_TextInputEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub text: *i8
+}
+
+struct SDL_MouseDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_MouseID
+}
+
+struct SDL_MouseMotionEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_MouseID,
+    pub state: SDL_MouseButtonFlags,
+    pub x: f32,
+    pub y: f32,
+    pub xrel: f32,
+    pub yrel: f32
+}
+
+struct SDL_MouseButtonEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_MouseID,
+    pub button: Uint8,
+    pub down: bool,
+    pub clicks: Uint8,
+    pub padding: Uint8,
+    pub x: f32,
+    pub y: f32
+}
+
+struct SDL_MouseWheelEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_MouseID,
+    pub x: f32,
+    pub y: f32,
+    pub direction: SDL_MouseWheelDirection,
+    pub mouse_x: f32,
+    pub mouse_y: f32,
+    pub integer_x: Sint32,
+    pub integer_y: Sint32
+}
+
+struct SDL_JoyAxisEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub axis: Uint8,
+    pub padding1: Uint8,
+    pub padding2: Uint8,
+    pub padding3: Uint8,
+    pub value: Sint16,
+    pub padding4: Uint16
+}
+
+struct SDL_JoyBallEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub ball: Uint8,
+    pub padding1: Uint8,
+    pub padding2: Uint8,
+    pub padding3: Uint8,
+    pub xrel: Sint16,
+    pub yrel: Sint16
+}
+
+struct SDL_JoyHatEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub hat: Uint8,
+    pub value: Uint8,
+    pub padding1: Uint8,
+    pub padding2: Uint8
+}
+
+struct SDL_JoyButtonEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub button: Uint8,
+    pub down: bool,
+    pub padding1: Uint8,
+    pub padding2: Uint8
+}
+
+struct SDL_JoyDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID
+}
+
+struct SDL_JoyBatteryEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub state: SDL_PowerState,
+    pub percent: i32
+}
+
+struct SDL_GamepadAxisEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub axis: Uint8,
+    pub padding1: Uint8,
+    pub padding2: Uint8,
+    pub padding3: Uint8,
+    pub value: Sint16,
+    pub padding4: Uint16
+}
+
+struct SDL_GamepadButtonEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub button: Uint8,
+    pub down: bool,
+    pub padding1: Uint8,
+    pub padding2: Uint8
+}
+
+struct SDL_GamepadDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID
+}
+
+struct SDL_GamepadTouchpadEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub touchpad: Sint32,
+    pub finger: Sint32,
+    pub x: f32,
+    pub y: f32,
+    pub pressure: f32
+}
+
+struct SDL_GamepadSensorEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_JoystickID,
+    pub sensor: Sint32,
+    pub data: [f32; 3],
+    pub sensor_timestamp: Uint64
+}
+
+struct SDL_AudioDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_AudioDeviceID,
+    pub recording: bool,
+    pub padding1: Uint8,
+    pub padding2: Uint8,
+    pub padding3: Uint8
+}
+
+struct SDL_CameraDeviceEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_CameraID
+}
+
+struct SDL_RenderEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID
+}
+
+struct SDL_TouchFingerEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub touchID: SDL_TouchID,
+    pub fingerID: SDL_FingerID,
+    pub x: f32,
+    pub y: f32,
+    pub dx: f32,
+    pub dy: f32,
+    pub pressure: f32,
+    pub windowID: SDL_WindowID
+}
+
+struct SDL_PinchFingerEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub scale: f32,
+    pub windowID: SDL_WindowID
+}
+
+struct SDL_PenProximityEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_PenID
+}
+
+struct SDL_PenMotionEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_PenID,
+    pub pen_state: SDL_PenInputFlags,
+    pub x: f32,
+    pub y: f32
+}
+
+struct SDL_PenTouchEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_PenID,
+    pub pen_state: SDL_PenInputFlags,
+    pub x: f32,
+    pub y: f32,
+    pub eraser: bool,
+    pub down: bool
+}
+
+struct SDL_PenButtonEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_PenID,
+    pub pen_state: SDL_PenInputFlags,
+    pub x: f32,
+    pub y: f32,
+    pub button: Uint8,
+    pub down: bool
+}
+
+struct SDL_PenAxisEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub which: SDL_PenID,
+    pub pen_state: SDL_PenInputFlags,
+    pub x: f32,
+    pub y: f32,
+    pub axis: SDL_PenAxis,
+    pub value: f32
+}
+
+struct SDL_DropEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub x: f32,
+    pub y: f32,
+    pub source: *i8,
+    pub data: *i8
+}
+
+struct SDL_ClipboardEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub owner: bool,
+    pub num_mime_types: Sint32,
+    pub mime_types: *mut *i8
+}
+
+struct SDL_SensorEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub which: SDL_SensorID,
+    pub data: [f32; 6],
+    pub sensor_timestamp: Uint64
+}
+
+struct SDL_QuitEvent {
+    pub _type: SDL_EventType,
+    pub reserved: Uint32,
+    pub timestamp: Uint64
+}
+
+struct SDL_UserEvent {
+    pub _type: Uint32,
+    pub reserved: Uint32,
+    pub timestamp: Uint64,
+    pub windowID: SDL_WindowID,
+    pub code: Sint32,
+    pub data1: *mut void,
+    pub data2: *mut void
+}
+
+struct SDL_Event {
+    pub _data: [u64; 16]
+}
+
+enum SDL_EventAction: i32 {
+    SDL_ADDEVENT,
+    SDL_PEEKEVENT,
+    SDL_GETEVENT
+}
+
+type SDL_EventFilter = fn(*mut void, *mut SDL_Event) -> bool;
+
+extern "C" {
+    fn SDL_PumpEvents();
+    fn SDL_PeepEvents(events: *mut SDL_Event, numevents: i32, action: SDL_EventAction, minType: Uint32, maxType: Uint32) -> i32;
+    fn SDL_HasEvent(_type: Uint32) -> bool;
+    fn SDL_HasEvents(minType: Uint32, maxType: Uint32) -> bool;
+    fn SDL_FlushEvent(_type: Uint32);
+    fn SDL_FlushEvents(minType: Uint32, maxType: Uint32);
+    fn SDL_PollEvent(event: *mut SDL_Event) -> bool;
+    fn SDL_WaitEvent(event: *mut SDL_Event) -> bool;
+    fn SDL_WaitEventTimeout(event: *mut SDL_Event, timeoutMS: Sint32) -> bool;
+    fn SDL_PushEvent(event: *mut SDL_Event) -> bool;
+    fn SDL_SetEventFilter(filter: SDL_EventFilter, userdata: *mut void);
+    fn SDL_GetEventFilter(filter: *mut SDL_EventFilter, userdata: *mut *mut void) -> bool;
+    fn SDL_AddEventWatch(filter: SDL_EventFilter, userdata: *mut void) -> bool;
+    fn SDL_RemoveEventWatch(filter: SDL_EventFilter, userdata: *mut void);
+    fn SDL_FilterEvents(filter: SDL_EventFilter, userdata: *mut void);
+    fn SDL_SetEventEnabled(_type: Uint32, enabled: bool);
+    fn SDL_EventEnabled(_type: Uint32) -> bool;
+    fn SDL_RegisterEvents(numevents: i32) -> Uint32;
+    fn SDL_GetWindowFromEvent(event: *SDL_Event) -> *mut SDL_Window;
+    fn SDL_GetEventDescription(event: *SDL_Event, buf: *mut i8, buflen: i32) -> i32;
+}

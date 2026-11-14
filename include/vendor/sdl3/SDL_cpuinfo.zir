@@ -1,0 +1,25 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+const SDL_CACHELINE_SIZE: i32 = 128;
+
+extern "C" {
+    fn SDL_GetNumLogicalCPUCores() -> i32;
+    fn SDL_GetCPUCacheLineSize() -> i32;
+    fn SDL_HasAltiVec() -> bool;
+    fn SDL_HasMMX() -> bool;
+    fn SDL_HasSSE() -> bool;
+    fn SDL_HasSSE2() -> bool;
+    fn SDL_HasSSE3() -> bool;
+    fn SDL_HasSSE41() -> bool;
+    fn SDL_HasSSE42() -> bool;
+    fn SDL_HasAVX() -> bool;
+    fn SDL_HasAVX2() -> bool;
+    fn SDL_HasAVX512F() -> bool;
+    fn SDL_HasARMSIMD() -> bool;
+    fn SDL_HasNEON() -> bool;
+    fn SDL_HasLSX() -> bool;
+    fn SDL_HasLASX() -> bool;
+    fn SDL_GetSystemRAM() -> i32;
+    fn SDL_GetSIMDAlignment() -> usize;
+    fn SDL_GetSystemPageSize() -> i32;
+}

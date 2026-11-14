@@ -1,0 +1,53 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_atomic.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_thread.zir" : *]
+
+struct SDL_Mutex {}
+
+struct SDL_RWLock {}
+
+struct SDL_Semaphore {}
+
+struct SDL_Condition {}
+
+enum SDL_InitStatus: i32 {
+    SDL_INIT_STATUS_UNINITIALIZED,
+    SDL_INIT_STATUS_INITIALIZING,
+    SDL_INIT_STATUS_INITIALIZED,
+    SDL_INIT_STATUS_UNINITIALIZING
+}
+
+struct SDL_InitState {
+    pub status: SDL_AtomicInt,
+    pub thread: SDL_ThreadID,
+    pub reserved: *mut void
+}
+
+extern "C" {
+    fn SDL_CreateMutex() -> *mut SDL_Mutex;
+    fn SDL_LockMutex(mutex: *mut SDL_Mutex);
+    fn SDL_TryLockMutex(mutex: *mut SDL_Mutex) -> bool;
+    fn SDL_UnlockMutex(mutex: *mut SDL_Mutex);
+    fn SDL_DestroyMutex(mutex: *mut SDL_Mutex);
+    fn SDL_CreateRWLock() -> *mut SDL_RWLock;
+    fn SDL_LockRWLockForReading(rwlock: *mut SDL_RWLock);
+    fn SDL_LockRWLockForWriting(rwlock: *mut SDL_RWLock);
+    fn SDL_TryLockRWLockForReading(rwlock: *mut SDL_RWLock) -> bool;
+    fn SDL_TryLockRWLockForWriting(rwlock: *mut SDL_RWLock) -> bool;
+    fn SDL_UnlockRWLock(rwlock: *mut SDL_RWLock);
+    fn SDL_DestroyRWLock(rwlock: *mut SDL_RWLock);
+    fn SDL_CreateSemaphore(initial_value: Uint32) -> *mut SDL_Semaphore;
+    fn SDL_DestroySemaphore(sem: *mut SDL_Semaphore);
+    fn SDL_WaitSemaphore(sem: *mut SDL_Semaphore);
+    fn SDL_TryWaitSemaphore(sem: *mut SDL_Semaphore) -> bool;
+    fn SDL_WaitSemaphoreTimeout(sem: *mut SDL_Semaphore, timeoutMS: Sint32) -> bool;
+    fn SDL_SignalSemaphore(sem: *mut SDL_Semaphore);
+    fn SDL_GetSemaphoreValue(sem: *mut SDL_Semaphore) -> Uint32;
+    fn SDL_CreateCondition() -> *mut SDL_Condition;
+    fn SDL_DestroyCondition(cond: *mut SDL_Condition);
+    fn SDL_SignalCondition(cond: *mut SDL_Condition);
+    fn SDL_BroadcastCondition(cond: *mut SDL_Condition);
+    fn SDL_WaitCondition(cond: *mut SDL_Condition, mutex: *mut SDL_Mutex);
+    fn SDL_WaitConditionTimeout(cond: *mut SDL_Condition, mutex: *mut SDL_Mutex, timeoutMS: Sint32) -> bool;
+    fn SDL_ShouldInit(state: *mut SDL_InitState) -> bool;
+    fn SDL_ShouldQuit(state: *mut SDL_InitState) -> bool;
+    fn SDL_SetInitialized(state: *mut SDL_InitState, initialized: bool);
+}

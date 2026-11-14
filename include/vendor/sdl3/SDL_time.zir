@@ -1,0 +1,36 @@
+#[include "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_stdinc.zir" : *]
+
+struct SDL_DateTime {
+    pub year: i32,
+    pub month: i32,
+    pub day: i32,
+    pub hour: i32,
+    pub minute: i32,
+    pub second: i32,
+    pub nanosecond: i32,
+    pub day_of_week: i32,
+    pub utc_offset: i32
+}
+
+enum SDL_DateFormat: i32 {
+    SDL_DATE_FORMAT_YYYYMMDD = 0,
+    SDL_DATE_FORMAT_DDMMYYYY = 1,
+    SDL_DATE_FORMAT_MMDDYYYY = 2
+}
+
+enum SDL_TimeFormat: i32 {
+    SDL_TIME_FORMAT_24HR = 0,
+    SDL_TIME_FORMAT_12HR = 1
+}
+
+extern "C" {
+    fn SDL_GetDateTimeLocalePreferences(dateFormat: *mut SDL_DateFormat, timeFormat: *mut SDL_TimeFormat) -> bool;
+    fn SDL_GetCurrentTime(ticks: *mut SDL_Time) -> bool;
+    fn SDL_TimeToDateTime(ticks: SDL_Time, dt: *mut SDL_DateTime, localTime: bool) -> bool;
+    fn SDL_DateTimeToTime(dt: *SDL_DateTime, ticks: *mut SDL_Time) -> bool;
+    fn SDL_TimeToWindows(ticks: SDL_Time, dwLowDateTime: *mut Uint32, dwHighDateTime: *mut Uint32);
+    fn SDL_TimeFromWindows(dwLowDateTime: Uint32, dwHighDateTime: Uint32) -> SDL_Time;
+    fn SDL_GetDaysInMonth(year: i32, month: i32) -> i32;
+    fn SDL_GetDayOfYear(year: i32, month: i32, day: i32) -> i32;
+    fn SDL_GetDayOfWeek(year: i32, month: i32, day: i32) -> i32;
+}

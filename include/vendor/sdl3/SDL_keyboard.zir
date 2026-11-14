@@ -1,0 +1,55 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_keycode.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_rect.zir", "vendor/sdl3/SDL_scancode.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+const SDL_PROP_TEXTINPUT_TYPE_NUMBER: *i8 = "SDL.textinput.type";
+const SDL_PROP_TEXTINPUT_CAPITALIZATION_NUMBER: *i8 = "SDL.textinput.capitalization";
+const SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN: *i8 = "SDL.textinput.autocorrect";
+const SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN: *i8 = "SDL.textinput.multiline";
+const SDL_PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER: *i8 = "SDL.textinput.android.inputtype";
+
+type SDL_KeyboardID = Uint32;
+
+enum SDL_TextInputType: i32 {
+    SDL_TEXTINPUT_TYPE_TEXT,
+    SDL_TEXTINPUT_TYPE_TEXT_NAME,
+    SDL_TEXTINPUT_TYPE_TEXT_EMAIL,
+    SDL_TEXTINPUT_TYPE_TEXT_USERNAME,
+    SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_HIDDEN,
+    SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_VISIBLE,
+    SDL_TEXTINPUT_TYPE_NUMBER,
+    SDL_TEXTINPUT_TYPE_NUMBER_PASSWORD_HIDDEN,
+    SDL_TEXTINPUT_TYPE_NUMBER_PASSWORD_VISIBLE
+}
+
+enum SDL_Capitalization: i32 {
+    SDL_CAPITALIZE_NONE,
+    SDL_CAPITALIZE_SENTENCES,
+    SDL_CAPITALIZE_WORDS,
+    SDL_CAPITALIZE_LETTERS
+}
+
+extern "C" {
+    fn SDL_HasKeyboard() -> bool;
+    fn SDL_GetKeyboards(count: *mut i32) -> *mut SDL_KeyboardID;
+    fn SDL_GetKeyboardNameForID(instance_id: SDL_KeyboardID) -> *i8;
+    fn SDL_GetKeyboardFocus() -> *mut SDL_Window;
+    fn SDL_GetKeyboardState(numkeys: *mut i32) -> *bool;
+    fn SDL_ResetKeyboard();
+    fn SDL_GetModState() -> SDL_Keymod;
+    fn SDL_SetModState(modstate: SDL_Keymod);
+    fn SDL_GetKeyFromScancode(scancode: SDL_Scancode, modstate: SDL_Keymod, key_event: bool) -> SDL_Keycode;
+    fn SDL_GetScancodeFromKey(key: SDL_Keycode, modstate: *mut SDL_Keymod) -> SDL_Scancode;
+    fn SDL_SetScancodeName(scancode: SDL_Scancode, name: *i8) -> bool;
+    fn SDL_GetScancodeName(scancode: SDL_Scancode) -> *i8;
+    fn SDL_GetScancodeFromName(name: *i8) -> SDL_Scancode;
+    fn SDL_GetKeyName(key: SDL_Keycode) -> *i8;
+    fn SDL_GetKeyFromName(name: *i8) -> SDL_Keycode;
+    fn SDL_StartTextInput(window: *mut SDL_Window) -> bool;
+    fn SDL_StartTextInputWithProperties(window: *mut SDL_Window, props: SDL_PropertiesID) -> bool;
+    fn SDL_TextInputActive(window: *mut SDL_Window) -> bool;
+    fn SDL_StopTextInput(window: *mut SDL_Window) -> bool;
+    fn SDL_ClearComposition(window: *mut SDL_Window) -> bool;
+    fn SDL_SetTextInputArea(window: *mut SDL_Window, rect: *SDL_Rect, cursor: i32) -> bool;
+    fn SDL_GetTextInputArea(window: *mut SDL_Window, rect: *mut SDL_Rect, cursor: *mut i32) -> bool;
+    fn SDL_HasScreenKeyboardSupport() -> bool;
+    fn SDL_ScreenKeyboardShown(window: *mut SDL_Window) -> bool;
+}

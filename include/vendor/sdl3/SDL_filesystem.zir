@@ -1,0 +1,57 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+const SDL_GLOB_CASEINSENSITIVE: u32 = 1;
+
+enum SDL_Folder: i32 {
+    SDL_FOLDER_HOME,
+    SDL_FOLDER_DESKTOP,
+    SDL_FOLDER_DOCUMENTS,
+    SDL_FOLDER_DOWNLOADS,
+    SDL_FOLDER_MUSIC,
+    SDL_FOLDER_PICTURES,
+    SDL_FOLDER_PUBLICSHARE,
+    SDL_FOLDER_SAVEDGAMES,
+    SDL_FOLDER_SCREENSHOTS,
+    SDL_FOLDER_TEMPLATES,
+    SDL_FOLDER_VIDEOS,
+    SDL_FOLDER_COUNT
+}
+
+enum SDL_PathType: i32 {
+    SDL_PATHTYPE_NONE,
+    SDL_PATHTYPE_FILE,
+    SDL_PATHTYPE_DIRECTORY,
+    SDL_PATHTYPE_OTHER
+}
+
+struct SDL_PathInfo {
+    pub _type: SDL_PathType,
+    pub size: Uint64,
+    pub create_time: SDL_Time,
+    pub modify_time: SDL_Time,
+    pub access_time: SDL_Time
+}
+
+type SDL_GlobFlags = Uint32;
+
+enum SDL_EnumerationResult: i32 {
+    SDL_ENUM_CONTINUE,
+    SDL_ENUM_SUCCESS,
+    SDL_ENUM_FAILURE
+}
+
+type SDL_EnumerateDirectoryCallback = fn(*mut void, *i8, *i8) -> SDL_EnumerationResult;
+
+extern "C" {
+    fn SDL_GetBasePath() -> *i8;
+    fn SDL_GetPrefPath(org: *i8, app: *i8) -> *mut i8;
+    fn SDL_GetUserFolder(folder: SDL_Folder) -> *i8;
+    fn SDL_CreateDirectory(path: *i8) -> bool;
+    fn SDL_EnumerateDirectory(path: *i8, callback: SDL_EnumerateDirectoryCallback, userdata: *mut void) -> bool;
+    fn SDL_RemovePath(path: *i8) -> bool;
+    fn SDL_RenamePath(oldpath: *i8, newpath: *i8) -> bool;
+    fn SDL_CopyFile(oldpath: *i8, newpath: *i8) -> bool;
+    fn SDL_GetPathInfo(path: *i8, info: *mut SDL_PathInfo) -> bool;
+    fn SDL_GlobDirectory(path: *i8, pattern: *i8, flags: SDL_GlobFlags, count: *mut i32) -> *mut *mut i8;
+    fn SDL_GetCurrentDirectory() -> *mut i8;
+}

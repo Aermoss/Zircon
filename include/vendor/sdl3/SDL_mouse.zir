@@ -1,0 +1,80 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_surface.zir", "vendor/sdl3/SDL_video.zir" : *]
+
+const SDL_BUTTON_LEFT: i32 = 1;
+const SDL_BUTTON_MIDDLE: i32 = 2;
+const SDL_BUTTON_RIGHT: i32 = 3;
+const SDL_BUTTON_X1: i32 = 4;
+const SDL_BUTTON_X2: i32 = 5;
+const SDL_BUTTON_LMASK: u32 = 1;
+const SDL_BUTTON_MMASK: u32 = 2;
+const SDL_BUTTON_RMASK: u32 = 4;
+const SDL_BUTTON_X1MASK: u32 = 8;
+const SDL_BUTTON_X2MASK: u32 = 16;
+
+type SDL_MouseID = Uint32;
+
+struct SDL_Cursor {}
+
+enum SDL_SystemCursor: i32 {
+    SDL_SYSTEM_CURSOR_DEFAULT,
+    SDL_SYSTEM_CURSOR_TEXT,
+    SDL_SYSTEM_CURSOR_WAIT,
+    SDL_SYSTEM_CURSOR_CROSSHAIR,
+    SDL_SYSTEM_CURSOR_PROGRESS,
+    SDL_SYSTEM_CURSOR_NWSE_RESIZE,
+    SDL_SYSTEM_CURSOR_NESW_RESIZE,
+    SDL_SYSTEM_CURSOR_EW_RESIZE,
+    SDL_SYSTEM_CURSOR_NS_RESIZE,
+    SDL_SYSTEM_CURSOR_MOVE,
+    SDL_SYSTEM_CURSOR_NOT_ALLOWED,
+    SDL_SYSTEM_CURSOR_POINTER,
+    SDL_SYSTEM_CURSOR_NW_RESIZE,
+    SDL_SYSTEM_CURSOR_N_RESIZE,
+    SDL_SYSTEM_CURSOR_NE_RESIZE,
+    SDL_SYSTEM_CURSOR_E_RESIZE,
+    SDL_SYSTEM_CURSOR_SE_RESIZE,
+    SDL_SYSTEM_CURSOR_S_RESIZE,
+    SDL_SYSTEM_CURSOR_SW_RESIZE,
+    SDL_SYSTEM_CURSOR_W_RESIZE,
+    SDL_SYSTEM_CURSOR_COUNT
+}
+
+enum SDL_MouseWheelDirection: i32 {
+    SDL_MOUSEWHEEL_NORMAL,
+    SDL_MOUSEWHEEL_FLIPPED
+}
+
+struct SDL_CursorFrameInfo {
+    pub surface: *mut SDL_Surface,
+    pub duration: Uint32
+}
+
+type SDL_MouseButtonFlags = Uint32;
+type SDL_MouseMotionTransformCallback = fn(*mut void, Uint64, *mut SDL_Window, SDL_MouseID, *mut f32, *mut f32);
+
+extern "C" {
+    fn SDL_HasMouse() -> bool;
+    fn SDL_GetMice(count: *mut i32) -> *mut SDL_MouseID;
+    fn SDL_GetMouseNameForID(instance_id: SDL_MouseID) -> *i8;
+    fn SDL_GetMouseFocus() -> *mut SDL_Window;
+    fn SDL_GetMouseState(x: *mut f32, y: *mut f32) -> SDL_MouseButtonFlags;
+    fn SDL_GetGlobalMouseState(x: *mut f32, y: *mut f32) -> SDL_MouseButtonFlags;
+    fn SDL_GetRelativeMouseState(x: *mut f32, y: *mut f32) -> SDL_MouseButtonFlags;
+    fn SDL_WarpMouseInWindow(window: *mut SDL_Window, x: f32, y: f32);
+    fn SDL_WarpMouseGlobal(x: f32, y: f32) -> bool;
+    fn SDL_SetRelativeMouseTransform(callback: SDL_MouseMotionTransformCallback, userdata: *mut void) -> bool;
+    fn SDL_SetWindowRelativeMouseMode(window: *mut SDL_Window, enabled: bool) -> bool;
+    fn SDL_GetWindowRelativeMouseMode(window: *mut SDL_Window) -> bool;
+    fn SDL_CaptureMouse(enabled: bool) -> bool;
+    fn SDL_CreateCursor(data: *Uint8, mask: *Uint8, w: i32, h: i32, hot_x: i32, hot_y: i32) -> *mut SDL_Cursor;
+    fn SDL_CreateColorCursor(surface: *mut SDL_Surface, hot_x: i32, hot_y: i32) -> *mut SDL_Cursor;
+    fn SDL_CreateAnimatedCursor(frames: *mut SDL_CursorFrameInfo, frame_count: i32, hot_x: i32, hot_y: i32) -> *mut SDL_Cursor;
+    fn SDL_CreateSystemCursor(id: SDL_SystemCursor) -> *mut SDL_Cursor;
+    fn SDL_SetCursor(cursor: *mut SDL_Cursor) -> bool;
+    fn SDL_GetCursor() -> *mut SDL_Cursor;
+    fn SDL_GetDefaultCursor() -> *mut SDL_Cursor;
+    fn SDL_DestroyCursor(cursor: *mut SDL_Cursor);
+    fn SDL_ShowCursor() -> bool;
+    fn SDL_HideCursor() -> bool;
+    fn SDL_CursorVisible() -> bool;
+}

@@ -1,0 +1,44 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_events.zir" : *]
+
+const SDL_INIT_AUDIO: u32 = 0x00000010;
+const SDL_INIT_VIDEO: u32 = 0x00000020;
+const SDL_INIT_JOYSTICK: u32 = 0x00000200;
+const SDL_INIT_HAPTIC: u32 = 0x00001000;
+const SDL_INIT_GAMEPAD: u32 = 0x00002000;
+const SDL_INIT_EVENTS: u32 = 0x00004000;
+const SDL_INIT_SENSOR: u32 = 0x00008000;
+const SDL_INIT_CAMERA: u32 = 0x00010000;
+const SDL_PROP_APP_METADATA_NAME_STRING: *i8 = "SDL.app.metadata.name";
+const SDL_PROP_APP_METADATA_VERSION_STRING: *i8 = "SDL.app.metadata.version";
+const SDL_PROP_APP_METADATA_IDENTIFIER_STRING: *i8 = "SDL.app.metadata.identifier";
+const SDL_PROP_APP_METADATA_CREATOR_STRING: *i8 = "SDL.app.metadata.creator";
+const SDL_PROP_APP_METADATA_COPYRIGHT_STRING: *i8 = "SDL.app.metadata.copyright";
+const SDL_PROP_APP_METADATA_URL_STRING: *i8 = "SDL.app.metadata.url";
+const SDL_PROP_APP_METADATA_TYPE_STRING: *i8 = "SDL.app.metadata.type";
+
+type SDL_InitFlags = Uint32;
+
+enum SDL_AppResult: i32 {
+    SDL_APP_CONTINUE,
+    SDL_APP_SUCCESS,
+    SDL_APP_FAILURE
+}
+
+type SDL_AppInit_func = fn(*mut *mut void, i32, *mut *mut i8) -> SDL_AppResult;
+type SDL_AppIterate_func = fn(*mut void) -> SDL_AppResult;
+type SDL_AppEvent_func = fn(*mut void, *mut SDL_Event) -> SDL_AppResult;
+type SDL_AppQuit_func = fn(*mut void, SDL_AppResult);
+type SDL_MainThreadCallback = fn(*mut void);
+
+extern "C" {
+    fn SDL_Init(flags: SDL_InitFlags) -> bool;
+    fn SDL_InitSubSystem(flags: SDL_InitFlags) -> bool;
+    fn SDL_QuitSubSystem(flags: SDL_InitFlags);
+    fn SDL_WasInit(flags: SDL_InitFlags) -> SDL_InitFlags;
+    fn SDL_Quit();
+    fn SDL_IsMainThread() -> bool;
+    fn SDL_RunOnMainThread(callback: SDL_MainThreadCallback, userdata: *mut void, wait_complete: bool) -> bool;
+    fn SDL_SetAppMetadata(appname: *i8, appversion: *i8, appidentifier: *i8) -> bool;
+    fn SDL_SetAppMetadataProperty(name: *i8, value: *i8) -> bool;
+    fn SDL_GetAppMetadataProperty(name: *i8) -> *i8;
+}

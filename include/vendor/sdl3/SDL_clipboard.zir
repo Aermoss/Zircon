@@ -1,0 +1,18 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir" : *]
+
+type SDL_ClipboardDataCallback = fn(*mut void, *i8, *mut usize) -> *void;
+type SDL_ClipboardCleanupCallback = fn(*mut void);
+
+extern "C" {
+    fn SDL_SetClipboardText(text: *i8) -> bool;
+    fn SDL_GetClipboardText() -> *mut i8;
+    fn SDL_HasClipboardText() -> bool;
+    fn SDL_SetPrimarySelectionText(text: *i8) -> bool;
+    fn SDL_GetPrimarySelectionText() -> *mut i8;
+    fn SDL_HasPrimarySelectionText() -> bool;
+    fn SDL_SetClipboardData(callback: SDL_ClipboardDataCallback, cleanup: SDL_ClipboardCleanupCallback, userdata: *mut void, mime_types: **i8, num_mime_types: usize) -> bool;
+    fn SDL_ClearClipboardData() -> bool;
+    fn SDL_GetClipboardData(mime_type: *i8, size: *mut usize) -> *mut void;
+    fn SDL_HasClipboardData(mime_type: *i8) -> bool;
+    fn SDL_GetClipboardMimeTypes(num_mime_types: *mut usize) -> *mut *mut i8;
+}

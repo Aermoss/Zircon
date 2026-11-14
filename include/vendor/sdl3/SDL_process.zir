@@ -1,0 +1,40 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_iostream.zir", "vendor/sdl3/SDL_properties.zir" : *]
+
+const SDL_PROP_PROCESS_CREATE_ARGS_POINTER: *i8 = "SDL.process.create.args";
+const SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER: *i8 = "SDL.process.create.environment";
+const SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING: *i8 = "SDL.process.create.working_directory";
+const SDL_PROP_PROCESS_CREATE_STDIN_NUMBER: *i8 = "SDL.process.create.stdin_option";
+const SDL_PROP_PROCESS_CREATE_STDIN_POINTER: *i8 = "SDL.process.create.stdin_source";
+const SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER: *i8 = "SDL.process.create.stdout_option";
+const SDL_PROP_PROCESS_CREATE_STDOUT_POINTER: *i8 = "SDL.process.create.stdout_source";
+const SDL_PROP_PROCESS_CREATE_STDERR_NUMBER: *i8 = "SDL.process.create.stderr_option";
+const SDL_PROP_PROCESS_CREATE_STDERR_POINTER: *i8 = "SDL.process.create.stderr_source";
+const SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN: *i8 = "SDL.process.create.stderr_to_stdout";
+const SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN: *i8 = "SDL.process.create.background";
+const SDL_PROP_PROCESS_CREATE_CMDLINE_STRING: *i8 = "SDL.process.create.cmdline";
+const SDL_PROP_PROCESS_PID_NUMBER: *i8 = "SDL.process.pid";
+const SDL_PROP_PROCESS_STDIN_POINTER: *i8 = "SDL.process.stdin";
+const SDL_PROP_PROCESS_STDOUT_POINTER: *i8 = "SDL.process.stdout";
+const SDL_PROP_PROCESS_STDERR_POINTER: *i8 = "SDL.process.stderr";
+const SDL_PROP_PROCESS_BACKGROUND_BOOLEAN: *i8 = "SDL.process.background";
+
+struct SDL_Process {}
+
+enum SDL_ProcessIO: i32 {
+    SDL_PROCESS_STDIO_INHERITED,
+    SDL_PROCESS_STDIO_NULL,
+    SDL_PROCESS_STDIO_APP,
+    SDL_PROCESS_STDIO_REDIRECT
+}
+
+extern "C" {
+    fn SDL_CreateProcess(args: **i8, pipe_stdio: bool) -> *mut SDL_Process;
+    fn SDL_CreateProcessWithProperties(props: SDL_PropertiesID) -> *mut SDL_Process;
+    fn SDL_GetProcessProperties(process: *mut SDL_Process) -> SDL_PropertiesID;
+    fn SDL_ReadProcess(process: *mut SDL_Process, datasize: *mut usize, exitcode: *mut i32) -> *mut void;
+    fn SDL_GetProcessInput(process: *mut SDL_Process) -> *mut SDL_IOStream;
+    fn SDL_GetProcessOutput(process: *mut SDL_Process) -> *mut SDL_IOStream;
+    fn SDL_KillProcess(process: *mut SDL_Process, force: bool) -> bool;
+    fn SDL_WaitProcess(process: *mut SDL_Process, block: bool, exitcode: *mut i32) -> bool;
+    fn SDL_DestroyProcess(process: *mut SDL_Process);
+}

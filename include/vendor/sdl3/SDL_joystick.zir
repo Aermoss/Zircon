@@ -1,0 +1,143 @@
+#[include "vendor/sdl3/SDL_stdinc.zir", "vendor/sdl3/SDL_error.zir", "vendor/sdl3/SDL_guid.zir", "vendor/sdl3/SDL_mutex.zir", "vendor/sdl3/SDL_power.zir", "vendor/sdl3/SDL_properties.zir", "vendor/sdl3/SDL_sensor.zir" : *]
+
+const SDL_JOYSTICK_AXIS_MAX: i32 = 32767;
+const SDL_PROP_JOYSTICK_CAP_MONO_LED_BOOLEAN: *i8 = "SDL.joystick.cap.mono_led";
+const SDL_PROP_JOYSTICK_CAP_RGB_LED_BOOLEAN: *i8 = "SDL.joystick.cap.rgb_led";
+const SDL_PROP_JOYSTICK_CAP_PLAYER_LED_BOOLEAN: *i8 = "SDL.joystick.cap.player_led";
+const SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN: *i8 = "SDL.joystick.cap.rumble";
+const SDL_PROP_JOYSTICK_CAP_TRIGGER_RUMBLE_BOOLEAN: *i8 = "SDL.joystick.cap.trigger_rumble";
+const SDL_HAT_CENTERED: u32 = 0x00;
+const SDL_HAT_UP: u32 = 0x01;
+const SDL_HAT_RIGHT: u32 = 0x02;
+const SDL_HAT_DOWN: u32 = 0x04;
+const SDL_HAT_LEFT: u32 = 0x08;
+const SDL_JOYSTICK_AXIS_MIN: i32 = -32768;
+const SDL_HAT_RIGHTUP: u32 = 3;
+const SDL_HAT_RIGHTDOWN: u32 = 6;
+const SDL_HAT_LEFTUP: u32 = 9;
+const SDL_HAT_LEFTDOWN: u32 = 12;
+
+struct SDL_Joystick {}
+
+type SDL_JoystickID = Uint32;
+
+enum SDL_JoystickType: i32 {
+    SDL_JOYSTICK_TYPE_UNKNOWN,
+    SDL_JOYSTICK_TYPE_GAMEPAD,
+    SDL_JOYSTICK_TYPE_WHEEL,
+    SDL_JOYSTICK_TYPE_ARCADE_STICK,
+    SDL_JOYSTICK_TYPE_FLIGHT_STICK,
+    SDL_JOYSTICK_TYPE_DANCE_PAD,
+    SDL_JOYSTICK_TYPE_GUITAR,
+    SDL_JOYSTICK_TYPE_DRUM_KIT,
+    SDL_JOYSTICK_TYPE_ARCADE_PAD,
+    SDL_JOYSTICK_TYPE_THROTTLE,
+    SDL_JOYSTICK_TYPE_COUNT
+}
+
+enum SDL_JoystickConnectionState: i32 {
+    SDL_JOYSTICK_CONNECTION_INVALID = -1,
+    SDL_JOYSTICK_CONNECTION_UNKNOWN,
+    SDL_JOYSTICK_CONNECTION_WIRED,
+    SDL_JOYSTICK_CONNECTION_WIRELESS
+}
+
+struct SDL_VirtualJoystickTouchpadDesc {
+    pub nfingers: Uint16,
+    pub padding: [Uint16; 3]
+}
+
+struct SDL_VirtualJoystickSensorDesc {
+    pub _type: SDL_SensorType,
+    pub rate: f32
+}
+
+struct SDL_VirtualJoystickDesc {
+    pub version: Uint32,
+    pub _type: Uint16,
+    pub padding: Uint16,
+    pub vendor_id: Uint16,
+    pub product_id: Uint16,
+    pub naxes: Uint16,
+    pub nbuttons: Uint16,
+    pub nballs: Uint16,
+    pub nhats: Uint16,
+    pub ntouchpads: Uint16,
+    pub nsensors: Uint16,
+    pub padding2: [Uint16; 2],
+    pub button_mask: Uint32,
+    pub axis_mask: Uint32,
+    pub name: *i8,
+    pub touchpads: *SDL_VirtualJoystickTouchpadDesc,
+    pub sensors: *SDL_VirtualJoystickSensorDesc,
+    pub userdata: *mut void,
+    pub Update: fn(*mut void),
+    pub SetPlayerIndex: fn(*mut void, i32),
+    pub Rumble: fn(*mut void, Uint16, Uint16) -> bool,
+    pub RumbleTriggers: fn(*mut void, Uint16, Uint16) -> bool,
+    pub SetLED: fn(*mut void, Uint8, Uint8, Uint8) -> bool,
+    pub SendEffect: fn(*mut void, *void, i32) -> bool,
+    pub SetSensorsEnabled: fn(*mut void, bool) -> bool,
+    pub Cleanup: fn(*mut void)
+}
+
+extern "C" {
+    fn SDL_LockJoysticks();
+    fn SDL_UnlockJoysticks();
+    fn SDL_HasJoystick() -> bool;
+    fn SDL_GetJoysticks(count: *mut i32) -> *mut SDL_JoystickID;
+    fn SDL_GetJoystickNameForID(instance_id: SDL_JoystickID) -> *i8;
+    fn SDL_GetJoystickPathForID(instance_id: SDL_JoystickID) -> *i8;
+    fn SDL_GetJoystickPlayerIndexForID(instance_id: SDL_JoystickID) -> i32;
+    fn SDL_GetJoystickGUIDForID(instance_id: SDL_JoystickID) -> SDL_GUID;
+    fn SDL_GetJoystickVendorForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetJoystickProductForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetJoystickProductVersionForID(instance_id: SDL_JoystickID) -> Uint16;
+    fn SDL_GetJoystickTypeForID(instance_id: SDL_JoystickID) -> SDL_JoystickType;
+    fn SDL_OpenJoystick(instance_id: SDL_JoystickID) -> *mut SDL_Joystick;
+    fn SDL_GetJoystickFromID(instance_id: SDL_JoystickID) -> *mut SDL_Joystick;
+    fn SDL_GetJoystickFromPlayerIndex(player_index: i32) -> *mut SDL_Joystick;
+    fn SDL_AttachVirtualJoystick(desc: *SDL_VirtualJoystickDesc) -> SDL_JoystickID;
+    fn SDL_DetachVirtualJoystick(instance_id: SDL_JoystickID) -> bool;
+    fn SDL_IsJoystickVirtual(instance_id: SDL_JoystickID) -> bool;
+    fn SDL_SetJoystickVirtualAxis(joystick: *mut SDL_Joystick, axis: i32, value: Sint16) -> bool;
+    fn SDL_SetJoystickVirtualBall(joystick: *mut SDL_Joystick, ball: i32, xrel: Sint16, yrel: Sint16) -> bool;
+    fn SDL_SetJoystickVirtualButton(joystick: *mut SDL_Joystick, button: i32, down: bool) -> bool;
+    fn SDL_SetJoystickVirtualHat(joystick: *mut SDL_Joystick, hat: i32, value: Uint8) -> bool;
+    fn SDL_SetJoystickVirtualTouchpad(joystick: *mut SDL_Joystick, touchpad: i32, finger: i32, down: bool, x: f32, y: f32, pressure: f32) -> bool;
+    fn SDL_SendJoystickVirtualSensorData(joystick: *mut SDL_Joystick, _type: SDL_SensorType, sensor_timestamp: Uint64, data: *f32, num_values: i32) -> bool;
+    fn SDL_GetJoystickProperties(joystick: *mut SDL_Joystick) -> SDL_PropertiesID;
+    fn SDL_GetJoystickName(joystick: *mut SDL_Joystick) -> *i8;
+    fn SDL_GetJoystickPath(joystick: *mut SDL_Joystick) -> *i8;
+    fn SDL_GetJoystickPlayerIndex(joystick: *mut SDL_Joystick) -> i32;
+    fn SDL_SetJoystickPlayerIndex(joystick: *mut SDL_Joystick, player_index: i32) -> bool;
+    fn SDL_GetJoystickGUID(joystick: *mut SDL_Joystick) -> SDL_GUID;
+    fn SDL_GetJoystickVendor(joystick: *mut SDL_Joystick) -> Uint16;
+    fn SDL_GetJoystickProduct(joystick: *mut SDL_Joystick) -> Uint16;
+    fn SDL_GetJoystickProductVersion(joystick: *mut SDL_Joystick) -> Uint16;
+    fn SDL_GetJoystickFirmwareVersion(joystick: *mut SDL_Joystick) -> Uint16;
+    fn SDL_GetJoystickSerial(joystick: *mut SDL_Joystick) -> *i8;
+    fn SDL_GetJoystickType(joystick: *mut SDL_Joystick) -> SDL_JoystickType;
+    fn SDL_GetJoystickGUIDInfo(guid: SDL_GUID, vendor: *mut Uint16, product: *mut Uint16, version: *mut Uint16, crc16: *mut Uint16);
+    fn SDL_JoystickConnected(joystick: *mut SDL_Joystick) -> bool;
+    fn SDL_GetJoystickID(joystick: *mut SDL_Joystick) -> SDL_JoystickID;
+    fn SDL_GetNumJoystickAxes(joystick: *mut SDL_Joystick) -> i32;
+    fn SDL_GetNumJoystickBalls(joystick: *mut SDL_Joystick) -> i32;
+    fn SDL_GetNumJoystickHats(joystick: *mut SDL_Joystick) -> i32;
+    fn SDL_GetNumJoystickButtons(joystick: *mut SDL_Joystick) -> i32;
+    fn SDL_SetJoystickEventsEnabled(enabled: bool);
+    fn SDL_JoystickEventsEnabled() -> bool;
+    fn SDL_UpdateJoysticks();
+    fn SDL_GetJoystickAxis(joystick: *mut SDL_Joystick, axis: i32) -> Sint16;
+    fn SDL_GetJoystickAxisInitialState(joystick: *mut SDL_Joystick, axis: i32, state: *mut Sint16) -> bool;
+    fn SDL_GetJoystickBall(joystick: *mut SDL_Joystick, ball: i32, dx: *mut i32, dy: *mut i32) -> bool;
+    fn SDL_GetJoystickHat(joystick: *mut SDL_Joystick, hat: i32) -> Uint8;
+    fn SDL_GetJoystickButton(joystick: *mut SDL_Joystick, button: i32) -> bool;
+    fn SDL_RumbleJoystick(joystick: *mut SDL_Joystick, low_frequency_rumble: Uint16, high_frequency_rumble: Uint16, duration_ms: Uint32) -> bool;
+    fn SDL_RumbleJoystickTriggers(joystick: *mut SDL_Joystick, left_rumble: Uint16, right_rumble: Uint16, duration_ms: Uint32) -> bool;
+    fn SDL_SetJoystickLED(joystick: *mut SDL_Joystick, red: Uint8, green: Uint8, blue: Uint8) -> bool;
+    fn SDL_SendJoystickEffect(joystick: *mut SDL_Joystick, data: *void, size: i32) -> bool;
+    fn SDL_CloseJoystick(joystick: *mut SDL_Joystick);
+    fn SDL_GetJoystickConnectionState(joystick: *mut SDL_Joystick) -> SDL_JoystickConnectionState;
+    fn SDL_GetJoystickPowerInfo(joystick: *mut SDL_Joystick, percent: *mut i32) -> SDL_PowerState;
+}

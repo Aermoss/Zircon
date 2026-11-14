@@ -1,0 +1,10 @@
+#[include "vendor/sdl3/SDL_stdinc.zir" : *]
+
+struct SDL_GUID {
+    pub data: [Uint8; 16]
+}
+
+extern "C" {
+    fn SDL_GUIDToString(guid: SDL_GUID, pszGUID: *mut i8, cbGUID: i32);
+    fn SDL_StringToGUID(pchGUID: *i8) -> SDL_GUID;
+}
