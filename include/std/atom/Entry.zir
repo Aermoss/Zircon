@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#[if AMD64]
 fn AtomicExchange8(target: *mut u8, value: u8) -> u8 {
     let result: u8;
 
@@ -721,6 +722,561 @@ fn AtomicPause() {
         pause
     };
 }
+#[else]
+fn AtomicExchange8(target: *mut u8, value: u8) -> u8 {
+    let wide: u32 = value as u32;
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide) -> {
+    1:
+        ldaxrb w11, [x9]
+        stlxrb w12, w10, [x9]
+        cbnz w12, 1b
+    } -> w11(result) : memory, x12;
+
+    result as u8
+}
+
+fn AtomicExchange16(target: *mut i16, value: i16) -> i16 {
+    let wide: u32 = value as u16 as u32;
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide) -> {
+    1:
+        ldaxrh w11, [x9]
+        stlxrh w12, w10, [x9]
+        cbnz w12, 1b
+    } -> w11(result) : memory, x12;
+
+    result as u16 as i16
+}
+
+fn AtomicExchange32(target: *mut u32, value: u32) -> u32 {
+    let wide: u32 = value;
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide) -> {
+    1:
+        ldaxr w11, [x9]
+        stlxr w12, w10, [x9]
+        cbnz w12, 1b
+    } -> w11(result) : memory, x12;
+
+    result
+}
+
+fn AtomicExchange64(target: *mut u64, value: u64) -> u64 {
+    let wide: u64 = value;
+    let result: u64;
+
+    volatile asm : x9(target), x10(wide) -> {
+    1:
+        ldaxr x11, [x9]
+        stlxr w12, x10, [x9]
+        cbnz w12, 1b
+    } -> x11(result) : memory, x12;
+
+    result
+}
+
+fn AtomicCompareExchange8(target: *mut u8, expected: u8, desired: u8) -> u8 {
+    let (wide_expected, wide_desired): (u32, u32) = (expected as u32, desired as u32);
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide_expected), w11(wide_desired) -> {
+    1:
+        ldaxrb w12, [x9]
+        eor w13, w12, w10
+        cbnz w13, 2f
+        stlxrb w13, w11, [x9]
+        cbnz w13, 1b
+    2:
+    } -> w12(result) : memory, x13;
+
+    result as u8
+}
+
+fn AtomicCompareExchange16(target: *mut i16, expected: i16, desired: i16) -> i16 {
+    let (wide_expected, wide_desired): (u32, u32) = (expected as u16 as u32, desired as u16 as u32);
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide_expected), w11(wide_desired) -> {
+    1:
+        ldaxrh w12, [x9]
+        eor w13, w12, w10
+        cbnz w13, 2f
+        stlxrh w13, w11, [x9]
+        cbnz w13, 1b
+    2:
+    } -> w12(result) : memory, x13;
+
+    result as u16 as i16
+}
+
+fn AtomicCompareExchange32(target: *mut u32, expected: u32, desired: u32) -> u32 {
+    let (wide_expected, wide_desired): (u32, u32) = (expected, desired);
+    let result: u32;
+
+    volatile asm : x9(target), w10(wide_expected), w11(wide_desired) -> {
+    1:
+        ldaxr w12, [x9]
+        eor w13, w12, w10
+        cbnz w13, 2f
+        stlxr w13, w11, [x9]
+        cbnz w13, 1b
+    2:
+    } -> w12(result) : memory, x13;
+
+    result
+}
+
+fn AtomicCompareExchange64(target: *mut u64, expected: u64, desired: u64) -> u64 {
+    let (wide_expected, wide_desired): (u64, u64) = (expected, desired);
+    let result: u64;
+
+    volatile asm : x9(target), x10(wide_expected), x11(wide_desired) -> {
+    1:
+        ldaxr x12, [x9]
+        eor x13, x12, x10
+        cbnz x13, 2f
+        stlxr w13, x11, [x9]
+        cbnz w13, 1b
+    2:
+    } -> x12(result) : memory, x13;
+
+    result
+}
+
+fn AtomicCompareExchangeBool8(target: *mut u8, expected: u8, desired: u8) -> bool {
+    AtomicCompareExchange8(target, expected, desired) == expected
+}
+
+fn AtomicCompareExchangeBool16(target: *mut i16, expected: i16, desired: i16) -> bool {
+    AtomicCompareExchange16(target, expected, desired) == expected
+}
+
+fn AtomicCompareExchangeBool32(target: *mut u32, expected: u32, desired: u32) -> bool {
+    AtomicCompareExchange32(target, expected, desired) == expected
+}
+
+fn AtomicCompareExchangeBool64(target: *mut u64, expected: u64, desired: u64) -> bool {
+    AtomicCompareExchange64(target, expected, desired) == expected
+}
+
+fn AtomicLoad8(target: *u8) -> u8 {
+    let result: u32;
+
+    volatile asm : x9(target) -> {
+        ldarb w10, [x9]
+    } -> w10(result) : memory;
+
+    result as u8
+}
+
+fn AtomicLoad16(target: *i16) -> i16 {
+    let result: u32;
+
+    volatile asm : x9(target) -> {
+        ldarh w10, [x9]
+    } -> w10(result) : memory;
+
+    result as u16 as i16
+}
+
+fn AtomicLoad32(target: *u32) -> u32 {
+    let result: u32;
+
+    volatile asm : x9(target) -> {
+        ldar w10, [x9]
+    } -> w10(result) : memory;
+
+    result
+}
+
+fn AtomicLoad64(target: *u64) -> u64 {
+    let result: u64;
+
+    volatile asm : x9(target) -> {
+        ldar x10, [x9]
+    } -> x10(result) : memory;
+
+    result
+}
+
+fn AtomicFetchAdd8(target: *mut u8, value: u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old + value) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAdd16(target: *mut i16, value: i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old + value) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAdd32(target: *mut u32, value: u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old + value) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAdd64(target: *mut u64, value: u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old + value) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchSub8(target: *mut u8, value: u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old - value) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchSub16(target: *mut i16, value: i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old - value) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchSub32(target: *mut u32, value: u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old - value) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchSub64(target: *mut u64, value: u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old - value) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAnd8(target: *mut u8, value: u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old & value) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAnd16(target: *mut i16, value: i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old & value) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAnd32(target: *mut u32, value: u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old & value) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchAnd64(target: *mut u64, value: u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old & value) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchOr8(target: *mut u8, value: u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old | value) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchOr16(target: *mut i16, value: i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old | value) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchOr32(target: *mut u32, value: u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old | value) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchOr64(target: *mut u64, value: u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old | value) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchXor8(target: *mut u8, value: u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old ^ value) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchXor16(target: *mut i16, value: i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old ^ value) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchXor32(target: *mut u32, value: u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old ^ value) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchXor64(target: *mut u64, value: u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old ^ value) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNot8(target: *mut u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, old ^ (0xFFu8)) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNot16(target: *mut i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, old ^ (-1i16)) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNot32(target: *mut u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, old ^ (0xFFFFFFFFu32)) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNot64(target: *mut u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, old ^ (0xFFFFFFFFFFFFFFFFu64)) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNeg8(target: *mut u8) -> u8 {
+    let mut old = AtomicLoad8(target);
+
+    while !AtomicCompareExchangeBool8(target, old, (0 as u8) - old) {
+        old = AtomicLoad8(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNeg16(target: *mut i16) -> i16 {
+    let mut old = AtomicLoad16(target);
+
+    while !AtomicCompareExchangeBool16(target, old, (0 as i16) - old) {
+        old = AtomicLoad16(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNeg32(target: *mut u32) -> u32 {
+    let mut old = AtomicLoad32(target);
+
+    while !AtomicCompareExchangeBool32(target, old, (0 as u32) - old) {
+        old = AtomicLoad32(target);
+    }
+
+    old
+}
+
+fn AtomicFetchNeg64(target: *mut u64) -> u64 {
+    let mut old = AtomicLoad64(target);
+
+    while !AtomicCompareExchangeBool64(target, old, (0 as u64) - old) {
+        old = AtomicLoad64(target);
+    }
+
+    old
+}
+
+fn AtomicIncrement8(target: *mut u8) {
+    AtomicFetchAdd8(target, 1);
+}
+
+fn AtomicIncrement16(target: *mut i16) {
+    AtomicFetchAdd16(target, 1);
+}
+
+fn AtomicIncrement32(target: *mut u32) {
+    AtomicFetchAdd32(target, 1);
+}
+
+fn AtomicIncrement64(target: *mut u64) {
+    AtomicFetchAdd64(target, 1);
+}
+
+fn AtomicDecrement8(target: *mut u8) {
+    AtomicFetchSub8(target, 1);
+}
+
+fn AtomicDecrement16(target: *mut i16) {
+    AtomicFetchSub16(target, 1);
+}
+
+fn AtomicDecrement32(target: *mut u32) {
+    AtomicFetchSub32(target, 1);
+}
+
+fn AtomicDecrement64(target: *mut u64) {
+    AtomicFetchSub64(target, 1);
+}
+
+fn AtomicBitTestAndSet32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchOr32(target, mask) & mask) != 0
+}
+
+fn AtomicBitTestAndSet64(target: *mut u64, bit: u8) -> bool {
+    let mask = (1 as u64) << bit as u64;
+    (AtomicFetchOr64(target, mask) & mask) != 0
+}
+
+fn AtomicBitTestAndReset32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchAnd32(target, mask ^ 0xFFFFFFFFu32) & mask) != 0
+}
+
+fn AtomicBitTestAndReset64(target: *mut u64, bit: u8) -> bool {
+    let mask = (1 as u64) << bit as u64;
+    (AtomicFetchAnd64(target, mask ^ 0xFFFFFFFFFFFFFFFFu64) & mask) != 0
+}
+
+fn AtomicBitTestAndComplement32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchXor32(target, mask) & mask) != 0
+}
+
+fn AtomicBitTestAndComplement64(target: *mut u64, bit: u8) -> bool {
+    let mask = (1 as u64) << bit as u64;
+    (AtomicFetchXor64(target, mask) & mask) != 0
+}
+
+fn AtomicBitTest32(target: *u32, bit: u8) -> bool {
+    (AtomicLoad32(target) & ((1 as u32) << bit as u32)) != 0
+}
+
+fn AtomicBitTest64(target: *u64, bit: u8) -> bool {
+    (AtomicLoad64(target) & ((1 as u64) << bit as u64)) != 0
+}
+
+fn AtomicMemoryFence() {
+    volatile asm {
+        dmb ish
+    } : memory;
+}
+
+fn AtomicLoadFence() {
+    volatile asm {
+        dmb ish
+    } : memory;
+}
+
+fn AtomicStoreFence() {
+    volatile asm {
+        dmb ish
+    } : memory;
+}
+
+fn AtomicPause() {
+    volatile asm {
+        yield
+    };
+}
+#[endif]
 
 class Atomic<T> {
     value: T;
