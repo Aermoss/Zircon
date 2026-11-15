@@ -260,9 +260,9 @@ fn WriteOutput(path: &String, content: &String) {
 
 fn PrintVersion() {
 #[if SVAROG]
-    WriteLine("Zircon 9.1 \"Mantle\" (svarog-unknown-triglav)");
+    WriteLine("Zircon 9.2 \"Mantle\" (svarog-unknown-triglav)");
 #[else]
-    WriteLine("Zircon 9.1 \"Mantle\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
+    WriteLine("Zircon 9.2 \"Mantle\" (" + LLVMGetDefaultTargetTriple().ToString() + ')');
 #[endif]
     WriteLine("Copyright (c) 2025-2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");
