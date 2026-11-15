@@ -529,7 +529,7 @@ class String {
 
     pub fn ToInteger(&this, base: HostSigned) -> Option<HostSigned> {
         let negative = this.StartsWith('-');
-        let sign_bit = 1 as HostUnsigned << (sizeof(HostUnsigned) * 8 - 1);
+        let sign_bit = 1 as HostUnsigned << (size_of<HostUnsigned>() * 8 - 1);
 
         match this.ParseUnsigned(if negative || this.StartsWith('+') { 1 } else { 0 }, base as HostUnsigned) {
             Option<HostUnsigned>::Some(value) if negative && value <= sign_bit => Option<HostSigned>::Some((!value + 1) as HostSigned),

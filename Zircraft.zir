@@ -2631,7 +2631,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     // glfwSwapInterval(1);
 
     let dark_mode: u32 = 1;
-    DwmSetWindowAttribute(glfwGetWin32Window(window), DWMWINDOWATTRIBUTE::DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode) as u32);
+    DwmSetWindowAttribute(glfwGetWin32Window(window), DWMWINDOWATTRIBUTE::DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, size_of(dark_mode) as u32);
 
     gladLoadGLLoader(glfwGetProcAddress as GLADloadproc);
     let version = glGetString(GL_VERSION) as *i8;

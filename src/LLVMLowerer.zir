@@ -180,7 +180,7 @@ class LLVMLowerer {
             fields.PushBack(lowered_field);
         }
 
-        LLVMStructSetBody(this.types[_type->_type], fields.Data(), fields.Length() as u32, 0);
+        LLVMStructSetBody(this.types[_type->_type], fields.Data(), fields.Length() as u32, if (_type->_type as *MIRStructureType)->packed { 1 } else { 0 });
     }
 
     fn LowerFunctionDeclarationFirstPass(&mut this, function: *MIRFunctionDeclaration) {
@@ -434,6 +434,7 @@ class LLVMLowerer {
         if pointer == null { return null; }
         let result = LLVMBuildLoad2(this.builder, _type, pointer, load->name.Data());
         if load->alignment != 0 { LLVMSetAlignment(result, load->alignment); }
+        if load->_volatile { LLVMSetVolatile(result, 1); }
         result
     }
 
@@ -444,6 +445,7 @@ class LLVMLowerer {
         if pointer == null { return null; }
         let result = LLVMBuildStore(this.builder, value, pointer);
         if store->alignment != 0 { LLVMSetAlignment(result, store->alignment); }
+        if store->_volatile { LLVMSetVolatile(result, 1); }
         result
     }
 

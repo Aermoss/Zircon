@@ -1288,13 +1288,13 @@ class Atomic<T> {
     }
 
     pub fn Load(&this) -> T {
-        if sizeof(T) == 1 {
+        if size_of<T>() == 1 {
             AtomicLoad8(&this.value as *u8) as T
-        } else if sizeof(T) == 2 {
+        } else if size_of<T>() == 2 {
             AtomicLoad16(&this.value as *i16) as T
-        } else if sizeof(T) == 4 {
+        } else if size_of<T>() == 4 {
             AtomicLoad32(&this.value as *u32) as T
-        } else if sizeof(T) == 8 {
+        } else if size_of<T>() == 8 {
             AtomicLoad64(&this.value as *u64) as T
         } else {
             AtomicLoadFence();
@@ -1305,13 +1305,13 @@ class Atomic<T> {
     }
 
     pub fn Store(&mut this, value: T) {
-        if sizeof(T) == 1 {
+        if size_of<T>() == 1 {
             AtomicExchange8(&this.value as *mut u8, value as u8);
-        } else if sizeof(T) == 2 {
+        } else if size_of<T>() == 2 {
             AtomicExchange16(&this.value as *mut i16, value as i16);
-        } else if sizeof(T) == 4 {
+        } else if size_of<T>() == 4 {
             AtomicExchange32(&this.value as *mut u32, value as u32);
-        } else if sizeof(T) == 8 {
+        } else if size_of<T>() == 8 {
             AtomicExchange64(&this.value as *mut u64, value as u64);
         } else {
             AtomicStoreFence();
@@ -1321,13 +1321,13 @@ class Atomic<T> {
     }
 
     pub fn Exchange(&mut this, value: T) -> T {
-        if sizeof(T) == 1 {
+        if size_of<T>() == 1 {
             AtomicExchange8(&this.value as *mut u8, value as u8) as T
-        } else if sizeof(T) == 2 {
+        } else if size_of<T>() == 2 {
             AtomicExchange16(&this.value as *mut i16, value as i16) as T
-        } else if sizeof(T) == 4 {
+        } else if size_of<T>() == 4 {
             AtomicExchange32(&this.value as *mut u32, value as u32) as T
-        } else if sizeof(T) == 8 {
+        } else if size_of<T>() == 8 {
             AtomicExchange64(&this.value as *mut u64, value as u64) as T
         } else {
             AtomicStoreFence();
@@ -1339,13 +1339,13 @@ class Atomic<T> {
     }
 
     pub fn CompareExchange(&mut this, expected: T, desired: T) -> bool {
-        if sizeof(T) == 1 {
+        if size_of<T>() == 1 {
             AtomicCompareExchangeBool8(&this.value as *mut u8, expected as u8, desired as u8)
-        } else if sizeof(T) == 2 {
+        } else if size_of<T>() == 2 {
             AtomicCompareExchangeBool16(&this.value as *mut i16, expected as i16, desired as i16)
-        } else if sizeof(T) == 4 {
+        } else if size_of<T>() == 4 {
             AtomicCompareExchangeBool32(&this.value as *mut u32, expected as u32, desired as u32)
-        } else if sizeof(T) == 8 {
+        } else if size_of<T>() == 8 {
             AtomicCompareExchangeBool64(&this.value as *mut u64, expected as u64, desired as u64)
         } else {
             AtomicMemoryFence();

@@ -91,7 +91,8 @@ class MIRArrayType : MIRType {
 
 class MIRStructureType : MIRType {
     pub name: String,
-    pub fields: Vector<*MIRType>;
+    pub fields: Vector<*MIRType>,
+    pub packed: bool = false;
 
     MIRStructureType(&mut this, name: String) : MIRType(MIRTypeKind::Structure) {
         this.name = name;
@@ -103,6 +104,10 @@ class MIRStructureType : MIRType {
 
     pub fn SetBody(&mut this, fields: Vector<*MIRType>) {
         this.fields = fields;
+    }
+
+    pub fn SetBody(&mut this, fields: Vector<*MIRType>, packed: bool) {
+        (this.fields, this.packed) = (fields, packed);
     }
 
     pub fn ToDefinitionString(&this) -> String {
@@ -557,14 +562,15 @@ class MIRAllocaInstruction : MIRInstruction {
 
 class MIRLoadInstruction : MIRInstruction {
     pub pointer: *MIRValue,
-    pub alignment: u32 = 0;
+    pub alignment: u32 = 0,
+    pub _volatile: bool;
 
-    MIRLoadInstruction(&mut this, name: String, pointer: *MIRValue, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Load, name, _type) {
-        this.pointer = pointer;
+    MIRLoadInstruction(&mut this, name: String, pointer: *MIRValue, _type: *MIRType, _volatile: bool) : MIRInstruction(MIRInstructionKind::Load, name, _type) {
+        (this.pointer, this._volatile) = (pointer, _volatile);
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = "load " + this._type->ToString() + ", " + this.pointer->ToString();
+        let mut result = (if this._volatile { "load volatile " } else { "load " }) + this._type->ToString() + ", " + this.pointer->ToString();
         if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as HostUnsigned); }
         result
     }
@@ -573,14 +579,15 @@ class MIRLoadInstruction : MIRInstruction {
 class MIRStoreInstruction : MIRInstruction {
     pub value: *MIRValue,
     pub pointer: *MIRValue,
-    pub alignment: u32 = 0;
+    pub alignment: u32 = 0,
+    pub _volatile: bool;
 
-    MIRStoreInstruction(&mut this, value: *MIRValue, pointer: *MIRValue, _type: *MIRType) : MIRInstruction(MIRInstructionKind::Store, "".ToString(), _type) {
-        (this.value, this.pointer) = (value, pointer);
+    MIRStoreInstruction(&mut this, value: *MIRValue, pointer: *MIRValue, _type: *MIRType, _volatile: bool) : MIRInstruction(MIRInstructionKind::Store, "".ToString(), _type) {
+        (this.value, this.pointer, this._volatile) = (value, pointer, _volatile);
     }
 
     pub fn ToString(&this) -> String {
-        let mut result = "store " + this.value->ToString() + ", " + this.pointer->ToString();
+        let mut result = (if this._volatile { "store volatile " } else { "store " }) + this.value->ToString() + ", " + this.pointer->ToString();
         if this.alignment != 0 { result += ", align " + String::FromInteger(this.alignment as HostUnsigned); }
         result
     }
@@ -1253,18 +1260,26 @@ class MIRBuilder {
     }
 
     pub fn BuildLoad(&mut this, name: String, pointer: *MIRValue) -> *mut MIRLoadInstruction {
+        this.BuildLoad(name, pointer, false)
+    }
+
+    pub fn BuildLoad(&mut this, name: String, pointer: *MIRValue, _volatile: bool) -> *mut MIRLoadInstruction {
         if pointer->_type->kind != MIRTypeKind::Pointer {
             Logger::Log("Loading from a non-pointer value!", LogSeverity::Fatal);
             return null;
         }
 
-        let load = this.context->arena.New<MIRLoadInstruction>(name, pointer, (pointer->_type as *MIRPointerType)->pointee);
+        let load = this.context->arena.New<MIRLoadInstruction>(name, pointer, (pointer->_type as *MIRPointerType)->pointee, _volatile);
         this.block->AddInstruction(load);
         load
     }
 
     pub fn BuildStore(&mut this, value: *MIRValue, pointer: *MIRValue) -> *mut MIRStoreInstruction {
-        let store = this.context->arena.New<MIRStoreInstruction>(value, pointer, this.context->VoidType());
+        this.BuildStore(value, pointer, false)
+    }
+
+    pub fn BuildStore(&mut this, value: *MIRValue, pointer: *MIRValue, _volatile: bool) -> *mut MIRStoreInstruction {
+        let store = this.context->arena.New<MIRStoreInstruction>(value, pointer, this.context->VoidType(), _volatile);
         this.block->AddInstruction(store);
         store
     }

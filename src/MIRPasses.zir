@@ -232,11 +232,12 @@ class MIRPromoteAllocas {
 
                     match instruction->kind {
                         MIRInstructionKind::Load => {
-                            allowed = this.SameType((instruction as *MIRLoadInstruction)->_type, _type);
+                            let load = instruction as *MIRLoadInstruction;
+                            allowed = !load->_volatile && this.SameType(load->_type, _type);
                         },
                         MIRInstructionKind::Store => {
                             let store = instruction as *MIRStoreInstruction;
-                            allowed = store->pointer == operand && store->value != operand && this.SameType(store->value->_type, _type);
+                            allowed = !store->_volatile && store->pointer == operand && store->value != operand && this.SameType(store->value->_type, _type);
                         },
                         _ => {}
                     }

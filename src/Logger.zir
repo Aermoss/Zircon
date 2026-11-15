@@ -72,13 +72,13 @@ fn StackDump() {
     }
 
     let mut symbol: SYMBOL_INFO;
-    memset(&mut symbol, 0, sizeof(symbol));
+    memset(&mut symbol, 0, size_of(symbol));
     symbol.SizeOfStruct = 88;
     symbol.MaxNameLen = 255;
 
     let mut module: IMAGEHLP_MODULE64;
-    memset(&mut module, 0, sizeof(module));
-    module.SizeOfStruct = sizeof(module) as u32;
+    memset(&mut module, 0, size_of(module));
+    module.SizeOfStruct = size_of(module) as u32;
 
     for i in 0..frames {
         let address = backtrace[i as usize] as u64;

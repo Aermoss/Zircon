@@ -118,7 +118,78 @@ class Lexer {
         false
     }
 
+    fn IsRawString(&this) -> bool {
+        if this.CurrentChar() != 'r' { return false; }
+        let mut offset: usize = 1;
+
+        while this.PeekChar(offset) == '#' {
+            offset += 1;
+        }
+
+        this.PeekChar(offset) == '"'
+    }
+
+    fn ScanRawString(&mut this, report: bool) -> String {
+        let span = this.Span();
+        let mut value = String();
+        let mut hashes: usize = 0;
+        this.Advance(1);
+
+        while this.CurrentChar() == '#' {
+            hashes += 1;
+            this.Advance(1);
+        }
+
+        this.Advance(1);
+
+        while this.CurrentChar() != '\0' {
+            if this.CurrentChar() == '"' {
+                let mut count: usize = 0;
+
+                while count < hashes && this.PeekChar(count + 1) == '#' {
+                    count += 1;
+                }
+
+                if count == hashes {
+                    this.Advance(hashes + 1);
+                    return value;
+                }
+            }
+
+            value += this.CurrentChar();
+            this.Advance(1);
+        }
+
+        if report {
+            Logger::Log("Unterminated raw string literal.", span, LogSeverity::Error);
+        }
+
+        value
+    }
+
+    fn AppendCodePoint(&this, value: &mut String, code: u32) {
+        if code < 0x80 {
+            value += code as i8;
+        } else if code < 0x800 {
+            value += (0xC0 | (code >> 6)) as i8;
+            value += (0x80 | (code & 0x3F)) as i8;
+        } else if code < 0x10000 {
+            value += (0xE0 | (code >> 12)) as i8;
+            value += (0x80 | ((code >> 6) & 0x3F)) as i8;
+            value += (0x80 | (code & 0x3F)) as i8;
+        } else {
+            value += (0xF0 | (code >> 18)) as i8;
+            value += (0x80 | ((code >> 12) & 0x3F)) as i8;
+            value += (0x80 | ((code >> 6) & 0x3F)) as i8;
+            value += (0x80 | (code & 0x3F)) as i8;
+        }
+    }
+
     fn ScanString(&mut this, report: bool) -> String {
+        if this.IsRawString() {
+            return this.ScanRawString(report);
+        }
+
         let span = this.Span();
         let quote_char = this.CurrentChar();
         let mut value = String();
@@ -173,6 +244,43 @@ class Lexer {
                         }
 
                         this.index -= 1;
+                    } else if escaped == 'u' {
+                        this.Advance(1);
+                        let mut digits = String();
+                        let mut valid = this.CurrentChar() == '{';
+
+                        if valid {
+                            this.Advance(1);
+
+                            while this.IsHexDigit(this.CurrentChar()) {
+                                digits += this.CurrentChar();
+                                this.Advance(1);
+                            }
+
+                            valid = this.CurrentChar() == '}' && !digits.Empty() && digits.Size() <= 7;
+                        }
+
+                        let code: u32 = if valid { digits.ToUnsignedInteger(16).Unwrap() as u32 } else { 0 };
+
+                        if valid && (code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) {
+                            valid = false;
+                        }
+
+                        if valid {
+                            this.AppendCodePoint(value, code);
+                        } else {
+                            if report { Logger::Log("Invalid Unicode escape sequence, expected '\\u{...}' with 1 to 6 hexadecimal digits of a valid code point.", span, LogSeverity::Error); }
+                            if this.CurrentChar() != '}' { this.index -= 1; }
+                        }
+                    } else if !this.IsOctDigit(escaped) {
+                        if report {
+                            let mut message = "Unknown escape sequence '\\".ToString();
+                            message += escaped;
+                            message += "'.";
+                            Logger::Log(message, span, LogSeverity::Error);
+                        }
+
+                        this.index -= 1;
                     } else {
                         let mut digits = String();
 
@@ -212,7 +320,7 @@ class Lexer {
     fn LexString(&mut this) -> Token {
         let mut token: Token;
         token.span = this.Span();
-        token._type = if this.CurrentChar() != '"' { TokenType::Character } else { TokenType::String };
+        token._type = if this.CurrentChar() == '\'' { TokenType::Character } else { TokenType::String };
         this.ScanString(true);
         token
     }
@@ -254,28 +362,28 @@ class Lexer {
             if this.CurrentChar() == 'x' || this.CurrentChar() == 'X' {
                 this.Advance(1);
 
-                while this.IsHexDigit(this.CurrentChar()) {
+                while this.IsHexDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsHexDigit(this.PeekChar(1))) {
                     this.Advance(1);
                 }
             } else if this.CurrentChar() == 'b' || this.CurrentChar() == 'B' {
                 this.Advance(1);
 
-                while this.IsBinDigit(this.CurrentChar()) {
+                while this.IsBinDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsBinDigit(this.PeekChar(1))) {
                     this.Advance(1);
                 }
             } else if this.CurrentChar() == 'o' || this.CurrentChar() == 'O' {
                 this.Advance(1);
 
-                while this.IsOctDigit(this.CurrentChar()) {
+                while this.IsOctDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsOctDigit(this.PeekChar(1))) {
                     this.Advance(1);
                 }
             } else {
-                while this.IsDigit(this.CurrentChar()) {
+                while this.IsDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsDigit(this.PeekChar(1))) {
                     this.Advance(1);
                 }
             }
         } else {
-            while this.IsDigit(this.CurrentChar()) {
+            while this.IsDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsDigit(this.PeekChar(1))) {
                 this.Advance(1);
             }
         }
@@ -284,7 +392,7 @@ class Lexer {
             token._type = TokenType::Float;
             this.Advance(1);
 
-            while this.IsDigit(this.CurrentChar()) {
+            while this.IsDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsDigit(this.PeekChar(1))) {
                 this.Advance(1);
             }
         }
@@ -297,7 +405,7 @@ class Lexer {
                 this.Advance(1);
             }
 
-            while this.IsDigit(this.CurrentChar()) {
+            while this.IsDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsDigit(this.PeekChar(1))) {
                 this.Advance(1);
             }
         }
@@ -312,7 +420,7 @@ class Lexer {
             token._type = TokenType::Float;
             this.Advance(1);
 
-            while this.IsDigit(this.CurrentChar()) {
+            while this.IsDigit(this.CurrentChar()) || (this.CurrentChar() == '_' && this.IsDigit(this.PeekChar(1))) {
                 this.Advance(1);
             }
         }
@@ -643,7 +751,7 @@ class Lexer {
 
             let mut token = if this.IsLabel() {
                 this.LexLabel()
-            } else if character == '"' || character == '\'' {
+            } else if character == '"' || character == '\'' || this.IsRawString() {
                 this.LexString()
             } else if this.IsDigit(character) {
                 this.LexNumber()

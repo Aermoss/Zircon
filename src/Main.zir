@@ -109,8 +109,8 @@ fn Execute(command: *i8) -> HostUnsigned {
     status as HostUnsigned
 #[elif WINDOWS]
     let mut startup_info: STARTUPINFOA;
-    memset(&mut startup_info, 0, sizeof(startup_info));
-    startup_info.cb = sizeof(startup_info) as u32;
+    memset(&mut startup_info, 0, size_of(startup_info));
+    startup_info.cb = size_of(startup_info) as u32;
     let mut process_info: PROCESS_INFORMATION;
 
     if CreateProcessA(null, command, null, null, 0, 0, null, null, &mut startup_info, &mut process_info) == 0 {

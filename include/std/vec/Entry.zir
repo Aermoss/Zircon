@@ -71,10 +71,10 @@ class Vector<T> {
     }
 
     fn Relocate(&mut this, capacity: usize) {
-        let data = malloc(capacity * sizeof(T)) as *mut T;
+        let data = malloc(capacity * size_of<T>()) as *mut T;
 
         if this.data != null {
-            memcpy(data, this.data, this.size * sizeof(T));
+            memcpy(data, this.data, this.size * size_of<T>());
             free(this.data);
         }
 
@@ -166,7 +166,7 @@ class Vector<T> {
 
     pub fn Insert(&mut this, index: usize, value: T) {
         this.Grow(this.size + 1);
-        memmove(this.data + index + 1, this.data + index, (this.size - index) * sizeof(T));
+        memmove(this.data + index + 1, this.data + index, (this.size - index) * size_of<T>());
         construct(this.data + index, value);
         this.size += 1;
     }
@@ -174,7 +174,7 @@ class Vector<T> {
     pub fn RemoveAt(&mut this, index: usize) -> T {
         let result = this.data[index];
         destruct(this.data + index);
-        memmove(this.data + index, this.data + index + 1, (this.size - index - 1) * sizeof(T));
+        memmove(this.data + index, this.data + index + 1, (this.size - index - 1) * size_of<T>());
         this.size -= 1;
         result
     }
@@ -185,7 +185,7 @@ class Vector<T> {
         for read_index in 0..this.size {
             if this.data[read_index] != value {
                 if read_index != write_index {
-                    memcpy(this.data + write_index, this.data + read_index, sizeof(T));
+                    memcpy(this.data + write_index, this.data + read_index, size_of<T>());
                 } write_index += 1;
             } else {
                 destruct(this.data + read_index);

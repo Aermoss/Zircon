@@ -45,7 +45,56 @@ class MIRLowerer {
         this.module = this.context.arena.New<MIRModule>();
         this.builder = MIRBuilder(&mut this.context, this.module);
         this.LowerModule(module);
+        this.AnnotatePackedAccesses();
         this.module
+    }
+
+    fn IsUnderaligned(&this, mut value: *MIRValue) -> bool {
+        loop {
+            if value->kind != MIRValueKind::Instruction { return false; }
+            let instruction = value as *MIRInstruction;
+
+            match instruction->kind {
+                MIRInstructionKind::StructGEP => {
+                    let gep = instruction as *MIRStructGEPInstruction;
+                    let pointee = (gep->pointer->_type as *MIRPointerType)->pointee;
+                    if pointee->kind == MIRTypeKind::Structure && (pointee as *MIRStructureType)->packed { return true; }
+                    value = gep->pointer;
+                },
+                MIRInstructionKind::ArrayGEP => {
+                    value = (instruction as *MIRArrayGEPInstruction)->pointer;
+                },
+                MIRInstructionKind::Cast => {
+                    let cast = instruction as *MIRCastInstruction;
+                    if cast->kind != MIRCastKind::Bitcast { return false; }
+                    value = cast->value;
+                },
+                _ => {
+                    return false;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn AnnotatePackedAccesses(&mut this) {
+        for declaration in this.module->declarations {
+            if declaration->kind != MIRDeclarationKind::Function { continue; }
+            let function = declaration as *MIRFunctionDeclaration;
+
+            for block in function->blocks {
+                for instruction in block->instructions {
+                    if instruction->kind == MIRInstructionKind::Load {
+                        let load = unsafe { instruction as *mut MIRLoadInstruction };
+                        if this.IsUnderaligned(load->pointer) { load->alignment = 1; }
+                    } else if instruction->kind == MIRInstructionKind::Store {
+                        let store = unsafe { instruction as *mut MIRStoreInstruction };
+                        if this.IsUnderaligned(store->pointer) { store->alignment = 1; }
+                    }
+                }
+            }
+        }
     }
 
     fn LowerModule(&mut this, module: *HIRModule) {
@@ -542,7 +591,7 @@ class MIRLowerer {
             fields.PushBack(lowered_field);
         }
 
-        (this.types[structure->_type]->_type as *mut MIRStructureType)->SetBody(fields);
+        (this.types[structure->_type]->_type as *mut MIRStructureType)->SetBody(fields, structure->packed);
     }
 
     fn LowerStructureDeclarationThirdPass(&mut this, structure: *HIRStructureDeclaration) {
@@ -681,7 +730,36 @@ class MIRLowerer {
     }
 
     fn LowerLetStatement(&mut this, _let: *HIRLetStatement) {
+        if _let->else_body == null {
+            this.BindPattern(_let->pattern);
+            return;
+        }
+
+        let target = this.LowerPlaceExpression(_let->initializer);
+        if target == null { return; }
+        let condition = this.TestPattern(_let->pattern, target);
+        if condition == null { return; }
+        let bind_block = this.builder.BuildBlock("let.bind".ToString());
+        let else_block = this.builder.BuildBlock("let.else".ToString());
+        this.builder.BuildConditionalBranch(condition, bind_block, else_block);
+        this.builder.SetCurrentBlock(else_block);
+
+        for destructor in _let->destructors {
+            this.LowerExpression(destructor);
+        }
+
+        this.LowerControlExpression(_let->else_body, null);
+
+        if !this.builder.GetCurrentBlock()->HasTerminator() {
+            this.builder.BuildUnreachable();
+        }
+
+        this.builder.SetCurrentBlock(bind_block);
         this.BindPattern(_let->pattern);
+
+        for destructor in _let->destructors {
+            this.LowerExpression(destructor);
+        }
     }
 
     fn LowerAssemblyStatement(&mut this, assembly: *HIRAssemblyStatement) {
@@ -1406,7 +1484,28 @@ class MIRLowerer {
     }
 
     fn LowerIntrinsicExpression(&mut this, intrinsic: *HIRIntrinsicExpression) -> *MIRValue {
-        let value = if intrinsic->kind == HIRIntrinsicKind::SizeOf { intrinsic->_type->Size() } else { intrinsic->_type->Alignment() };
+        if intrinsic->kind == HIRIntrinsicKind::VolatileRead {
+            let pointer = this.LowerExpression(intrinsic->operands[0]);
+            if pointer == null { return null; }
+            return this.builder.BuildLoad("volatile.read".ToString(), pointer, true);
+        }
+
+        if intrinsic->kind == HIRIntrinsicKind::VolatileWrite {
+            let pointer = this.LowerExpression(intrinsic->operands[0]);
+            let value = this.LowerExpression(intrinsic->operands[1]);
+            if pointer == null || value == null { return null; }
+            this.builder.BuildStore(value, pointer, true);
+            return this.UnitConstant();
+        }
+
+        let value = if intrinsic->kind == HIRIntrinsicKind::SizeOf {
+            intrinsic->_type->Size()
+        } else if intrinsic->kind == HIRIntrinsicKind::OffsetOf {
+            intrinsic->_type->FieldOffset(intrinsic->index)
+        } else {
+            intrinsic->_type->Alignment()
+        };
+
         this.builder.ConstantInteger(value as HostUnsigned, this.LowerType((intrinsic as *HIRExpression)->_type))
     }
 
@@ -2237,6 +2336,7 @@ class MIRLowerer {
             HIRPatternKind::Literal => this.TestLiteralPattern(pattern as *HIRLiteralPattern, target),
             HIRPatternKind::Range => this.TestRangePattern(pattern as *HIRRangePattern, target),
             HIRPatternKind::Tuple => this.TestTuplePattern(pattern as *HIRTuplePattern, target),
+            HIRPatternKind::Array => this.TestArrayPattern(pattern as *HIRArrayPattern, target),
             HIRPatternKind::Field => this.TestPattern((pattern as *HIRFieldPattern)->pattern, target),
             HIRPatternKind::Structure => this.TestStructurePattern(pattern as *HIRStructurePattern, target),
             HIRPatternKind::Enumeration => this.TestEnumerationPattern(pattern as *HIREnumerationPattern, target),
@@ -2273,6 +2373,24 @@ class MIRLowerer {
             let kind = if range->inclusive { if signed { MIRBinaryKind::ICmpSle } else { MIRBinaryKind::ICmpUle } } else if signed { MIRBinaryKind::ICmpSlt } else { MIRBinaryKind::ICmpUlt };
             let compare = this.builder.BuildBinary("pattern.le".ToString(), kind, value, end, bool_type);
             condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, compare, bool_type);
+        }
+
+        condition
+    }
+
+    fn TestArrayPattern(&mut this, array: *HIRArrayPattern, target: *MIRValue) -> *MIRValue {
+        let bool_type = this.context.IntegerType(1);
+        let size_type = this.context.IntegerType(this.target_info.pointer_size as u32 * 8);
+        let mut condition: *MIRValue = this.builder.ConstantInteger(1, bool_type);
+        let element_type = this.LowerType(array->_type->Element());
+        if element_type == null { return null; }
+        let base = this.builder.BuildCast("pattern.array.cast".ToString(), MIRCastKind::Bitcast, target, this.context.PointerType(element_type));
+
+        for i in 0..array->patterns.Length() {
+            let place = this.builder.BuildArrayGEP("pattern.array".ToString(), base, this.builder.ConstantInteger(i as HostUnsigned, size_type));
+            let result = this.TestPattern(array->patterns[i], place);
+            if result == null { return null; }
+            condition = this.builder.BuildBinary("pattern.and".ToString(), MIRBinaryKind::And, condition, result, bool_type);
         }
 
         condition
@@ -2419,6 +2537,11 @@ class MIRLowerer {
             },
             HIRPatternKind::Tuple => {
                 for pattern in (pattern as *HIRTuplePattern)->patterns {
+                    this.BindPattern(pattern);
+                }
+            },
+            HIRPatternKind::Array => {
+                for pattern in (pattern as *HIRArrayPattern)->patterns {
                     this.BindPattern(pattern);
                 }
             },

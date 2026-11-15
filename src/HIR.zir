@@ -54,6 +54,7 @@ class HIRType {
     pub fn IsFunction(&this) -> bool { this.kind == HIRTypeKind::Function }
     pub fn IsClass(&this) -> bool { this.kind == HIRTypeKind::Class }
     pub fn IsStructure(&this) -> bool { this.kind == HIRTypeKind::Structure }
+    pub fn IsPacked(&this) -> bool { this.kind == HIRTypeKind::Structure && (this as *HIRStructureType)->declaration->packed }
     pub fn IsEnumeration(&this) -> bool { this.kind == HIRTypeKind::Enumeration }
     pub fn IsVariant(&this) -> bool { this.kind == HIRTypeKind::Variant }
 
@@ -387,6 +388,8 @@ class HIRType {
             }
 
             alignment
+        } else if this.IsPacked() {
+            1
         } else if this.HasFields() {
             let mut alignment: usize = 1;
 
@@ -451,6 +454,14 @@ class HIRType {
 
             let remainder = size % alignment;
             if remainder != 0 { size += alignment - remainder; }
+            size
+        } else if this.IsPacked() {
+            let mut size: usize = 0;
+
+            for field in this.Fields() {
+                size += field->_type->Size();
+            }
+
             size
         } else if this.HasFields() {
             let mut size: usize = 0;
@@ -550,6 +561,38 @@ class HIRType {
         }
 
         (this as *HIRFunctionType)->_return
+    }
+
+    pub fn FieldOffset(&this, index: usize) -> usize {
+        let mut offset: usize = 0;
+
+        if this.IsClass() {
+            if (this as *HIRClassType)->declaration->vptr {
+                offset = hir_lowerer->target_info.pointer_size;
+            }
+
+            let parent = (this as *HIRClassType)->declaration->parent;
+
+            if parent != null {
+                let parent_alignment = parent->Alignment();
+                let remainder = offset % parent_alignment;
+                if remainder != 0 { offset += parent_alignment - remainder; }
+                offset += parent->Size();
+            }
+        }
+
+        let fields = this.Fields();
+        let packed = this.IsPacked();
+
+        for i in 0..fields.Length() {
+            let field_alignment: usize = if packed { 1 } else { fields[i]->_type->Alignment() };
+            let remainder = offset % field_alignment;
+            if remainder != 0 { offset += field_alignment - remainder; }
+            if i == index { return offset; }
+            offset += fields[i]->_type->Size();
+        }
+
+        offset
     }
 
     pub fn Fields(&this) -> &Vector<*HIRFieldDeclaration> {
@@ -736,6 +779,74 @@ class HIRType {
     }
 
     pub virtual fn ToString(&this) -> String;
+
+    pub fn Name(&this) -> String {
+        match this.kind {
+            HIRTypeKind::Pointer => {
+                let pointer = this as *HIRPointerType;
+                (if pointer->mutable { "*mut " } else { "*" }) + pointer->pointee->Name()
+            },
+            HIRTypeKind::Reference => {
+                let reference = this as *HIRReferenceType;
+                (if reference->mutable { "&mut " } else { "&" }) + reference->referent->Name()
+            },
+            HIRTypeKind::Slice => {
+                let slice = this as *HIRSliceType;
+                (if slice->mutable { "&mut [" } else { "&[" }) + slice->element->Name() + ']'
+            },
+            HIRTypeKind::Array => {
+                let array = this as *HIRArrayType;
+                '[' + array->element->Name() + "; " + String::FromInteger(array->length as HostUnsigned) + ']'
+            },
+            HIRTypeKind::Tuple => {
+                let mut result = '('.ToString();
+
+                for i in 0..(this as *HIRTupleType)->elements.Length() {
+                    if i != 0 { result += ", "; }
+                    result += (this as *HIRTupleType)->elements[i]->Name();
+                }
+
+                result + ')'
+            },
+            HIRTypeKind::Function => {
+                let function = this as *HIRFunctionType;
+                let mut result = "fn(".ToString();
+
+                for i in 0..function->parameters.Length() {
+                    if i != 0 { result += ", "; }
+                    result += function->parameters[i]->Name();
+                }
+
+                if function->var_arg {
+                    if !function->parameters.Empty() { result += ", "; }
+                    result += "...";
+                } result += ')';
+
+                if function->_return->kind != HIRTypeKind::Void {
+                    result += " -> " + function->_return->Name();
+                }
+
+                result
+            },
+            HIRTypeKind::Class => this.GenericName((this as *HIRClassType)->declaration->name, (this as *HIRClassType)->declaration->instance),
+            HIRTypeKind::Structure => this.GenericName((this as *HIRStructureType)->declaration->name, (this as *HIRStructureType)->declaration->instance),
+            HIRTypeKind::Variant => this.GenericName((this as *HIRVariantType)->declaration->name, (this as *HIRVariantType)->declaration->instance),
+            HIRTypeKind::Enumeration => (this as *HIREnumerationType)->declaration->name,
+            _ => this.ToString()
+        }
+    }
+
+    fn GenericName(&this, name: &String, instance: *GenericInstance) -> String {
+        if instance == null || instance->types.Empty() { return name; }
+        let mut result = name + '<';
+
+        for i in 0..instance->types.Length() {
+            if i != 0 { result += ", "; }
+            result += instance->types[i]->Name();
+        }
+
+        result + '>'
+    }
 }
 
 class HIRNeverType : HIRType {
@@ -968,7 +1079,7 @@ class HIRVariantType : HIRType {
 }
 
 enum HIRPatternKind: u8 {
-    Wildcard, Rest, Literal, Range, Identifier, Tuple, Field, Structure, Enumeration, Variant, Or, Dereference
+    Wildcard, Rest, Literal, Range, Identifier, Tuple, Array, Field, Structure, Enumeration, Variant, Or, Dereference
 }
 
 class HIRPattern {
@@ -990,6 +1101,11 @@ class HIRPattern {
             },
             HIRPatternKind::Tuple => {
                 for pattern in (this as *HIRTuplePattern)->patterns {
+                    if !pattern->IsIrrefutable() { return false; }
+                } return true;
+            },
+            HIRPatternKind::Array => {
+                for pattern in (this as *HIRArrayPattern)->patterns {
                     if !pattern->IsIrrefutable() { return false; }
                 } return true;
             },
@@ -1109,6 +1225,26 @@ class HIRTuplePattern : HIRPattern {
         }
 
         result + ')'
+    }
+}
+
+class HIRArrayPattern : HIRPattern {
+    pub patterns: Vector<*HIRPattern>,
+    pub _type: *HIRType;
+
+    HIRArrayPattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRType) : HIRPattern(HIRPatternKind::Array) {
+        (this.patterns, this._type) = (patterns, _type);
+    }
+
+    pub override fn ToString(&this) -> String {
+        let mut result = '['.ToString();
+
+        for i in 0..this.patterns.Length() {
+            if i != 0 { result += ", "; }
+            result += this.patterns[i]->ToString();
+        }
+
+        result + ']'
     }
 }
 
@@ -1941,28 +2077,52 @@ class HIRDestructorExpression : HIRExpression {
 }
 
 enum HIRIntrinsicKind: u8 {
-    SizeOf, AlignOf
+    SizeOf, AlignOf, OffsetOf, VolatileRead, VolatileWrite
 }
 
 extend HIRIntrinsicKind {
     pub fn ToString(this) -> String {
         match this {
-            HIRIntrinsicKind::SizeOf => "sizeof",
-            HIRIntrinsicKind::AlignOf => "alignof"
+            HIRIntrinsicKind::SizeOf => "size_of",
+            HIRIntrinsicKind::AlignOf => "align_of",
+            HIRIntrinsicKind::OffsetOf => "offset_of",
+            HIRIntrinsicKind::VolatileRead => "volatile_read",
+            HIRIntrinsicKind::VolatileWrite => "volatile_write"
         }.ToString()
     }
 }
 
 class HIRIntrinsicExpression : HIRExpression {
     pub kind: HIRIntrinsicKind,
-    pub _type: *HIRType;
+    pub _type: *HIRType,
+    pub operands: Vector<*HIRExpression>,
+    pub index: usize = 0;
 
     HIRIntrinsicExpression(&mut this, kind: HIRIntrinsicKind, _type: *HIRType, result_type: *HIRType) : HIRExpression(HIRExpressionKind::Intrinsic, result_type) {
         (this.kind, this._type) = (kind, _type);
     }
 
+    HIRIntrinsicExpression(&mut this, kind: HIRIntrinsicKind, _type: *HIRType, operands: Vector<*HIRExpression>, index: usize, result_type: *HIRType) : HIRExpression(HIRExpressionKind::Intrinsic, result_type) {
+        (this.kind, this._type, this.operands, this.index) = (kind, _type, operands, index);
+    }
+
     pub override fn ToString(&this) -> String {
-        this.kind.ToString() + '(' + this._type->ToString() + ')'
+        if this.kind == HIRIntrinsicKind::OffsetOf {
+            return this.kind.ToString() + '(' + this._type->ToString() + ", " + String::FromInteger(this.index as HostUnsigned) + ')';
+        }
+
+        if this.operands.Empty() {
+            return this.kind.ToString() + '(' + this._type->ToString() + ')';
+        }
+
+        let mut result = this.kind.ToString() + '(';
+
+        for i in 0..this.operands.Length() {
+            if i != 0 { result += ", "; }
+            result += this.operands[i]->ToString();
+        }
+
+        result + ')'
     }
 }
 
@@ -2164,7 +2324,7 @@ class HIRPatternChecker {
 
     fn RangeMax(&this, _type: *HIRType) -> HostUnsigned {
         let width = _type->Width();
-        if width >= (sizeof(HostUnsigned) * 8) as u32 { return -1 as HostUnsigned; }
+        if width >= (size_of<HostUnsigned>() * 8) as u32 { return -1 as HostUnsigned; }
         (1 as HostUnsigned << width) - 1
     }
 
@@ -2326,7 +2486,7 @@ class HIRPatternChecker {
     }
 
     pub fn IsFinite(&this, _type: *HIRType) -> bool {
-        _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() || _type->IsStructure() || _type->IsTuple()
+        _type->IsBoolean() || _type->IsEnumeration() || _type->IsVariant() || _type->IsStructure() || _type->IsTuple() || _type->IsArray()
     }
 
     pub fn Constructors(&this, _type: *HIRType) -> Vector<String> {
@@ -2347,7 +2507,7 @@ class HIRPatternChecker {
             for member in (_type as *HIRVariantType)->declaration->members {
                 keys.PushBack(member->name);
             }
-        } else if _type->IsStructure() || _type->IsTuple() {
+        } else if _type->IsStructure() || _type->IsTuple() || _type->IsArray() {
             keys.PushBack(String());
         }
 
@@ -2378,6 +2538,12 @@ class HIRPatternChecker {
             }
         } else if _type->IsTuple() {
             for element in (_type as *HIRTupleType)->elements {
+                types.PushBack(element);
+            }
+        } else if _type->IsArray() {
+            let element: *HIRType = _type->Element();
+
+            for i in 0.._type->Length() {
                 types.PushBack(element);
             }
         }
@@ -2421,6 +2587,11 @@ class HIRPatternChecker {
             },
             HIRPatternKind::Tuple => {
                 for element in (pattern as *HIRTuplePattern)->patterns {
+                    fields.PushBack(element);
+                }
+            },
+            HIRPatternKind::Array => {
+                for element in (pattern as *HIRArrayPattern)->patterns {
                     fields.PushBack(element);
                 }
             },
@@ -2693,6 +2864,13 @@ class HIRPatternChecker {
                 if i != 0 { result += ", "; }
                 result += fields[i];
             } return result + ")";
+        } else if _type->IsArray() {
+            let mut result = "[".ToString();
+
+            for i in 0..fields.Length() {
+                if i != 0 { result += ", "; }
+                result += fields[i];
+            } return result + "]";
         }
 
         '_'.ToString()
@@ -2876,10 +3054,16 @@ fn DestructorsToString(destructors: &Vector<*HIRExpression>, indent: usize) -> S
 class HIRLetStatement : HIRStatement {
     pub pattern: *HIRPattern,
     pub _type: *HIRType,
-    pub initializer: *HIRExpression;
+    pub initializer: *HIRExpression,
+    pub else_body: *HIRExpression = null,
+    pub destructors: Vector<*HIRExpression>;
 
     HIRLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression) : HIRStatement(HIRStatementKind::Variable) {
         (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
+    }
+
+    HIRLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression, else_body: *HIRExpression, destructors: Vector<*HIRExpression>) : HIRStatement(HIRStatementKind::Variable) {
+        (this.pattern, this._type, this.initializer, this.else_body, this.destructors) = (pattern, _type, initializer, else_body, destructors);
     }
 
     pub fn ToString(&this, indent: usize) -> String {
@@ -2891,6 +3075,10 @@ class HIRLetStatement : HIRStatement {
 
         if this.initializer != null {
             result += " = " + this.initializer->ToString(indent);
+        }
+
+        if this.else_body != null {
+            result += " else " + this.else_body->ToString(indent);
         }
 
         result
@@ -3141,9 +3329,12 @@ class HIRStructureDeclaration : HIRTypedDeclaration {
     pub copy_constructor: *mut HIRFunctionDeclaration = null,
     pub copy_assign: *mut HIRFunctionDeclaration = null,
     pub destructor: *mut HIRFunctionDeclaration = null,
-    pub instance: *GenericInstance = null;
+    pub instance: *GenericInstance = null,
+    pub packed: bool;
 
-    HIRStructureDeclaration(&mut this, name: String, _type: *HIRType) : HIRTypedDeclaration(HIRDeclarationKind::Structure, name, _type) {}
+    HIRStructureDeclaration(&mut this, name: String, _type: *HIRType, packed: bool) : HIRTypedDeclaration(HIRDeclarationKind::Structure, name, _type) {
+        this.packed = packed;
+    }
 
     pub override fn ToString(&this) -> String {
         let mut result = "struct %" + this.name + " {";
@@ -3621,6 +3812,10 @@ class HIRBuilder {
         this.context->arena.New<HIRTuplePattern>(patterns, _type)
     }
 
+    pub fn ArrayPattern(&mut this, patterns: Vector<*HIRPattern>, _type: *HIRType) -> *mut HIRArrayPattern {
+        this.context->arena.New<HIRArrayPattern>(patterns, _type)
+    }
+
     pub fn FieldPattern(&mut this, name: String, pattern: *HIRPattern) -> *mut HIRFieldPattern {
         this.context->arena.New<HIRFieldPattern>(name, pattern)
     }
@@ -3735,9 +3930,38 @@ class HIRBuilder {
         }
     }
 
+    pub fn IsPackedField(&this, mut expression: *HIRExpression) -> bool {
+        loop {
+            match expression->kind {
+                HIRExpressionKind::FieldAccess => {
+                    let access = expression as *HIRFieldAccessExpression;
+                    if access->instance->_type->IsPacked() { return true; }
+                    expression = access->instance;
+                },
+                HIRExpressionKind::TupleAccess => {
+                    expression = (expression as *HIRTupleAccessExpression)->instance;
+                },
+                HIRExpressionKind::IndexAccess => {
+                    let access = expression as *HIRIndexAccessExpression;
+                    if !access->value->_type->IsArray() { return false; }
+                    expression = access->value;
+                },
+                _ => {
+                    return false;
+                }
+            }
+        }
+
+        false
+    }
+
     pub fn AddressOf(&mut this, operand: *HIRExpression) -> *HIRExpression {
         if operand->kind == HIRExpressionKind::Unary && (operand as *HIRUnaryExpression)->kind == HIRUnaryKind::Dereference {
             return (operand as *HIRUnaryExpression)->operand;
+        }
+
+        if this.IsPackedField(operand) {
+            Logger::Log("Cannot take a reference to a field of a packed structure; copy the field into a local variable first.", LogSeverity::Error);
         }
 
         this.SetAddressable(operand);
@@ -3753,7 +3977,7 @@ class HIRBuilder {
     }
 
     fn MaskToWidth(&this, value: HostUnsigned, width: u32) -> HostUnsigned {
-        if width >= (sizeof(HostUnsigned) * 8) as u32 { return value; }
+        if width >= (size_of<HostUnsigned>() * 8) as u32 { return value; }
         value & ((1 as HostUnsigned << width) - 1)
     }
 
@@ -3818,7 +4042,7 @@ class HIRBuilder {
 
     fn SignExtend(&this, value: HostUnsigned, width: u32) -> HostSigned {
         let masked = this.MaskToWidth(value, width);
-        if width >= (sizeof(HostUnsigned) * 8) as u32 { return masked as HostSigned; }
+        if width >= (size_of<HostUnsigned>() * 8) as u32 { return masked as HostSigned; }
         let sign_bit = 1 as HostUnsigned << (width - 1);
 
         if (masked & sign_bit) != 0 {
@@ -3831,9 +4055,11 @@ class HIRBuilder {
     fn FoldBinary(&mut this, kind: HIRBinaryKind, left: *HIRLiteral, right: *HIRLiteral, _type: *HIRType) -> *HIRExpression {
         match left->kind {
             HIRLiteralKind::Integer if right->kind == HIRLiteralKind::Integer => {
+                let operand_type = (left as *HIRExpression)->_type;
                 let (left, right) = ((left as *HIRIntegerLiteral)->value, (right as *HIRIntegerLiteral)->value);
                 if (kind == HIRBinaryKind::Divide || kind == HIRBinaryKind::Modulo) && right == 0 { return null; }
                 let (signed, width) = (_type->IsSigned(), _type->Width());
+                let (operand_signed, operand_width) = (operand_type->IsSigned(), operand_type->Width());
 
                 match kind {
                     HIRBinaryKind::Add => this.IntegerLiteral(this.MaskToWidth(left + right, width), _type),
@@ -3848,10 +4074,10 @@ class HIRBuilder {
                     HIRBinaryKind::RightShift => this.IntegerLiteral(this.MaskToWidth(if signed { (this.SignExtend(left, width) >> right as HostSigned) as HostUnsigned } else { left >> right }, width), _type),
                     HIRBinaryKind::Equal => this.BooleanLiteral(left == right, this.context->BooleanType()),
                     HIRBinaryKind::NotEqual => this.BooleanLiteral(left != right, this.context->BooleanType()),
-                    HIRBinaryKind::Less => this.BooleanLiteral(if signed { this.SignExtend(left, width) < this.SignExtend(right, width) } else { left < right }, this.context->BooleanType()),
-                    HIRBinaryKind::LessEqual => this.BooleanLiteral(if signed { this.SignExtend(left, width) <= this.SignExtend(right, width) } else { left <= right }, this.context->BooleanType()),
-                    HIRBinaryKind::Greater => this.BooleanLiteral(if signed { this.SignExtend(left, width) > this.SignExtend(right, width) } else { left > right }, this.context->BooleanType()),
-                    HIRBinaryKind::GreaterEqual => this.BooleanLiteral(if signed { this.SignExtend(left, width) >= this.SignExtend(right, width) } else { left >= right }, this.context->BooleanType()),
+                    HIRBinaryKind::Less => this.BooleanLiteral(if operand_signed { this.SignExtend(left, operand_width) < this.SignExtend(right, operand_width) } else { left < right }, this.context->BooleanType()),
+                    HIRBinaryKind::LessEqual => this.BooleanLiteral(if operand_signed { this.SignExtend(left, operand_width) <= this.SignExtend(right, operand_width) } else { left <= right }, this.context->BooleanType()),
+                    HIRBinaryKind::Greater => this.BooleanLiteral(if operand_signed { this.SignExtend(left, operand_width) > this.SignExtend(right, operand_width) } else { left > right }, this.context->BooleanType()),
+                    HIRBinaryKind::GreaterEqual => this.BooleanLiteral(if operand_signed { this.SignExtend(left, operand_width) >= this.SignExtend(right, operand_width) } else { left >= right }, this.context->BooleanType()),
                     _ => null
                 }
             },
@@ -4037,6 +4263,24 @@ class HIRBuilder {
         this.context->arena.New<HIRIntrinsicExpression>(kind, _type, this.context->IntegerPointerType(false))
     }
 
+    pub fn OffsetOf(&mut this, _type: *HIRType, index: usize) -> *mut HIRIntrinsicExpression {
+        this.context->arena.New<HIRIntrinsicExpression>(HIRIntrinsicKind::OffsetOf, _type, Vector<*HIRExpression>(), index, this.context->IntegerPointerType(false))
+    }
+
+    pub fn VolatileRead(&mut this, pointer: *HIRExpression) -> *mut HIRIntrinsicExpression {
+        let pointee: *HIRType = pointer->_type->Pointee();
+        let mut operands = Vector<*HIRExpression>();
+        operands.PushBack(pointer);
+        this.context->arena.New<HIRIntrinsicExpression>(HIRIntrinsicKind::VolatileRead, pointee, operands, 0usize, pointee)
+    }
+
+    pub fn VolatileWrite(&mut this, pointer: *HIRExpression, value: *HIRExpression) -> *mut HIRIntrinsicExpression {
+        let mut operands = Vector<*HIRExpression>();
+        operands.PushBack(pointer);
+        operands.PushBack(value);
+        this.context->arena.New<HIRIntrinsicExpression>(HIRIntrinsicKind::VolatileWrite, value->_type, operands, 0usize, this.context->UnitType())
+    }
+
     pub fn Deferred(&mut this, expression: *ASTExpression, _type: *HIRType) -> *mut HIRDeferredExpression {
         this.context->arena.New<HIRDeferredExpression>(expression, _type)
     }
@@ -4101,6 +4345,10 @@ class HIRBuilder {
         this.context->arena.New<HIRLetStatement>(pattern, _type, initializer)
     }
 
+    pub fn BuildLetStatement(&mut this, pattern: *HIRPattern, _type: *HIRType, initializer: *HIRExpression, else_body: *HIRExpression, destructors: Vector<*HIRExpression>) -> *mut HIRLetStatement {
+        this.context->arena.New<HIRLetStatement>(pattern, _type, initializer, else_body, destructors)
+    }
+
     pub fn BuildExpressionStatement(&mut this, expression: *HIRExpression) -> *mut HIRExpressionStatement {
         let statement = this.context->arena.New<HIRExpressionStatement>(expression);
         this.block->statements.PushBack(statement);
@@ -4143,8 +4391,8 @@ class HIRBuilder {
         declaration
     }
 
-    pub fn BuildStructureDeclaration(&mut this, name: String, _type: *HIRType) -> *mut HIRStructureDeclaration {
-        let declaration = this.context->arena.New<HIRStructureDeclaration>(name, _type);
+    pub fn BuildStructureDeclaration(&mut this, name: String, _type: *HIRType, packed: bool) -> *mut HIRStructureDeclaration {
+        let declaration = this.context->arena.New<HIRStructureDeclaration>(name, _type, packed);
         this.module->declarations.PushBack(declaration);
         declaration
     }

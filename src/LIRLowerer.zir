@@ -788,6 +788,7 @@ class LIRLowerer {
             },
             MIRTypeKind::Pointer | MIRTypeKind::Function => 4,
             MIRTypeKind::Array => this.AlignOf((_type as *MIRArrayType)->element),
+            MIRTypeKind::Structure if (_type as *MIRStructureType)->packed => 1,
             MIRTypeKind::Structure => {
                 let mut alignment: u32 = 1;
 
@@ -822,10 +823,11 @@ class LIRLowerer {
             },
             MIRTypeKind::Structure => {
                 let mut size: u32 = 0;
+                let packed = (_type as *MIRStructureType)->packed;
                 let alignment = this.AlignOf(_type);
 
                 for field in (_type as *MIRStructureType)->fields {
-                    let field_alignment = this.AlignOf(field);
+                    let field_alignment: u32 = if packed { 1 } else { this.AlignOf(field) };
                     size = this.AlignUp(size, field_alignment);
                     size += this.SizeOf(field);
                 }
@@ -852,12 +854,12 @@ class LIRLowerer {
 
         for i in 0..index as usize {
             let field = _type->fields[i];
-            let field_alignment = this.AlignOf(field);
+            let field_alignment: u32 = if _type->packed { 1 } else { this.AlignOf(field) };
             offset = this.AlignUp(offset, field_alignment);
             offset += this.SizeOf(field);
         }
 
-        if index as usize < _type->fields.Length() {
+        if index as usize < _type->fields.Length() && !_type->packed {
             offset = this.AlignUp(offset, this.AlignOf(_type->fields[index as usize]));
         }
 
@@ -871,7 +873,7 @@ class LIRLowerer {
 
     fn SignExtendValue(&this, value: HostSigned, width: u32) -> HostSigned {
         let bits = if width == 0 || width > 32 { 32 } else { width };
-        let shift = (sizeof(HostSigned) * 8 - bits as usize) as HostSigned;
+        let shift = (size_of<HostSigned>() * 8 - bits as usize) as HostSigned;
         (value << shift) >> shift
     }
 
@@ -1070,17 +1072,45 @@ class LIRLowerer {
         this.AllocateStack(this.SizeOf(alloca->_type), this.AlignOf(alloca->_type))
     }
 
+    fn LoadBytes(&mut this, memory: *LIRMemoryOperand, size: u32) -> *LIROperand {
+        let legal = this.LegalMemory(memory, size);
+        let mut result = this.EmitValue(LIROpcode::Lbu, this.builder.MemoryOperand(legal->base, legal->offset), null);
+
+        for k in 1..size {
+            let byte = this.EmitValue(LIROpcode::Lbu, this.builder.MemoryOperand(legal->base, legal->offset + k as i32), null);
+            let shifted = this.EmitValue(LIROpcode::Slli, byte, this.Immediate((8 * k) as HostSigned));
+            result = this.EmitValue(LIROpcode::Or, result, shifted);
+        }
+
+        result
+    }
+
+    fn StoreBytes(&mut this, source: *LIROperand, memory: *LIRMemoryOperand, size: u32) {
+        let legal = this.LegalMemory(memory, size);
+
+        for k in 0..size {
+            let byte = if k == 0 { source } else { this.EmitValue(LIROpcode::Srli, source, this.Immediate((8 * k) as HostSigned)) };
+            this.Emit(LIROpcode::Sb, null, byte, this.builder.MemoryOperand(legal->base, legal->offset + k as i32));
+        }
+    }
+
     fn LowerLoadInstruction(&mut this, load: *MIRLoadInstruction) -> *LIROperand {
         let pointer = this.LowerValue(load->pointer);
         if pointer == null { return null; }
-        let (size, alignment) = (this.SizeOf(load->_type), this.AlignOf(load->_type));
+        let (size, natural_alignment) = (this.SizeOf(load->_type), this.AlignOf(load->_type));
+        let mut alignment = natural_alignment;
+        if load->alignment != 0 && load->alignment < alignment { alignment = load->alignment; }
 
         if this.IsAggregate(load->_type) {
-            let temporary = this.AllocateStack(size, alignment);
+            let temporary = this.AllocateStack(size, natural_alignment);
             this.CopyMemory(temporary, this.EnsureMemory(pointer), size, alignment);
             return temporary;
         } else if !this.IsScalar(load->_type) {
             return this.Unsupported(if load->_type->kind == MIRTypeKind::Float { "Floating point" } else { "64-bit integer arithmetic" });
+        }
+
+        if alignment < size {
+            return this.LoadBytes(this.EnsureMemory(pointer), size);
         }
 
         this.EmitValue(this.LoadOpcode(size), this.LegalMemory(this.EnsureMemory(pointer), size), null)
@@ -1088,7 +1118,8 @@ class LIRLowerer {
 
     fn LowerStoreInstruction(&mut this, store: *MIRStoreInstruction) -> *LIROperand {
         let _type = store->value->_type;
-        let (size, alignment) = (this.SizeOf(_type), this.AlignOf(_type));
+        let (size, mut alignment) = (this.SizeOf(_type), this.AlignOf(_type));
+        if store->alignment != 0 && store->alignment < alignment { alignment = store->alignment; }
 
         if this.IsAggregate(_type) && this.IsEmptyConstant(store->value) {
             let pointer = this.LowerValue(store->pointer);
@@ -1109,6 +1140,12 @@ class LIRLowerer {
         }
 
         let source = this.EnsureRegister(value);
+
+        if alignment < size {
+            this.StoreBytes(source, this.EnsureMemory(pointer), size);
+            return null;
+        }
+
         this.Emit(this.StoreOpcode(size), null, source, this.LegalMemory(this.EnsureMemory(pointer), size));
         null
     }

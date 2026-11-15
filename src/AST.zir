@@ -235,7 +235,7 @@ class ASTFunctionType : ASTType {
 }
 
 enum ASTPatternKind: u8 {
-    Wildcard, Rest, Literal, Range, Identifier, Tuple, Field, Structure, Variant, Path, Or
+    Wildcard, Rest, Literal, Range, Identifier, Tuple, Array, Field, Structure, Variant, Path, Or
 }
 
 extend ASTPatternKind {
@@ -247,6 +247,7 @@ extend ASTPatternKind {
             ASTPatternKind::Range => "Range",
             ASTPatternKind::Identifier => "Identifier",
             ASTPatternKind::Tuple => "Tuple",
+            ASTPatternKind::Array => "Array",
             ASTPatternKind::Field => "Field",
             ASTPatternKind::Structure => "Structure",
             ASTPatternKind::Variant => "Variant",
@@ -304,6 +305,12 @@ class ASTTuplePattern : ASTPattern {
     pub patterns: Vector<*ASTPattern>;
 
     ASTTuplePattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Tuple, span) {}
+}
+
+class ASTArrayPattern : ASTPattern {
+    pub patterns: Vector<*ASTPattern>;
+
+    ASTArrayPattern(&mut this, span: SourceSpan) : ASTPattern(ASTPatternKind::Array, span) {}
 }
 
 class ASTFieldPattern : ASTPattern {
@@ -529,7 +536,8 @@ class ASTTupleLiteral : ASTLiteral {
 
 class ASTStructureLiteral : ASTLiteral {
     pub target: *ASTExpression,
-    pub fields: Map<String, *ASTExpression>;
+    pub fields: Map<String, *ASTExpression>,
+    pub base: *ASTExpression = null;
 
     ASTStructureLiteral(&mut this, target: *ASTExpression, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Structure, span) {
         this.target = target;
@@ -542,6 +550,11 @@ class ASTStructureLiteral : ASTLiteral {
             if i > 0 { result += ", "; }
             let (name, expression) = this.fields.AsSlice()[i];
             result += name + ": " + expression->ToString();
+        }
+
+        if this.base != null {
+            if this.fields.Length() > 0 { result += ", "; }
+            result += ".." + this.base->ToString();
         }
 
         result + " }"
@@ -1056,10 +1069,11 @@ class ASTStatement : ASTNode {
 class ASTLetStatement : ASTStatement {
     pub pattern: *ASTPattern,
     pub _type: *ASTType,
-    pub initializer: *ASTExpression;
+    pub initializer: *ASTExpression,
+    pub else_body: *ASTBlockExpression;
 
-    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, span: SourceSpan) : ASTStatement(ASTStatementKind::Variable, span) {
-        (this.pattern, this._type, this.initializer) = (pattern, _type, initializer);
+    ASTLetStatement(&mut this, pattern: *ASTPattern, _type: *ASTType, initializer: *ASTExpression, else_body: *ASTBlockExpression, span: SourceSpan) : ASTStatement(ASTStatementKind::Variable, span) {
+        (this.pattern, this._type, this.initializer, this.else_body) = (pattern, _type, initializer, else_body);
     }
 }
 
@@ -1195,10 +1209,11 @@ class ASTStructureDeclaration : ASTDeclaration {
     pub fields: Vector<*ASTFieldDeclaration>,
     pub methods: Vector<*ASTFunctionDeclaration>,
     pub types: Vector<String>,
-    pub generic: bool = false;
+    pub generic: bool = false,
+    pub packed: bool;
 
-    ASTStructureDeclaration(&mut this, name: String, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Structure, span) {
-        this.name = name;
+    ASTStructureDeclaration(&mut this, name: String, packed: bool, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Structure, span) {
+        (this.name, this.packed) = (name, packed);
     }
 }
 
@@ -1289,10 +1304,11 @@ class ASTExtendDeclaration : ASTDeclaration {
 
 class ASTTypeDeclaration : ASTDeclaration {
     pub name: String,
-    pub _type: *ASTType;
+    pub _type: *ASTType,
+    pub types: Vector<String>;
 
-    ASTTypeDeclaration(&mut this, name: String, _type: *ASTType, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Type, span) {
-        (this.name, this._type) = (name, _type);
+    ASTTypeDeclaration(&mut this, name: String, types: Vector<String>, _type: *ASTType, span: SourceSpan) : ASTDeclaration(ASTDeclarationKind::Type, span) {
+        (this.name, this.types, this._type) = (name, types, _type);
     }
 }
 

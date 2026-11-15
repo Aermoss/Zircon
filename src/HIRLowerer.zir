@@ -328,6 +328,13 @@ class HIRLowerer {
 
     fn LowerTypeDeclaration(&mut this, type_definition: *ASTTypeDeclaration) {
         if !this.TakePendingType(type_definition, type_definition->name) { return; }
+
+        if !type_definition->types.Empty() {
+            let generic = this.context.arena.New<GenericDeclaration>(type_definition);
+            this.scope_manager.current->Set(type_definition->name, generic, type_definition);
+            return;
+        }
+
         this.scope_manager.current->Set(type_definition->name, this.LowerTypeOrVoid(type_definition->_type), type_definition);
     }
 
@@ -676,14 +683,14 @@ class HIRLowerer {
 
     fn ValidateFieldType(&mut this, name: &String, _type: *HIRType, owner: *HIRType, node: *ASTNode) -> bool {
         if _type->IsNever() {
-            Logger::Log("Field '" + name + "' cannot have type '" + _type->ToString() + "'.", node, LogSeverity::Error);
+            Logger::Log("Field '" + name + "' cannot have type '" + _type->Name() + "'.", node, LogSeverity::Error);
             return false;
         }
 
         let mut visited = Vector<*HIRType>();
 
         if this.ContainsByValue(_type, owner, visited) {
-            Logger::Log("Recursive type '" + owner->ToString() + "' has infinite size; field '" + name + "' must be behind a pointer.", node, LogSeverity::Error);
+            Logger::Log("Recursive type '" + owner->Name() + "' has infinite size; field '" + name + "' must be behind a pointer.", node, LogSeverity::Error);
             return false;
         }
 
@@ -751,7 +758,7 @@ class HIRLowerer {
         }
 
         if !target->IsCompatible(expression->_type) {
-            Logger::Log(message.ToString() + " ('" + target->ToString() + "' != '" + expression->_type->ToString() + "').", node, LogSeverity::Error);
+            Logger::Log(message.ToString() + " ('" + target->Name() + "' != '" + expression->_type->Name() + "').", node, LogSeverity::Error);
             return null;
         }
 
@@ -816,7 +823,11 @@ class HIRLowerer {
                 this.IsConstantExpression(binary->left) && this.IsConstantExpression(binary->right)
             },
             HIRExpressionKind::DeclarationReference => (expression as *HIRDeclarationReference)->declaration->kind == HIRDeclarationKind::Function,
-            _ => expression->kind == HIRExpressionKind::Intrinsic
+            HIRExpressionKind::Intrinsic => {
+                let kind = (expression as *HIRIntrinsicExpression)->kind;
+                kind == HIRIntrinsicKind::SizeOf || kind == HIRIntrinsicKind::AlignOf || kind == HIRIntrinsicKind::OffsetOf
+            },
+            _ => false
         }
     }
 
@@ -914,7 +925,7 @@ class HIRLowerer {
             if _type == null { return null; }
 
             if _type->IsNever() {
-                Logger::Log("Parameter '" + parameter->name + "' cannot have type '" + _type->ToString() + "'.", parameter->_type, LogSeverity::Error);
+                Logger::Log("Parameter '" + parameter->name + "' cannot have type '" + _type->Name() + "'.", parameter->_type, LogSeverity::Error);
             }
 
             parameters.PushBack(this.builder.BuildParameterDeclaration(parameter->name, _type, parameter->mutable));
@@ -1408,6 +1419,10 @@ class HIRLowerer {
             return value;
         }
 
+        if value->category == HIRExpressionCategory::Place && value->_type->IsTrivial() && this.builder.IsPackedField(value) {
+            return value;
+        }
+
         if value->category == HIRExpressionCategory::Place {
             let function = this.GetCopyConstructor(value->_type);
             if function == null { return null; }
@@ -1492,7 +1507,7 @@ class HIRLowerer {
                 let function = this.ResolveOverload(candidates, values, null, true);
 
                 if function == null {
-                    Logger::Log("Field '" + field->name + "' of type '" + field->_type->ToString() + "' has no default constructor, it must be initialized explicitly.", LogSeverity::Error);
+                    Logger::Log("Field '" + field->name + "' of type '" + field->_type->Name() + "' has no default constructor, it must be initialized explicitly.", LogSeverity::Error);
                     continue;
                 }
 
@@ -1531,7 +1546,7 @@ class HIRLowerer {
             if call == null { return false; }
             this.builder.BuildExpressionStatement(call);
         } else if _type->IsVariant() {
-            Logger::Log("Type '" + _type->ToString() + "' has no default value.", node, LogSeverity::Error);
+            Logger::Log("Type '" + _type->Name() + "' has no default value.", node, LogSeverity::Error);
             return false;
         } else if _type->IsStructure() {
             for field in (_type as *HIRStructureType)->declaration->fields {
@@ -1619,8 +1634,8 @@ class HIRLowerer {
             if (function->_virtual || function->_override) && method->instance_kind != ASTInstanceKind::ConstRef && method->instance_kind != ASTInstanceKind::MutRef {
                 Logger::Log("Virtual method '" + function->name + "' must take '&this' or '&mut this'.", method, LogSeverity::Error);
             } else if conflict >= 0 {
-                let expected = vtable[conflict as usize]->_return->ToString();
-                Logger::Log("Method '" + function->name + "' has the parameters of a virtual method but returns '" + function->_return->ToString() + "' instead of '" + expected + "'.", method, LogSeverity::Error);
+                let expected = vtable[conflict as usize]->_return->Name();
+                Logger::Log("Method '" + function->name + "' has the parameters of a virtual method but returns '" + function->_return->Name() + "' instead of '" + expected + "'.", method, LogSeverity::Error);
             } else if function->_override {
                 if slot < 0 {
                     Logger::Log("Method '" + function->name + "' is marked 'override' but does not override a virtual method.", method, LogSeverity::Error);
@@ -1654,7 +1669,7 @@ class HIRLowerer {
 
         for function in (_type as *HIRClassType)->declaration->vtable {
             if function->abstract {
-                Logger::Log("Cannot create an instance of abstract class '" + _type->ToString() + "', method '" + function->name + "' has no body.", node, LogSeverity::Error);
+                Logger::Log("Cannot create an instance of abstract class '" + _type->Name() + "', method '" + function->name + "' has no body.", node, LogSeverity::Error);
                 return true;
             }
         }
@@ -1682,9 +1697,9 @@ class HIRLowerer {
             if !_type->IsClass() {
                 Logger::Log("Constructor target must be a class.", candidate, LogSeverity::Error);
             } else if parent == null || *_type != *parent {
-                Logger::Log("Type '" + _type->ToString() + "' is not the parent of '" + this.current_type->ToString() + "'.", candidate, LogSeverity::Error);
+                Logger::Log("Type '" + _type->Name() + "' is not the parent of '" + this.current_type->Name() + "'.", candidate, LogSeverity::Error);
             } else if initializer != null {
-                Logger::Log("Parent '" + _type->ToString() + "' is initialized more than once.", candidate, LogSeverity::Error);
+                Logger::Log("Parent '" + _type->Name() + "' is initialized more than once.", candidate, LogSeverity::Error);
             } else {
                 initializer = candidate;
             }
@@ -1705,7 +1720,7 @@ class HIRLowerer {
 
         if constructor == null {
             if initializer == null {
-                Logger::Log("Parent '" + parent->ToString() + "' has no default constructor, it must be initialized explicitly.", node, LogSeverity::Error);
+                Logger::Log("Parent '" + parent->Name() + "' has no default constructor, it must be initialized explicitly.", node, LogSeverity::Error);
             } return;
         }
 
@@ -1963,7 +1978,7 @@ class HIRLowerer {
 
         let mut scope: *mut Scope = null;
         let _type = this.context.StructureType(null);
-        let declaration = this.builder.BuildStructureDeclaration(structure->name, _type);
+        let declaration = this.builder.BuildStructureDeclaration(structure->name, _type, structure->packed);
         _type->declaration = declaration;
 
         if instance == null {
@@ -1999,6 +2014,14 @@ class HIRLowerer {
     pub fn LowerStructureDeclarationThirdPass(&mut this, declaration: *mut HIRStructureDeclaration, structure: *ASTStructureDeclaration, scope: *mut Scope) {
         let (previous_type, previous_scope) = (this.current_type, this.scope_manager.current);
         (this.current_type, this.scope_manager.current) = (declaration->_type, scope);
+
+        if declaration->packed {
+            for field in declaration->fields {
+                if !field->_type->IsTrivial() {
+                    Logger::Log("Field '" + field->name + "' of packed structure '" + declaration->name + "' must be trivially copyable, but has type '" + field->_type->Name() + "'.", structure, LogSeverity::Error);
+                }
+            }
+        }
 
         for method in structure->methods {
             let function = this.LowerFunctionDeclarationFirstPass(method, null);
@@ -2039,7 +2062,11 @@ class HIRLowerer {
             let other_dereferenced = this.builder.Dereference(other_reference);
 
             for field in declaration->fields {
-                this.LowerFieldCopyConstructor(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
+                if declaration->packed {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field)));
+                } else {
+                    this.LowerFieldCopyConstructor(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
+                }
             }
 
             this.scope_manager.PopScope();
@@ -2058,6 +2085,7 @@ class HIRLowerer {
             let this_dereferenced = this.builder.Dereference(this_reference);
 
             for field in declaration->fields {
+                if declaration->packed { continue; }
                 this.LowerFieldDestructor(this.builder.FieldAccess(this_dereferenced, field), field->_type, structure);
             }
 
@@ -2081,7 +2109,11 @@ class HIRLowerer {
             let other_dereferenced = this.builder.Dereference(other_reference);
 
             for field in declaration->fields {
-                this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
+                if declaration->packed {
+                    this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field)));
+                } else {
+                    this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
+                }
             }
 
             this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
@@ -2119,7 +2151,7 @@ class HIRLowerer {
                 }
 
                 if !_type->IsCompatible(value->_type) {
-                    Logger::Log("Expected an expression of type '" + underlying_type->ToString() + "'.", member->value, LogSeverity::Error);
+                    Logger::Log("Expected an expression of type '" + underlying_type->Name() + "'.", member->value, LogSeverity::Error);
                     continue;
                 }
             }
@@ -2462,12 +2494,49 @@ class HIRLowerer {
         }
     }
 
+    fn LowerLetElseStatement(&mut this, _let: *ASTLetStatement, _type: *HIRType) {
+        let temporary_index = this.temporaries.Length();
+        let mut initializer = this.LowerExpectedExpression(_let->initializer, _type);
+        if initializer == null { return; }
+
+        if _type != null {
+            initializer = this.Validate(this.Coerce(initializer, _type), _type, "Incompatible binding initialization types", _let->initializer);
+            if initializer == null { return; }
+        }
+
+        initializer = this.ImplicitDereference(initializer);
+        let destructors = this.GetTemporaryDestructorsSince(temporary_index, null);
+        this.scope_manager.PushScope("<else>".ToString(), false);
+        let else_body = this.LowerBlockExpression(_let->else_body, true, HIRBlockTail::Value, null);
+        this.scope_manager.PopScope();
+        if else_body == null { return; }
+
+        if !else_body->_type->IsNever() {
+            Logger::Log("The 'else' block of a 'let ... else' statement must not complete normally; end it with 'return', 'break', 'continue' or a call to a function returning '!'.", _let->else_body, LogSeverity::Error);
+        }
+
+        let pattern = this.LowerPattern(_let->pattern, null, initializer, HIRBindingMode::Value);
+        if pattern == null { return; }
+
+        if pattern->IsIrrefutable() {
+            Logger::Log("Irrefutable pattern in a 'let ... else' statement; the 'else' block is never executed.", _let->pattern, LogSeverity::Warning);
+        }
+
+        let statement = this.builder.BuildLetStatement(pattern, _type, initializer, else_body, destructors);
+        this.builder.GetCurrentBlock()->statements.PushBack(statement);
+    }
+
     fn LowerLetStatement(&mut this, _let: *ASTLetStatement) {
         let mut _type: *HIRType = null;
 
         if _let->_type != null {
             _type = this.LowerType(_let->_type);
             if _type == null { return; }
+        }
+
+        if _let->else_body != null {
+            this.LowerLetElseStatement(_let, _type);
+            return;
         }
 
         let mut initializer: *HIRExpression = null;
@@ -2653,7 +2722,7 @@ class HIRLowerer {
             }
 
             if common == null {
-                Logger::Log("Incompatible branch types ('" + _type->ToString() + "' != '" + branch->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible branch types ('" + _type->Name() + "' != '" + branch->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             } _type = common;
         }
@@ -3091,7 +3160,7 @@ class HIRLowerer {
                 if value == null { return null; }
 
                 if !value->_type->IsTrivial() {
-                    Logger::Log("Type '" + value->_type->ToString() + "' cannot be repeated in an array, because it is not trivially copyable.", array->elements[0], LogSeverity::Error);
+                    Logger::Log("Type '" + value->_type->Name() + "' cannot be repeated in an array, because it is not trivially copyable.", array->elements[0], LogSeverity::Error);
                     return null;
                 }
 
@@ -3165,8 +3234,25 @@ class HIRLowerer {
                     let mut values = Vector<*HIRExpression>();
                     let mut initialized_fields = Vector<usize>();
                     values.Resize(fields.Length());
+                    let mut base: *HIRExpression = null;
 
-                    if structure->fields.Length() != fields.Length() {
+                    if structure->base != null {
+                        base = this.LowerExpression(structure->base);
+                        if base == null { return null; }
+                        base = this.ImplicitDereference(base);
+
+                        if *base->_type != *_type {
+                            Logger::Log("Incompatible structure update base type ('" + base->_type->Name() + "' != '" + (_type as *HIRType)->Name() + "').", structure->base, LogSeverity::Error);
+                            return null;
+                        }
+
+                        if base->category != HIRExpressionCategory::Place {
+                            Logger::Log("The base of a structure update must be a variable or another place expression.", structure->base, LogSeverity::Error);
+                            return null;
+                        }
+                    }
+
+                    if base == null && structure->fields.Length() != fields.Length() {
                         Logger::Log("Structure '" + path->ToString() + "' field count mismatch.", literal, LogSeverity::Error);
                         return null;
                     }
@@ -3200,6 +3286,21 @@ class HIRLowerer {
                         values[index as usize] = value;
                     }
 
+                    if base != null {
+                        for i in 0..fields.Length() {
+                            if initialized_fields.Contains(i) { continue; }
+
+                            if !fields[i]->public && (this.current_type == null || *this.current_type != *_type) {
+                                Logger::Log("Field '" + fields[i]->name + "' of structure '" + path->ToString() + "' is private and cannot be copied by a structure update.", structure->base, LogSeverity::Error);
+                                return null;
+                            }
+
+                            let value = this.LowerCopyOrMoveValue(this.builder.FieldAccess(base, fields[i]));
+                            if value == null { return null; }
+                            values[i] = value;
+                        }
+                    }
+
                     let literal = this.builder.StructureLiteral(values, _type);
                     this.temporaries.PushBack(literal);
                     return literal;
@@ -3217,6 +3318,11 @@ class HIRLowerer {
 
                     if !member->structure {
                         Logger::Log("Variant member '" + path->ToString() + "' is not a structure.", literal, LogSeverity::Error);
+                        return null;
+                    }
+
+                    if structure->base != null {
+                        Logger::Log("Structure update syntax can only be used with structures, not variant members.", structure->base, LogSeverity::Error);
                         return null;
                     }
 
@@ -3315,7 +3421,9 @@ class HIRLowerer {
             right = this.Coerce(right, left->_type);
         }
 
-        if left->_type->HasSpecialMembers() {
+        let packed = left->_type->IsTrivial() && (this.builder.IsPackedField(left) || this.builder.IsPackedField(right));
+
+        if left->_type->HasSpecialMembers() && !packed {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(left);
             values.PushBack(right);
@@ -3463,80 +3571,145 @@ class HIRLowerer {
         result
     }
 
+    fn IsTypeIntrinsic(&this, name: &String) -> bool {
+        name == "size_of" || name == "align_of" || name == "offset_of" || name == "type_id" || name == "type_name"
+    }
+
+    fn LowerTypeIntrinsic(&mut this, call: *ASTCallExpression, path: *ASTPath) -> *HIRExpression {
+        let name = path->segments[0].name;
+        let types = path->segments[0].types;
+
+        if types.Length() > 1 {
+            Logger::Log("Intrinsic '" + name + "' expects exactly one type argument.", call, LogSeverity::Error);
+            return null;
+        }
+
+        let mut _type: *HIRType = null;
+
+        if types.Length() == 1 {
+            _type = this.LowerType(types[0]);
+            if _type == null { return null; }
+        } else if name == "size_of" && call->arguments.Length() == 1 {
+            let index = this.temporaries.Length();
+            let value = this.LowerExpression(call->arguments[0]);
+            this.temporaries.Resize(index);
+            if value == null { return null; }
+            _type = this.ImplicitDereference(value)->_type;
+        } else {
+            Logger::Log("Intrinsic '" + name + "' requires a type argument, as in '" + name + "<T>()'.", call, LogSeverity::Error);
+            return null;
+        }
+
+        let expected: usize = if name == "offset_of" || types.Empty() { 1 } else { 0 };
+
+        if call->arguments.Length() != expected {
+            Logger::Log("Invalid number of arguments for intrinsic '" + name + "'.", call, LogSeverity::Error);
+            return null;
+        }
+
+        if name == "size_of" {
+            return this.builder.Intrinsic(HIRIntrinsicKind::SizeOf, _type);
+        } else if name == "align_of" {
+            return this.builder.Intrinsic(HIRIntrinsicKind::AlignOf, _type);
+        } else if name == "type_name" {
+            return this.builder.StringLiteral(_type->Name(), this.context.PointerType(this.context.IntegerType(8, true), false));
+        } else if name == "type_id" {
+#[if SVAROG]
+            Logger::Log("The type_id intrinsic requires a 64-bit integer and is not supported by the Svarog compiler.", call, LogSeverity::Error);
+            return null;
+#[else]
+            return this.builder.IntegerLiteral(_type->ToString().Hash(), this.context.IntegerType(64, false));
+#[endif]
+        }
+
+        let argument = call->arguments[0];
+
+        if argument->kind != ASTExpressionKind::Literal || (argument as *ASTLiteral)->kind != ASTLiteralKind::String {
+            Logger::Log("The field of 'offset_of' must be a string literal, as in 'offset_of<T>(\"field\")'.", argument, LogSeverity::Error);
+            return null;
+        }
+
+        if !_type->HasFields() {
+            Logger::Log("'offset_of' requires a class or structure type, not '" + _type->Name() + "'.", call, LogSeverity::Error);
+            return null;
+        }
+
+        this.CompleteType(_type);
+        let field_name = (argument as *ASTStringLiteral)->value;
+        let fields = _type->Fields();
+
+        for i in 0..fields.Length() {
+            if fields[i]->name != field_name { continue; }
+
+            if !fields[i]->public && (this.current_type == null || *this.current_type != *_type) {
+                Logger::Log("Field '" + field_name + "' is private.", argument, LogSeverity::Error);
+                return null;
+            }
+
+            return this.builder.OffsetOf(_type, i);
+        }
+
+        Logger::Log("Field '" + field_name + "' not found in type '" + _type->Name() + "'.", argument, LogSeverity::Error);
+        null
+    }
+
     fn LowerCallExpression(&mut this, call: *ASTCallExpression) -> *HIRExpression {
         if call->expression->kind == ASTExpressionKind::Path {
             let path = (call->expression as *ASTPathExpression)->path;
 
+            if !path->absolute && path->segments.Length() == 1 && this.IsTypeIntrinsic(path->segments[0].name) {
+                return this.LowerTypeIntrinsic(call, path);
+            }
+
             if !path->absolute && path->segments.Length() == 1 && path->segments[0].types.Empty() {
-                if path->segments[0].name == "sizeof" || path->segments[0].name == "alignof" || path->segments[0].name == "typeid" {
-                    if call->arguments.Length() != 1 {
-                        Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
-                        return null;
-                    }
-
-                    let mut _type: *HIRType;
-                    let argument = call->arguments[0];
-
-                    if argument->kind == ASTExpressionKind::Path {
-                        if this.IsPrimitiveTypeName((argument as *ASTPathExpression)->path) {
-                            _type = this.LowerType((argument as *ASTPathExpression)->path);
-                            if _type == null { return null; }
-                        } else {
-                            let path = (argument as *ASTPathExpression)->path;
-                            let symbols = this.scope_manager.Resolve(path, false);
-                            if symbols.Empty() { return null; }
-
-                            for symbol in symbols {
-                                match symbol->kind {
-                                    SymbolKind::Type => {
-                                        _type = symbol->_type;
-                                    },
-                                    SymbolKind::Pattern => {
-                                        _type = (symbol->pattern as *HIRIdentifierPattern)->_type;
-                                    },
-                                    SymbolKind::Expression => {
-                                        _type = symbol->expression->_type;
-                                    },
-                                    SymbolKind::Declaration => {
-                                        _type = (symbol->declaration as *HIRTypedDeclaration)->_type;
-                                    },
-                                    _ => {}
-                                }
-
-                                if _type != null {
-                                    break;
-                                }
-                            }
-
-                            if _type == null {
-                                Logger::Log("Symbol '" + path->ToString() + "' cannot be used as a type.", path, LogSeverity::Error);
-                                return null;
-                            }
-                        }
-                    } else if argument->kind == ASTExpressionKind::Literal && (argument as *ASTLiteral)->kind == ASTLiteralKind::Tuple && (argument as *ASTTupleLiteral)->elements.Empty() {
-                        _type = this.context.UnitType();
-                    } else {
-                        Logger::Log("Invalid argument kind '" + argument->kind.ToString() + "' for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
-                        return null;
-                    }
-
-                    if path->segments[0].name == "typeid" {
-#[if SVAROG]
-                        Logger::Log("The typeid intrinsic requires a 64-bit integer and is not supported by the Svarog compiler.", call, LogSeverity::Error);
-                        return null;
-#[else]
-                        return this.builder.IntegerLiteral(_type->ToString().Hash(), this.context.IntegerType(64, false));
-#[endif]
-                    }
-
-                    return this.builder.Intrinsic(if path->segments[0].name == "sizeof" { HIRIntrinsicKind::SizeOf } else { HIRIntrinsicKind::AlignOf }, _type);
-                } else if path->segments[0].name == "caller_location" {
+                if path->segments[0].name == "caller_location" {
                     if call->arguments.Length() != 0 {
                         Logger::Log("Invalid number of arguments for intrinsic '" + path->segments[0].name + "'.", call, LogSeverity::Error);
                         return null;
                     }
 
                     return this.LowerCallerLocation(call);
+                } else if path->segments[0].name == "volatile_read" || path->segments[0].name == "volatile_write" {
+                    let name = path->segments[0].name;
+                    let write = name == "volatile_write";
+                    let expected: usize = if write { 2 } else { 1 };
+
+                    if call->arguments.Length() != expected {
+                        Logger::Log("Invalid number of arguments for intrinsic '" + name + "'.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let mut invalid = false;
+                    let values = this.LowerCallArguments(call->arguments, call, &mut invalid);
+                    if invalid { return null; }
+                    let pointer = this.ImplicitDereference(values[0]);
+
+                    if !pointer->_type->IsPointer() || pointer->_type->IsReference() {
+                        Logger::Log("The first argument of '" + name + "' must be a pointer.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let pointee: *HIRType = pointer->_type->Pointee();
+
+                    if !pointee->IsInteger() && !pointee->IsBoolean() && !pointee->IsCharacter() && !pointee->IsEnumeration() && !pointee->IsPointer() {
+                        Logger::Log("'" + name + "' can only access integer, boolean, character, enumeration or pointer values, not '" + pointee->Name() + "'.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    if !write {
+                        return this.builder.VolatileRead(pointer);
+                    }
+
+                    if !pointer->_type->IsMutable() {
+                        Logger::Log("The first argument of 'volatile_write' must be a mutable pointer.", call, LogSeverity::Error);
+                        return null;
+                    }
+
+                    let mut value = this.Coerce(this.ImplicitDereference(values[1]), pointee);
+                    if value == null { return null; }
+                    value = this.Validate(value, pointee, "Incompatible 'volatile_write' value types", call);
+                    if value == null { return null; }
+                    return this.builder.VolatileWrite(pointer, value);
                 } else if path->segments[0].name == "slice" {
                     if call->arguments.Length() != 2 {
                         Logger::Log("Invalid number of arguments for 'slice'.", call, LogSeverity::Error);
@@ -3836,7 +4009,7 @@ class HIRLowerer {
         } else if _type->IsInteger() || _type->IsFloat() || _type->IsEnumeration() || _type->IsFunction() || _type->kind == HIRTypeKind::Pointer {
             coerced
         } else {
-            Logger::Log("Type '" + _type->ToString() + "' cannot be passed as a variadic argument.", node, LogSeverity::Error);
+            Logger::Log("Type '" + _type->Name() + "' cannot be passed as a variadic argument.", node, LogSeverity::Error);
             null
         }
     }
@@ -3963,7 +4136,7 @@ class HIRLowerer {
         if this.RejectAbstractClass(_type, _new) { return null; }
 
         if _type->IsNever() {
-            Logger::Log("Cannot allocate a value of type '" + _type->ToString() + "'.", _new, LogSeverity::Error);
+            Logger::Log("Cannot allocate a value of type '" + _type->Name() + "'.", _new, LogSeverity::Error);
             return null;
         }
 
@@ -4116,7 +4289,7 @@ class HIRLowerer {
 
         if *value->_type == target {
             if !state {
-                Logger::Log("Redundant cast. ('" + value->_type->ToString() + "' to '" + target->ToString() + "')", cast, LogSeverity::Warning);
+                Logger::Log("Redundant cast. ('" + value->_type->Name() + "' to '" + target->Name() + "')", cast, LogSeverity::Warning);
             } else {
                 if !failed || this._unsafe {
                     return this.builder.Cast(value, target);
@@ -4175,7 +4348,7 @@ class HIRLowerer {
 
             this.builder.Cast(value, target)
         } else {
-            Logger::Log("Cannot cast '" + value->_type->ToString() + "' to '" + target->ToString() + "'.", cast, LogSeverity::Error);
+            Logger::Log("Cannot cast '" + value->_type->Name() + "' to '" + target->Name() + "'.", cast, LogSeverity::Error);
             null
         }
     }
@@ -4285,12 +4458,12 @@ class HIRLowerer {
         }
 
         if !instance->_type->IsTuple() {
-            Logger::Log("Cannot access field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' of type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
+            Logger::Log("Cannot access field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' of type '" + instance->_type->Name() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
 
         if tuple_access->index >= (instance->_type as *HIRTupleType)->elements.Length() {
-            Logger::Log("Field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' not found in type '" + instance->_type->ToString() + "'.", tuple_access, LogSeverity::Error);
+            Logger::Log("Field '" + String::FromInteger(tuple_access->index as HostUnsigned) + "' not found in type '" + instance->_type->Name() + "'.", tuple_access, LogSeverity::Error);
             return null;
         }
 
@@ -4320,7 +4493,7 @@ class HIRLowerer {
         }
 
         if !instance->_type->HasFields() {
-            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->ToString() + "'.", member_access->member_span, LogSeverity::Error);
+            Logger::Log("Cannot access field '" + member_access->member + "' of type '" + instance->_type->Name() + "'.", member_access->member_span, LogSeverity::Error);
             return null;
         }
 
@@ -4340,7 +4513,7 @@ class HIRLowerer {
 
             this.builder.FieldAccess(instance, field)
         } else {
-            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->ToString() + "'.", member_access->member_span, LogSeverity::Error);
+            Logger::Log("Field '" + member_access->member + "' not found in type '" + instance->_type->Name() + "'.", member_access->member_span, LogSeverity::Error);
             null
         }
     }
@@ -4384,12 +4557,12 @@ class HIRLowerer {
             },
             ASTUnaryKind::Dereference => {
                 if !value->_type->IsPointer() {
-                    Logger::Log("Cannot dereference non-pointer type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                    Logger::Log("Cannot dereference non-pointer type '" + value->_type->Name() + "'.", unary, LogSeverity::Error);
                     return null;
                 }
 
                 if value->_type->Pointee().IsVoid() {
-                    Logger::Log("Cannot dereference a value of type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                    Logger::Log("Cannot dereference a value of type '" + value->_type->Name() + "'.", unary, LogSeverity::Error);
                     return null;
                 }
 
@@ -4421,12 +4594,12 @@ class HIRLowerer {
                 match unary->kind {
                     ASTUnaryKind::Negate => {
                         if !value->_type->IsInteger() && !value->_type->IsFloat() {
-                            Logger::Log("Cannot negate type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                            Logger::Log("Cannot negate type '" + value->_type->Name() + "'.", unary, LogSeverity::Error);
                             return null;
                         }
 
                         if value->_type->IsInteger() && !value->_type->IsSigned() {
-                            Logger::Log("Cannot negate unsigned type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                            Logger::Log("Cannot negate unsigned type '" + value->_type->Name() + "'.", unary, LogSeverity::Error);
                             return null;
                         }
 
@@ -4434,7 +4607,7 @@ class HIRLowerer {
                     },
                     ASTUnaryKind::Not => {
                         if !value->_type->IsInteger() && !value->_type->IsBoolean() {
-                            Logger::Log("Cannot invert type '" + value->_type->ToString() + "'.", unary, LogSeverity::Error);
+                            Logger::Log("Cannot invert type '" + value->_type->Name() + "'.", unary, LogSeverity::Error);
                             return null;
                         }
 
@@ -4490,7 +4663,7 @@ class HIRLowerer {
 
         if binary->kind == ASTBinaryKind::LogicalAnd || binary->kind == ASTBinaryKind::LogicalOr {
             if !left->_type->IsBoolean() {
-                Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
+                Logger::Log("Invalid type '" + left->_type->Name() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
                 return null;
             }
 
@@ -4500,7 +4673,7 @@ class HIRLowerer {
             if right == null { return null; }
 
             if !right->_type->IsBoolean() {
-                Logger::Log("Invalid type '" + right->_type->ToString() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
+                Logger::Log("Invalid type '" + right->_type->Name() + "' for binary operation '" + binary->kind.ToString() + "'.", binary, LogSeverity::Error);
                 return null;
             }
 
@@ -4562,7 +4735,7 @@ class HIRLowerer {
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 ASTBinaryKind::LogicalAnd | ASTBinaryKind::BitwiseAnd | ASTBinaryKind::LogicalOr | ASTBinaryKind::BitwiseOr | ASTBinaryKind::BitwiseXor => this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type),
                 _ => {
-                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
@@ -4570,12 +4743,12 @@ class HIRLowerer {
             if kind == ASTBinaryKind::Equal || kind == ASTBinaryKind::NotEqual || kind == ASTBinaryKind::Greater || kind == ASTBinaryKind::GreaterEqual || kind == ASTBinaryKind::Less || kind == ASTBinaryKind::LessEqual {
                 this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType())
             } else {
-                Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                 null
             }
         } else if left->_type->IsInteger() && right->_type->IsInteger() {
             if *left->_type != *right->_type && !(kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->Name() + "' != '" + right->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4587,7 +4760,7 @@ class HIRLowerer {
             }
 
             if (kind == ASTBinaryKind::LeftShift || kind == ASTBinaryKind::RightShift) && this.IntegerLiteralValue(right, &mut constant) && constant >= left->_type->Width() as HostUnsigned {
-                Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                Logger::Log("Shift amount " + String::FromInteger(constant) + " is out of range for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4596,13 +4769,13 @@ class HIRLowerer {
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual | ASTBinaryKind::Greater | ASTBinaryKind::GreaterEqual | ASTBinaryKind::Less | ASTBinaryKind::LessEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 ASTBinaryKind::BitwiseAnd | ASTBinaryKind::BitwiseOr | ASTBinaryKind::BitwiseXor | ASTBinaryKind::LeftShift | ASTBinaryKind::RightShift => this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type),
                 _ => {
-                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
         } else if left->_type->IsFloat() && right->_type->IsFloat() {
             if *left->_type != *right->_type {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->Name() + "' != '" + right->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4610,13 +4783,13 @@ class HIRLowerer {
                 ASTBinaryKind::Add | ASTBinaryKind::Subtract | ASTBinaryKind::Multiply | ASTBinaryKind::Divide | ASTBinaryKind::Modulo => this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type),
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual | ASTBinaryKind::Greater | ASTBinaryKind::GreaterEqual | ASTBinaryKind::Less | ASTBinaryKind::LessEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 _ => {
-                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
         } else if left->_type->IsPointer() && right->_type->IsPointer() {
             if *left->_type != *right->_type && !(left->_type->IsNullPointer() || right->_type->IsNullPointer()) {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->Name() + "' != '" + right->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4624,7 +4797,7 @@ class HIRLowerer {
                 ASTBinaryKind::Subtract => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.IntegerPointerType(false)),
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual | ASTBinaryKind::Greater | ASTBinaryKind::GreaterEqual | ASTBinaryKind::Less | ASTBinaryKind::LessEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 _ => {
-                    Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
@@ -4638,7 +4811,7 @@ class HIRLowerer {
             }
 
             if pointer->_type->Pointee().IsVoid() {
-                Logger::Log("Pointer arithmetic is not allowed on type '" + pointer->_type->ToString() + "'.", node, LogSeverity::Error);
+                Logger::Log("Pointer arithmetic is not allowed on type '" + pointer->_type->Name() + "'.", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4653,25 +4826,25 @@ class HIRLowerer {
                     this.builder.Binary(this.LowerBinaryKind(kind), left, right, pointer->_type)
                 },
                 _ => {
-                    Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
         } else if (left->_type->IsFunction() && right->_type->IsNullPointer()) || (left->_type->IsNullPointer() && right->_type->IsFunction()) {
             if *left->_type != *right->_type && !(left->_type->IsNullPointer() || right->_type->IsNullPointer()) {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->Name() + "' != '" + right->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             }
 
             if kind == ASTBinaryKind::Equal || kind == ASTBinaryKind::NotEqual {
                 this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType())
             } else {
-                Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                Logger::Log("Invalid pointer binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                 null
             }
         } else if left->_type->IsEnumeration() && right->_type->IsEnumeration() {
             if *left->_type != *right->_type {
-                Logger::Log("Incompatible binary operation types. ('" + left->_type->ToString() + "' != '" + right->_type->ToString() + "').", node, LogSeverity::Error);
+                Logger::Log("Incompatible binary operation types. ('" + left->_type->Name() + "' != '" + right->_type->Name() + "').", node, LogSeverity::Error);
                 return null;
             }
 
@@ -4679,12 +4852,12 @@ class HIRLowerer {
                 ASTBinaryKind::BitwiseAnd | ASTBinaryKind::BitwiseOr | ASTBinaryKind::BitwiseXor => this.builder.Binary(this.LowerBinaryKind(kind), left, right, left->_type),
                 ASTBinaryKind::Equal | ASTBinaryKind::NotEqual | ASTBinaryKind::Greater | ASTBinaryKind::GreaterEqual | ASTBinaryKind::Less | ASTBinaryKind::LessEqual => this.builder.Binary(this.LowerBinaryKind(kind), left, right, this.context.BooleanType()),
                 _ => {
-                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->ToString() + "'.", node, LogSeverity::Error);
+                    Logger::Log("Invalid binary operation '" + kind.ToString() + "' for type '" + left->_type->Name() + "'.", node, LogSeverity::Error);
                     null
                 }
             }
         } else {
-            Logger::Log("Invalid type '" + left->_type->ToString() + "' for binary operation '" + kind.ToString() + "'.", node, LogSeverity::Error);
+            Logger::Log("Invalid type '" + left->_type->Name() + "' for binary operation '" + kind.ToString() + "'.", node, LogSeverity::Error);
             null
         }
     }
@@ -4756,7 +4929,7 @@ class HIRLowerer {
         if values == 0 {
             if result->tail != null && !result->tail->_type->IsUnit() && !result->tail->_type->IsNever() {
                 result->tail = this.Coerce(result->tail);
-                Logger::Log("Incompatible branch types ('" + result->tail->_type->ToString() + "' != '()').", block, LogSeverity::Error);
+                Logger::Log("Incompatible branch types ('" + result->tail->_type->Name() + "' != '()').", block, LogSeverity::Error);
                 result->_type = result->tail->_type;
                 return;
             }
@@ -4821,7 +4994,7 @@ class HIRLowerer {
             (block->tail, block->_type) = (moved, moved->_type);
             block->destructors = this.GetTemporaryDestructors(moved);
         } else {
-            Logger::Log("Expected a value of type '()', but found '" + value->_type->ToString() + "'; add ';' to discard it.", expression, LogSeverity::Error);
+            Logger::Log("Expected a value of type '()', but found '" + value->_type->Name() + "'; add ';' to discard it.", expression, LogSeverity::Error);
         }
     }
 
@@ -4844,7 +5017,7 @@ class HIRLowerer {
             condition = this.builder.BuildCondition(pattern, expression);
         } else {
             if expression != null && !expression->_type->IsBoolean() {
-                Logger::Log("Invalid condition type '" + expression->_type->ToString() + "'.", _if->condition->expression, LogSeverity::Error);
+                Logger::Log("Invalid condition type '" + expression->_type->Name() + "'.", _if->condition->expression, LogSeverity::Error);
             }
 
             condition = this.builder.BuildCondition(expression);
@@ -4900,7 +5073,7 @@ class HIRLowerer {
             condition = this.builder.BuildCondition(pattern, expression);
         } else {
             if expression != null && !expression->_type->IsBoolean() {
-                Logger::Log("Invalid condition type '" + expression->_type->ToString() + "'.", _while->condition->expression, LogSeverity::Error);
+                Logger::Log("Invalid condition type '" + expression->_type->Name() + "'.", _while->condition->expression, LogSeverity::Error);
             }
 
             condition = this.builder.BuildCondition(expression);
@@ -5097,8 +5270,8 @@ class HIRLowerer {
         let target = this.ImplicitDereference(this.LowerExpression(_match->target));
         if target == null { return null; }
 
-        if !target->_type->IsUnit() && !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() {
-            Logger::Log("Cannot match on a value of type '" + target->_type->ToString() + "'.", _match->target, LogSeverity::Error);
+        if !target->_type->IsUnit() && !target->_type->IsBoolean() && !target->_type->IsCharacter() && !target->_type->IsInteger() && !target->_type->IsFloat() && !target->_type->IsStructure() && !target->_type->IsEnumeration() && !target->_type->IsVariant() && !target->_type->IsArray() {
+            Logger::Log("Cannot match on a value of type '" + target->_type->Name() + "'.", _match->target, LogSeverity::Error);
             return null;
         }
 
@@ -5148,7 +5321,7 @@ class HIRLowerer {
         let missing = expression->Uncovered();
 
         if missing.Length() == 1 && missing[0] == "_" {
-            Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "'; add a '_' arm.", _match, LogSeverity::Error);
+            Logger::Log("Non-exhaustive match on '" + target->_type->Name() + "'; add a '_' arm.", _match, LogSeverity::Error);
         } else if !missing.Empty() {
             let mut names = String();
 
@@ -5157,7 +5330,7 @@ class HIRLowerer {
                 names += "'" + missing[i] + "'";
             }
 
-            Logger::Log("Non-exhaustive match on '" + target->_type->ToString() + "', not covered: " + names + ".", _match, LogSeverity::Error);
+            Logger::Log("Non-exhaustive match on '" + target->_type->Name() + "', not covered: " + names + ".", _match, LogSeverity::Error);
         }
 
         let _type = this.UnifyBranches(expression, _match);
@@ -5220,7 +5393,7 @@ class HIRLowerer {
         }
 
         if value == null && !return_type->IsUnit() {
-            Logger::Log("Expected a return value of type '" + return_type->ToString() + "'.", node, LogSeverity::Error);
+            Logger::Log("Expected a return value of type '" + return_type->Name() + "'.", node, LogSeverity::Error);
             return null;
         }
 
@@ -5439,7 +5612,7 @@ class HIRLowerer {
         if lowered == null { return null; }
 
         if lowered->kind != HIRExpressionKind::Literal || ((lowered as *HIRLiteral)->kind != HIRLiteralKind::Integer && (lowered as *HIRLiteral)->kind != HIRLiteralKind::Character) || !lowered->_type->IsSame(_type) {
-            Logger::Log("Range pattern bounds must be integer or character literals of type '" + _type->ToString() + "'.", bound, LogSeverity::Error);
+            Logger::Log("Range pattern bounds must be integer or character literals of type '" + _type->Name() + "'.", bound, LogSeverity::Error);
             return null;
         }
 
@@ -5447,7 +5620,7 @@ class HIRLowerer {
     }
 
     fn LowerPattern(&mut this, pattern: *ASTPattern, mut target_type: *HIRType, mut value: *HIRExpression, mode: HIRBindingMode) -> *HIRPattern {
-        if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant || pattern->kind == ASTPatternKind::Path) {
+        if target_type == null && value != null && value->_type->IsReference() && (pattern->kind == ASTPatternKind::Tuple || pattern->kind == ASTPatternKind::Array || pattern->kind == ASTPatternKind::Structure || pattern->kind == ASTPatternKind::Variant || pattern->kind == ASTPatternKind::Path) {
             return this.LowerReferencePattern(pattern, value);
         }
 
@@ -5468,7 +5641,7 @@ class HIRLowerer {
                 if literal == null { return null; }
 
                 if expected != null && !literal->_type->IsSame(expected) {
-                    Logger::Log("Mismatched pattern type, expected '" + expected->ToString() + "' but found '" + literal->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                    Logger::Log("Mismatched pattern type, expected '" + expected->Name() + "' but found '" + literal->_type->Name() + "'.", pattern, LogSeverity::Error);
                     return null;
                 }
 
@@ -5609,14 +5782,14 @@ class HIRLowerer {
                 }
 
                 if !any_type->IsTuple() {
-                    Logger::Log("Cannot destructure non-tuple type '" + any_type->ToString() + "' with a tuple pattern.", pattern, LogSeverity::Error);
+                    Logger::Log("Cannot destructure non-tuple type '" + any_type->Name() + "' with a tuple pattern.", pattern, LogSeverity::Error);
                     return null;
                 }
 
                 let tuple_type = any_type as *HIRTupleType;
                 let mut expanded = Vector<*ASTPattern>();
 
-                if !this.ExpandRestPatterns(tuple->patterns, tuple_type->elements.Length(), "Tuple type '" + any_type->ToString() + "'", pattern, expanded) {
+                if !this.ExpandRestPatterns(tuple->patterns, tuple_type->elements.Length(), "Tuple type '" + any_type->Name() + "'", pattern, expanded) {
                     return null;
                 }
 
@@ -5638,6 +5811,62 @@ class HIRLowerer {
 
                 this.builder.TuplePattern(patterns, tuple_type)
             },
+            ASTPatternKind::Array => {
+                let array = pattern as *ASTArrayPattern;
+
+                if value != null {
+                    if target_type != null {
+                        value = this.Coerce(value, target_type);
+                    } else {
+                        value = this.Coerce(value);
+                    }
+
+                    if value == null {
+                        return null;
+                    }
+                }
+
+                let mut any_type = target_type;
+
+                if any_type == null && value != null {
+                    any_type = value->_type;
+                }
+
+                if any_type->IsSlice() {
+                    Logger::Log("Array patterns can only match fixed-size arrays, not the slice type '" + any_type->Name() + "'.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                if !any_type->IsArray() {
+                    Logger::Log("Cannot destructure non-array type '" + any_type->Name() + "' with an array pattern.", pattern, LogSeverity::Error);
+                    return null;
+                }
+
+                let mut expanded = Vector<*ASTPattern>();
+
+                if !this.ExpandRestPatterns(array->patterns, any_type->Length(), "Array type '" + any_type->Name() + "'", pattern, expanded) {
+                    return null;
+                }
+
+                let mut patterns = Vector<*HIRPattern>();
+                let size_type = this.context.IntegerPointerType(false);
+
+                for i in 0..expanded.Length() {
+                    if expanded[i] == null {
+                        patterns.PushBack(this.builder.WildcardPattern());
+                        continue;
+                    }
+
+                    let mut element_type: *HIRType = null;
+                    if target_type != null { element_type = any_type->Element(); }
+                    let element = if value != null { this.builder.IndexAccess(value, this.builder.IntegerLiteral(i as HostUnsigned, size_type)) } else { null };
+                    let lowered_pattern = this.LowerPattern(expanded[i], element_type, element, mode);
+                    if lowered_pattern == null { return null; }
+                    patterns.PushBack(lowered_pattern);
+                }
+
+                this.builder.ArrayPattern(patterns, any_type)
+            },
             ASTPatternKind::Field => {
                 let field = pattern as *ASTFieldPattern;
                 let lowered_pattern = this.LowerPattern(field->pattern, target_type, value, mode);
@@ -5657,7 +5886,7 @@ class HIRLowerer {
                     let description = "structure '" + structure->path->ToString() + "'";
 
                     if value != null && !value->_type->IsSame(symbol->_type) {
-                        Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found " + description + ".", pattern, LogSeverity::Error);
+                        Logger::Log("Mismatched pattern type, expected '" + value->_type->Name() + "' but found " + description + ".", pattern, LogSeverity::Error);
                         return null;
                     }
 
@@ -5703,7 +5932,7 @@ class HIRLowerer {
                     }
 
                     if value != null && !value->_type->IsSame(member->_type) {
-                        Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found " + description + ".", pattern, LogSeverity::Error);
+                        Logger::Log("Mismatched pattern type, expected '" + value->_type->Name() + "' but found " + description + ".", pattern, LogSeverity::Error);
                         return null;
                     }
 
@@ -5757,7 +5986,7 @@ class HIRLowerer {
                     }
 
                     if value != null && !value->_type->IsSame(member->_type) {
-                        Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                        Logger::Log("Mismatched pattern type, expected '" + value->_type->Name() + "' but found '" + member->_type->Name() + "'.", pattern, LogSeverity::Error);
                         return null;
                     }
 
@@ -5800,7 +6029,7 @@ class HIRLowerer {
                             let member = symbol->declaration as *HIREnumerationMember;
 
                             if value != null && !value->_type->IsSame(member->_type) {
-                                Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                                Logger::Log("Mismatched pattern type, expected '" + value->_type->Name() + "' but found '" + member->_type->Name() + "'.", pattern, LogSeverity::Error);
                                 return null;
                             }
 
@@ -5815,7 +6044,7 @@ class HIRLowerer {
                             }
 
                             if value != null && !value->_type->IsSame(member->_type) {
-                                Logger::Log("Mismatched pattern type, expected '" + value->_type->ToString() + "' but found '" + member->_type->ToString() + "'.", pattern, LogSeverity::Error);
+                                Logger::Log("Mismatched pattern type, expected '" + value->_type->Name() + "' but found '" + member->_type->Name() + "'.", pattern, LogSeverity::Error);
                                 return null;
                             }
 
@@ -5975,7 +6204,7 @@ class HIRLowerer {
                     if element == null { return null; }
 
                     if element->IsNever() {
-                        Logger::Log("Slice elements cannot have type '" + element->ToString() + "'.", array->element, LogSeverity::Error);
+                        Logger::Log("Slice elements cannot have type '" + element->Name() + "'.", array->element, LogSeverity::Error);
                         return null;
                     }
 
@@ -5993,7 +6222,7 @@ class HIRLowerer {
 
                 if array->length != null {
                     if element->IsNever() {
-                        Logger::Log("Array elements cannot have type '" + element->ToString() + "'.", array->element, LogSeverity::Error);
+                        Logger::Log("Array elements cannot have type '" + element->Name() + "'.", array->element, LogSeverity::Error);
                         return null;
                     }
 
@@ -6013,7 +6242,7 @@ class HIRLowerer {
                     if lowered_element == null { return null; }
 
                     if lowered_element->IsNever() {
-                        Logger::Log("Tuple elements cannot have type '" + lowered_element->ToString() + "'.", element, LogSeverity::Error);
+                        Logger::Log("Tuple elements cannot have type '" + lowered_element->Name() + "'.", element, LogSeverity::Error);
                         return null;
                     }
 

@@ -47,6 +47,10 @@ class GenericDeclaration {
         (this.declaration, this.scope, this._type) = (declaration, hir_lowerer->scope_manager.current, hir_lowerer->current_type);
 
         match declaration->kind {
+            ASTDeclarationKind::Type => {
+                let alias = declaration as *ASTTypeDeclaration;
+                (this.name, this.types) = (alias->name, alias->types);
+            },
             ASTDeclarationKind::Class => {
                 let _class = declaration as *ASTClassDeclaration;
                 (this.name, this.types) = (_class->name, _class->types);
@@ -82,6 +86,17 @@ class GenericDeclaration {
         }
 
         match this.declaration->kind {
+            ASTDeclarationKind::Type => {
+                if instance->completed == HIRLoweringPass::None {
+                    instance->active = HIRLoweringPass::Fourth;
+                    let _type = hir_lowerer->LowerType((this.declaration as *ASTTypeDeclaration)->_type);
+                    (instance->completed, instance->active) = (HIRLoweringPass::Fourth, HIRLoweringPass::None);
+
+                    if _type != null {
+                        instance->symbol = this.arena.New<Symbol>(_type);
+                    }
+                }
+            },
             ASTDeclarationKind::Class => {
                 let _class = this.declaration as *ASTClassDeclaration;
 
@@ -257,6 +272,8 @@ class GenericDeclaration {
 
         if instance->active == HIRLoweringPass::None {
             this.LowerInstance(instance);
+        } else if this.declaration->kind == ASTDeclarationKind::Type && instance->symbol == null {
+            Logger::Log("Type alias '" + this.name + "' refers to itself.", node, LogSeverity::Error);
         }
 
         instance

@@ -109,8 +109,8 @@ class Arena {
     }
 
     pub fn New<T>(&mut this, args...) -> *mut T {
-        let size = (sizeof(T) + ARENA_DEFAULT_ALIGNMENT - 1) & !(ARENA_DEFAULT_ALIGNMENT - 1);
-        let destructor_size = (sizeof(ArenaDestructor) + ARENA_DEFAULT_ALIGNMENT - 1) & !(ARENA_DEFAULT_ALIGNMENT - 1);
+        let size = (size_of<T>() + ARENA_DEFAULT_ALIGNMENT - 1) & !(ARENA_DEFAULT_ALIGNMENT - 1);
+        let destructor_size = (size_of<ArenaDestructor>() + ARENA_DEFAULT_ALIGNMENT - 1) & !(ARENA_DEFAULT_ALIGNMENT - 1);
         let pointer = this.Allocate(size + destructor_size) as *mut i8;
         if pointer == null { return null; }
         let destructor = (pointer + size) as *mut ArenaDestructor;
