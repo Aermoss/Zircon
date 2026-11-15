@@ -941,6 +941,10 @@ class HIRLowerer {
             var_arg = false;
         }
 
+        if function->body == null && this.abi == HIRDeclarationABI::Native && this.current_type == null {
+            Logger::Log("Function '" + function->name + "' has no body; external functions must be declared in an extern block.", function, LogSeverity::Error);
+        }
+
         let declaration = this.builder.BuildFunctionDeclaration(function->name, parameters, _return, this.context.FunctionType(parameter_types, _return, var_arg), function->no_mangle, function->public, this.abi);
         (declaration->_virtual, declaration->_override, declaration->node) = (function->_virtual, function->_override, function);
         declaration->abstract = function->_virtual && function->body == null;
