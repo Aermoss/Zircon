@@ -7,5 +7,6 @@
 *.lir
 *.ll
 
+saves/
 !bin/zirconc.exe
 !bin/zirgen.exe

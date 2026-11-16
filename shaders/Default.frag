@@ -47,21 +47,28 @@ uniform float fogStart;
 uniform float fogEnd;
 
 void main() {
+    float layer = floor(fragTexCoord.z + 0.5f);
     vec4 albedo = texture(albedoMap, fragTexCoord);
     vec4 grassColor = vec4(cherryGrove / 255.0f, 1.0f);
 
-    if (fragTexCoord.z == 1.0f) {
+    if (layer == 1.0f) {
         vec4 color = texture(albedoMap, vec3(fragTexCoord.xy, 0.0f));
         if (color.a != 0.0f) albedo = color * grassColor;
     }
 
-    if (fragTexCoord.z == 2.0f)
+    if (layer == 2.0f)
         albedo = albedo * grassColor;
+
+    if (layer == 10.0f)
+        albedo = albedo * vec4(forest / 255.0f, 1.0f);
+
+    if (layer == 11.0f)
+        albedo = vec4(albedo.rgb * vec3(0.25f, 0.46f, 0.89f), 0.6f);
 
     if (albedo.a == 0.0f)
         discard;
 
     float distance = length(fragPosition - viewPosition);
     float fogFactor = clamp((distance - fogStart) / (fogEnd - fogStart), 0.0f, 1.0f);
-    fragColor = mix(albedo * vec4(fragLight, 1.0f), vec4(fogColor, 1.0f), fogFactor);
+    fragColor = mix(albedo * vec4(fragLight, 1.0f), vec4(fogColor, albedo.a), fogFactor);
 }
