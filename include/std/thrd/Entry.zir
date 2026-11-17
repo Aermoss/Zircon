@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/mem", "std/time" : *]
+#[include "std/io", "std/mem", "std/time", "std/atom" : *]
 
 type ThreadFunction = fn(*mut void);
 
@@ -28,7 +28,130 @@ class ThreadStart {
     }
 }
 
-#[if WINDOWS]
+#[if TRIGLAV]
+type NativeMutex = u32;
+type NativeCondition = u32;
+
+const TRIGLAV_NO_THREAD: u32 = 0xFFFFFFFF;
+const TRIGLAV_WAIT_FOREVER: u32 = 0xFFFFFFFF;
+const TRIGLAV_WAIT_TIMED_OUT: u32 = 1;
+const TRIGLAV_THREAD_RUNNING: u32 = 0;
+const TRIGLAV_THREAD_FINISHED: u32 = 1;
+const TRIGLAV_THREAD_DETACHED: u32 = 2;
+
+class TriglavThreadControl {
+    pub function: ThreadFunction,
+    pub argument: *mut void,
+    pub heap: *mut TriglavHeap,
+    pub state: u32;
+
+    TriglavThreadControl(&mut this, function: ThreadFunction, argument: *mut void) {
+        this.function = function;
+        this.argument = argument;
+        this.heap = TriglavNewHeap();
+        this.state = TRIGLAV_THREAD_RUNNING;
+    }
+}
+
+extern "C" {
+    fn TriglavThreadCreate(entry: *mut void, argument: *mut void, stack: usize) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(37), a0(entry), a1(argument), a2(stack) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn TriglavThreadExit() -> ! {
+        volatile asm : a7(38), a0(0) -> {
+            ecall
+        } : memory;
+
+        loop {}
+    }
+
+    fn TriglavWait(address: *mut u32, expected: u32, milliseconds: u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(40), a0(address), a1(expected), a2(milliseconds) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn TriglavWake(address: *mut u32, count: u32) -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(41), a0(address), a1(count) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn TriglavYield() {
+        volatile asm : a7(39) -> {
+            ecall
+        } : memory;
+    }
+
+    fn TriglavSleep(milliseconds: u32) {
+        volatile asm : a7(10), a0(milliseconds) -> {
+            ecall
+        } : memory;
+    }
+
+    fn TriglavProcessorCount() -> u32 {
+        let mut result: u32 = 0;
+
+        volatile asm : a7(42) -> {
+            ecall
+        } -> a0(result) : memory;
+
+        result
+    }
+
+    fn TriglavLock(lock: *mut u32) {
+        if AtomicExchange32(lock, 1) == 0 { return; }
+
+        while AtomicExchange32(lock, 2) != 0 {
+            TriglavWait(lock, 2, TRIGLAV_WAIT_FOREVER);
+        }
+    }
+
+    fn TriglavTryLock(lock: *mut u32) -> bool {
+        AtomicCompareExchangeBool32(lock, 0, 1)
+    }
+
+    fn TriglavUnlock(lock: *mut u32) {
+        if AtomicExchange32(lock, 0) == 2 {
+            TriglavWake(lock, 1);
+        }
+    }
+
+    fn TriglavRetireControl(control: *mut TriglavThreadControl) {
+        TriglavAdoptHeap(control->heap);
+        delete control;
+    }
+
+    fn ThreadEntry(start: *mut void) {
+        let control = start as *mut TriglavThreadControl;
+        TriglavSetHeap(control->heap);
+        (control->function)(control->argument);
+
+        if AtomicExchange32(&mut control->state, TRIGLAV_THREAD_FINISHED) == TRIGLAV_THREAD_DETACHED {
+            delete control;
+        } else {
+            TriglavWake(&mut control->state, 0xFFFFFFFF);
+        }
+
+        TriglavThreadExit();
+    }
+}
+#[elif WINDOWS]
 class SRWLOCK {
     pub Ptr: *mut void
 }
@@ -41,12 +164,14 @@ type NativeMutex = SRWLOCK;
 type NativeCondition = CONDITION_VARIABLE;
 
 const INFINITE: u32 = 0xFFFFFFFF;
+const ALL_PROCESSOR_GROUPS: u16 = 0xFFFF;
 
 extern "C" {
     fn CreateThread(lpThreadAttributes: *mut void, dwStackSize: usize, lpStartAddress: *mut void, lpParameter: *mut void, dwCreationFlags: u32, lpThreadId: *mut u32) -> *mut void;
     fn WaitForSingleObject(hHandle: *mut void, dwMilliseconds: u32) -> u32;
     fn Sleep(dwMilliseconds: u32);
     fn SwitchToThread() -> i32;
+    fn GetActiveProcessorCount(GroupNumber: u16) -> u32;
 
     fn InitializeSRWLock(SRWLock: *mut SRWLOCK);
     fn AcquireSRWLockExclusive(SRWLock: *mut SRWLOCK);
@@ -76,6 +201,10 @@ class pthread_cond_t {
 }
 
 type pthread_t = usize;
+
+const SC_NPROCESSORS_ONLN_LINUX: i32 = 84;
+const SC_NPROCESSORS_ONLN_DARWIN: i32 = 58;
+
 type NativeMutex = pthread_mutex_t;
 type NativeCondition = pthread_cond_t;
 
@@ -99,6 +228,7 @@ extern "C" {
 
     fn nanosleep(request: *timespec, remaining: *mut timespec) -> i32;
     fn sched_yield() -> i32;
+    fn sysconf(name: i32) -> isize;
 
     fn ThreadEntry(start: *mut void) -> *mut void {
         let data = start as *mut ThreadStart;
@@ -114,6 +244,9 @@ class Thread {
 #[if WINDOWS]
     handle: *mut void = null,
     id: u32 = 0,
+#[elif TRIGLAV]
+    control: *mut TriglavThreadControl = null,
+    id: u32 = 0,
 #[else]
     handle: pthread_t = 0,
 #[endif]
@@ -127,7 +260,22 @@ class Thread {
         this.Start(function, argument, committed_stack);
     }
 
+    ~Thread(&mut this) {
+        this.Detach();
+    }
+
     fn Start(&mut this, function: ThreadFunction, argument: *mut void, committed_stack: usize) {
+#[if TRIGLAV]
+        this.control = new TriglavThreadControl(function, argument);
+        this.id = TriglavThreadCreate(ThreadEntry as *mut void, this.control as *mut void, committed_stack);
+
+        if this.id == TRIGLAV_NO_THREAD {
+            free(this.control->heap as *mut void);
+            delete this.control;
+            this.control = null;
+            this.joined = true;
+        }
+#[else]
         let start = new ThreadStart(function, argument);
 #[if WINDOWS]
         this.handle = CreateThread(null, committed_stack, ThreadEntry as *mut void, start as *mut void, 0, &mut this.id);
@@ -140,15 +288,26 @@ class Thread {
             delete start;
             this.joined = true;
         }
+#[endif]
     }
 
-    ~Thread(&mut this) {
-        this.Detach();
+    pub fn Started(&this) -> bool {
+#[if TRIGLAV]
+        this.control != null
+#[else]
+        !this.joined
+#[endif]
     }
 
     pub fn Join(&mut this) {
         if this.joined { return; }
-#[if WINDOWS]
+#[if TRIGLAV]
+        while volatile_read(&this.control->state as *u32) != TRIGLAV_THREAD_FINISHED {
+            TriglavWait(&mut this.control->state, TRIGLAV_THREAD_RUNNING, TRIGLAV_WAIT_FOREVER);
+        }
+
+        TriglavRetireControl(this.control);
+#[elif WINDOWS]
         WaitForSingleObject(this.handle, INFINITE);
         CloseHandle(this.handle);
 #[else]
@@ -159,7 +318,11 @@ class Thread {
 
     pub fn Detach(&mut this) {
         if this.joined { return; }
-#[if WINDOWS]
+#[if TRIGLAV]
+        if AtomicExchange32(&mut this.control->state, TRIGLAV_THREAD_DETACHED) == TRIGLAV_THREAD_FINISHED {
+            TriglavRetireControl(this.control);
+        }
+#[elif WINDOWS]
         CloseHandle(this.handle);
 #[else]
         pthread_detach(this.handle);
@@ -168,13 +331,18 @@ class Thread {
     }
 
     pub fn GetId(&this) -> usize {
-#[if WINDOWS]
+#[if WINDOWS || TRIGLAV]
         this.id as usize
 #[else]
         this.handle
 #[endif]
     }
 
+#[if TRIGLAV]
+    pub fn Sleep(&this, seconds: u32, nanoseconds: i32) {
+        TriglavSleep(seconds * 1000 + (nanoseconds / 1000000) as u32);
+    }
+#[else]
     pub fn Sleep(&this, seconds: i64, nanoseconds: i32) {
 #[if WINDOWS]
         ::Sleep((seconds * 1000 + (nanoseconds / 1000000) as i64) as u32);
@@ -184,13 +352,29 @@ class Thread {
         nanosleep(&time, null);
 #[endif]
     }
+#[endif]
 
     pub fn Yield() {
-#[if WINDOWS]
+#[if TRIGLAV]
+        TriglavYield();
+#[elif WINDOWS]
         SwitchToThread();
 #[else]
         sched_yield();
 #[endif]
+    }
+
+    pub fn HardwareConcurrency() -> usize {
+#[if TRIGLAV]
+        let count = TriglavProcessorCount() as usize;
+#[elif WINDOWS]
+        let count = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) as usize;
+#[elif DARWIN]
+        let count = sysconf(SC_NPROCESSORS_ONLN_DARWIN) as usize;
+#[else]
+        let count = sysconf(SC_NPROCESSORS_ONLN_LINUX) as usize;
+#[endif]
+        if count == 0 { 1 } else { count }
     }
 }
 
@@ -198,7 +382,9 @@ class Mutex {
     lock: NativeMutex;
 
     Mutex(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        this.lock = 0;
+#[elif WINDOWS]
         InitializeSRWLock(&mut this.lock);
 #[else]
         pthread_mutex_init(&mut this.lock, null);
@@ -206,13 +392,15 @@ class Mutex {
     }
 
     ~Mutex(&mut this) {
-#[if !WINDOWS]
+#[if !WINDOWS && !TRIGLAV]
         pthread_mutex_destroy(&mut this.lock);
 #[endif]
     }
 
     pub fn Lock(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        TriglavLock(&mut this.lock);
+#[elif WINDOWS]
         AcquireSRWLockExclusive(&mut this.lock);
 #[else]
         pthread_mutex_lock(&mut this.lock);
@@ -220,7 +408,9 @@ class Mutex {
     }
 
     pub fn Unlock(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        TriglavUnlock(&mut this.lock);
+#[elif WINDOWS]
         ReleaseSRWLockExclusive(&mut this.lock);
 #[else]
         pthread_mutex_unlock(&mut this.lock);
@@ -228,7 +418,9 @@ class Mutex {
     }
 
     pub fn TryLock(&mut this) -> bool {
-#[if WINDOWS]
+#[if TRIGLAV]
+        TriglavTryLock(&mut this.lock)
+#[elif WINDOWS]
         TryAcquireSRWLockExclusive(&mut this.lock) != 0
 #[else]
         pthread_mutex_trylock(&mut this.lock) == 0
@@ -257,7 +449,9 @@ class ConditionVariable {
     condition: NativeCondition;
 
     ConditionVariable(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        this.condition = 0;
+#[elif WINDOWS]
         InitializeConditionVariable(&mut this.condition);
 #[else]
         pthread_cond_init(&mut this.condition, null);
@@ -265,13 +459,16 @@ class ConditionVariable {
     }
 
     ~ConditionVariable(&mut this) {
-#[if !WINDOWS]
+#[if !WINDOWS && !TRIGLAV]
         pthread_cond_destroy(&mut this.condition);
 #[endif]
     }
 
     pub fn Signal(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        AtomicFetchAdd32(&mut this.condition, 1);
+        TriglavWake(&mut this.condition, 1);
+#[elif WINDOWS]
         WakeConditionVariable(&mut this.condition);
 #[else]
         pthread_cond_signal(&mut this.condition);
@@ -279,7 +476,10 @@ class ConditionVariable {
     }
 
     pub fn Broadcast(&mut this) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        AtomicFetchAdd32(&mut this.condition, 1);
+        TriglavWake(&mut this.condition, 0xFFFFFFFF);
+#[elif WINDOWS]
         WakeAllConditionVariable(&mut this.condition);
 #[else]
         pthread_cond_broadcast(&mut this.condition);
@@ -287,7 +487,13 @@ class ConditionVariable {
     }
 
     pub fn Wait(&mut this, mtx: *mut Mutex, timeout: u32) -> bool {
-#[if WINDOWS]
+#[if TRIGLAV]
+        let sequence = volatile_read(&this.condition as *u32);
+        mtx->Unlock();
+        let result = TriglavWait(&mut this.condition, sequence, timeout);
+        mtx->Lock();
+        result != TRIGLAV_WAIT_TIMED_OUT
+#[elif WINDOWS]
         SleepConditionVariableSRW(&mut this.condition, mtx->Handle(), timeout, 0) != 0
 #[else]
         let mut deadline: timespec;
@@ -300,7 +506,12 @@ class ConditionVariable {
     }
 
     pub fn Wait(&mut this, mtx: *mut Mutex) {
-#[if WINDOWS]
+#[if TRIGLAV]
+        let sequence = volatile_read(&this.condition as *u32);
+        mtx->Unlock();
+        TriglavWait(&mut this.condition, sequence, TRIGLAV_WAIT_FOREVER);
+        mtx->Lock();
+#[elif WINDOWS]
         SleepConditionVariableSRW(&mut this.condition, mtx->Handle(), INFINITE, 0);
 #[else]
         pthread_cond_wait(&mut this.condition, mtx->Handle());

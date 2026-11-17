@@ -15,9 +15,13 @@
  */
 
 #[if TRIGLAV]
-static mut _triglav_bins: [*mut u8; 36];
-static mut _triglav_chunk_ptr: *mut u8 = null;
-static mut _triglav_chunk_end: *mut u8 = null;
+struct TriglavHeap {
+    pub bins: [*mut u8; 36],
+    pub chunk_ptr: *mut u8,
+    pub chunk_end: *mut u8
+}
+
+static mut triglav_heap: TriglavHeap;
 #[endif]
 
 extern "C" {
@@ -37,6 +41,53 @@ extern "C" {
         volatile asm : a7(2), a0(ptr) -> {
             ecall
         } : memory;
+    }
+
+    fn TriglavCurrentHeap() -> *mut TriglavHeap {
+        let mut heap: *mut TriglavHeap = null;
+
+        volatile asm {
+            mv a0, tp
+        } -> a0(heap);
+
+        if heap == null { &mut triglav_heap as *mut TriglavHeap } else { heap }
+    }
+
+    fn TriglavSetHeap(heap: *mut TriglavHeap) {
+        volatile asm : a0(heap) -> {
+            mv tp, a0
+        } : memory;
+    }
+
+    fn TriglavNewHeap() -> *mut TriglavHeap {
+        let heap = malloc(size_of<TriglavHeap>()) as *mut TriglavHeap;
+
+        for i in 0usize..36 {
+            heap->bins[i] = null;
+        }
+
+        heap->chunk_ptr = null;
+        heap->chunk_end = null;
+        heap
+    }
+
+    fn TriglavAdoptHeap(retired: *mut TriglavHeap) {
+        let heap = TriglavCurrentHeap();
+
+        for i in 0usize..36 {
+            let first = retired->bins[i];
+            if first == null { continue; }
+            let mut last = first;
+
+            while *(last as **mut u8) != null {
+                last = *(last as **mut u8);
+            }
+
+            *(last as *mut *mut u8) = heap->bins[i];
+            heap->bins[i] = first;
+        }
+
+        free(retired as *mut void);
     }
 
     fn TriglavOutOfMemory() -> ! {
@@ -82,24 +133,25 @@ extern "C" {
                 (35usize, 4096usize)
             };
 
-            let cached = _triglav_bins[bin];
+            let heap = TriglavCurrentHeap();
+            let cached = heap->bins[bin];
 
             if cached != null {
-                _triglav_bins[bin] = *(cached as **mut u8);
+                heap->bins[bin] = *(cached as **mut u8);
                 return cached as *mut void;
             }
 
             let total = capacity + 8;
 
-            if _triglav_chunk_ptr == null || (_triglav_chunk_end as usize) - (_triglav_chunk_ptr as usize) < total {
+            if heap->chunk_ptr == null || (heap->chunk_end as usize) - (heap->chunk_ptr as usize) < total {
                 let chunk = TriglavAllocate(32768) as *mut u8;
                 if chunk == null { TriglavOutOfMemory(); }
-                _triglav_chunk_ptr = chunk;
-                _triglav_chunk_end = chunk + 32768;
+                heap->chunk_ptr = chunk;
+                heap->chunk_end = chunk + 32768;
             }
 
-            let header = _triglav_chunk_ptr as *mut usize;
-            _triglav_chunk_ptr = _triglav_chunk_ptr + total;
+            let header = heap->chunk_ptr as *mut usize;
+            heap->chunk_ptr = heap->chunk_ptr + total;
             header[0] = capacity;
             header[1] = bin;
             return (header as *mut u8 + 8) as *mut void;
@@ -122,8 +174,9 @@ extern "C" {
         let bin = header[1];
 
         if bin < 36 {
-            *(ptr as *mut *mut u8) = _triglav_bins[bin];
-            _triglav_bins[bin] = ptr as *mut u8;
+            let heap = TriglavCurrentHeap();
+            *(ptr as *mut *mut u8) = heap->bins[bin];
+            heap->bins[bin] = ptr as *mut u8;
             return;
         }
 

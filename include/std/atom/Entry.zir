@@ -14,7 +14,333 @@
  * limitations under the License.
  */
 
-#[if AMD64]
+#[if SVAROG]
+const SVAROG_ATOMIC_EXCHANGE: u32 = 0;
+const SVAROG_ATOMIC_ADD: u32 = 1;
+const SVAROG_ATOMIC_SUB: u32 = 2;
+const SVAROG_ATOMIC_AND: u32 = 3;
+const SVAROG_ATOMIC_OR: u32 = 4;
+const SVAROG_ATOMIC_XOR: u32 = 5;
+const SVAROG_ATOMIC_COMPARE: u32 = 6;
+const SVAROG_ATOMIC_NEGATE: u32 = 7;
+
+fn SvarogLoadReserved(target: *mut u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target) -> {
+        lr.w a2, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogStoreConditional(target: *mut u32, value: u32) -> bool {
+    let failed: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        sc.w a2, a1, (a0)
+    } -> a2(failed) : memory;
+
+    failed == 0
+}
+
+fn SvarogAtomicSwap(target: *mut u32, value: u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        amoswap.w a2, a1, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogAtomicAdd(target: *mut u32, value: u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        amoadd.w a2, a1, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogAtomicAnd(target: *mut u32, value: u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        amoand.w a2, a1, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogAtomicOr(target: *mut u32, value: u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        amoor.w a2, a1, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogAtomicXor(target: *mut u32, value: u32) -> u32 {
+    let result: u32;
+
+    volatile asm : a0(target), a1(value) -> {
+        amoxor.w a2, a1, (a0)
+    } -> a2(result) : memory;
+
+    result
+}
+
+fn SvarogApply(operation: u32, old: u32, value: u32) -> u32 {
+    if operation == SVAROG_ATOMIC_ADD { old + value }
+    else if operation == SVAROG_ATOMIC_SUB { old - value }
+    else if operation == SVAROG_ATOMIC_AND { old & value }
+    else if operation == SVAROG_ATOMIC_OR { old | value }
+    else if operation == SVAROG_ATOMIC_XOR { old ^ value }
+    else if operation == SVAROG_ATOMIC_NEGATE { 0 - old }
+    else { value }
+}
+
+fn SvarogSubword(target: usize, bits: u32, operation: u32, value: u32, expected: u32) -> u32 {
+    let word = (target & !(3 as usize)) as *mut u32;
+    let shift = ((target & 3) as u32) * 8;
+    let mask = if bits == 8 { 0xFF as u32 } else { 0xFFFF as u32 };
+
+    loop {
+        let current = SvarogLoadReserved(word);
+        let old = (current >> shift) & mask;
+
+        if operation == SVAROG_ATOMIC_COMPARE && old != (expected & mask) {
+            return old;
+        }
+
+        let updated = if operation == SVAROG_ATOMIC_COMPARE { value } else { SvarogApply(operation, old, value) };
+        let replacement = (current & !(mask << shift)) | ((updated & mask) << shift);
+
+        if SvarogStoreConditional(word, replacement) {
+            return old;
+        }
+    }
+}
+
+fn SvarogWord(target: *mut u32, operation: u32, value: u32, expected: u32) -> u32 {
+    loop {
+        let old = SvarogLoadReserved(target);
+
+        if operation == SVAROG_ATOMIC_COMPARE && old != expected {
+            return old;
+        }
+
+        let updated = if operation == SVAROG_ATOMIC_COMPARE { value } else { SvarogApply(operation, old, value) };
+
+        if SvarogStoreConditional(target, updated) {
+            return old;
+        }
+    }
+}
+
+fn AtomicExchange8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_EXCHANGE, value as u32, 0) as u8
+}
+
+fn AtomicCompareExchange8(target: *mut u8, expected: u8, desired: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_COMPARE, desired as u32, expected as u32) as u8
+}
+
+fn AtomicCompareExchangeBool8(target: *mut u8, expected: u8, desired: u8) -> bool {
+    AtomicCompareExchange8(target, expected, desired) == expected
+}
+
+fn AtomicLoad8(target: *u8) -> u8 {
+    volatile_read(target)
+}
+
+fn AtomicFetchAdd8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_ADD, value as u32, 0) as u8
+}
+
+fn AtomicFetchSub8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_SUB, value as u32, 0) as u8
+}
+
+fn AtomicFetchAnd8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_AND, value as u32, 0) as u8
+}
+
+fn AtomicFetchOr8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_OR, value as u32, 0) as u8
+}
+
+fn AtomicFetchXor8(target: *mut u8, value: u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_XOR, value as u32, 0) as u8
+}
+
+fn AtomicFetchNot8(target: *mut u8) -> u8 {
+    AtomicFetchXor8(target, !(0 as u8))
+}
+
+fn AtomicFetchNeg8(target: *mut u8) -> u8 {
+    SvarogSubword(target as usize, 8, SVAROG_ATOMIC_NEGATE, 0, 0) as u8
+}
+
+fn AtomicIncrement8(target: *mut u8) {
+    AtomicFetchAdd8(target, 1);
+}
+
+fn AtomicDecrement8(target: *mut u8) {
+    AtomicFetchSub8(target, 1);
+}
+
+fn AtomicExchange16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_EXCHANGE, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicCompareExchange16(target: *mut i16, expected: i16, desired: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_COMPARE, desired as u16 as u32, expected as u16 as u32) as u16 as i16
+}
+
+fn AtomicCompareExchangeBool16(target: *mut i16, expected: i16, desired: i16) -> bool {
+    AtomicCompareExchange16(target, expected, desired) == expected
+}
+
+fn AtomicLoad16(target: *i16) -> i16 {
+    volatile_read(target)
+}
+
+fn AtomicFetchAdd16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_ADD, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicFetchSub16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_SUB, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicFetchAnd16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_AND, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicFetchOr16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_OR, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicFetchXor16(target: *mut i16, value: i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_XOR, value as u16 as u32, 0) as u16 as i16
+}
+
+fn AtomicFetchNot16(target: *mut i16) -> i16 {
+    AtomicFetchXor16(target, !(0 as i16))
+}
+
+fn AtomicFetchNeg16(target: *mut i16) -> i16 {
+    SvarogSubword(target as usize, 16, SVAROG_ATOMIC_NEGATE, 0, 0) as u16 as i16
+}
+
+fn AtomicIncrement16(target: *mut i16) {
+    AtomicFetchAdd16(target, 1);
+}
+
+fn AtomicDecrement16(target: *mut i16) {
+    AtomicFetchSub16(target, 1);
+}
+
+fn AtomicExchange32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicSwap(target, value)
+}
+
+fn AtomicCompareExchange32(target: *mut u32, expected: u32, desired: u32) -> u32 {
+    SvarogWord(target, SVAROG_ATOMIC_COMPARE, desired, expected)
+}
+
+fn AtomicCompareExchangeBool32(target: *mut u32, expected: u32, desired: u32) -> bool {
+    AtomicCompareExchange32(target, expected, desired) == expected
+}
+
+fn AtomicLoad32(target: *u32) -> u32 {
+    volatile_read(target)
+}
+
+fn AtomicFetchAdd32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicAdd(target, value)
+}
+
+fn AtomicFetchSub32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicAdd(target, 0 - value)
+}
+
+fn AtomicFetchAnd32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicAnd(target, value)
+}
+
+fn AtomicFetchOr32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicOr(target, value)
+}
+
+fn AtomicFetchXor32(target: *mut u32, value: u32) -> u32 {
+    SvarogAtomicXor(target, value)
+}
+
+fn AtomicFetchNot32(target: *mut u32) -> u32 {
+    AtomicFetchXor32(target, !(0 as u32))
+}
+
+fn AtomicFetchNeg32(target: *mut u32) -> u32 {
+    SvarogWord(target, SVAROG_ATOMIC_NEGATE, 0, 0)
+}
+
+fn AtomicIncrement32(target: *mut u32) {
+    AtomicFetchAdd32(target, 1);
+}
+
+fn AtomicDecrement32(target: *mut u32) {
+    AtomicFetchSub32(target, 1);
+}
+
+fn AtomicBitTestAndSet32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchOr32(target, mask) & mask) != 0
+}
+
+fn AtomicBitTestAndReset32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchAnd32(target, !mask) & mask) != 0
+}
+
+fn AtomicBitTestAndComplement32(target: *mut u32, bit: u8) -> bool {
+    let mask = (1 as u32) << bit as u32;
+    (AtomicFetchXor32(target, mask) & mask) != 0
+}
+
+fn AtomicBitTest32(target: *u32, bit: u8) -> bool {
+    (AtomicLoad32(target) & ((1 as u32) << bit as u32)) != 0
+}
+
+fn AtomicMemoryFence() {
+    volatile asm {
+        fence
+    } : memory;
+}
+
+fn AtomicLoadFence() {
+    volatile asm {
+        fence
+    } : memory;
+}
+
+fn AtomicStoreFence() {
+    volatile asm {
+        fence
+    } : memory;
+}
+
+fn AtomicPause() {
+    volatile asm {
+        nop
+    };
+}
+#[elif AMD64]
 fn AtomicExchange8(target: *mut u8, value: u8) -> u8 {
     let result: u8;
 
@@ -1294,8 +1620,10 @@ class Atomic<T> {
             AtomicLoad16(&this.value as *i16) as T
         } else if size_of<T>() == 4 {
             AtomicLoad32(&this.value as *u32) as T
+#[if !SVAROG]
         } else if size_of<T>() == 8 {
             AtomicLoad64(&this.value as *u64) as T
+#[endif]
         } else {
             AtomicLoadFence();
             let value = this.value;
@@ -1306,13 +1634,15 @@ class Atomic<T> {
 
     pub fn Store(&mut this, value: T) {
         if size_of<T>() == 1 {
-            AtomicExchange8(&this.value as *mut u8, value as u8);
+            AtomicExchange8(&mut this.value as *mut u8, value as u8);
         } else if size_of<T>() == 2 {
-            AtomicExchange16(&this.value as *mut i16, value as i16);
+            AtomicExchange16(&mut this.value as *mut i16, value as i16);
         } else if size_of<T>() == 4 {
-            AtomicExchange32(&this.value as *mut u32, value as u32);
+            AtomicExchange32(&mut this.value as *mut u32, value as u32);
+#[if !SVAROG]
         } else if size_of<T>() == 8 {
-            AtomicExchange64(&this.value as *mut u64, value as u64);
+            AtomicExchange64(&mut this.value as *mut u64, value as u64);
+#[endif]
         } else {
             AtomicStoreFence();
             this.value = value;
@@ -1322,13 +1652,15 @@ class Atomic<T> {
 
     pub fn Exchange(&mut this, value: T) -> T {
         if size_of<T>() == 1 {
-            AtomicExchange8(&this.value as *mut u8, value as u8) as T
+            AtomicExchange8(&mut this.value as *mut u8, value as u8) as T
         } else if size_of<T>() == 2 {
-            AtomicExchange16(&this.value as *mut i16, value as i16) as T
+            AtomicExchange16(&mut this.value as *mut i16, value as i16) as T
         } else if size_of<T>() == 4 {
-            AtomicExchange32(&this.value as *mut u32, value as u32) as T
+            AtomicExchange32(&mut this.value as *mut u32, value as u32) as T
+#[if !SVAROG]
         } else if size_of<T>() == 8 {
-            AtomicExchange64(&this.value as *mut u64, value as u64) as T
+            AtomicExchange64(&mut this.value as *mut u64, value as u64) as T
+#[endif]
         } else {
             AtomicStoreFence();
             let old = this.value;
@@ -1340,13 +1672,15 @@ class Atomic<T> {
 
     pub fn CompareExchange(&mut this, expected: T, desired: T) -> bool {
         if size_of<T>() == 1 {
-            AtomicCompareExchangeBool8(&this.value as *mut u8, expected as u8, desired as u8)
+            AtomicCompareExchangeBool8(&mut this.value as *mut u8, expected as u8, desired as u8)
         } else if size_of<T>() == 2 {
-            AtomicCompareExchangeBool16(&this.value as *mut i16, expected as i16, desired as i16)
+            AtomicCompareExchangeBool16(&mut this.value as *mut i16, expected as i16, desired as i16)
         } else if size_of<T>() == 4 {
-            AtomicCompareExchangeBool32(&this.value as *mut u32, expected as u32, desired as u32)
+            AtomicCompareExchangeBool32(&mut this.value as *mut u32, expected as u32, desired as u32)
+#[if !SVAROG]
         } else if size_of<T>() == 8 {
-            AtomicCompareExchangeBool64(&this.value as *mut u64, expected as u64, desired as u64)
+            AtomicCompareExchangeBool64(&mut this.value as *mut u64, expected as u64, desired as u64)
+#[endif]
         } else {
             AtomicMemoryFence();
 
