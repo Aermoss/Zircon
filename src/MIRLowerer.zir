@@ -1052,6 +1052,110 @@ class MIRLowerer {
         }
     }
 
+    fn SwitchCaseValue(&mut this, pattern: *HIRPattern, width: u32, values: &mut Vector<HostUnsigned>) -> bool {
+        let mut value: *MIRValue = null;
+
+        match pattern->kind {
+            HIRPatternKind::Literal => {
+                value = this.LowerExpression((pattern as *HIRLiteralPattern)->literal);
+            },
+            HIRPatternKind::Enumeration => {
+                value = this.LowerExpression((pattern as *HIREnumerationPattern)->member->value);
+            },
+            HIRPatternKind::Or => {
+                for alternative in (pattern as *HIROrPattern)->patterns {
+                    if !this.SwitchCaseValue(alternative, width, values) { return false; }
+                }
+
+                return true;
+            },
+            _ => {
+                return false;
+            }
+        }
+
+        if value == null || value->kind != MIRValueKind::Constant || (value as *MIRConstant)->kind != MIRConstantKind::Integer {
+            return false;
+        }
+
+        let mask = if width >= 64 { -1 as HostUnsigned } else { ((1 as HostUnsigned) << (width as HostUnsigned)) - 1 };
+        let masked = (value as *MIRConstantInteger)->value & mask;
+        if masked >= 0x80000000 { return false; }
+        values.PushBack(masked);
+        true
+    }
+
+    fn LowerSwitchMatch(&mut this, _match: *HIRMatchExpression, target: *MIRValue, destination: *MIRValue) -> bool {
+        let pointee = (target->_type as *MIRPointerType)->pointee;
+        if pointee->kind != MIRTypeKind::Integer { return false; }
+        let width = (pointee as *MIRIntegerType)->width;
+        let mut arm_values = Vector<Vector<HostUnsigned>>();
+        let mut fallback: *HIRMatchArm = null;
+        let mut count: usize = 0;
+
+        for arm in _match->arms {
+            if arm->guard != null { return false; }
+
+            if arm->pattern->kind == HIRPatternKind::Wildcard || arm->pattern->kind == HIRPatternKind::Identifier {
+                fallback = arm;
+                break;
+            }
+
+            let mut values = Vector<HostUnsigned>();
+            if !this.SwitchCaseValue(arm->pattern, width, values) { return false; }
+            count += values.Length();
+            arm_values.PushBack(values);
+        }
+
+        if count < 2 { return false; }
+        let value = this.builder.BuildLoad("match.value".ToString(), target);
+        let merge_block = this.builder.BuildBlock("match.merge".ToString());
+        let default_block = if fallback != null { this.builder.BuildBlock("match.default".ToString()) } else if _match->IsExhaustive() { this.builder.BuildBlock("match.unreachable".ToString()) } else { merge_block };
+        let switch = this.builder.BuildSwitch(value, default_block);
+        let mut seen = Vector<HostUnsigned>();
+
+        for i in 0..arm_values.Length() {
+            let mut fresh = Vector<HostUnsigned>();
+
+            for case_value in arm_values[i] {
+                if !seen.Contains(case_value) && !fresh.Contains(case_value) { fresh.PushBack(case_value); }
+            }
+
+            if fresh.Empty() { continue; }
+            let arm = _match->arms[i];
+            let body_block = this.builder.BuildBlock("match.body".ToString());
+
+            for case_value in fresh {
+                switch->AddCase(case_value, body_block);
+                seen.PushBack(case_value);
+            }
+
+            this.builder.SetCurrentBlock(body_block);
+            this.BindPattern(arm->pattern);
+            this.LowerBlockExpression(arm->body, destination);
+
+            if !this.builder.GetCurrentBlock()->HasTerminator() {
+                this.builder.BuildBranch(merge_block);
+            }
+        }
+
+        if fallback != null {
+            this.builder.SetCurrentBlock(default_block);
+            this.BindPattern(fallback->pattern);
+            this.LowerBlockExpression(fallback->body, destination);
+
+            if !this.builder.GetCurrentBlock()->HasTerminator() {
+                this.builder.BuildBranch(merge_block);
+            }
+        } else if default_block != merge_block {
+            this.builder.SetCurrentBlock(default_block);
+            this.builder.BuildUnreachable();
+        }
+
+        this.builder.SetCurrentBlock(merge_block);
+        true
+    }
+
     fn LowerMatchExpression(&mut this, _match: *HIRMatchExpression, destination: *MIRValue) {
         let target = this.LowerPlaceExpression(_match->target);
         if target == null { return; }
@@ -1060,6 +1164,7 @@ class MIRLowerer {
             this.LowerExpression(destructor);
         }
 
+        if this.LowerSwitchMatch(_match, target, destination) { return; }
         let merge_block = this.builder.BuildBlock("match.merge".ToString());
 
         for arm in _match->arms {

@@ -603,6 +603,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     for input_file in input_files {
         let (name, extension) = SplitExtension(input_file);
         let mut asm_input = String();
+        let mut direct_object = String();
 
 #[if SVAROG]
         let target = Target(triple);
@@ -667,8 +668,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
                 if target.backend == TargetBackend::Svarog {
                     let mut pass_manager = MIRPassManager(&mut mir_lowerer.context);
+                    pass_manager.Add(MIRPassKind::InlineFunctions);
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
+                    pass_manager.Add(MIRPassKind::FoldConstants);
+                    pass_manager.Add(MIRPassKind::RemoveDeadCode);
+                    pass_manager.Add(MIRPassKind::ReorderBlocks);
                     let passes_start = Instant::Now();
                     pass_manager.Run(mir_module);
                     WriteLine("MIR passes ran in " + FormatElapsedSeconds(passes_start) + " seconds.");
@@ -690,11 +695,10 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     WriteLine("LIR module allocated in " + FormatElapsedSeconds(allocator_start) + " seconds.");
                     if emit_lir { WriteOutput(name + ".physical.lir", lir_module->ToString()); }
 
-                    let mut emitter = SvarogEmitter();
-                    let assembly = emitter.Emit(lir_module);
-
                     if !Logger::HasError() {
                         if emit_asm {
+                            let mut emitter = SvarogEmitter();
+                            let assembly = emitter.Emit(lir_module);
                             let mut asm_name = name + ".s";
                             if !output_file.Empty() { asm_name = output_file; }
                             WriteOutput(asm_name, assembly);
@@ -705,7 +709,31 @@ fn Main(args: &mut Vector<String>) -> i32 {
                                 asm_input = JoinPath(temp_path, SplitPath(asm_input).1);
                             }
 
-                            WriteOutput(asm_input, assembly);
+                            let mut object_name = name + ".o";
+
+                            if !emit_object {
+                                if !temp_path.Empty() { object_name = JoinPath(temp_path, SplitPath(object_name).1); }
+                            } else if !output_file.Empty() {
+                                object_name = output_file;
+                            }
+
+                            let mut emitter = SvarogEmitter();
+
+                            if !lir_module->assembly.Empty() {
+                                WriteOutput(asm_input, emitter.Emit(lir_module));
+                            } else {
+                                let emit_start = Instant::Now();
+                                emitter.EmitObject(lir_module);
+
+                                if !Logger::HasError() {
+                                    if emitter.WriteObject(object_name) {
+                                        direct_object = object_name;
+                                        WriteLine("Object emitted in " + FormatElapsedSeconds(emit_start) + " seconds.");
+                                    } else {
+                                        Logger::Log(object_name, "Failed to write file.", LogSeverity::Error);
+                                    }
+                                }
+                            }
                         }
                     }
 #[if !SVAROG]
@@ -835,6 +863,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
         }
 
         if target.backend == TargetBackend::Svarog {
+            if !direct_object.Empty() {
+                objects.PushBack(direct_object);
+                if !emit_object { temp_files.PushBack(direct_object); }
+                continue;
+            }
+
             if asm_input.Empty() {
                 continue;
             }

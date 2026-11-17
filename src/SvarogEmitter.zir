@@ -14,36 +14,124 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/LIR.zir", "src/Logger.zir" : *]
+#[include "std/str", "std/vec", "std/map", "std/file", "src/LIR.zir", "src/Logger.zir" : *]
+
+const SVAROG_OBJECT_MAGIC: u32 = 0x4A424F53;
+const SVAROG_TEXT: u32 = 0;
+const SVAROG_DATA: u32 = 1;
+
+const SVAROG_OPCODE_SHIFT: u32 = 26;
+const SVAROG_REG0_SHIFT: u32 = 21;
+const SVAROG_REG1_SHIFT: u32 = 16;
+const SVAROG_REG2_SHIFT: u32 = 11;
+const SVAROG_IMM11_MASK: u32 = 0x7FF;
+const SVAROG_IMM16_MASK: u32 = 0xFFFF;
+const SVAROG_IMM21_MASK: u32 = 0x1FFFFF;
+const SVAROG_IMM26_MASK: u32 = 0x3FFFFFF;
+
+const SVAROG_RELOCATION_ABSOLUTE_UPPER21: u32 = 1;
+const SVAROG_RELOCATION_ABSOLUTE_LOWER11: u32 = 2;
+const SVAROG_RELOCATION_PC_UPPER21: u32 = 3;
+const SVAROG_RELOCATION_PC_LOWER11: u32 = 4;
+const SVAROG_RELOCATION_BRANCH16: u32 = 5;
+const SVAROG_RELOCATION_BRANCH21: u32 = 6;
+const SVAROG_RELOCATION_BRANCH26: u32 = 7;
+const SVAROG_RELOCATION_ABSOLUTE32: u32 = 8;
+
+const SVAROG_ADDI: u32 = 26;
+const SVAROG_ADD: u32 = 25;
+const SVAROG_SUB: u32 = 27;
+const SVAROG_SLLI: u32 = 44;
+const SVAROG_LW: u32 = 5;
+const SVAROG_SW: u32 = 10;
+const SVAROG_BR: u32 = 12;
+const SVAROG_BLR: u32 = 14;
+
+class SvarogSymbol {
+    pub name: String,
+    pub section: u32,
+    pub offset: u32,
+    pub global: bool;
+
+    SvarogSymbol(&mut this) {}
+
+    SvarogSymbol(&mut this, name: &String, section: u32, offset: u32, global: bool) {
+        (this.name, this.section, this.offset, this.global) = (name, section, offset, global);
+    }
+}
+
+class SvarogRelocation {
+    pub section: u32,
+    pub offset: u32,
+    pub kind: u32,
+    pub symbol: String;
+
+    SvarogRelocation(&mut this) {}
+
+    SvarogRelocation(&mut this, section: u32, offset: u32, kind: u32, symbol: &String) {
+        (this.section, this.offset, this.kind, this.symbol) = (section, offset, kind, symbol);
+    }
+}
+
+class SvarogFixup {
+    pub offset: u32,
+    pub kind: u32,
+    pub block: *LIRBlock = null,
+    pub symbol: String;
+
+    SvarogFixup(&mut this) {}
+
+    SvarogFixup(&mut this, offset: u32, kind: u32, block: *LIRBlock, symbol: &String) {
+        (this.offset, this.kind, this.block, this.symbol) = (offset, kind, block, symbol);
+    }
+}
 
 class SvarogEmitter {
     output: String,
+    binary: bool = false,
+    sections: Vector<Vector<u8>>,
+    section: u32 = 0,
+    symbols: Vector<SvarogSymbol>,
+    relocations: Vector<SvarogRelocation>,
+    fixups: Vector<SvarogFixup>,
+    block_fixups: Vector<SvarogFixup>,
+    block_offsets: Vector<u32>,
+    function_offsets: Map<String, u32>,
     function: *LIRFunction = null,
     function_index: u32 = 0,
+    table_index: u32 = 0,
     has_frame: bool = false;
 
     SvarogEmitter(&mut this) {}
 
-    pub fn Emit(&mut this, module: *LIRModule) -> String {
-        this.output = String();
-        let mut defined = Vector<String>();
+    fn Externs(&mut this, module: *LIRModule) -> Vector<String> {
+        let mut defined = Map<String, bool>();
+        let mut seen = Map<String, bool>();
         let mut externs = Vector<String>();
 
         for function in module->functions {
-            if !function->blocks.Empty() { defined.PushBack(function->name); }
+            if !function->blocks.Empty() { defined[function->name] = true; }
         }
 
         for global in module->globals {
-            defined.PushBack(global->name);
+            defined[global->name] = true;
         }
 
         for function in module->functions {
             for block in function->blocks {
                 for instruction in block->instructions {
-                    for operand in instruction->uses {
+                    let mut operands = instruction->uses;
+
+                    for inner in instruction->body {
+                        for operand in inner->uses { operands.PushBack(operand); }
+                    }
+
+                    for operand in operands {
                         if operand->kind != LIROperandKind::Symbol { continue; }
-                        let name = (operand as *LIRSymbolOperand)->name;
-                        if !defined.Contains(name) && !externs.Contains(name) { externs.PushBack(name); }
+                        let &name = (operand as *LIRSymbolOperand)->name;
+                        if defined.Has(name) || seen.Has(name) { continue; }
+                        seen[name] = true;
+                        externs.PushBack(name);
                     }
                 }
             }
@@ -51,12 +139,19 @@ class SvarogEmitter {
 
         for global in module->globals {
             for relocation in global->relocations {
-                if !defined.Contains(relocation.symbol) && !externs.Contains(relocation.symbol) {
-                    externs.PushBack(relocation.symbol);
-                }
+                if defined.Has(relocation.symbol) || seen.Has(relocation.symbol) { continue; }
+                seen[relocation.symbol] = true;
+                externs.PushBack(relocation.symbol);
             }
         }
 
+        externs
+    }
+
+    pub fn Emit(&mut this, module: *LIRModule) -> String {
+        this.output = String();
+        this.binary = false;
+        let externs = this.Externs(module);
         this.output += "\t.text\n";
 
         for name in externs {
@@ -82,6 +177,178 @@ class SvarogEmitter {
         }
 
         this.output
+    }
+
+    pub fn EmitObject(&mut this, module: *LIRModule) {
+        this.binary = true;
+        this.sections.Clear();
+        this.sections.Resize(2);
+        this.section = SVAROG_TEXT;
+
+        for function in module->functions {
+            if !function->blocks.Empty() {
+                this.EmitFunction(function);
+            }
+        }
+
+        if !module->globals.Empty() {
+            this.section = SVAROG_DATA;
+
+            for global in module->globals {
+                this.EmitGlobal(global);
+            }
+        }
+
+        for s in 0usize..2 {
+            while this.sections[s].Length() % 4 != 0 {
+                this.sections[s].PushBack(0);
+            }
+        }
+
+        for fixup in this.fixups {
+            this.Patch(fixup.offset, fixup.kind, this.function_offsets.Get(fixup.symbol, 0));
+        }
+    }
+
+    fn Size(&this) -> u32 {
+        this.sections[this.section as usize].Length() as u32
+    }
+
+    fn Byte(&mut this, value: u32) {
+        this.sections[this.section as usize].PushBack(value as u8);
+    }
+
+    fn Word(&mut this, value: u32) {
+        this.Byte(value & 0xFF);
+        this.Byte((value >> 8) & 0xFF);
+        this.Byte((value >> 16) & 0xFF);
+        this.Byte((value >> 24) & 0xFF);
+    }
+
+    fn Start(&mut this) -> u32 {
+        while this.Size() % 4 != 0 { this.Byte(0); }
+        this.Size()
+    }
+
+    fn Raw(&mut this, word: u32) {
+        this.Start();
+        this.Word(word);
+    }
+
+    fn Define(&mut this, name: &String, global: bool) {
+        this.symbols.PushBack(SvarogSymbol(name, this.section, this.Size(), global));
+    }
+
+    fn Relocate(&mut this, offset: u32, kind: u32, symbol: &String) {
+        this.relocations.PushBack(SvarogRelocation(this.section, offset, kind, symbol));
+    }
+
+    fn Patch(&mut this, offset: u32, kind: u32, target: u32) {
+        let field = if kind == SVAROG_RELOCATION_BRANCH16 { ((target - offset) >> 2) & SVAROG_IMM16_MASK }
+            else if kind == SVAROG_RELOCATION_BRANCH21 { ((target - offset) >> 2) & SVAROG_IMM21_MASK }
+            else { ((target - offset) >> 2) & SVAROG_IMM26_MASK };
+
+        for k in 0u32..4 {
+            this.sections[SVAROG_TEXT as usize][(offset + k) as usize] = this.sections[SVAROG_TEXT as usize][(offset + k) as usize] | ((field >> (k * 8)) & 0xFF) as u8;
+        }
+    }
+
+    fn Control(&mut this, kind: u32, word: u32, target: *LIROperand) {
+        let offset = this.Start();
+        let name = this.Target(target);
+        this.Relocate(offset, kind, name);
+
+        if target->kind == LIROperandKind::Block {
+            this.block_fixups.PushBack(SvarogFixup(offset, kind, (target as *LIRBlockOperand)->block, String()));
+        } else {
+            this.fixups.PushBack(SvarogFixup(offset, kind, null, name));
+        }
+
+        this.Word(word);
+    }
+
+    fn LoadImmediate(&mut this, register: u32, immediate: u32) {
+        if immediate <= 0x7FFF || immediate >= 0xFFFF8000 {
+            this.Raw((26u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | (immediate & SVAROG_IMM16_MASK));
+        } else if (immediate & SVAROG_IMM11_MASK) == 0 {
+            this.Raw((6u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | ((immediate >> 11) & SVAROG_IMM21_MASK));
+        } else {
+            this.Raw((6u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | ((immediate >> 11) & SVAROG_IMM21_MASK));
+            this.Raw((40u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | (register << SVAROG_REG1_SHIFT) | (immediate & SVAROG_IMM11_MASK));
+        }
+    }
+
+    fn LoadSymbol(&mut this, register: u32, symbol: &String) {
+        let offset = this.Start();
+        this.Word((6u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT));
+        this.Word((40u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | (register << SVAROG_REG1_SHIFT));
+        this.Relocate(offset, SVAROG_RELOCATION_ABSOLUTE_UPPER21, symbol);
+        this.Relocate(offset + 4, SVAROG_RELOCATION_ABSOLUTE_LOWER11, symbol);
+    }
+
+    fn LoadAddress(&mut this, register: u32, symbol: &String) {
+        let offset = this.Start();
+        this.Word((7u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT));
+        this.Word((26u32 << SVAROG_OPCODE_SHIFT) | (register << SVAROG_REG0_SHIFT) | (register << SVAROG_REG1_SHIFT));
+        this.Relocate(offset, SVAROG_RELOCATION_PC_UPPER21, symbol);
+        this.Relocate(offset + 4, SVAROG_RELOCATION_PC_LOWER11, symbol);
+    }
+
+    fn WordSymbol(&mut this, symbol: &String) {
+        this.Relocate(this.Size(), SVAROG_RELOCATION_ABSOLUTE32, symbol);
+        this.Word(0);
+    }
+
+    fn PutWord(&this, bytes: &mut Vector<u8>, value: u32) {
+        bytes.PushBack(value as u8);
+        bytes.PushBack((value >> 8) as u8);
+        bytes.PushBack((value >> 16) as u8);
+        bytes.PushBack((value >> 24) as u8);
+    }
+
+    fn PutString(&this, bytes: &mut Vector<u8>, value: &String) {
+        this.PutWord(bytes, value.Length() as u32);
+
+        for i in 0..value.Length() {
+            bytes.PushBack(value[i] as u8);
+        }
+    }
+
+    pub fn WriteObject(&mut this, path: &String) -> bool {
+        let mut bytes = Vector<u8>();
+        this.PutWord(bytes, SVAROG_OBJECT_MAGIC);
+
+        for s in 0usize..2 {
+            let &section = this.sections[s];
+            this.PutWord(bytes, (section.Length() / 4) as u32);
+
+            for i in 0..section.Length() {
+                bytes.PushBack(section[i]);
+            }
+        }
+
+        this.PutWord(bytes, this.symbols.Length() as u32);
+
+        for symbol in this.symbols {
+            this.PutString(bytes, symbol.name);
+            this.PutWord(bytes, symbol.section);
+            this.PutWord(bytes, symbol.offset);
+            this.PutWord(bytes, if symbol.global { 1 } else { 0 });
+        }
+
+        this.PutWord(bytes, this.relocations.Length() as u32);
+
+        for relocation in this.relocations {
+            this.PutWord(bytes, relocation.section);
+            this.PutWord(bytes, relocation.offset);
+            this.PutWord(bytes, relocation.kind);
+            this.PutString(bytes, relocation.symbol);
+        }
+
+        let mut file = File();
+        if file.Open(path, FileMode::Write).IsErr() { return false; }
+        let written = file.Write(bytes.Data(), bytes.Length()).IsOk();
+        file.Close().IsOk() && written
     }
 
     fn Symbol(&this, name: &String) -> String {
@@ -127,12 +394,79 @@ class SvarogEmitter {
         }
     }
 
+    fn Index(&mut this, operand: *LIROperand) -> u32 {
+        if operand->kind != LIROperandKind::Register {
+            Logger::Log("Expected a register operand in '" + this.function->name + "'.", LogSeverity::Error);
+            return 0;
+        }
+
+        let register = operand as *LIRRegisterOperand;
+
+        if register->kind == LIRRegisterKind::Virtual {
+            Logger::Log("Unallocated virtual register in '" + this.function->name + "'.", LogSeverity::Error);
+            return 0;
+        }
+
+        (register as *LIRPhysicalRegister)->index as u32
+    }
+
+    fn Value(&this, operand: *LIROperand) -> u32 {
+        (operand as *LIRImmediateOperand)->value as u32
+    }
+
+    fn Target(&mut this, operand: *LIROperand) -> String {
+        if operand->kind == LIROperandKind::Block { return this.Label((operand as *LIRBlockOperand)->block); }
+        if operand->kind == LIROperandKind::Symbol { return this.Symbol((operand as *LIRSymbolOperand)->name); }
+        Logger::Log("Expected a label operand in '" + this.function->name + "'.", LogSeverity::Error);
+        String()
+    }
+
     fn Line(&mut this, text: &String) {
         this.output += "    " + text + '\n';
     }
 
     fn Line(&mut this, text: *i8) {
         this.Line(text.ToString());
+    }
+
+    fn ImmediateLine(&mut this, name: *i8, opcode: u32, destination: u8, source: u8, immediate: i32) {
+        if this.binary {
+            this.Raw((opcode << SVAROG_OPCODE_SHIFT) | ((destination as u32) << SVAROG_REG0_SHIFT) | ((source as u32) << SVAROG_REG1_SHIFT) | ((immediate as u32) & SVAROG_IMM16_MASK));
+        } else {
+            this.Line(name.ToString() + ' ' + LIRRegisterName(destination) + ", " + LIRRegisterName(source) + ", " + String::FromInteger(immediate as HostSigned));
+        }
+    }
+
+    fn MemoryLine(&mut this, name: *i8, opcode: u32, register: u8, base: u8, offset: i32) {
+        if this.binary {
+            this.Raw((opcode << SVAROG_OPCODE_SHIFT) | ((register as u32) << SVAROG_REG0_SHIFT) | ((base as u32) << SVAROG_REG1_SHIFT) | ((offset as u32) & SVAROG_IMM16_MASK));
+        } else {
+            this.Line(name.ToString() + ' ' + LIRRegisterName(register) + ", " + String::FromInteger(offset as HostSigned) + '(' + LIRRegisterName(base) + ')');
+        }
+    }
+
+    fn RegisterLine(&mut this, name: *i8, opcode: u32, destination: u8, left: u8, right: u8) {
+        if this.binary {
+            this.Raw((opcode << SVAROG_OPCODE_SHIFT) | ((destination as u32) << SVAROG_REG0_SHIFT) | ((left as u32) << SVAROG_REG1_SHIFT) | ((right as u32) << SVAROG_REG2_SHIFT));
+        } else {
+            this.Line(name.ToString() + ' ' + LIRRegisterName(destination) + ", " + LIRRegisterName(left) + ", " + LIRRegisterName(right));
+        }
+    }
+
+    fn LoadImmediateLine(&mut this, register: u8, value: u32) {
+        if this.binary {
+            this.LoadImmediate(register as u32, value);
+        } else {
+            this.Line("li " + LIRRegisterName(register) + ", " + String::FromInteger(value as HostUnsigned));
+        }
+    }
+
+    fn ReturnLine(&mut this, register: u8) {
+        if this.binary {
+            this.Raw((SVAROG_BR << SVAROG_OPCODE_SHIFT) | ((register as u32) << SVAROG_REG0_SHIFT));
+        } else {
+            this.Line("br " + LIRRegisterName(register));
+        }
     }
 
     fn AlignUp(&this, value: u32, alignment: u32) -> u32 {
@@ -173,24 +507,24 @@ class SvarogEmitter {
         let size = this.FrameSize();
 
         if size <= 32767 {
-            this.Line("addi sp, sp, -" + String::FromInteger(size as HostUnsigned));
-            if function->has_calls { this.Line("sw ra, " + String::FromInteger((size - 4) as HostUnsigned) + "(sp)"); }
-            this.Line("sw fp, " + String::FromInteger((size - 8) as HostUnsigned) + "(sp)");
+            this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_SP, -(size as i32));
+            if function->has_calls { this.MemoryLine("sw", SVAROG_SW, LIR_RA, LIR_SP, (size - 4) as i32); }
+            this.MemoryLine("sw", SVAROG_SW, LIR_FP, LIR_SP, (size - 8) as i32);
         } else {
-            this.Line("addi sp, sp, -8");
-            if function->has_calls { this.Line("sw ra, 4(sp)"); }
-            this.Line("sw fp, 0(sp)");
-            this.Line("addi fp, sp, 8");
-            this.Line("li t6, " + String::FromInteger((size - 8) as HostUnsigned));
-            this.Line("sub sp, sp, t6");
+            this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_SP, -8);
+            if function->has_calls { this.MemoryLine("sw", SVAROG_SW, LIR_RA, LIR_SP, 4); }
+            this.MemoryLine("sw", SVAROG_SW, LIR_FP, LIR_SP, 0);
+            this.ImmediateLine("addi", SVAROG_ADDI, LIR_FP, LIR_SP, 8);
+            this.LoadImmediateLine(LIR_T6, size - 8);
+            this.RegisterLine("sub", SVAROG_SUB, LIR_SP, LIR_SP, LIR_T6);
         }
 
         for i in 0..function->saved_registers.Length() {
-            this.Line("sw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as HostUnsigned) + "(sp)");
+            this.MemoryLine("sw", SVAROG_SW, function->saved_registers[i], LIR_SP, (function->outgoing_size as usize + i * 4) as i32);
         }
 
         if size <= 32767 {
-            this.Line("addi fp, sp, " + String::FromInteger(size as HostUnsigned));
+            this.ImmediateLine("addi", SVAROG_ADDI, LIR_FP, LIR_SP, size as i32);
         }
     }
 
@@ -201,30 +535,30 @@ class SvarogEmitter {
             let size = this.FrameSize();
 
             if size <= 32767 {
-                this.Line("addi sp, fp, -" + String::FromInteger(size as HostUnsigned));
+                this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_FP, -(size as i32));
             } else {
-                this.Line("li t6, " + String::FromInteger(size as HostUnsigned));
-                this.Line("sub sp, fp, t6");
+                this.LoadImmediateLine(LIR_T6, size);
+                this.RegisterLine("sub", SVAROG_SUB, LIR_SP, LIR_FP, LIR_T6);
             }
 
             for i in 0..function->saved_registers.Length() {
-                this.Line("lw " + LIRRegisterName(function->saved_registers[i]) + ", " + String::FromInteger((function->outgoing_size as usize + i * 4) as HostUnsigned) + "(sp)");
+                this.MemoryLine("lw", SVAROG_LW, function->saved_registers[i], LIR_SP, (function->outgoing_size as usize + i * 4) as i32);
             }
 
             if size <= 32767 {
-                this.Line("lw fp, " + String::FromInteger((size - 8) as HostUnsigned) + "(sp)");
-                if function->has_calls { this.Line("lw ra, " + String::FromInteger((size - 4) as HostUnsigned) + "(sp)"); }
-                this.Line("addi sp, sp, " + String::FromInteger(size as HostUnsigned));
+                this.MemoryLine("lw", SVAROG_LW, LIR_FP, LIR_SP, (size - 8) as i32);
+                if function->has_calls { this.MemoryLine("lw", SVAROG_LW, LIR_RA, LIR_SP, (size - 4) as i32); }
+                this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_SP, size as i32);
             } else {
-                this.Line("li t6, " + String::FromInteger((size - 8) as HostUnsigned));
-                this.Line("add sp, sp, t6");
-                this.Line("lw fp, 0(sp)");
-                if function->has_calls { this.Line("lw ra, 4(sp)"); }
-                this.Line("addi sp, sp, 8");
+                this.LoadImmediateLine(LIR_T6, size - 8);
+                this.RegisterLine("add", SVAROG_ADD, LIR_SP, LIR_SP, LIR_T6);
+                this.MemoryLine("lw", SVAROG_LW, LIR_FP, LIR_SP, 0);
+                if function->has_calls { this.MemoryLine("lw", SVAROG_LW, LIR_RA, LIR_SP, 4); }
+                this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_SP, 8);
             }
         }
 
-        this.Line("br ra");
+        this.ReturnLine(LIR_RA);
     }
 
     fn EmitFunction(&mut this, function: *LIRFunction) {
@@ -238,15 +572,32 @@ class SvarogEmitter {
             || function->outgoing_size > 0 || this.UsesFramePointer(function);
 
         let name = this.Symbol(function->name);
-        this.output += '\n';
-        if function->global { this.output += "\t.global\t" + name + '\n'; }
-        this.output += name + ":\n";
+        this.table_index = 0;
+
+        if this.binary {
+            this.function_offsets[name] = this.Size();
+            this.Define(name, function->global);
+            this.block_offsets.Clear();
+            this.block_fixups.Clear();
+        } else {
+            this.output += '\n';
+            if function->global { this.output += "\t.global\t" + name + '\n'; }
+            this.output += name + ":\n";
+        }
+
         if this.has_frame { this.EmitPrologue(); }
 
         for i in 0..function->blocks.Length() {
             let block = function->blocks[i];
             let next = if i + 1 < function->blocks.Length() { function->blocks[i + 1] } else { null };
-            this.output += this.Label(block) + ":\n";
+
+            if this.binary {
+                this.block_offsets.PushBack(this.Size());
+                this.Define(this.Label(block), false);
+            } else {
+                this.output += this.Label(block) + ":\n";
+            }
+
             let size = block->instructions.Length();
 
             for k in 0..size {
@@ -254,11 +605,24 @@ class SvarogEmitter {
 
                 if k + 2 == size && instruction->opcode >= LIROpcode::Beq && instruction->opcode <= LIROpcode::Bgeu && (instruction->uses[2] as *LIRBlockOperand)->block == next && block->instructions[k + 1]->opcode == LIROpcode::B {
                     let other = block->instructions[k + 1]->uses[0];
-                    this.Line(this.InvertBranch(instruction->opcode).ToString() + ' ' + this.Operand(instruction->uses[0]) + ", " + this.Operand(instruction->uses[1]) + ", " + this.Operand(other));
+                    let inverted = this.InvertBranch(instruction->opcode);
+
+                    if this.binary {
+                        this.Control(SVAROG_RELOCATION_BRANCH16, (this.Opcode(inverted) << SVAROG_OPCODE_SHIFT) | (this.Index(instruction->uses[0]) << SVAROG_REG0_SHIFT) | (this.Index(instruction->uses[1]) << SVAROG_REG1_SHIFT), other);
+                    } else {
+                        this.Line(inverted.ToString() + ' ' + this.Operand(instruction->uses[0]) + ", " + this.Operand(instruction->uses[1]) + ", " + this.Operand(other));
+                    }
+
                     break;
                 }
 
                 this.EmitInstruction(instruction, next);
+            }
+        }
+
+        if this.binary {
+            for fixup in this.block_fixups {
+                this.Patch(fixup.offset, fixup.kind, this.block_offsets[fixup.block->index as usize]);
             }
         }
 
@@ -276,8 +640,200 @@ class SvarogEmitter {
         }
     }
 
+    fn Opcode(&this, opcode: LIROpcode) -> u32 {
+        match opcode {
+            LIROpcode::Nop => 0,
+            LIROpcode::Lb => 1,
+            LIROpcode::Lbu => 2,
+            LIROpcode::Lh => 3,
+            LIROpcode::Lhu => 4,
+            LIROpcode::Lw => 5,
+            LIROpcode::Lui => 6,
+            LIROpcode::Auipc => 7,
+            LIROpcode::Sb => 8,
+            LIROpcode::Sh => 9,
+            LIROpcode::Sw => 10,
+            LIROpcode::B => 11,
+            LIROpcode::Br => 12,
+            LIROpcode::Bl => 13,
+            LIROpcode::Blr => 14,
+            LIROpcode::Beq => 15,
+            LIROpcode::Bne => 16,
+            LIROpcode::Blt => 17,
+            LIROpcode::Bltu => 18,
+            LIROpcode::Bge => 19,
+            LIROpcode::Bgeu => 20,
+            LIROpcode::Slt => 21,
+            LIROpcode::Sltu => 22,
+            LIROpcode::Slti => 23,
+            LIROpcode::Sltiu => 24,
+            LIROpcode::Add => 25,
+            LIROpcode::Addi => 26,
+            LIROpcode::Sub => 27,
+            LIROpcode::Subi => 28,
+            LIROpcode::Mul => 29,
+            LIROpcode::Mulh => 30,
+            LIROpcode::Mulhsu => 31,
+            LIROpcode::Mulhu => 32,
+            LIROpcode::Div => 33,
+            LIROpcode::Divu => 34,
+            LIROpcode::Rem => 35,
+            LIROpcode::Remu => 36,
+            LIROpcode::And => 37,
+            LIROpcode::Andi => 38,
+            LIROpcode::Or => 39,
+            LIROpcode::Ori => 40,
+            LIROpcode::Xor => 41,
+            LIROpcode::Xori => 42,
+            LIROpcode::Sll => 43,
+            LIROpcode::Slli => 44,
+            LIROpcode::Srl => 45,
+            LIROpcode::Srli => 46,
+            LIROpcode::Sra => 47,
+            LIROpcode::Srai => 48,
+            LIROpcode::Csrrw => 49,
+            LIROpcode::Csrrs => 50,
+            LIROpcode::Csrrc => 51,
+            LIROpcode::Csrrwi => 52,
+            LIROpcode::Csrrsi => 53,
+            LIROpcode::Csrrci => 54,
+            LIROpcode::Ecall => 55,
+            LIROpcode::Ebreak => 56,
+            LIROpcode::Eret => 57,
+            LIROpcode::Wfi => 58,
+            LIROpcode::LrW => 59,
+            LIROpcode::ScW => 60,
+            LIROpcode::Fence | LIROpcode::FenceI => 62,
+            LIROpcode::Hlt => 63,
+            _ => if opcode >= LIROpcode::AmoswapW && opcode <= LIROpcode::AmomaxuW { 61 } else { 0 }
+        }
+    }
+
+    fn AtomicOperation(&this, opcode: LIROpcode) -> u32 {
+        match opcode {
+            LIROpcode::AmoaddW => 1,
+            LIROpcode::AmoxorW => 2,
+            LIROpcode::AmoandW => 3,
+            LIROpcode::AmoorW => 4,
+            LIROpcode::AmominW => 5,
+            LIROpcode::AmomaxW => 6,
+            LIROpcode::AmominuW => 7,
+            LIROpcode::AmomaxuW => 8,
+            _ => 0
+        }
+    }
+
+    fn IsSystem(&this, opcode: LIROpcode) -> bool {
+        opcode >= LIROpcode::Csrrw && opcode <= LIROpcode::FenceI
+    }
+
+    fn EmitSystem(&mut this, instruction: *LIRInstruction) {
+        let opcode = instruction->opcode;
+        let code = this.Opcode(opcode);
+        let mut operands = Vector<*LIROperand>();
+
+        for operand in instruction->defines { operands.PushBack(operand); }
+        for operand in instruction->uses { operands.PushBack(operand); }
+
+        if opcode >= LIROpcode::Csrrw && opcode <= LIROpcode::Csrrci {
+            let immediate = opcode >= LIROpcode::Csrrwi;
+            let csr = this.Value(operands[1]);
+
+            if this.binary {
+                let source = if immediate { this.Value(operands[2]) } else { this.Index(operands[2]) };
+                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | ((source & 0x1F) << SVAROG_REG1_SHIFT) | (csr & SVAROG_IMM16_MASK));
+            } else {
+                this.Line(opcode.ToString() + ' ' + this.Operand(operands[0]) + ", " + LIRCSRName(csr as HostSigned) + ", " + this.Operand(operands[2]));
+            }
+
+            return;
+        }
+
+        if opcode >= LIROpcode::LrW && opcode <= LIROpcode::AmomaxuW {
+            let memory = operands[operands.Length() - 1] as *LIRMemoryOperand;
+
+            if this.binary {
+                let source = if opcode == LIROpcode::LrW { 0 } else { this.Index(operands[1]) };
+                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT)
+                    | (source << SVAROG_REG2_SHIFT) | (this.AtomicOperation(opcode) << 3) | 3);
+            } else {
+                let source = if opcode == LIROpcode::LrW { String() } else { this.Operand(operands[1]) + ", " };
+                this.Line(opcode.ToString() + ' ' + this.Operand(operands[0]) + ", " + source + '(' + this.Operand(memory->base) + ')');
+            }
+
+            return;
+        }
+
+        if this.binary {
+            this.Raw((code << SVAROG_OPCODE_SHIFT) | (if opcode == LIROpcode::FenceI { 1 } else { 0 }));
+        } else {
+            this.Line(opcode.ToString());
+        }
+    }
+
+    fn EncodeInstruction(&mut this, instruction: *LIRInstruction) {
+        let opcode = instruction->opcode;
+        let mut operands = Vector<*LIROperand>();
+
+        for operand in instruction->defines { operands.PushBack(operand); }
+        for operand in instruction->uses { operands.PushBack(operand); }
+
+        if opcode == LIROpcode::Li {
+            let source = operands[1];
+
+            if source->kind == LIROperandKind::Immediate {
+                this.LoadImmediate(this.Index(operands[0]), this.Value(source));
+            } else {
+                this.LoadSymbol(this.Index(operands[0]), this.Target(source));
+            }
+
+            return;
+        }
+
+        if opcode == LIROpcode::La {
+            this.LoadAddress(this.Index(operands[0]), this.Target(operands[1]));
+            return;
+        }
+
+        let code = this.Opcode(opcode);
+        let word = code << SVAROG_OPCODE_SHIFT;
+
+        if code >= 1 && code <= 10 {
+            if code == 6 || code == 7 {
+                this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Value(operands[1]) & SVAROG_IMM21_MASK));
+            } else {
+                let memory = operands[1] as *LIRMemoryOperand;
+                this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT) | ((memory->offset as u32) & SVAROG_IMM16_MASK));
+            }
+        } else if code == 11 {
+            this.Control(SVAROG_RELOCATION_BRANCH26, word, operands[0]);
+        } else if code == 12 {
+            this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT));
+        } else if code >= 15 && code <= 20 {
+            this.Control(SVAROG_RELOCATION_BRANCH16, word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(operands[1]) << SVAROG_REG1_SHIFT), operands[2]);
+        } else if code >= 21 && code <= 48 {
+            let register_form = code == 21 || code == 22 || (code >= 25 && code % 2 == 1) || (code >= 29 && code <= 36);
+            let base = word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(operands[1]) << SVAROG_REG1_SHIFT);
+
+            if register_form {
+                this.Raw(base | (this.Index(operands[2]) << SVAROG_REG2_SHIFT));
+            } else {
+                this.Raw(base | (this.Value(operands[2]) & SVAROG_IMM16_MASK));
+            }
+        } else if code == 63 || code == 0 {
+            this.Raw(word);
+        } else {
+            Logger::Log("Cannot encode '" + instruction->ToString() + "' in '" + this.function->name + "'.", LogSeverity::Error);
+        }
+    }
+
     fn EmitInstruction(&mut this, instruction: *LIRInstruction, next: *LIRBlock) {
         let opcode = instruction->opcode;
+
+        if this.IsSystem(opcode) {
+            this.EmitSystem(instruction);
+            return;
+        }
 
         match opcode {
             LIROpcode::Ret => {
@@ -285,8 +841,8 @@ class SvarogEmitter {
                 return;
             },
             LIROpcode::Asm => {
-                for line in instruction->text.Split('\n') {
-                    this.Line(line.Strip());
+                for inner in instruction->body {
+                    this.EmitInstruction(inner, null);
                 } return;
             },
             LIROpcode::B => {
@@ -294,10 +850,46 @@ class SvarogEmitter {
                 if target == next { return; }
             },
             LIROpcode::Bl | LIROpcode::Blr => {
+                if this.binary {
+                    if opcode == LIROpcode::Bl { this.Control(SVAROG_RELOCATION_BRANCH21, (13u32 << SVAROG_OPCODE_SHIFT) | ((LIR_RA as u32) << SVAROG_REG0_SHIFT), instruction->uses[0]); }
+                    else { this.Raw((SVAROG_BLR << SVAROG_OPCODE_SHIFT) | ((LIR_RA as u32) << SVAROG_REG0_SHIFT) | (this.Index(instruction->uses[0]) << SVAROG_REG1_SHIFT)); }
+                    return;
+                }
+
                 this.Line(opcode.ToString() + " ra, " + this.Operand(instruction->uses[0]));
                 return;
             },
-            LIROpcode::Addi if instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0 && this.Operand(instruction->defines[0]) == this.Operand(instruction->uses[0]) => {
+            LIROpcode::Jt => {
+                let table = "__LJT" + String::FromInteger(this.function_index as HostUnsigned) + '_' + String::FromInteger(this.table_index as HostUnsigned);
+                this.table_index += 1;
+
+                if this.binary {
+                    this.Raw((SVAROG_SLLI << SVAROG_OPCODE_SHIFT) | ((LIR_T6 as u32) << SVAROG_REG0_SHIFT) | (this.Index(instruction->uses[0]) << SVAROG_REG1_SHIFT) | 2);
+                    this.LoadAddress(LIR_T6 as u32 - 1, table);
+                    this.Raw((SVAROG_ADD << SVAROG_OPCODE_SHIFT) | ((LIR_T6 as u32 - 1) << SVAROG_REG0_SHIFT) | ((LIR_T6 as u32 - 1) << SVAROG_REG1_SHIFT) | ((LIR_T6 as u32) << SVAROG_REG2_SHIFT));
+                    this.Raw((SVAROG_LW << SVAROG_OPCODE_SHIFT) | ((LIR_T6 as u32 - 1) << SVAROG_REG0_SHIFT) | ((LIR_T6 as u32 - 1) << SVAROG_REG1_SHIFT));
+                    this.Raw((SVAROG_BR << SVAROG_OPCODE_SHIFT) | ((LIR_T6 as u32 - 1) << SVAROG_REG0_SHIFT));
+                    this.Define(table, false);
+
+                    for i in 1..instruction->uses.Length() {
+                        this.WordSymbol(this.Target(instruction->uses[i]));
+                    }
+
+                    return;
+                }
+
+                this.Line("slli t6, " + this.Operand(instruction->uses[0]) + ", 2");
+                this.Line("la t5, " + table);
+                this.Line("add t5, t5, t6");
+                this.Line("lw t5, 0(t5)");
+                this.Line("br t5");
+                this.output += table + ":\n";
+
+                for i in 1..instruction->uses.Length() {
+                    this.output += "\t.word\t" + this.Operand(instruction->uses[i]) + '\n';
+                } return;
+            },
+            LIROpcode::Addi if instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0 && instruction->defines[0]->kind == LIROperandKind::Register && instruction->uses[0]->kind == LIROperandKind::Register && (instruction->defines[0] as *LIRPhysicalRegister)->index == (instruction->uses[0] as *LIRPhysicalRegister)->index => {
                 return;
             },
             _ => {}
@@ -313,6 +905,11 @@ class SvarogEmitter {
             if instruction->uses[i]->kind == LIROperandKind::Immediate && opcode != LIROpcode::Li && (register_form || !last) {
                 Logger::Log("Invalid immediate operand in '" + instruction->ToString() + "' (in '" + this.function->name + "').", LogSeverity::Error);
             }
+        }
+
+        if this.binary {
+            this.EncodeInstruction(instruction);
+            return;
         }
 
         let mut text = opcode.ToString();
@@ -333,6 +930,42 @@ class SvarogEmitter {
 
     fn EmitGlobal(&mut this, global: *LIRGlobal) {
         let name = this.Symbol(global->name);
+
+        if this.binary {
+            if global->alignment > 1 {
+                let remainder = this.Size() % global->alignment;
+
+                if remainder != 0 {
+                    for _ in 0..(global->alignment - remainder) { this.Byte(0); }
+                }
+            }
+
+            this.Define(name, global->global);
+            let mut offset: usize = 0;
+
+            while offset < global->data.Length() {
+                let mut relocation: HostSigned = -1;
+
+                for i in 0..global->relocations.Length() {
+                    if global->relocations[i].offset as usize == offset {
+                        relocation = i as HostSigned;
+                        break;
+                    }
+                }
+
+                if relocation >= 0 {
+                    this.WordSymbol(this.Symbol(global->relocations[relocation as usize].symbol));
+                    offset += 4;
+                    continue;
+                }
+
+                this.Byte(global->data[offset] as u32);
+                offset += 1;
+            }
+
+            return;
+        }
+
         if global->alignment > 1 { this.output += "\t.align\t" + String::FromInteger(global->alignment as HostUnsigned) + '\n'; }
         if global->global { this.output += "\t.global\t" + name + '\n'; }
         this.output += name + ":\n";

@@ -15,7 +15,58 @@
  */
 
 #[include "std/str", "std/vec", "std/map",
-    "src/MIR.zir", "src/LIR.zir", "src/Logger.zir" : *]
+    "src/MIR.zir", "src/MIRAnalysis.zir", "src/LIR.zir", "src/Logger.zir" : *]
+
+enum LIRAssemblyKind: u8 {
+    Unknown, Branch, Plain, Register, Immediate, Load, Store, Upper, Jump, LoadImmediate, LoadAddress,
+    Move, Not, SetZero, ZeroLeft, ZeroRight, CSR, CSRRead, CSRWrite, Counter, Atomic
+}
+
+fn LIRAssemblyForm(name: &String) -> (LIROpcode, LIRAssemblyKind, usize) {
+    let plain = [LIROpcode::Nop, LIROpcode::Hlt, LIROpcode::Ecall, LIROpcode::Ebreak, LIROpcode::Eret, LIROpcode::Wfi, LIROpcode::Fence, LIROpcode::FenceI];
+    let loads = [LIROpcode::Lb, LIROpcode::Lbu, LIROpcode::Lh, LIROpcode::Lhu, LIROpcode::Lw];
+    let stores = [LIROpcode::Sb, LIROpcode::Sh, LIROpcode::Sw];
+    let uppers = [LIROpcode::Lui, LIROpcode::Auipc];
+    let registers = [LIROpcode::Slt, LIROpcode::Sltu, LIROpcode::Add, LIROpcode::Sub, LIROpcode::Mul, LIROpcode::Mulh, LIROpcode::Mulhsu, LIROpcode::Mulhu,
+        LIROpcode::Div, LIROpcode::Divu, LIROpcode::Rem, LIROpcode::Remu, LIROpcode::And, LIROpcode::Or, LIROpcode::Xor, LIROpcode::Sll, LIROpcode::Srl, LIROpcode::Sra];
+    let immediates = [LIROpcode::Slti, LIROpcode::Sltiu, LIROpcode::Addi, LIROpcode::Subi, LIROpcode::Andi, LIROpcode::Ori, LIROpcode::Xori, LIROpcode::Slli, LIROpcode::Srli, LIROpcode::Srai];
+    let csrs = [LIROpcode::Csrrw, LIROpcode::Csrrs, LIROpcode::Csrrc, LIROpcode::Csrrwi, LIROpcode::Csrrsi, LIROpcode::Csrrci];
+    let atomics = [LIROpcode::LrW, LIROpcode::ScW, LIROpcode::AmoswapW, LIROpcode::AmoaddW, LIROpcode::AmoxorW, LIROpcode::AmoandW, LIROpcode::AmoorW,
+        LIROpcode::AmominW, LIROpcode::AmomaxW, LIROpcode::AmominuW, LIROpcode::AmomaxuW];
+    let branches = [LIROpcode::B, LIROpcode::Bl, LIROpcode::Blr, LIROpcode::Beq, LIROpcode::Bne, LIROpcode::Blt, LIROpcode::Bltu, LIROpcode::Bge, LIROpcode::Bgeu];
+
+    for opcode in plain { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Plain, 0); } }
+    for opcode in loads { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Load, 2); } }
+    for opcode in stores { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Store, 2); } }
+    for opcode in uppers { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Upper, 2); } }
+    for opcode in registers { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Register, 3); } }
+    for opcode in immediates { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Immediate, 3); } }
+    for opcode in csrs { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::CSR, 3); } }
+    for opcode in atomics { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Atomic, if opcode == LIROpcode::LrW { 2 } else { 3 }); } }
+    for opcode in branches { if opcode.ToString() == name { return (opcode, LIRAssemblyKind::Branch, 0); } }
+
+    if name == "br" { (LIROpcode::Br, LIRAssemblyKind::Jump, 1) }
+    else if name == "li" { (LIROpcode::Li, LIRAssemblyKind::LoadImmediate, 2) }
+    else if name == "la" { (LIROpcode::La, LIRAssemblyKind::LoadAddress, 2) }
+    else if name == "mv" { (LIROpcode::Addi, LIRAssemblyKind::Move, 2) }
+    else if name == "not" { (LIROpcode::Xori, LIRAssemblyKind::Not, 2) }
+    else if name == "neg" { (LIROpcode::Sub, LIRAssemblyKind::ZeroLeft, 2) }
+    else if name == "seqz" { (LIROpcode::Sltiu, LIRAssemblyKind::SetZero, 2) }
+    else if name == "snez" { (LIROpcode::Sltu, LIRAssemblyKind::ZeroLeft, 2) }
+    else if name == "sltz" { (LIROpcode::Slt, LIRAssemblyKind::ZeroRight, 2) }
+    else if name == "sgtz" { (LIROpcode::Slt, LIRAssemblyKind::ZeroLeft, 2) }
+    else if name == "csrr" { (LIROpcode::Csrrs, LIRAssemblyKind::CSRRead, 2) }
+    else if name == "csrw" { (LIROpcode::Csrrw, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "csrs" { (LIROpcode::Csrrs, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "csrc" { (LIROpcode::Csrrc, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "csrwi" { (LIROpcode::Csrrwi, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "csrsi" { (LIROpcode::Csrrsi, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "csrci" { (LIROpcode::Csrrci, LIRAssemblyKind::CSRWrite, 2) }
+    else if name == "rdcycle" || name == "rdtime" || name == "rdinstret" { (LIROpcode::Csrrs, LIRAssemblyKind::Counter, 1) }
+    else if name == "beqz" || name == "bnez" || name == "blez" || name == "bgez" || name == "bltz" || name == "bgtz"
+        || name == "bgt" || name == "ble" || name == "bgtu" || name == "bleu" { (LIROpcode::B, LIRAssemblyKind::Branch, 0) }
+    else { (LIROpcode::Nop, LIRAssemblyKind::Unknown, 0) }
+}
 
 class LIRPhiEdge {
     pub from: *MIRBlock,
@@ -366,11 +417,39 @@ class LIRLowerer {
             }
         }
 
+        let mut aggregate_uses = Map<*MIRValue, u32>();
+
+        for block in function->blocks {
+            for instruction in block->instructions {
+                for operand in MIROperands(instruction) {
+                    if this.IsAggregateLoad(operand) { aggregate_uses[operand] = aggregate_uses.Get(operand, 0) + 1; }
+                }
+            }
+
+            if block->terminator != null {
+                for operand in MIROperands(block->terminator as *MIRInstruction) {
+                    if this.IsAggregateLoad(operand) { aggregate_uses[operand] = aggregate_uses.Get(operand, 0) + 1; }
+                }
+            }
+        }
+
         for block in function->blocks {
             this.block = block;
             this.builder.SetCurrentBlock(this.blocks[block]);
+            let count = block->instructions.Length();
 
-            for instruction in block->instructions {
+            for i in 0..count {
+                let instruction = block->instructions[i];
+
+                if i + 1 < count && this.IsAggregateLoad(instruction) && aggregate_uses.Get(instruction, 0) == 1 && this.IsForwardedStore(block->instructions[i + 1], instruction) {
+                    let pointer = this.LowerValue((instruction as *MIRLoadInstruction)->pointer);
+
+                    if pointer != null {
+                        this.values[instruction] = this.EnsureMemory(pointer);
+                        continue;
+                    }
+                }
+
                 this.values[instruction] = this.LowerInstruction(instruction);
             }
 
@@ -382,6 +461,18 @@ class LIRLowerer {
         this.LowerPhiCopies();
         this.OptimizeFunction(lowered);
         this.builder.SetCurrentFunction(null);
+    }
+
+    fn IsAggregateLoad(&this, value: *MIRValue) -> bool {
+        if value == null || value->kind != MIRValueKind::Instruction || (value as *MIRInstruction)->kind != MIRInstructionKind::Load { return false; }
+        let load = value as *MIRLoadInstruction;
+        this.IsAggregate(load->_type) && !load->_volatile && (load->alignment == 0 || load->alignment >= this.AlignOf(load->_type))
+    }
+
+    fn IsForwardedStore(&this, instruction: *MIRInstruction, load: *MIRInstruction) -> bool {
+        if instruction->kind != MIRInstructionKind::Store { return false; }
+        let store = instruction as *MIRStoreInstruction;
+        store->value == load as *MIRValue && !store->_volatile && (store->alignment == 0 || store->alignment >= this.AlignOf(store->value->_type))
     }
 
     fn VirtualIndex(&this, operand: *LIROperand) -> isize {
@@ -1013,8 +1104,52 @@ class LIRLowerer {
         this.builder.MemoryOperand(this.Physical(LIR_FP), -(function->frame_size as i32))
     }
 
+    fn MemoryAddress(&mut this, memory: *LIRMemoryOperand) -> *LIROperand {
+        let address = this.builder.VirtualRegister();
+        let base = this.EnsureRegister(memory->base);
+
+        if this.FitsSigned16(memory->offset as HostSigned) {
+            this.Emit(LIROpcode::Addi, address, base, this.Immediate(memory->offset as HostSigned));
+        } else {
+            this.Emit(LIROpcode::Add, address, base, this.EnsureRegister(this.Immediate(memory->offset as HostSigned)));
+        }
+
+        address
+    }
+
+    fn EmitWordLoop(&mut this, destination: *LIRMemoryOperand, source: *LIRMemoryOperand, size: u32) {
+        let target = this.MemoryAddress(destination);
+        let from = if source != null { this.MemoryAddress(source) } else { null };
+        let end = this.EmitAddImmediate(target, size as HostSigned);
+        let end_register = this.EnsureRegister(end);
+        let name = this.builder.GetCurrentBlock()->name;
+        let loop_block = this.builder.BuildBlock(name + ".copy");
+        let exit_block = this.builder.BuildBlock(name + ".copied");
+        this.EmitBranch(loop_block);
+        this.builder.SetCurrentBlock(loop_block);
+
+        if from != null {
+            let value = this.EmitValue(LIROpcode::Lw, this.builder.MemoryOperand(from, 0), null);
+            this.Emit(LIROpcode::Sw, null, value, this.builder.MemoryOperand(target, 0));
+            this.Emit(LIROpcode::Addi, from, from, this.Immediate(4));
+        } else {
+            this.Emit(LIROpcode::Sw, null, this.Zero(), this.builder.MemoryOperand(target, 0));
+        }
+
+        this.Emit(LIROpcode::Addi, target, target, this.Immediate(4));
+        this.EmitCompareBranch(LIROpcode::Bne, target, end_register, loop_block);
+        this.EmitBranch(exit_block);
+        this.builder.SetCurrentBlock(exit_block);
+    }
+
     fn CopyMemory(&mut this, destination: *LIRMemoryOperand, source: *LIRMemoryOperand, size: u32, alignment: u32) {
         let unit: u32 = if alignment >= 4 && size % 4 == 0 { 4 } else if alignment >= 2 && size % 2 == 0 { 2 } else { 1 };
+
+        if unit == 4 && size >= 64 {
+            this.EmitWordLoop(destination, source, size);
+            return;
+        }
+
         let load = if unit == 4 { LIROpcode::Lw } else if unit == 2 { LIROpcode::Lhu } else { LIROpcode::Lbu };
         let store = if unit == 4 { LIROpcode::Sw } else if unit == 2 { LIROpcode::Sh } else { LIROpcode::Sb };
         let legal_source = this.LegalMemory(source, size);
@@ -1030,6 +1165,12 @@ class LIRLowerer {
 
     fn ZeroMemory(&mut this, destination: *LIRMemoryOperand, size: u32, alignment: u32) {
         let unit: u32 = if alignment >= 4 && size % 4 == 0 { 4 } else if alignment >= 2 && size % 2 == 0 { 2 } else { 1 };
+
+        if unit == 4 && size >= 64 {
+            this.EmitWordLoop(destination, null, size);
+            return;
+        }
+
         let store = if unit == 4 { LIROpcode::Sw } else if unit == 2 { LIROpcode::Sh } else { LIROpcode::Sb };
         let legal_destination = this.LegalMemory(destination, size);
         let mut offset: u32 = 0;
@@ -1471,6 +1612,298 @@ class LIRLowerer {
         this.Physical(index as u8)
     }
 
+    fn AssemblyError(&mut this, line: &String, message: &String) {
+        Logger::Log(message + " (in inline assembly '" + line + "').", LogSeverity::Error);
+    }
+
+    fn AssemblyNumber(&this, text: &String, value: &mut u32) -> bool {
+        let mut start: usize = 0;
+        let negative = text.StartsWith('-');
+        if negative { start = 1; }
+        let mut base: u32 = 10;
+
+        if text.Length() > start + 2 && text[start] == '0' {
+            let prefix = text[start + 1];
+            if prefix == 'x' || prefix == 'X' { (base, start) = (16, start + 2); }
+            else if prefix == 'b' || prefix == 'B' { (base, start) = (2, start + 2); }
+            else if prefix == 'o' || prefix == 'O' { (base, start) = (8, start + 2); }
+        }
+
+        if start >= text.Length() { return false; }
+        let mut result: u32 = 0;
+
+        for i in start..text.Length() {
+            let character = text[i];
+            let digit: u32 = if character >= '0' && character <= '9' { (character - '0') as u32 }
+                else if character >= 'a' && character <= 'f' { (character - 'a') as u32 + 10 }
+                else if character >= 'A' && character <= 'F' { (character - 'A') as u32 + 10 }
+                else { 99 };
+            if digit >= base { return false; }
+            result = result * base + digit;
+        }
+
+        value = if negative { 0 - result } else { result };
+        true
+    }
+
+    fn AssemblyRegister(&mut this, line: &String, text: &String) -> *LIROperand {
+        let index = LIRRegisterIndex(text);
+
+        if index < 0 {
+            this.AssemblyError(line, "Expected a register, found '" + text + "'");
+            return null;
+        }
+
+        this.Physical(index as u8)
+    }
+
+    fn AssemblyImmediate(&mut this, line: &String, text: &String) -> *LIROperand {
+        let mut value: u32 = 0;
+
+        if !this.AssemblyNumber(text, value) {
+            this.AssemblyError(line, "Expected an integer, found '" + text + "'");
+            return null;
+        }
+
+        this.Immediate(value as i32 as HostSigned)
+    }
+
+    fn AssemblySymbol(&mut this, line: &String, text: &String) -> *LIROperand {
+        let mut valid = !text.Empty() && !(text[0] >= '0' && text[0] <= '9');
+
+        for character in text {
+            if !((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '_' || character == '.') {
+                valid = false;
+            }
+        }
+
+        if !valid {
+            this.AssemblyError(line, "Expected a symbol, found '" + text + "'");
+            return null;
+        }
+
+        this.builder.SymbolOperand(text)
+    }
+
+    fn AssemblyValue(&mut this, line: &String, text: &String) -> *LIROperand {
+        let mut value: u32 = 0;
+        if this.AssemblyNumber(text, value) { return this.Immediate(value as i32 as HostSigned); }
+        this.AssemblySymbol(line, text)
+    }
+
+    fn AssemblyMemory(&mut this, line: &String, text: &String) -> *LIROperand {
+        let mut open = text.Length();
+
+        for i in 0..text.Length() {
+            if text[i] == '(' {
+                open = i;
+                break;
+            }
+        }
+
+        if open == text.Length() || !text.EndsWith(')') {
+            this.AssemblyError(line, "Expected 'offset(register)', found '" + text + "'");
+            return null;
+        }
+
+        let base = this.AssemblyRegister(line, text.SubString(open + 1, text.Length() - open - 2).Strip());
+        let offset_text = text.SubString(0, open).Strip();
+        let mut offset: u32 = 0;
+
+        if !offset_text.Empty() && !this.AssemblyNumber(offset_text, offset) {
+            this.AssemblyError(line, "Expected an integer offset, found '" + offset_text + "'");
+            return null;
+        }
+
+        if base == null { return null; }
+        this.builder.MemoryOperand(base, offset as i32)
+    }
+
+    fn AssemblyCSR(&mut this, line: &String, text: &String) -> *LIROperand {
+        let number = LIRCSRIndex(text);
+        if number >= 0 { return this.Immediate(number as HostSigned); }
+        this.AssemblyImmediate(line, text)
+    }
+
+    fn AssemblyCSRImmediate(&mut this, line: &String, text: &String) -> *LIROperand {
+        let operand = this.AssemblyImmediate(line, text);
+
+        if operand != null && (this.ImmediateValue(operand) < 0 || this.ImmediateValue(operand) > 31) {
+            this.AssemblyError(line, "CSR immediate must be between 0 and 31".ToString());
+            return null;
+        }
+
+        operand
+    }
+
+    fn AssemblyLine(&mut this, line: &String) -> *mut LIRInstruction {
+        let mut split = line.Length();
+
+        for i in 0..line.Length() {
+            if line[i] == ' ' || line[i] == '\t' {
+                split = i;
+                break;
+            }
+        }
+
+        let mut name = line.SubString(0, split);
+        let rest = line.SubString(split).Strip();
+        let mut operands = Vector<String>();
+
+        if !rest.Empty() {
+            for piece in rest.Split(',') {
+                operands.PushBack(piece.Strip());
+            }
+        }
+
+        if name.EndsWith(".aqrl") { name = name.SubString(0, name.Length() - 5); }
+        else if name.EndsWith(".aq") || name.EndsWith(".rl") { name = name.SubString(0, name.Length() - 3); }
+
+        let (opcode, kind, count) = LIRAssemblyForm(name);
+
+        if kind == LIRAssemblyKind::Unknown {
+            this.AssemblyError(line, "Unknown mnemonic '" + name + "'");
+            return null;
+        }
+
+        if kind == LIRAssemblyKind::Branch {
+            this.AssemblyError(line, "Branches are not supported".ToString());
+            return null;
+        }
+
+        if operands.Length() != count {
+            this.AssemblyError(line, "Expected " + String::FromInteger(count as HostUnsigned) + " operands for '" + name + "'");
+            return null;
+        }
+
+        let mut defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+
+        match kind {
+            LIRAssemblyKind::Register => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyRegister(line, operands[1]));
+                uses.PushBack(this.AssemblyRegister(line, operands[2]));
+            },
+            LIRAssemblyKind::Immediate => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyRegister(line, operands[1]));
+                uses.PushBack(this.AssemblyImmediate(line, operands[2]));
+            },
+            LIRAssemblyKind::Load => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyMemory(line, operands[1]));
+            },
+            LIRAssemblyKind::Store => {
+                uses.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyMemory(line, operands[1]));
+            },
+            LIRAssemblyKind::Upper => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyImmediate(line, operands[1]));
+            },
+            LIRAssemblyKind::Jump => {
+                uses.PushBack(this.AssemblyRegister(line, operands[0]));
+            },
+            LIRAssemblyKind::LoadImmediate => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyValue(line, operands[1]));
+            },
+            LIRAssemblyKind::LoadAddress => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblySymbol(line, operands[1]));
+            },
+            LIRAssemblyKind::Move | LIRAssemblyKind::Not | LIRAssemblyKind::SetZero => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyRegister(line, operands[1]));
+                let immediate: HostSigned = if kind == LIRAssemblyKind::Not { -1 } else if kind == LIRAssemblyKind::SetZero { 1 } else { 0 };
+                uses.PushBack(this.Immediate(immediate));
+            },
+            LIRAssemblyKind::ZeroLeft => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.Zero());
+                uses.PushBack(this.AssemblyRegister(line, operands[1]));
+            },
+            LIRAssemblyKind::ZeroRight => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyRegister(line, operands[1]));
+                uses.PushBack(this.Zero());
+            },
+            LIRAssemblyKind::CSR => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyCSR(line, operands[1]));
+                uses.PushBack(if opcode >= LIROpcode::Csrrwi { this.AssemblyCSRImmediate(line, operands[2]) } else { this.AssemblyRegister(line, operands[2]) });
+            },
+            LIRAssemblyKind::CSRRead => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.AssemblyCSR(line, operands[1]));
+                uses.PushBack(this.Zero());
+            },
+            LIRAssemblyKind::CSRWrite => {
+                defines.PushBack(this.Zero());
+                uses.PushBack(this.AssemblyCSR(line, operands[0]));
+                uses.PushBack(if opcode >= LIROpcode::Csrrwi { this.AssemblyCSRImmediate(line, operands[1]) } else { this.AssemblyRegister(line, operands[1]) });
+            },
+            LIRAssemblyKind::Counter => {
+                let csr: HostSigned = if name == "rdcycle" { 16 } else if name == "rdtime" { 18 } else { 17 };
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                uses.PushBack(this.Immediate(csr));
+                uses.PushBack(this.Zero());
+            },
+            LIRAssemblyKind::Atomic => {
+                defines.PushBack(this.AssemblyRegister(line, operands[0]));
+                if opcode != LIROpcode::LrW { uses.PushBack(this.AssemblyRegister(line, operands[1])); }
+                let memory = this.AssemblyMemory(line, operands[count - 1]);
+
+                if memory != null && (memory as *LIRMemoryOperand)->offset != 0 {
+                    this.AssemblyError(line, "Atomic instructions do not take an offset".ToString());
+                    return null;
+                }
+
+                uses.PushBack(memory);
+            },
+            _ => {}
+        }
+
+        for operand in defines {
+            if operand == null { return null; }
+        }
+
+        for operand in uses {
+            if operand == null { return null; }
+        }
+
+        this.context.arena.New<LIRInstruction>(opcode, defines, uses)
+    }
+
+    fn ParseAssembly(&mut this, text: &String) -> Vector<*LIRInstruction> {
+        let mut body = Vector<*LIRInstruction>();
+
+        for raw in text.Split('\n') {
+            let mut end = raw.Length();
+
+            for i in 0..raw.Length() {
+                if raw[i] == ';' {
+                    end = i;
+                    break;
+                }
+            }
+
+            let line = raw.SubString(0, end).Strip();
+            if line.Empty() { continue; }
+
+            if line.EndsWith(':') || line.StartsWith('.') {
+                this.AssemblyError(line, "Labels and directives are not supported".ToString());
+                continue;
+            }
+
+            let instruction = this.AssemblyLine(line);
+            if instruction != null { body.PushBack(instruction); }
+        }
+
+        body
+    }
+
     fn LowerAssemblyInstruction(&mut this, assembly: *MIRAssemblyInstruction) -> *LIROperand {
         let mut inputs = Vector<*LIROperand>();
         let mut outputs = Vector<*LIROperand>();
@@ -1496,7 +1929,7 @@ class LIRLowerer {
         }
 
         let instruction = this.Emit(LIROpcode::Asm, null, null, null);
-        instruction->text = assembly->text;
+        instruction->body = this.ParseAssembly(assembly->text);
         instruction->implicit_uses = inputs;
         instruction->implicit_defines = defines;
 
@@ -1524,6 +1957,9 @@ class LIRLowerer {
             },
             MIRTerminatorKind::ConditionalBranch => {
                 this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction);
+            },
+            MIRTerminatorKind::Switch => {
+                this.LowerSwitchInstruction(terminator as *MIRSwitchInstruction);
             },
             MIRTerminatorKind::Unreachable => {
                 this.Emit(LIROpcode::Hlt, null, null, null);
@@ -1559,6 +1995,115 @@ class LIRLowerer {
 
         let instruction = this.Emit(LIROpcode::Ret, null, null, null);
         instruction->implicit_uses = uses;
+    }
+
+    fn EmitCompareBranch(&mut this, opcode: LIROpcode, left: *LIROperand, right: *LIROperand, target: *LIRBlock) {
+        let defines = Vector<*LIROperand>();
+        let mut uses = Vector<*LIROperand>();
+        uses.PushBack(left);
+        uses.PushBack(right);
+        uses.PushBack(this.builder.BlockOperand(target));
+        this.builder.BuildInstruction(opcode, defines, uses);
+    }
+
+    fn CaseConstant(&mut this, value: HostUnsigned) -> *LIROperand {
+        if value == 0 { return this.Zero(); }
+        this.EnsureRegister(this.Immediate(value as HostSigned))
+    }
+
+    fn EmitSwitchSearch(&mut this, value: *LIROperand, values: &Vector<HostUnsigned>, targets: &Vector<*LIRBlock>, first: usize, last: usize, default_target: *LIRBlock) {
+        if last - first <= 4 {
+            for i in first..last {
+                this.EmitCompareBranch(LIROpcode::Beq, value, this.CaseConstant(values[i]), targets[i]);
+            }
+
+            this.EmitBranch(default_target);
+            return;
+        }
+
+        let middle = (first + last) / 2;
+        let upper = this.builder.BuildBlock(this.block->name + ".switch");
+        this.EmitCompareBranch(LIROpcode::Bgeu, value, this.CaseConstant(values[middle]), upper);
+        this.EmitSwitchSearch(value, values, targets, first, middle, default_target);
+        this.builder.SetCurrentBlock(upper);
+        this.EmitSwitchSearch(value, values, targets, middle, last, default_target);
+    }
+
+    fn LowerSwitchInstruction(&mut this, switch: *MIRSwitchInstruction) {
+        let width = this.IntegerWidth(switch->value->_type);
+
+        if width == 0 || width > 32 {
+            this.Unsupported("64-bit integer arithmetic");
+            return;
+        }
+
+        let lowered = this.LowerValue(switch->value);
+        if lowered == null { return; }
+
+        if this.IsImmediate(lowered) {
+            let constant = this.TruncateValue(this.ImmediateValue(lowered), width) as HostUnsigned;
+            let mut target = switch->default_target;
+
+            for case in switch->cases {
+                if case.value == constant {
+                    target = case.target;
+                    break;
+                }
+            }
+
+            this.EmitBranch(this.EdgeTarget(target, false));
+            return;
+        }
+
+        let value = this.EnsureRegister(this.ZeroExtend(lowered, width));
+        let mut edges = Map<*MIRBlock, *LIRBlock>();
+        let default_target = this.EdgeTarget(switch->default_target, true);
+        edges[switch->default_target] = default_target;
+        let mut values = Vector<HostUnsigned>();
+        let mut targets = Vector<*LIRBlock>();
+
+        for case in switch->cases {
+            if !edges.Has(case.target) { edges[case.target] = this.EdgeTarget(case.target, true); }
+            let mut position = values.Length();
+
+            while position > 0 && values[position - 1] > case.value {
+                position -= 1;
+            }
+
+            values.Insert(position, case.value);
+            targets.Insert(position, edges[case.target]);
+        }
+
+        let count = values.Length();
+
+        if count == 0 {
+            this.EmitBranch(default_target);
+            return;
+        }
+
+        let range = values[count - 1] - values[0] + 1;
+
+        if count >= 4 && range <= 3 * count as HostUnsigned && range <= 4096 {
+            let index = this.EnsureRegister(this.EmitAddImmediate(value, -(values[0] as HostSigned)));
+            this.EmitCompareBranch(LIROpcode::Bgeu, index, this.EnsureRegister(this.Immediate(range as HostSigned)), default_target);
+            let mut uses = Vector<*LIROperand>();
+            uses.PushBack(index);
+            let mut next: usize = 0;
+
+            for k in 0..range {
+                if next < count && values[next] == values[0] + k {
+                    uses.PushBack(this.builder.BlockOperand(targets[next]));
+                    next += 1;
+                } else {
+                    uses.PushBack(this.builder.BlockOperand(default_target));
+                }
+            }
+
+            this.builder.BuildInstruction(LIROpcode::Jt, Vector<*LIROperand>(), uses);
+            return;
+        }
+
+        this.EmitSwitchSearch(value, values, targets, 0, count, default_target);
     }
 
     fn LowerConditionalBranchInstruction(&mut this, branch: *MIRConditionalBranchInstruction) {

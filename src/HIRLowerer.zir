@@ -1177,11 +1177,15 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->length as HostUnsigned {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.IndexAccess(this_dereferenced, index);
-                let other_element = this.builder.IndexAccess(other_dereferenced, index);
-                this.LowerFieldCopyConstructor(this_element, other_element, _type->element, null);
+            if (_type as *HIRType)->IsTrivial() {
+                this.LowerFieldCopyConstructor(this_dereferenced, other_dereferenced, _type, null);
+            } else {
+                for i in 0.._type->length as HostUnsigned {
+                    let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                    let this_element = this.builder.IndexAccess(this_dereferenced, index);
+                    let other_element = this.builder.IndexAccess(other_dereferenced, index);
+                    this.LowerFieldCopyConstructor(this_element, other_element, _type->element, null);
+                }
             }
 
             this.scope_manager.PopScope();
@@ -1201,10 +1205,12 @@ class HIRLowerer {
             let this_reference = this.builder.ReferenceDeclaration(this_parameter, false);
             let this_dereferenced = this.builder.Dereference(this_reference);
 
-            for i in 0.._type->length as HostUnsigned {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.IndexAccess(this_dereferenced, index);
-                this.LowerFieldDestructor(this_element, _type->element, null);
+            if !(_type as *HIRType)->IsTrivial() {
+                for i in 0.._type->length as HostUnsigned {
+                    let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                    let this_element = this.builder.IndexAccess(this_dereferenced, index);
+                    this.LowerFieldDestructor(this_element, _type->element, null);
+                }
             }
 
             this.scope_manager.PopScope();
@@ -1228,11 +1234,15 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->length as HostUnsigned {
-                let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
-                let this_element = this.builder.IndexAccess(this_dereferenced, index);
-                let other_element = this.builder.IndexAccess(other_dereferenced, index);
-                this.LowerFieldCopyAssignment(this_element, other_element, _type->element, null);
+            if (_type as *HIRType)->IsTrivial() {
+                this.LowerFieldCopyAssignment(this_dereferenced, other_dereferenced, _type, null);
+            } else {
+                for i in 0.._type->length as HostUnsigned {
+                    let index = this.builder.IntegerLiteral(i, this.context.IntegerPointerType(false));
+                    let this_element = this.builder.IndexAccess(this_dereferenced, index);
+                    let other_element = this.builder.IndexAccess(other_dereferenced, index);
+                    this.LowerFieldCopyAssignment(this_element, other_element, _type->element, null);
+                }
             }
 
             this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
@@ -1271,10 +1281,14 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->elements.Length() {
-                let this_element = this.builder.TupleAccess(this_dereferenced, i);
-                let other_element = this.builder.TupleAccess(other_dereferenced, i);
-                this.LowerFieldCopyConstructor(this_element, other_element, _type->elements[i], null);
+            if (_type as *HIRType)->IsTrivial() {
+                this.LowerFieldCopyConstructor(this_dereferenced, other_dereferenced, _type, null);
+            } else {
+                for i in 0.._type->elements.Length() {
+                    let this_element = this.builder.TupleAccess(this_dereferenced, i);
+                    let other_element = this.builder.TupleAccess(other_dereferenced, i);
+                    this.LowerFieldCopyConstructor(this_element, other_element, _type->elements[i], null);
+                }
             }
 
             this.scope_manager.PopScope();
@@ -1320,10 +1334,14 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for i in 0.._type->elements.Length() {
-                let this_element = this.builder.TupleAccess(this_dereferenced, i);
-                let other_element = this.builder.TupleAccess(other_dereferenced, i);
-                this.LowerFieldCopyAssignment(this_element, other_element, _type->elements[i], null);
+            if (_type as *HIRType)->IsTrivial() {
+                this.LowerFieldCopyAssignment(this_dereferenced, other_dereferenced, _type, null);
+            } else {
+                for i in 0.._type->elements.Length() {
+                    let this_element = this.builder.TupleAccess(this_dereferenced, i);
+                    let other_element = this.builder.TupleAccess(other_dereferenced, i);
+                    this.LowerFieldCopyAssignment(this_element, other_element, _type->elements[i], null);
+                }
             }
 
             this.builder.BuildExpressionStatement(this.builder.Return(this_reference, Vector<*HIRExpression>()));
@@ -1419,7 +1437,7 @@ class HIRLowerer {
             return value;
         }
 
-        if value->category == HIRExpressionCategory::Place && value->_type->IsTrivial() && this.builder.IsPackedField(value) {
+        if value->category == HIRExpressionCategory::Place && value->_type->IsTrivial() {
             return value;
         }
 
@@ -1519,7 +1537,7 @@ class HIRLowerer {
     }
 
     fn LowerFieldCopyConstructor(&mut this, this_field: *HIRExpression, other_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if _type->HasSpecialMembers() {
+        if _type->HasSpecialMembers() && !_type->IsTrivial() {
             let function = this.GetCopyConstructor(_type);
             if function == null { return; }
             let mut values = Vector<*HIRExpression>();
@@ -1730,7 +1748,7 @@ class HIRLowerer {
     }
 
     fn LowerFieldDestructor(&mut this, this_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if !_type->HasSpecialMembers() { return; }
+        if !_type->HasSpecialMembers() || _type->IsTrivial() { return; }
         let function = this.GetDestructor(_type);
         if function == null { return; }
         let mut values = Vector<*HIRExpression>();
@@ -1741,7 +1759,7 @@ class HIRLowerer {
     }
 
     fn LowerFieldCopyAssignment(&mut this, this_field: *HIRExpression, other_field: *HIRExpression, _type: *HIRType, node: *ASTNode) {
-        if _type->HasSpecialMembers() {
+        if _type->HasSpecialMembers() && !_type->IsTrivial() {
             let function = this.GetCopyAssignment(_type);
             if function == null { return; }
             let mut values = Vector<*HIRExpression>();
@@ -2061,10 +2079,10 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for field in declaration->fields {
-                if declaration->packed {
-                    this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field)));
-                } else {
+            if declaration->_type->IsTrivial() {
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this_dereferenced, other_dereferenced));
+            } else {
+                for field in declaration->fields {
                     this.LowerFieldCopyConstructor(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
                 }
             }
@@ -2108,10 +2126,10 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            for field in declaration->fields {
-                if declaration->packed {
-                    this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field)));
-                } else {
+            if declaration->_type->IsTrivial() {
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this_dereferenced, other_dereferenced));
+            } else {
+                for field in declaration->fields {
                     this.LowerFieldCopyAssignment(this.builder.FieldAccess(this_dereferenced, field), this.builder.FieldAccess(other_dereferenced, field), field->_type, structure);
                 }
             }
@@ -2262,9 +2280,14 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
-            this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.TagAccess(this_dereferenced), this.builder.TagAccess(other_dereferenced)));
+            if declaration->_type->IsTrivial() {
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this_dereferenced, other_dereferenced));
+            } else {
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this.builder.TagAccess(this_dereferenced), this.builder.TagAccess(other_dereferenced)));
+            }
 
             for member in declaration->members {
+                if declaration->_type->IsTrivial() { break; }
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(member->index as HostUnsigned, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
@@ -2297,6 +2320,7 @@ class HIRLowerer {
             let this_dereferenced = this.builder.Dereference(this_reference);
 
             for member in declaration->members {
+                if declaration->_type->IsTrivial() { break; }
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(member->index as HostUnsigned, this.context.IntegerType(8, false));
                 let condition = this.builder.BuildCondition(this.builder.Binary(HIRBinaryKind::Equal, this_tag, member_tag, this.context.BooleanType()));
@@ -2332,7 +2356,12 @@ class HIRLowerer {
             let other_reference = this.builder.ReferenceDeclaration(other_parameter, false);
             let other_dereferenced = this.builder.Dereference(other_reference);
 
+            if declaration->_type->IsTrivial() {
+                this.builder.BuildExpressionStatement(this.builder.Assignment(this_dereferenced, other_dereferenced));
+            }
+
             for other_member in declaration->members {
+                if declaration->_type->IsTrivial() { break; }
                 let this_tag = this.builder.TagAccess(this_dereferenced);
                 let other_tag = this.builder.TagAccess(other_dereferenced);
                 let member_tag = this.builder.IntegerLiteral(other_member->index as HostUnsigned, this.context.IntegerType(8, false));
@@ -2810,6 +2839,7 @@ class HIRLowerer {
             i -= 1;
 
             for instance in this.temporary_stack[i].Reverse() {
+                if instance->_type->IsTrivial() { continue; }
                 let function = this.GetDestructor(instance->_type);
                 if function == null { continue; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
@@ -2832,7 +2862,7 @@ class HIRLowerer {
                 continue;
             }
 
-            if instance == exception { continue; }
+            if instance == exception || instance->_type->IsTrivial() { continue; }
             let function = this.GetDestructor(instance->_type);
             if function == null { continue; }
             let callee = this.builder.ReferenceDeclaration(function, false);
@@ -2848,7 +2878,7 @@ class HIRLowerer {
         let mut destructors = Vector<*HIRExpression>();
 
         for instance in this.temporaries.Reverse() {
-            if instance == exception { continue; }
+            if instance == exception || instance->_type->IsTrivial() { continue; }
             let function = this.GetDestructor(instance->_type);
             if function == null { continue; }
             let callee = this.builder.ReferenceDeclaration(function, false);
@@ -2884,6 +2914,7 @@ class HIRLowerer {
                     }
                 }
 
+                if instance->_type->IsTrivial() { continue; }
                 let function = this.GetDestructor(instance->_type);
                 if function == null { continue; }
                 let callee = this.builder.ReferenceDeclaration(function, false);
@@ -3421,9 +3452,7 @@ class HIRLowerer {
             right = this.Coerce(right, left->_type);
         }
 
-        let packed = left->_type->IsTrivial() && (this.builder.IsPackedField(left) || this.builder.IsPackedField(right));
-
-        if left->_type->HasSpecialMembers() && !packed {
+        if left->_type->HasSpecialMembers() && !left->_type->IsTrivial() {
             let mut values = Vector<*HIRExpression>();
             values.PushBack(left);
             values.PushBack(right);
@@ -3810,7 +3839,7 @@ class HIRLowerer {
 
                     let target_type: *HIRType = target->_type->Pointee();
 
-                    if target_type->HasSpecialMembers() {
+                    if target_type->HasSpecialMembers() && !target_type->IsTrivial() {
                         let function = this.GetDestructor(target_type);
                         if function == null { return null; }
                         let callee = this.builder.ReferenceDeclaration(function, false);

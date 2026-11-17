@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/arena", "src/Logger.zir" : *]
+#[include "std/str", "std/vec", "std/map", "std/arena", "src/Logger.zir" : *]
 
 enum MIRTypeKind: u8 {
     Void, Integer, Float, Pointer, Array, Structure, Function
@@ -812,7 +812,7 @@ class MIRAssemblyInstruction : MIRInstruction {
 }
 
 enum MIRTerminatorKind: u8 {
-    Return, Branch, ConditionalBranch, Unreachable
+    Return, Branch, ConditionalBranch, Switch, Unreachable
 }
 
 class MIRTerminator : MIRInstruction {
@@ -866,6 +866,42 @@ class MIRConditionalBranchInstruction : MIRTerminator {
 
     pub override fn ToString(&this) -> String {
         "branch " + this.condition->ToString() + ", " + this.then_target->ToString() + ", " + this.else_target->ToString()
+    }
+}
+
+class MIRSwitchCase {
+    pub value: HostUnsigned,
+    pub target: *MIRBlock;
+
+    MIRSwitchCase(&mut this) {}
+
+    MIRSwitchCase(&mut this, value: HostUnsigned, target: *MIRBlock) {
+        (this.value, this.target) = (value, target);
+    }
+}
+
+class MIRSwitchInstruction : MIRTerminator {
+    pub value: *MIRValue,
+    pub default_target: *MIRBlock,
+    pub cases: Vector<MIRSwitchCase>;
+
+    MIRSwitchInstruction(&mut this, value: *MIRValue, default_target: *MIRBlock, _type: *MIRType) : MIRTerminator(MIRTerminatorKind::Switch, _type) {
+        (this.value, this.default_target) = (value, default_target);
+    }
+
+    pub fn AddCase(&mut this, value: HostUnsigned, target: *MIRBlock) {
+        this.cases.PushBack(MIRSwitchCase(value, target));
+    }
+
+    pub override fn ToString(&this) -> String {
+        let mut result = "switch " + this.value->ToString() + ", " + this.default_target->ToString() + " [";
+
+        for i in 0..this.cases.Length() {
+            if i != 0 { result += ", "; }
+            result += String::FromInteger(this.cases[i].value) + ": " + this.cases[i].target->ToString();
+        }
+
+        result + ']'
     }
 }
 
@@ -1019,7 +1055,8 @@ class MIRFunctionDeclaration : MIRLinkableDeclaration {
     pub return_attributes: MIRAttributes,
     pub blocks: Vector<*mut MIRBlock>,
     pub names: Map<String, u32>,
-    pub alloca_index: usize = 0;
+    pub alloca_index: usize = 0,
+    pub inline_size: usize = 0;
 
     MIRFunctionDeclaration(&mut this, name: String, parameters: Vector<*MIRParameter>, _return: *MIRType, _type: *MIRType, linkage: MIRDeclarationLinkage) : MIRLinkableDeclaration(MIRDeclarationKind::Function, name, _type, linkage) {
         (this.parameters, this._return) = (parameters, _return);
@@ -1378,6 +1415,12 @@ class MIRBuilder {
         let branch = this.context->arena.New<MIRConditionalBranchInstruction>(condition, then_target, else_target, this.context->VoidType());
         this.block->SetTerminator(branch);
         branch
+    }
+
+    pub fn BuildSwitch(&mut this, value: *MIRValue, default_target: *MIRBlock) -> *mut MIRSwitchInstruction {
+        let switch = this.context->arena.New<MIRSwitchInstruction>(value, default_target, this.context->VoidType());
+        this.block->SetTerminator(switch);
+        switch
     }
 
     pub fn BuildUnreachable(&mut this) -> *mut MIRUnreachableInstruction {

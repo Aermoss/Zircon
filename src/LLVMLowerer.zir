@@ -717,6 +717,7 @@ class LLVMLowerer {
             MIRTerminatorKind::Return => this.LowerReturnInstruction(terminator as *MIRReturnInstruction),
             MIRTerminatorKind::Branch => this.LowerBranchInstruction(terminator as *MIRBranchInstruction),
             MIRTerminatorKind::ConditionalBranch => this.LowerConditionalBranchInstruction(terminator as *MIRConditionalBranchInstruction),
+            MIRTerminatorKind::Switch => this.LowerSwitchInstruction(terminator as *MIRSwitchInstruction),
             MIRTerminatorKind::Unreachable => this.LowerUnreachableInstruction(terminator as *MIRUnreachableInstruction)
         }
     }
@@ -745,6 +746,23 @@ class LLVMLowerer {
         let else_target = this.blocks.Get(branch->else_target, null);
         if else_target == null { return null; }
         LLVMBuildCondBr(this.builder, condition, then_target, else_target)
+    }
+
+    fn LowerSwitchInstruction(&mut this, switch: *MIRSwitchInstruction) -> LLVMValueRef {
+        let value = this.LowerValue(switch->value);
+        if value == null { return null; }
+        let default_target = this.blocks.Get(switch->default_target, null);
+        if default_target == null { return null; }
+        let lowered = LLVMBuildSwitch(this.builder, value, default_target, switch->cases.Length() as u32);
+        let _type = LLVMTypeOf(value);
+
+        for case in switch->cases {
+            let target = this.blocks.Get(case.target, null);
+            if target == null { return null; }
+            LLVMAddCase(lowered, LLVMConstInt(_type, case.value, 0), target);
+        }
+
+        lowered
     }
 
     fn LowerUnreachableInstruction(&mut this, unreachable: *MIRUnreachableInstruction) -> LLVMValueRef {

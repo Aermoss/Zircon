@@ -91,6 +91,9 @@ fn MIROperands(instruction: *MIRInstruction) -> Vector<*MIRValue> {
                 MIRTerminatorKind::ConditionalBranch => {
                     result.PushBack((terminator as *MIRConditionalBranchInstruction)->condition);
                 },
+                MIRTerminatorKind::Switch => {
+                    result.PushBack((terminator as *MIRSwitchInstruction)->value);
+                },
                 _ => {}
             }
         },
@@ -115,6 +118,16 @@ fn MIRSuccessors(block: *MIRBlock) -> Vector<*MIRBlock> {
 
             if branch->else_target != branch->then_target {
                 result.PushBack(branch->else_target);
+            }
+        },
+        MIRTerminatorKind::Switch => {
+            let switch = terminator as *MIRSwitchInstruction;
+            result.PushBack(switch->default_target);
+
+            for case in switch->cases {
+                if !result.Contains(case.target) {
+                    result.PushBack(case.target);
+                }
             }
         },
         _ => {}

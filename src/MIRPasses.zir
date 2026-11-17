@@ -16,15 +16,21 @@
 
 #[include "std/str", "std/vec", "std/map", "src/MIR.zir", "src/MIRAnalysis.zir" : *]
 
+const MIR_INLINE_LIMIT: usize = 10;
+const MIR_INLINE_BUDGET: usize = 48;
+
 enum MIRPassKind: u8 {
-    ReorderBlocks, PromoteAllocas
+    InlineFunctions, ReorderBlocks, PromoteAllocas, FoldConstants, RemoveDeadCode
 }
 
 extend MIRPassKind {
     pub fn ToString(this) -> String {
         match this {
+            MIRPassKind::InlineFunctions => "inline-functions",
             MIRPassKind::ReorderBlocks => "reorder-blocks",
-            MIRPassKind::PromoteAllocas => "promote-allocas"
+            MIRPassKind::PromoteAllocas => "promote-allocas",
+            MIRPassKind::FoldConstants => "fold-constants",
+            MIRPassKind::RemoveDeadCode => "remove-dead-code"
         }.ToString()
     }
 }
@@ -42,13 +48,20 @@ class MIRPassManager {
     }
 
     pub fn Run(&mut this, module: *MIRModule) {
+        if this.passes.Contains(MIRPassKind::InlineFunctions) {
+            let mut pass = MIRInlineFunctions(this.context);
+            pass.Run(module);
+        }
+
         for declaration in module->declarations {
             if declaration->kind != MIRDeclarationKind::Function { continue; }
             let function = declaration as *mut MIRFunctionDeclaration;
             if function->blocks.Empty() { continue; }
 
             for pass in this.passes {
-                this.RunPass(pass, function);
+                if pass != MIRPassKind::InlineFunctions {
+                    this.RunPass(pass, function);
+                }
             }
         }
     }
@@ -62,7 +75,16 @@ class MIRPassManager {
             MIRPassKind::PromoteAllocas => {
                 let mut pass = MIRPromoteAllocas(this.context);
                 pass.Run(function)
-            }
+            },
+            MIRPassKind::FoldConstants => {
+                let mut pass = MIRFoldConstants(this.context);
+                pass.Run(function)
+            },
+            MIRPassKind::RemoveDeadCode => {
+                let mut pass = MIRRemoveDeadCode();
+                pass.Run(function)
+            },
+            MIRPassKind::InlineFunctions => false
         }
     }
 }
@@ -492,6 +514,10 @@ class MIRPromoteAllocas {
                         let branch = terminator as *mut MIRConditionalBranchInstruction;
                         branch->condition = this.Resolve(branch->condition);
                     },
+                    MIRTerminatorKind::Switch => {
+                        let switch = terminator as *mut MIRSwitchInstruction;
+                        switch->value = this.Resolve(switch->value);
+                    },
                     _ => {}
                 }
             },
@@ -569,5 +595,791 @@ class MIRPromoteAllocas {
 
             block->instructions = kept;
         }
+    }
+}
+
+fn MIRResolveValue(map: &Map<*MIRValue, *MIRValue>, mut value: *MIRValue) -> *MIRValue {
+    while value != null && map.Has(value) {
+        value = map.Get(value, null);
+    }
+
+    value
+}
+
+fn MIRResolveBlock(map: &Map<*MIRBlock, *mut MIRBlock>, block: *MIRBlock) -> *MIRBlock {
+    if block != null && map.Has(block) { map.Get(block, null) } else { block }
+}
+
+fn MIRRemapOperands(context: *mut MIRContext, instruction: *mut MIRInstruction, values: &Map<*MIRValue, *MIRValue>, blocks: &Map<*MIRBlock, *mut MIRBlock>) {
+    match instruction->kind {
+        MIRInstructionKind::Load => {
+            let load = instruction as *mut MIRLoadInstruction;
+            load->pointer = MIRResolveValue(values, load->pointer);
+        },
+        MIRInstructionKind::Store => {
+            let store = instruction as *mut MIRStoreInstruction;
+            (store->value, store->pointer) = (MIRResolveValue(values, store->value), MIRResolveValue(values, store->pointer));
+        },
+        MIRInstructionKind::ArrayGEP => {
+            let gep = instruction as *mut MIRArrayGEPInstruction;
+            (gep->pointer, gep->index) = (MIRResolveValue(values, gep->pointer), MIRResolveValue(values, gep->index));
+        },
+        MIRInstructionKind::StructGEP => {
+            let gep = instruction as *mut MIRStructGEPInstruction;
+            gep->pointer = MIRResolveValue(values, gep->pointer);
+        },
+        MIRInstructionKind::Unary => {
+            let unary = instruction as *mut MIRUnaryInstruction;
+            unary->operand = MIRResolveValue(values, unary->operand);
+        },
+        MIRInstructionKind::Binary => {
+            let binary = instruction as *mut MIRBinaryInstruction;
+            (binary->left, binary->right) = (MIRResolveValue(values, binary->left), MIRResolveValue(values, binary->right));
+        },
+        MIRInstructionKind::Call => {
+            let call = instruction as *mut MIRCallInstruction;
+            call->callee = MIRResolveValue(values, call->callee);
+
+            for i in 0..call->arguments.Length() {
+                call->arguments[i] = MIRResolveValue(values, call->arguments[i]);
+            }
+        },
+        MIRInstructionKind::Cast => {
+            let cast = instruction as *mut MIRCastInstruction;
+            cast->value = MIRResolveValue(values, cast->value);
+        },
+        MIRInstructionKind::Select => {
+            let select = instruction as *mut MIRSelectInstruction;
+            select->condition = MIRResolveValue(values, select->condition);
+            select->then_value = MIRResolveValue(values, select->then_value);
+            select->else_value = MIRResolveValue(values, select->else_value);
+        },
+        MIRInstructionKind::Phi => {
+            let phi = instruction as *mut MIRPhiInstruction;
+
+            for i in 0..phi->incomings.Length() {
+                phi->incomings[i].value = MIRResolveValue(values, phi->incomings[i].value);
+                phi->incomings[i].block = MIRResolveBlock(blocks, phi->incomings[i].block);
+            }
+        },
+        MIRInstructionKind::Assembly => {
+            let assembly = instruction as *mut MIRAssemblyInstruction;
+
+            for i in 0..assembly->inputs.Length() {
+                let operand = assembly->inputs[i];
+                let value = MIRResolveValue(values, operand->value);
+                if value != operand->value { assembly->inputs[i] = context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+            }
+
+            for i in 0..assembly->outputs.Length() {
+                let operand = assembly->outputs[i];
+                let value = MIRResolveValue(values, operand->value);
+                if value != operand->value { assembly->outputs[i] = context->arena.New<MIRAssemblyOperand>(operand->name, value); }
+            }
+        },
+        MIRInstructionKind::Terminator => {
+            let terminator = instruction as *mut MIRTerminator;
+
+            match terminator->kind {
+                MIRTerminatorKind::Return => {
+                    let _return = terminator as *mut MIRReturnInstruction;
+                    _return->value = MIRResolveValue(values, _return->value);
+                },
+                MIRTerminatorKind::Branch => {
+                    let branch = terminator as *mut MIRBranchInstruction;
+                    branch->target = MIRResolveBlock(blocks, branch->target);
+                },
+                MIRTerminatorKind::ConditionalBranch => {
+                    let branch = terminator as *mut MIRConditionalBranchInstruction;
+                    branch->condition = MIRResolveValue(values, branch->condition);
+                    branch->then_target = MIRResolveBlock(blocks, branch->then_target);
+                    branch->else_target = MIRResolveBlock(blocks, branch->else_target);
+                },
+                MIRTerminatorKind::Switch => {
+                    let switch = terminator as *mut MIRSwitchInstruction;
+                    switch->value = MIRResolveValue(values, switch->value);
+                    switch->default_target = MIRResolveBlock(blocks, switch->default_target);
+
+                    for i in 0..switch->cases.Length() {
+                        switch->cases[i].target = MIRResolveBlock(blocks, switch->cases[i].target);
+                    }
+                },
+                _ => {}
+            }
+        },
+        _ => {}
+    }
+}
+
+fn MIRRemapFunction(context: *mut MIRContext, function: *mut MIRFunctionDeclaration, values: &Map<*MIRValue, *MIRValue>) {
+    let blocks = Map<*MIRBlock, *mut MIRBlock>();
+
+    for block in function->blocks {
+        for instruction in block->instructions {
+            MIRRemapOperands(context, instruction, values, blocks);
+        }
+
+        if block->terminator != null {
+            MIRRemapOperands(context, block->terminator as *mut MIRInstruction, values, blocks);
+        }
+    }
+}
+
+class MIRValueCounts {
+    keys: Vector<*MIRValue>,
+    counts: Vector<u32>,
+    used: usize = 0;
+
+    MIRValueCounts(&mut this) {
+        this.Resize(256);
+    }
+
+    fn Resize(&mut this, capacity: usize) {
+        let (keys, counts) = (this.keys, this.counts);
+        this.keys.Clear();
+        this.counts.Clear();
+
+        for i in 0..capacity {
+            this.keys.PushBack(null);
+            this.counts.PushBack(0);
+        }
+
+        this.used = 0;
+
+        for i in 0..keys.Length() {
+            if keys[i] != null { this.counts[this.Slot(keys[i])] = counts[i]; }
+        }
+    }
+
+    fn Slot(&mut this, key: *MIRValue) -> usize {
+        let mask = this.keys.Length() - 1;
+        let mut slot = (((key as usize) >> 3) * 40503) & mask;
+
+        while this.keys[slot] != null && this.keys[slot] != key {
+            slot = (slot + 1) & mask;
+        }
+
+        if this.keys[slot] == null {
+            this.keys[slot] = key;
+            this.used += 1;
+        }
+
+        slot
+    }
+
+    pub fn Add(&mut this, key: *MIRValue, amount: i32) {
+        if key == null { return; }
+        if (this.used + 1) * 2 > this.keys.Length() { this.Resize(this.keys.Length() * 2); }
+        let slot = this.Slot(key);
+        let count = this.counts[slot] as i32 + amount;
+        this.counts[slot] = if count < 0 { 0 } else { count as u32 };
+    }
+
+    pub fn Get(&mut this, key: *MIRValue) -> u32 {
+        if key == null { return 1; }
+        if (this.used + 1) * 2 > this.keys.Length() { this.Resize(this.keys.Length() * 2); }
+        this.counts[this.Slot(key)]
+    }
+}
+
+class MIRInlineFunctions {
+    context: *mut MIRContext;
+
+    MIRInlineFunctions(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    pub fn Run(&mut this, module: *MIRModule) -> bool {
+        let mut changed = false;
+
+        for declaration in module->declarations {
+            if declaration->kind != MIRDeclarationKind::Function { continue; }
+            let function = declaration as *mut MIRFunctionDeclaration;
+            function->inline_size = if this.IsCandidate(function) { this.Size(function) } else { MIR_INLINE_LIMIT + 1 };
+        }
+
+        for declaration in module->declarations {
+            if declaration->kind != MIRDeclarationKind::Function { continue; }
+            let function = declaration as *mut MIRFunctionDeclaration;
+            if function->blocks.Empty() { continue; }
+            if !this.InlineCalls(function) { continue; }
+            changed = true;
+            if function->inline_size <= MIR_INLINE_LIMIT { function->inline_size = this.Size(function); }
+        }
+
+        changed
+    }
+
+    fn IsCandidate(&this, callee: *MIRFunctionDeclaration) -> bool {
+        if callee->blocks.Empty() || this.Size(callee) > MIR_INLINE_LIMIT { return false; }
+        if callee->_type->kind != MIRTypeKind::Function || (callee->_type as *MIRFunctionType)->var_arg { return false; }
+        if callee->return_attributes.sret != null { return false; }
+
+        for parameter in callee->parameters {
+            if parameter->attributes.sret != null || parameter->attributes.byval != null || parameter->attributes.stack_align != 0 { return false; }
+        }
+
+        for block in callee->blocks {
+            for instruction in block->instructions {
+                if instruction->kind == MIRInstructionKind::Assembly && (instruction as *MIRAssemblyInstruction)->text.Contains(':') { return false; }
+            }
+        }
+
+        true
+    }
+
+    fn Size(&this, function: *MIRFunctionDeclaration) -> usize {
+        let mut size: usize = 0;
+
+        for block in function->blocks {
+            for instruction in block->instructions {
+                if instruction->kind != MIRInstructionKind::Alloca { size += 1; }
+            }
+
+            size += 1;
+        }
+
+        size
+    }
+
+    fn Callee(&this, call: *MIRCallInstruction) -> *mut MIRFunctionDeclaration {
+        let callee = call->callee;
+        if callee->kind != MIRValueKind::DeclarationReference { return null; }
+        let declaration = (callee as *MIRDeclarationReference)->declaration;
+        if declaration->kind != MIRDeclarationKind::Function { return null; }
+        declaration as *mut MIRFunctionDeclaration
+    }
+
+    fn IsInlinable(&this, caller: *MIRFunctionDeclaration, call: *MIRCallInstruction, callee: *MIRFunctionDeclaration) -> bool {
+        if callee == caller || callee->inline_size > MIR_INLINE_LIMIT { return false; }
+        if callee->parameters.Length() != call->arguments.Length() || call->return_attributes.sret != null { return false; }
+
+        for attributes in call->attributes {
+            if attributes.sret != null || attributes.byval != null || attributes.stack_align != 0 { return false; }
+        }
+
+        for block in callee->blocks {
+            for instruction in block->instructions {
+                if instruction->kind == MIRInstructionKind::Call {
+                    let inner = this.Callee(instruction as *MIRCallInstruction);
+                    if inner == callee || inner == caller { return false; }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn InlineCalls(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let mut replacements = Map<*MIRValue, *MIRValue>();
+        let mut budget = MIR_INLINE_BUDGET;
+        let mut changed = false;
+        let mut b: usize = 0;
+
+        while b < function->blocks.Length() {
+            let block = function->blocks[b];
+            let mut i: usize = 0;
+
+            while i < block->instructions.Length() {
+                let instruction = block->instructions[i];
+
+                if instruction->kind == MIRInstructionKind::Call {
+                    let call = instruction as *mut MIRCallInstruction;
+                    let callee = this.Callee(call);
+
+                    if callee != null && this.IsInlinable(function, call, callee) {
+                        let size = callee->inline_size;
+
+                        if size <= budget {
+                            budget -= size;
+                            this.InlineCall(function, block, i, call, callee, replacements);
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+
+                i += 1;
+            }
+
+            b += 1;
+        }
+
+        if changed {
+            MIRRemapFunction(this.context, function, replacements);
+        }
+
+        changed
+    }
+
+    fn Clone(&mut this, instruction: *MIRInstruction) -> *mut MIRInstruction {
+        let arena = &mut this.context->arena;
+
+        match instruction->kind {
+            MIRInstructionKind::Alloca => {
+                let alloca = instruction as *MIRAllocaInstruction;
+                arena.New<MIRAllocaInstruction>(instruction->name, alloca->_type, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Load => {
+                let load = instruction as *MIRLoadInstruction;
+                let clone = arena.New<MIRLoadInstruction>(instruction->name, load->pointer, (instruction as *MIRValue)->_type, load->_volatile);
+                clone->alignment = load->alignment;
+                clone as *mut MIRInstruction
+            },
+            MIRInstructionKind::Store => {
+                let store = instruction as *MIRStoreInstruction;
+                let clone = arena.New<MIRStoreInstruction>(store->value, store->pointer, (instruction as *MIRValue)->_type, store->_volatile);
+                clone->alignment = store->alignment;
+                clone as *mut MIRInstruction
+            },
+            MIRInstructionKind::ArrayGEP => {
+                let gep = instruction as *MIRArrayGEPInstruction;
+                arena.New<MIRArrayGEPInstruction>(instruction->name, gep->pointer, gep->index, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::StructGEP => {
+                let gep = instruction as *MIRStructGEPInstruction;
+                arena.New<MIRStructGEPInstruction>(instruction->name, gep->pointer, gep->index, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Unary => {
+                let unary = instruction as *MIRUnaryInstruction;
+                arena.New<MIRUnaryInstruction>(instruction->name, unary->kind, unary->operand, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Binary => {
+                let binary = instruction as *MIRBinaryInstruction;
+                arena.New<MIRBinaryInstruction>(instruction->name, binary->kind, binary->left, binary->right, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Call => {
+                let call = instruction as *MIRCallInstruction;
+                let clone = arena.New<MIRCallInstruction>(instruction->name, call->callee, call->arguments, (instruction as *MIRValue)->_type);
+                clone->attributes = call->attributes;
+                clone->return_attributes = call->return_attributes;
+                clone as *mut MIRInstruction
+            },
+            MIRInstructionKind::Cast => {
+                let cast = instruction as *MIRCastInstruction;
+                arena.New<MIRCastInstruction>(instruction->name, cast->kind, cast->value, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Select => {
+                let select = instruction as *MIRSelectInstruction;
+                arena.New<MIRSelectInstruction>(instruction->name, select->condition, select->then_value, select->else_value, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Phi => {
+                let phi = instruction as *MIRPhiInstruction;
+                let clone = arena.New<MIRPhiInstruction>(instruction->name, (instruction as *MIRValue)->_type);
+                clone->incomings = phi->incomings;
+                clone as *mut MIRInstruction
+            },
+            MIRInstructionKind::Assembly => {
+                let assembly = instruction as *MIRAssemblyInstruction;
+                arena.New<MIRAssemblyInstruction>(assembly->_volatile, assembly->text, assembly->inputs, assembly->outputs, assembly->clobbers, (instruction as *MIRValue)->_type) as *mut MIRInstruction
+            },
+            MIRInstructionKind::Terminator => {
+                let terminator = instruction as *MIRTerminator;
+                let _type = (instruction as *MIRValue)->_type;
+
+                match terminator->kind {
+                    MIRTerminatorKind::Return => arena.New<MIRReturnInstruction>((terminator as *MIRReturnInstruction)->value, _type) as *mut MIRInstruction,
+                    MIRTerminatorKind::Branch => arena.New<MIRBranchInstruction>((terminator as *MIRBranchInstruction)->target, _type) as *mut MIRInstruction,
+                    MIRTerminatorKind::ConditionalBranch => {
+                        let branch = terminator as *MIRConditionalBranchInstruction;
+                        arena.New<MIRConditionalBranchInstruction>(branch->condition, branch->then_target, branch->else_target, _type) as *mut MIRInstruction
+                    },
+                    MIRTerminatorKind::Switch => {
+                        let switch = terminator as *MIRSwitchInstruction;
+                        let clone = arena.New<MIRSwitchInstruction>(switch->value, switch->default_target, _type);
+                        clone->cases = switch->cases;
+                        clone as *mut MIRInstruction
+                    },
+                    MIRTerminatorKind::Unreachable => arena.New<MIRUnreachableInstruction>(_type) as *mut MIRInstruction
+                }
+            }
+        }
+    }
+
+    fn InlineCall(&mut this, function: *mut MIRFunctionDeclaration, block: *mut MIRBlock, index: usize, call: *mut MIRCallInstruction, callee: *mut MIRFunctionDeclaration, replacements: &mut Map<*MIRValue, *MIRValue>) {
+        let void_type = this.context->VoidType();
+        let continuation = this.context->arena.New<MIRBlock>(block->name + ".after");
+        function->AddBlock(continuation);
+        let mut before = Vector<*mut MIRInstruction>();
+        let mut after = Vector<*mut MIRInstruction>();
+
+        for j in 0..block->instructions.Length() {
+            if j < index { before.PushBack(block->instructions[j]); }
+            else if j > index { after.PushBack(block->instructions[j]); }
+        }
+
+        block->instructions = before;
+        continuation->instructions = after;
+        continuation->terminator = block->terminator;
+        block->terminator = null;
+
+        for successor in MIRSuccessors(continuation) {
+            for instruction in successor->instructions {
+                if instruction->kind != MIRInstructionKind::Phi { continue; }
+                let phi = instruction as *mut MIRPhiInstruction;
+
+                for k in 0..phi->incomings.Length() {
+                    if phi->incomings[k].block == block as *MIRBlock { phi->incomings[k].block = continuation; }
+                }
+            }
+        }
+
+        let mut values = Map<*MIRValue, *MIRValue>();
+        let mut blocks = Map<*MIRBlock, *mut MIRBlock>();
+
+        for p in 0..callee->parameters.Length() {
+            values[callee->parameters[p] as *MIRValue] = call->arguments[p];
+        }
+
+        let mut returns: usize = 0;
+
+        for source in callee->blocks {
+            let target = this.context->arena.New<MIRBlock>(source->name);
+            function->AddBlock(target);
+            blocks[source] = target;
+
+            if source->terminator != null && source->terminator->kind == MIRTerminatorKind::Return {
+                returns += 1;
+            }
+        }
+
+        let result_type = (call as *MIRValue)->_type;
+        let has_result = result_type->kind != MIRTypeKind::Void;
+        let mut slot: *mut MIRAllocaInstruction = null;
+        let mut single: *MIRValue = null;
+
+        if has_result && returns > 1 {
+            slot = this.context->arena.New<MIRAllocaInstruction>("inline.result".ToString(), result_type, this.context->PointerType(result_type));
+            function->AddAllocaInstruction(slot);
+            let load = this.context->arena.New<MIRLoadInstruction>(function->GetUniqueName("inline.value".ToString()), slot as *MIRValue, result_type, false);
+            continuation->instructions.Insert(0, load as *mut MIRInstruction);
+            replacements[call as *MIRValue] = load as *MIRValue;
+        }
+
+        let mut clones = Vector<*mut MIRInstruction>();
+
+        for source in callee->blocks {
+            let target = blocks[source];
+
+            for instruction in source->instructions {
+                let clone = this.Clone(instruction);
+                values[instruction as *MIRValue] = clone as *MIRValue;
+                clones.PushBack(clone);
+
+                if instruction->kind == MIRInstructionKind::Alloca {
+                    function->AddAllocaInstruction(clone as *mut MIRAllocaInstruction);
+                } else {
+                    target->AddInstruction(clone);
+                }
+            }
+
+            let terminator = source->terminator;
+            if terminator == null { continue; }
+
+            if terminator->kind == MIRTerminatorKind::Return {
+                let value = (terminator as *MIRReturnInstruction)->value;
+
+                if has_result && value != null {
+                    if slot != null {
+                        let store = this.context->arena.New<MIRStoreInstruction>(value, slot as *MIRValue, void_type, false);
+                        target->AddInstruction(store as *mut MIRInstruction);
+                        clones.PushBack(store as *mut MIRInstruction);
+                    } else {
+                        single = value;
+                    }
+                }
+
+                target->SetTerminator(this.context->arena.New<MIRBranchInstruction>(continuation, void_type));
+            } else {
+                let clone = this.Clone(terminator) as *mut MIRTerminator;
+                target->SetTerminator(clone);
+                clones.PushBack(clone as *mut MIRInstruction);
+            }
+        }
+
+        for clone in clones {
+            MIRRemapOperands(this.context, clone, values, blocks);
+        }
+
+        if has_result && slot == null {
+            replacements[call as *MIRValue] = if single != null { MIRResolveValue(values, single) } else { this.context->arena.New<MIRConstantUndef>(result_type) as *MIRValue };
+        }
+
+        block->SetTerminator(this.context->arena.New<MIRBranchInstruction>(blocks[callee->blocks[0]], void_type));
+    }
+}
+
+class MIRFoldConstants {
+    context: *mut MIRContext,
+    replacements: Map<*MIRValue, *MIRValue>;
+
+    MIRFoldConstants(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    fn ConstantValue(&this, value: *MIRValue, constant: &mut HostUnsigned) -> bool {
+        if value == null || value->kind != MIRValueKind::Constant { return false; }
+        let kind = (value as *MIRConstant)->kind;
+
+        if kind == MIRConstantKind::Integer {
+            constant = (value as *MIRConstantInteger)->value;
+            return true;
+        }
+
+        if kind == MIRConstantKind::Null && value->_type->kind == MIRTypeKind::Integer {
+            constant = 0;
+            return true;
+        }
+
+        false
+    }
+
+    fn Width(&this, _type: *MIRType) -> u32 {
+        if _type->kind == MIRTypeKind::Integer { (_type as *MIRIntegerType)->width } else { 0 }
+    }
+
+    fn Mask(&this, value: HostUnsigned, width: u32) -> HostUnsigned {
+        if width >= 32 { value & 0xFFFFFFFF } else { value & (((1 as HostUnsigned) << (width as HostUnsigned)) - 1) }
+    }
+
+    fn Signed(&this, value: HostUnsigned, width: u32) -> HostSigned {
+        let masked = this.Mask(value, width);
+        let sign = (1 as HostUnsigned) << ((width - 1) as HostUnsigned);
+        if (masked & sign) != 0 { (masked as HostSigned) - ((sign as HostSigned) * 2) } else { masked as HostSigned }
+    }
+
+    fn FoldBinary(&mut this, binary: *MIRBinaryInstruction) -> *MIRValue {
+        let width = this.Width(binary->left->_type);
+        if width == 0 || width > 32 { return null; }
+        let (mut a, mut b) = (0 as HostUnsigned, 0 as HostUnsigned);
+        if !this.ConstantValue(binary->left, a) || !this.ConstantValue(binary->right, b) { return null; }
+        let (ua, ub) = (this.Mask(a, width), this.Mask(b, width));
+        let (sa, sb) = (this.Signed(a, width), this.Signed(b, width));
+        let mut result: HostUnsigned = 0;
+        let mut boolean = false;
+
+        match binary->kind {
+            MIRBinaryKind::Add => { result = ua + ub; },
+            MIRBinaryKind::Sub => { result = ua - ub; },
+            MIRBinaryKind::Mul => { result = ua * ub; },
+            MIRBinaryKind::UDiv if ub != 0 => { result = ua / ub; },
+            MIRBinaryKind::URem if ub != 0 => { result = ua % ub; },
+            MIRBinaryKind::SDiv if sb != 0 => { result = (sa / sb) as HostUnsigned; },
+            MIRBinaryKind::SRem if sb != 0 => { result = (sa % sb) as HostUnsigned; },
+            MIRBinaryKind::And => { result = ua & ub; },
+            MIRBinaryKind::Or => { result = ua | ub; },
+            MIRBinaryKind::Xor => { result = ua ^ ub; },
+            MIRBinaryKind::Shl if ub < width as HostUnsigned => { result = ua << ub; },
+            MIRBinaryKind::LShr if ub < width as HostUnsigned => { result = ua >> ub; },
+            MIRBinaryKind::AShr if ub < width as HostUnsigned => { result = (sa >> (ub as HostSigned)) as HostUnsigned; },
+            MIRBinaryKind::ICmpEq => { (result, boolean) = (if ua == ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpNe => { (result, boolean) = (if ua != ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpUlt => { (result, boolean) = (if ua < ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpUle => { (result, boolean) = (if ua <= ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpUgt => { (result, boolean) = (if ua > ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpUge => { (result, boolean) = (if ua >= ub { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpSlt => { (result, boolean) = (if sa < sb { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpSle => { (result, boolean) = (if sa <= sb { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpSgt => { (result, boolean) = (if sa > sb { 1 } else { 0 }, true); },
+            MIRBinaryKind::ICmpSge => { (result, boolean) = (if sa >= sb { 1 } else { 0 }, true); },
+            _ => { return null; }
+        }
+
+        let _type = (binary as *MIRValue)->_type;
+        let result_width = this.Width(_type);
+        if result_width == 0 { return null; }
+        if !boolean { result = this.Mask(result, result_width); }
+        this.context->arena.New<MIRConstantInteger>(result, _type)
+    }
+
+    fn FoldCast(&mut this, cast: *MIRCastInstruction) -> *MIRValue {
+        let (source_width, target_width) = (this.Width(cast->value->_type), this.Width((cast as *MIRValue)->_type));
+        if source_width == 0 || target_width == 0 || source_width > 32 || target_width > 32 { return null; }
+        let mut value = 0 as HostUnsigned;
+        if !this.ConstantValue(cast->value, value) { return null; }
+
+        let result = match cast->kind {
+            MIRCastKind::Trunc | MIRCastKind::ZExt | MIRCastKind::Bitcast => this.Mask(value, if source_width < target_width { source_width } else { target_width }),
+            MIRCastKind::SExt => this.Mask(this.Signed(value, source_width) as HostUnsigned, target_width),
+            _ => return null
+        };
+
+        this.context->arena.New<MIRConstantInteger>(result, (cast as *MIRValue)->_type)
+    }
+
+    fn Fold(&mut this, instruction: *MIRInstruction) -> *MIRValue {
+        match instruction->kind {
+            MIRInstructionKind::Binary => this.FoldBinary(instruction as *MIRBinaryInstruction),
+            MIRInstructionKind::Cast => this.FoldCast(instruction as *MIRCastInstruction),
+            MIRInstructionKind::Select => {
+                let select = instruction as *MIRSelectInstruction;
+                let mut condition = 0 as HostUnsigned;
+                if !this.ConstantValue(select->condition, condition) { return null; }
+                if condition != 0 { select->then_value } else { select->else_value }
+            },
+            MIRInstructionKind::Phi => {
+                let phi = instruction as *MIRPhiInstruction;
+                let mut unique: *MIRValue = null;
+
+                for incoming in phi->incomings {
+                    let value = MIRResolveValue(this.replacements, incoming.value);
+                    if value == phi as *MIRValue { continue; }
+                    if unique != null && unique != value { return null; }
+                    unique = value;
+                }
+
+                unique
+            },
+            _ => null
+        }
+    }
+
+    fn RemoveIncoming(&this, target: *MIRBlock, from: *MIRBlock) {
+        for instruction in target->instructions {
+            if instruction->kind != MIRInstructionKind::Phi { continue; }
+            let phi = instruction as *mut MIRPhiInstruction;
+            let mut incomings = Vector<MIRPhiIncoming>();
+
+            for incoming in phi->incomings {
+                if incoming.block != from { incomings.PushBack(incoming); }
+            }
+
+            phi->incomings = incomings;
+        }
+    }
+
+    fn FoldTerminator(&mut this, block: *mut MIRBlock) -> bool {
+        let terminator = block->terminator;
+        if terminator == null { return false; }
+        let void_type = this.context->VoidType();
+
+        if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+            let branch = terminator as *MIRConditionalBranchInstruction;
+            let mut condition = 0 as HostUnsigned;
+            if !this.ConstantValue(MIRResolveValue(this.replacements, branch->condition), condition) { return false; }
+            let (taken, dropped) = if condition != 0 { (branch->then_target, branch->else_target) } else { (branch->else_target, branch->then_target) };
+            if dropped != taken { this.RemoveIncoming(dropped, block); }
+            block->terminator = this.context->arena.New<MIRBranchInstruction>(taken, void_type);
+            return true;
+        }
+
+        if terminator->kind == MIRTerminatorKind::Switch {
+            let switch = terminator as *MIRSwitchInstruction;
+            let mut value = 0 as HostUnsigned;
+            let resolved = MIRResolveValue(this.replacements, switch->value);
+            if !this.ConstantValue(resolved, value) { return false; }
+            value = this.Mask(value, this.Width(resolved->_type));
+            let mut taken = switch->default_target;
+
+            for case in switch->cases {
+                if case.value == value { taken = case.target; break; }
+            }
+
+            for target in MIRSuccessors(block) {
+                if target != taken { this.RemoveIncoming(target, block); }
+            }
+
+            block->terminator = this.context->arena.New<MIRBranchInstruction>(taken, void_type);
+            return true;
+        }
+
+        false
+    }
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let mut changed = false;
+        let mut progress = true;
+        let no_blocks = Map<*MIRBlock, *mut MIRBlock>();
+
+        while progress {
+            progress = false;
+            this.replacements.Clear();
+
+            for block in function->blocks {
+                let mut kept = Vector<*mut MIRInstruction>();
+
+                for instruction in block->instructions {
+                    MIRRemapOperands(this.context, instruction, this.replacements, no_blocks);
+                    let folded = this.Fold(instruction);
+
+                    if folded != null && folded != instruction as *MIRValue {
+                        this.replacements[instruction as *MIRValue] = folded;
+                        progress = true;
+                        continue;
+                    }
+
+                    kept.PushBack(instruction);
+                }
+
+                block->instructions = kept;
+                if this.FoldTerminator(block) { progress = true; }
+            }
+
+            if progress {
+                MIRRemapFunction(this.context, function, this.replacements);
+                changed = true;
+            }
+        }
+
+        changed
+    }
+}
+
+class MIRRemoveDeadCode {
+    MIRRemoveDeadCode(&mut this) {}
+
+    fn IsRemovable(&this, instruction: *MIRInstruction) -> bool {
+        match instruction->kind {
+            MIRInstructionKind::ArrayGEP | MIRInstructionKind::StructGEP | MIRInstructionKind::Unary | MIRInstructionKind::Binary
+                | MIRInstructionKind::Cast | MIRInstructionKind::Select | MIRInstructionKind::Phi => true,
+            MIRInstructionKind::Load => !(instruction as *MIRLoadInstruction)->_volatile,
+            _ => false
+        }
+    }
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let mut uses = MIRValueCounts();
+
+        for block in function->blocks {
+            for instruction in block->instructions {
+                for operand in MIROperands(instruction) {
+                    uses.Add(operand, 1);
+                }
+            }
+
+            if block->terminator != null {
+                for operand in MIROperands(block->terminator as *MIRInstruction) {
+                    uses.Add(operand, 1);
+                }
+            }
+        }
+
+        let mut changed = false;
+        let mut removed = true;
+
+        while removed {
+            removed = false;
+
+            for block in function->blocks {
+                let mut kept = Vector<*mut MIRInstruction>();
+
+                for instruction in block->instructions {
+                    if this.IsRemovable(instruction) && uses.Get(instruction as *MIRValue) == 0 {
+                        for operand in MIROperands(instruction) {
+                            uses.Add(operand, -1);
+                        }
+
+                        (removed, changed) = (true, true);
+                        continue;
+                    }
+
+                    kept.PushBack(instruction);
+                }
+
+                block->instructions = kept;
+            }
+        }
+
+        changed
     }
 }

@@ -103,7 +103,7 @@ class LIRAllocator {
     }
 
     fn IsTerminator(&this, instruction: *LIRInstruction) -> bool {
-        instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt
+        instruction->opcode == LIROpcode::B || instruction->opcode == LIROpcode::Ret || instruction->opcode == LIROpcode::Hlt || instruction->opcode == LIROpcode::Jt
     }
 
     fn SetBit(&this, bits: &mut Vector<u32>, base: usize, index: u32) {
@@ -136,39 +136,34 @@ class LIRAllocator {
             block_ends.PushBack(position - 1);
         }
 
-        let mut successors = Vector<isize>();
+        let mut successors = Vector<u32>();
+        let mut successor_offsets = Vector<usize>();
 
         for i in 0..block_count {
             let block = function->blocks[i];
-            let mut first: isize = -1;
-            let mut second: isize = -1;
+            let start = successors.Length();
+            successor_offsets.PushBack(start);
 
             for instruction in block->instructions {
                 for operand in instruction->uses {
                     if operand->kind != LIROperandKind::Block { continue; }
-                    let target = (operand as *LIRBlockOperand)->block->index as isize;
+                    let target = (operand as *LIRBlockOperand)->block->index;
+                    let mut known = false;
 
-                    if first < 0 {
-                        first = target;
-                    } else if second < 0 && target != first {
-                        second = target;
+                    for k in start..successors.Length() {
+                        if successors[k] == target { known = true; break; }
                     }
+
+                    if !known { successors.PushBack(target); }
                 }
             }
 
-            if (block->instructions.Empty() || !this.IsTerminator(block->instructions.Back())) && i + 1 < block_count {
-                if first < 0 {
-                    if first < 0 {
-                        first = (i + 1) as isize;
-                    } else if second < 0 {
-                        second = (i + 1) as isize;
-                    }
-                }
+            if successors.Length() == start && (block->instructions.Empty() || !this.IsTerminator(block->instructions.Back())) && i + 1 < block_count {
+                successors.PushBack((i + 1) as u32);
             }
-
-            successors.PushBack(first);
-            successors.PushBack(second);
         }
+
+        successor_offsets.PushBack(successors.Length());
 
         let mut gen = Vector<u32>();
         let mut kill = Vector<u32>();
@@ -213,9 +208,8 @@ class LIRAllocator {
                 for w in 0..words {
                     let mut out: u32 = 0;
 
-                    for s in 0usize..2 {
-                        let successor = successors[i * 2 + s];
-                        if successor >= 0 { out |= live_in[(successor as usize) * words + w]; }
+                    for s in successor_offsets[i]..successor_offsets[i + 1] {
+                        out |= live_in[(successors[s] as usize) * words + w];
                     }
 
                     let _in = gen[base + w] | (out & !kill[base + w]);
@@ -275,6 +269,7 @@ class LIRAllocator {
         this.BuildFixedRanges(block_starts);
         this.LinearScan(position);
         this.Rewrite();
+        this.ForwardSlots();
 
         let mut saved = Vector<u8>();
 
@@ -566,6 +561,106 @@ class LIRAllocator {
         this.physical[interval.register as usize]
     }
 
+    fn FrameSlot(&this, operand: *LIROperand) -> isize {
+        if operand->kind != LIROperandKind::Memory { return -1; }
+        let memory = operand as *LIRMemoryOperand;
+        if this.PhysicalIndex(memory->base) != LIR_FP as isize || (memory->offset & 3) != 0 { return -1; }
+        (memory->offset as isize) + 0x40000000
+    }
+
+    fn Forget(&this, slots: &mut Vector<isize>, registers: &mut Vector<u8>, register: isize) {
+        let mut i: usize = 0;
+
+        while i < slots.Length() {
+            if registers[i] as isize == register {
+                slots.RemoveAt(i);
+                registers.RemoveAt(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn ForwardSlots(&mut this) {
+        let mut slots = Vector<isize>();
+        let mut registers = Vector<u8>();
+
+        for block in this.function->blocks {
+            slots.Clear();
+            registers.Clear();
+            let mut kept = Vector<*LIRInstruction>();
+
+            for instruction in block->instructions {
+                let opcode = instruction->opcode;
+
+                if opcode == LIROpcode::Lw && instruction->defines.Length() == 1 {
+                    let slot = this.FrameSlot(instruction->uses[0]);
+                    let destination = this.PhysicalIndex(instruction->defines[0]);
+
+                    if slot >= 0 && destination >= 0 {
+                        if let Option<usize>::Some(found) = slots.Index(slot) {
+                            let source = registers[found];
+                            if source as isize == destination { continue; }
+                            let mut defines = Vector<*LIROperand>();
+                            defines.PushBack(instruction->defines[0]);
+                            let mut uses = Vector<*LIROperand>();
+                            uses.PushBack(this.physical[source as usize]);
+                            uses.PushBack(this.context->arena.New<LIRImmediateOperand>(0 as HostSigned));
+                            kept.PushBack(this.context->arena.New<LIRInstruction>(LIROpcode::Addi, defines, uses));
+                            this.Forget(slots, registers, destination);
+                            continue;
+                        }
+
+                        this.Forget(slots, registers, destination);
+                        slots.PushBack(slot);
+                        registers.PushBack(destination as u8);
+                        kept.PushBack(instruction);
+                        continue;
+                    }
+                }
+
+                if opcode == LIROpcode::Sw {
+                    let slot = this.FrameSlot(instruction->uses[1]);
+                    let source = this.PhysicalIndex(instruction->uses[0]);
+
+                    if slot >= 0 && source > 0 {
+                        let mut i: usize = 0;
+
+                        while i < slots.Length() {
+                            if slots[i] == slot {
+                                slots.RemoveAt(i);
+                                registers.RemoveAt(i);
+                            } else {
+                                i += 1;
+                            }
+                        }
+
+                        slots.PushBack(slot);
+                        registers.PushBack(source as u8);
+                        kept.PushBack(instruction);
+                        continue;
+                    }
+                }
+
+                let writes_memory = opcode == LIROpcode::Sw || opcode == LIROpcode::Sh || opcode == LIROpcode::Sb || opcode == LIROpcode::Asm
+                    || opcode == LIROpcode::Bl || opcode == LIROpcode::Blr || !instruction->implicit_defines.Empty();
+
+                if writes_memory {
+                    slots.Clear();
+                    registers.Clear();
+                } else {
+                    for operand in instruction->defines {
+                        this.Forget(slots, registers, this.PhysicalIndex(operand));
+                    }
+                }
+
+                kept.PushBack(instruction);
+            }
+
+            block->instructions = kept;
+        }
+    }
+
     fn Rewrite(&mut this) {
         for block in this.function->blocks {
             let mut rewritten = Vector<*LIRInstruction>();
@@ -590,7 +685,7 @@ class LIRAllocator {
                 let lowered = this.context->arena.New<LIRInstruction>(instruction->opcode, defines, uses);
                 lowered->implicit_uses = instruction->implicit_uses;
                 lowered->implicit_defines = instruction->implicit_defines;
-                lowered->text = instruction->text;
+                lowered->body = instruction->body;
 
                 for other in this.before { rewritten.PushBack(other); }
                 rewritten.PushBack(lowered);

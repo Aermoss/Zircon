@@ -112,6 +112,32 @@ fn LIRRegisterIndex(name: &String) -> i32 {
     }
 }
 
+const LIR_CSR_NAMES: *i8 = "status ienable ipending epc cause vector scratch badaddr ptbase asid tlbflush";
+
+fn LIRCSRIndex(name: &String) -> i32 {
+    if name == "cycle" { return 16; }
+    if name == "instret" { return 17; }
+    if name == "time" { return 18; }
+    if name == "coreid" { return 19; }
+    let names = LIR_CSR_NAMES.ToString().Split(' ');
+
+    for i in 0..names.Length() {
+        if names[i] == name { return i as i32; }
+    }
+
+    -1
+}
+
+fn LIRCSRName(index: HostSigned) -> String {
+    if index == 16 { return "cycle".ToString(); }
+    if index == 17 { return "instret".ToString(); }
+    if index == 18 { return "time".ToString(); }
+    if index == 19 { return "coreid".ToString(); }
+    let names = LIR_CSR_NAMES.ToString().Split(' ');
+    if index >= 0 && (index as usize) < names.Length() { return names[index as usize]; }
+    String::FromInteger(index)
+}
+
 class LIRPhysicalRegister : LIRRegisterOperand {
     pub index: u8,
     pub name: String;
@@ -188,7 +214,11 @@ enum LIROpcode: u16 {
     And, Andi, Or, Ori, Xor, Xori,
     Sll, Slli, Srl, Srli, Sra, Srai,
     Hlt,
-    Li, La, Ret, Asm
+    Csrrw, Csrrs, Csrrc, Csrrwi, Csrrsi, Csrrci,
+    Ecall, Ebreak, Eret, Wfi,
+    LrW, ScW, AmoswapW, AmoaddW, AmoxorW, AmoandW, AmoorW, AmominW, AmomaxW, AmominuW, AmomaxuW,
+    Fence, FenceI,
+    Li, La, Ret, Asm, Jt
 }
 
 extend LIROpcode {
@@ -244,10 +274,34 @@ extend LIROpcode {
             LIROpcode::Sra => "sra",
             LIROpcode::Srai => "srai",
             LIROpcode::Hlt => "hlt",
+            LIROpcode::Csrrw => "csrrw",
+            LIROpcode::Csrrs => "csrrs",
+            LIROpcode::Csrrc => "csrrc",
+            LIROpcode::Csrrwi => "csrrwi",
+            LIROpcode::Csrrsi => "csrrsi",
+            LIROpcode::Csrrci => "csrrci",
+            LIROpcode::Ecall => "ecall",
+            LIROpcode::Ebreak => "ebreak",
+            LIROpcode::Eret => "eret",
+            LIROpcode::Wfi => "wfi",
+            LIROpcode::LrW => "lr.w",
+            LIROpcode::ScW => "sc.w",
+            LIROpcode::AmoswapW => "amoswap.w",
+            LIROpcode::AmoaddW => "amoadd.w",
+            LIROpcode::AmoxorW => "amoxor.w",
+            LIROpcode::AmoandW => "amoand.w",
+            LIROpcode::AmoorW => "amoor.w",
+            LIROpcode::AmominW => "amomin.w",
+            LIROpcode::AmomaxW => "amomax.w",
+            LIROpcode::AmominuW => "amominu.w",
+            LIROpcode::AmomaxuW => "amomaxu.w",
+            LIROpcode::Fence => "fence",
+            LIROpcode::FenceI => "fence.i",
             LIROpcode::Li => "li",
             LIROpcode::La => "la",
             LIROpcode::Ret => "ret",
-            LIROpcode::Asm => "asm"
+            LIROpcode::Asm => "asm",
+            LIROpcode::Jt => "jt"
         }.ToString()
     }
 }
@@ -258,7 +312,7 @@ class LIRInstruction {
     pub uses: Vector<*LIROperand>,
     pub implicit_defines: Vector<*LIROperand>,
     pub implicit_uses: Vector<*LIROperand>,
-    pub text: String;
+    pub body: Vector<*LIRInstruction>;
 
     LIRInstruction(&mut this, opcode: LIROpcode, defines: Vector<*LIROperand>, uses: Vector<*LIROperand>) {
         (this.opcode, this.defines, this.uses) = (opcode, defines, uses);
@@ -277,7 +331,11 @@ class LIRInstruction {
         result += this.opcode.ToString();
 
         if this.opcode == LIROpcode::Asm {
-            result += " \"" + this.text.Escape() + '"';
+            result += " {";
+
+            for i in 0..this.body.Length() {
+                result += (if i > 0 { "; " } else { " " }) + this.body[i]->ToString();
+            } result += " }";
         }
 
         if !this.uses.Empty() {
