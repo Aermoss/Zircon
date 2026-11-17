@@ -128,8 +128,8 @@ jobs:
 
       - name: Rebuild compiler natively.
         run: |
-          ./zirconc src/Main.zir -o zirconc2 -Linclude -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -v
-          ./zirconc2 src/Main.zir -o zirconc3 -Linclude -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM
+          ./zirconc src/Main.zir -o zirconc2 -Iinclude -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM -v
+          ./zirconc2 src/Main.zir -o zirconc3 -Iinclude -L"/usr/lib/llvm-$LLVM_MAJOR/lib" -lLLVM
           cmp zirconc2 zirconc3
           mv zirconc2 zirconc
 
@@ -184,8 +184,8 @@ jobs:
 
       - name: Rebuild compiler natively.
         run: |
-          ./zirconc src/Main.zir -o zirconc2 -Linclude -L"$LLVM_LIB" -lLLVM -v
-          ./zirconc2 src/Main.zir -o zirconc3 -Linclude -L"$LLVM_LIB" -lLLVM
+          ./zirconc src/Main.zir -o zirconc2 -Iinclude -L"$LLVM_LIB" -lLLVM -v
+          ./zirconc2 src/Main.zir -o zirconc3 -Iinclude -L"$LLVM_LIB" -lLLVM
           ./zirconc3 --version
           mv zirconc2 zirconc
 
