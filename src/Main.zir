@@ -348,7 +348,6 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (mut defines, mut libs) = (Vector<String>(), Vector<String>());
 
     include_paths.PushBack(".".ToString());
-    include_paths.PushBack("include".ToString());
 #[if SVAROG]
     include_paths.PushBack("/include".ToString());
 #[else]
