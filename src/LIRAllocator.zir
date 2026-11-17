@@ -23,6 +23,7 @@ class LIRInterval {
     pub end: u32 = 0,
     pub register: i32 = -1,
     pub slot: i32 = 0,
+    pub weight: u32 = 0,
     pub spilled: bool = false;
 
     LIRInterval(&mut this) {}
@@ -51,8 +52,8 @@ class LIRAllocator {
     ranges: Vector<LIRFixedRange>,
     range_offsets: Vector<u32>,
     scratch: Vector<i32>,
-    before: Vector<*LIRInstruction>,
-    after: Vector<*LIRInstruction>;
+    before: Vector<*mut LIRInstruction>,
+    after: Vector<*mut LIRInstruction>;
 
     LIRAllocator(&mut this, context: *mut LIRContext) {
         this.context = context;
@@ -112,6 +113,21 @@ class LIRAllocator {
 
     fn TestBit(&this, bits: &Vector<u32>, base: usize, index: u32) -> bool {
         (bits[base + (index / 32) as usize] & (1u32 << (index % 32))) != 0
+    }
+
+    fn AddWeight(&mut this, register: usize, weight: u32) {
+        let total = this.intervals[register].weight + weight;
+        this.intervals[register].weight = if total > 0xFFFF { 0xFFFF } else { total };
+    }
+
+    fn Length(&this, register: u32) -> u32 {
+        let interval = this.intervals[register as usize];
+        let length = interval.end - interval.start + 1;
+        if length > 0xFFFF { 0xFFFF } else { length }
+    }
+
+    fn Cheaper(&this, first: u32, second: u32) -> bool {
+        this.intervals[first as usize].weight * this.Length(second) <= this.intervals[second as usize].weight * this.Length(first)
     }
 
     fn Extend(&mut this, register: u32, position: u32) {
@@ -231,6 +247,40 @@ class LIRAllocator {
             this.intervals.PushBack(LIRInterval());
             this.hints.PushBack(-1);
             this.copies.PushBack(-1);
+        }
+
+        let mut depths = Vector<u32>();
+
+        for i in 0..block_count {
+            depths.PushBack(0);
+        }
+
+        for i in 0..block_count {
+            for s in successor_offsets[i]..successor_offsets[i + 1] {
+                let header = successors[s] as usize;
+                if header > i { continue; }
+
+                for k in header..(i + 1) {
+                    depths[k] += 1;
+                }
+            }
+        }
+
+        for i in 0..block_count {
+            let depth = if depths[i] > 3 { 3 } else { depths[i] };
+            let weight = 1u32 << (3 * depth);
+
+            for instruction in function->blocks[i]->instructions {
+                for operand in instruction->uses {
+                    let index = this.VirtualIndex(this.UsedRegister(operand));
+                    if index >= 0 { this.AddWeight(index as usize, weight); }
+                }
+
+                for operand in instruction->defines {
+                    let index = this.VirtualIndex(operand);
+                    if index >= 0 { this.AddWeight(index as usize, weight); }
+                }
+            }
         }
 
         for i in 0..block_count {
@@ -469,17 +519,17 @@ class LIRAllocator {
 
             if chosen < 0 {
                 let mut victim: isize = -1;
-                let mut furthest = end;
 
                 for k in 0..active.Length() {
                     let other = this.intervals[active[k] as usize];
+                    if this.Conflicts(other.register as u8, start, end) { continue; }
 
-                    if other.end > furthest && !this.Conflicts(other.register as u8, start, end) {
-                        (victim, furthest) = (k as isize, other.end);
+                    if victim < 0 || this.Cheaper(active[k], active[victim as usize]) {
+                        victim = k as isize;
                     }
                 }
 
-                if victim < 0 {
+                if victim < 0 || this.Cheaper(current, active[victim as usize]) {
                     this.Spill(current);
                     continue;
                 }
@@ -497,13 +547,24 @@ class LIRAllocator {
     }
 
     fn ScratchFor(&mut this, register: u32, load: bool) -> *LIROperand {
+        let interval = this.intervals[register as usize];
+
         for i in 0usize..2 {
             if this.scratch[i] == register as i32 {
-                return this.physical[(LIR_T5 + (i as u8)) as usize];
+                let scratch = this.physical[(LIR_T5 + (i as u8)) as usize];
+
+                if !load {
+                    let defines = Vector<*LIROperand>();
+                    let mut uses = Vector<*LIROperand>();
+                    uses.PushBack(scratch);
+                    uses.PushBack(this.context->arena.New<LIRMemoryOperand>(this.physical[LIR_FP as usize], interval.slot));
+                    this.after.PushBack(this.context->arena.New<LIRInstruction>(LIROpcode::Sw, defines, uses));
+                }
+
+                return scratch;
             }
         }
 
-        let interval = this.intervals[register as usize];
         let mut index: usize = 0;
 
         if !load {
@@ -588,7 +649,7 @@ class LIRAllocator {
         for block in this.function->blocks {
             slots.Clear();
             registers.Clear();
-            let mut kept = Vector<*LIRInstruction>();
+            let mut kept = Vector<*mut LIRInstruction>();
 
             for instruction in block->instructions {
                 let opcode = instruction->opcode;
@@ -663,7 +724,7 @@ class LIRAllocator {
 
     fn Rewrite(&mut this) {
         for block in this.function->blocks {
-            let mut rewritten = Vector<*LIRInstruction>();
+            let mut rewritten = Vector<*mut LIRInstruction>();
 
             for instruction in block->instructions {
                 this.scratch.Clear();
@@ -671,21 +732,15 @@ class LIRAllocator {
                 this.scratch.PushBack(-1);
                 this.before.Clear();
                 this.after.Clear();
-                let mut uses = Vector<*LIROperand>();
-                let mut defines = Vector<*LIROperand>();
+                let lowered = instruction;
 
-                for operand in instruction->uses {
-                    uses.PushBack(this.RewriteOperand(operand, true));
+                for i in 0..lowered->uses.Length() {
+                    lowered->uses[i] = this.RewriteOperand(lowered->uses[i], true);
                 }
 
-                for operand in instruction->defines {
-                    defines.PushBack(this.RewriteOperand(operand, false));
+                for i in 0..lowered->defines.Length() {
+                    lowered->defines[i] = this.RewriteOperand(lowered->defines[i], false);
                 }
-
-                let lowered = this.context->arena.New<LIRInstruction>(instruction->opcode, defines, uses);
-                lowered->implicit_uses = instruction->implicit_uses;
-                lowered->implicit_defines = instruction->implicit_defines;
-                lowered->body = instruction->body;
 
                 for other in this.before { rewritten.PushBack(other); }
                 rewritten.PushBack(lowered);

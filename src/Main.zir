@@ -672,6 +672,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     pass_manager.Add(MIRPassKind::PromoteAllocas);
                     pass_manager.Add(MIRPassKind::FoldConstants);
+                    pass_manager.Add(MIRPassKind::ThreadBranches);
+                    pass_manager.Add(MIRPassKind::RemoveRedundantLoads);
                     pass_manager.Add(MIRPassKind::RemoveDeadCode);
                     pass_manager.Add(MIRPassKind::ReorderBlocks);
                     let passes_start = Instant::Now();

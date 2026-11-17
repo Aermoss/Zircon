@@ -312,7 +312,7 @@ class LIRInstruction {
     pub uses: Vector<*LIROperand>,
     pub implicit_defines: Vector<*LIROperand>,
     pub implicit_uses: Vector<*LIROperand>,
-    pub body: Vector<*LIRInstruction>;
+    pub body: Vector<*mut LIRInstruction>;
 
     LIRInstruction(&mut this, opcode: LIROpcode, defines: Vector<*LIROperand>, uses: Vector<*LIROperand>) {
         (this.opcode, this.defines, this.uses) = (opcode, defines, uses);
@@ -363,7 +363,7 @@ class LIRInstruction {
 class LIRBlock {
     pub name: String,
     pub index: u32 = 0,
-    pub instructions: Vector<*LIRInstruction>,
+    pub instructions: Vector<*mut LIRInstruction>,
     pub predecessors: Vector<*LIRBlock>,
     pub successors: Vector<*LIRBlock>;
 

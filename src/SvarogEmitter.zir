@@ -100,9 +100,27 @@ class SvarogEmitter {
     function: *LIRFunction = null,
     function_index: u32 = 0,
     table_index: u32 = 0,
-    has_frame: bool = false;
+    has_frame: bool = false,
+    shared_return: bool = false,
+    return_emitted: bool = false,
+    writes_stack: bool = false;
 
     SvarogEmitter(&mut this) {}
+
+    fn At(&this, instruction: *LIRInstruction, index: usize) -> *LIROperand {
+        let count = instruction->defines.Length();
+        if index < count { instruction->defines[index] } else { instruction->uses[index - count] }
+    }
+
+    fn AddExterns(&this, instruction: *LIRInstruction, defined: &Map<String, bool>, seen: &mut Map<String, bool>, externs: &mut Vector<String>) {
+        for operand in instruction->uses {
+            if operand->kind != LIROperandKind::Symbol { continue; }
+            let &name = (operand as *LIRSymbolOperand)->name;
+            if defined.Has(name) || seen.Has(name) { continue; }
+            seen[name] = true;
+            externs.PushBack(name);
+        }
+    }
 
     fn Externs(&mut this, module: *LIRModule) -> Vector<String> {
         let mut defined = Map<String, bool>();
@@ -120,18 +138,10 @@ class SvarogEmitter {
         for function in module->functions {
             for block in function->blocks {
                 for instruction in block->instructions {
-                    let mut operands = instruction->uses;
+                    this.AddExterns(instruction, defined, seen, externs);
 
                     for inner in instruction->body {
-                        for operand in inner->uses { operands.PushBack(operand); }
-                    }
-
-                    for operand in operands {
-                        if operand->kind != LIROperandKind::Symbol { continue; }
-                        let &name = (operand as *LIRSymbolOperand)->name;
-                        if defined.Has(name) || seen.Has(name) { continue; }
-                        seen[name] = true;
-                        externs.PushBack(name);
+                        this.AddExterns(inner, defined, seen, externs);
                     }
                 }
             }
@@ -497,6 +507,32 @@ class SvarogEmitter {
         false
     }
 
+    fn IsStackPointer(&this, operand: *LIROperand) -> bool {
+        operand->kind == LIROperandKind::Register && (operand as *LIRRegisterOperand)->kind == LIRRegisterKind::Physical && (operand as *LIRPhysicalRegister)->index == LIR_SP
+    }
+
+    fn WritesStackPointer(&this, function: *LIRFunction) -> bool {
+        for block in function->blocks {
+            for instruction in block->instructions {
+                for operand in instruction->defines {
+                    if this.IsStackPointer(operand) { return true; }
+                }
+
+                for operand in instruction->implicit_defines {
+                    if this.IsStackPointer(operand) { return true; }
+                }
+
+                for inner in instruction->body {
+                    for operand in inner->defines {
+                        if this.IsStackPointer(operand) { return true; }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     fn FrameSize(&this) -> u32 {
         let function = this.function;
         this.AlignUp(function->frame_size + function->saved_registers.Length() as u32 * 4 + function->outgoing_size, 4)
@@ -528,14 +564,121 @@ class SvarogEmitter {
         }
     }
 
+    fn CountReturns(&this, function: *LIRFunction) -> u32 {
+        let mut count: u32 = 0;
+
+        for block in function->blocks {
+            for instruction in block->instructions {
+                if instruction->opcode == LIROpcode::Ret { count += 1; }
+            }
+        }
+
+        count
+    }
+
+    fn EpilogueSize(&this, function: *LIRFunction) -> u32 {
+        let mut size = 3 + function->saved_registers.Length() as u32;
+        if function->has_calls { size += 1; }
+        if this.writes_stack { size += 1; }
+        size
+    }
+
+    fn ReturnLabel(&this) -> String {
+        "__LBB" + String::FromInteger(this.function_index as HostUnsigned) + "_R"
+    }
+
+    fn EmitReturn(&mut this) {
+        if !this.shared_return {
+            this.EmitEpilogue();
+            return;
+        }
+
+        let label = this.ReturnLabel();
+
+        if this.return_emitted {
+            if this.binary {
+                let offset = this.Start();
+                this.Relocate(offset, SVAROG_RELOCATION_BRANCH26, label);
+                this.fixups.PushBack(SvarogFixup(offset, SVAROG_RELOCATION_BRANCH26, null, label));
+                this.Word(11u32 << SVAROG_OPCODE_SHIFT);
+            } else {
+                this.Line("b " + label);
+            }
+
+            return;
+        }
+
+        this.return_emitted = true;
+
+        if this.binary {
+            this.function_offsets[label] = this.Size();
+            this.Define(label, false);
+        } else {
+            this.output += label + ":\n";
+        }
+
+        this.EmitEpilogue();
+    }
+
     fn EmitEpilogue(&mut this) {
+        this.RestoreFrame();
+        this.ReturnLine(LIR_RA);
+    }
+
+    fn IsMove(&this, instruction: *LIRInstruction) -> bool {
+        instruction->opcode == LIROpcode::Addi && instruction->uses[1]->kind == LIROperandKind::Immediate && (instruction->uses[1] as *LIRImmediateOperand)->value == 0
+            && instruction->defines[0]->kind == LIROperandKind::Register && instruction->uses[0]->kind == LIROperandKind::Register
+            && (instruction->defines[0] as *LIRPhysicalRegister)->index == (instruction->uses[0] as *LIRPhysicalRegister)->index
+    }
+
+    fn IsTailCall(&this, block: *LIRBlock, index: usize) -> bool {
+        let instruction = block->instructions[index];
+        if instruction->opcode != LIROpcode::Bl || instruction->uses[0]->kind != LIROperandKind::Symbol { return false; }
+        if this.function->frame_size > 8 || this.function->outgoing_size > 0 { return false; }
+
+        for k in (index + 1)..block->instructions.Length() {
+            let other = block->instructions[k];
+            if other->opcode == LIROpcode::Ret { return true; }
+            if !this.IsMove(other) { return false; }
+        }
+
+        false
+    }
+
+    fn FinalTarget(&this, block: *LIRBlock) -> *LIRBlock {
+        let mut target = block;
+
+        for _ in 0..8 {
+            if target->instructions.Length() != 1 || target->instructions[0]->opcode != LIROpcode::B { break; }
+            target = (target->instructions[0]->uses[0] as *LIRBlockOperand)->block;
+        }
+
+        target
+    }
+
+    fn ThreadBranches(&mut this, function: *LIRFunction) {
+        for i in 0..function->blocks.Length() {
+            let next = if i + 1 < function->blocks.Length() { function->blocks[i + 1] as *LIRBlock } else { null };
+
+            for instruction in function->blocks[i]->instructions {
+                for operand in instruction->uses {
+                    if operand->kind != LIROperandKind::Block { continue; }
+                    let target = operand as *mut LIRBlockOperand;
+                    if target->block == next { continue; }
+                    target->block = this.FinalTarget(target->block);
+                }
+            }
+        }
+    }
+
+    fn RestoreFrame(&mut this) {
         let function = this.function;
 
         if this.has_frame {
             let size = this.FrameSize();
 
             if size <= 32767 {
-                this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_FP, -(size as i32));
+                if this.writes_stack { this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_FP, -(size as i32)); }
             } else {
                 this.LoadImmediateLine(LIR_T6, size);
                 this.RegisterLine("sub", SVAROG_SUB, LIR_SP, LIR_FP, LIR_T6);
@@ -557,8 +700,6 @@ class SvarogEmitter {
                 this.ImmediateLine("addi", SVAROG_ADDI, LIR_SP, LIR_SP, 8);
             }
         }
-
-        this.ReturnLine(LIR_RA);
     }
 
     fn EmitFunction(&mut this, function: *LIRFunction) {
@@ -571,8 +712,12 @@ class SvarogEmitter {
         this.has_frame = function->has_calls || function->frame_size > 8 || !function->saved_registers.Empty()
             || function->outgoing_size > 0 || this.UsesFramePointer(function);
 
+        this.writes_stack = this.WritesStackPointer(function);
+        this.ThreadBranches(function);
         let name = this.Symbol(function->name);
         this.table_index = 0;
+        this.shared_return = this.has_frame && this.CountReturns(function) > 1 && this.EpilogueSize(function) >= 5;
+        this.return_emitted = false;
 
         if this.binary {
             this.function_offsets[name] = this.Size();
@@ -598,26 +743,7 @@ class SvarogEmitter {
                 this.output += this.Label(block) + ":\n";
             }
 
-            let size = block->instructions.Length();
-
-            for k in 0..size {
-                let instruction = block->instructions[k];
-
-                if k + 2 == size && instruction->opcode >= LIROpcode::Beq && instruction->opcode <= LIROpcode::Bgeu && (instruction->uses[2] as *LIRBlockOperand)->block == next && block->instructions[k + 1]->opcode == LIROpcode::B {
-                    let other = block->instructions[k + 1]->uses[0];
-                    let inverted = this.InvertBranch(instruction->opcode);
-
-                    if this.binary {
-                        this.Control(SVAROG_RELOCATION_BRANCH16, (this.Opcode(inverted) << SVAROG_OPCODE_SHIFT) | (this.Index(instruction->uses[0]) << SVAROG_REG0_SHIFT) | (this.Index(instruction->uses[1]) << SVAROG_REG1_SHIFT), other);
-                    } else {
-                        this.Line(inverted.ToString() + ' ' + this.Operand(instruction->uses[0]) + ", " + this.Operand(instruction->uses[1]) + ", " + this.Operand(other));
-                    }
-
-                    break;
-                }
-
-                this.EmitInstruction(instruction, next);
-            }
+            this.EmitBlock(block, next, false);
         }
 
         if this.binary {
@@ -627,6 +753,62 @@ class SvarogEmitter {
         }
 
         this.function_index += 1;
+    }
+
+    fn CanDuplicate(&this, target: *LIRBlock, block: *LIRBlock) -> bool {
+        let size = target->instructions.Length();
+        if target == block || target->index > block->index || size == 0 || size > 5 { return false; }
+        if target->instructions[size - 1]->opcode != LIROpcode::B { return false; }
+
+        for instruction in target->instructions {
+            if instruction->opcode == LIROpcode::Jt { return false; }
+        }
+
+        true
+    }
+
+    fn EmitBlock(&mut this, block: *LIRBlock, next: *LIRBlock, duplicate: bool) {
+        let size = block->instructions.Length();
+
+        for k in 0..size {
+            let instruction = block->instructions[k];
+
+            if k + 2 == size && instruction->opcode >= LIROpcode::Beq && instruction->opcode <= LIROpcode::Bgeu && (instruction->uses[2] as *LIRBlockOperand)->block == next && block->instructions[k + 1]->opcode == LIROpcode::B {
+                let other = block->instructions[k + 1]->uses[0];
+                let inverted = this.InvertBranch(instruction->opcode);
+
+                if this.binary {
+                    this.Control(SVAROG_RELOCATION_BRANCH16, (this.Opcode(inverted) << SVAROG_OPCODE_SHIFT) | (this.Index(instruction->uses[0]) << SVAROG_REG0_SHIFT) | (this.Index(instruction->uses[1]) << SVAROG_REG1_SHIFT), other);
+                } else {
+                    this.Line(inverted.ToString() + ' ' + this.Operand(instruction->uses[0]) + ", " + this.Operand(instruction->uses[1]) + ", " + this.Operand(other));
+                }
+
+                break;
+            }
+
+            if this.IsTailCall(block, k) {
+                this.RestoreFrame();
+
+                if this.binary {
+                    this.Control(SVAROG_RELOCATION_BRANCH26, 11u32 << SVAROG_OPCODE_SHIFT, instruction->uses[0]);
+                } else {
+                    this.Line("b " + this.Operand(instruction->uses[0]));
+                }
+
+                break;
+            }
+
+            if !duplicate && k + 1 == size && instruction->opcode == LIROpcode::B {
+                let target = (instruction->uses[0] as *LIRBlockOperand)->block;
+
+                if target != next && this.CanDuplicate(target, block) {
+                    this.EmitBlock(target, next, true);
+                    break;
+                }
+            }
+
+            this.EmitInstruction(instruction, next);
+        }
     }
 
     fn InvertBranch(&this, opcode: LIROpcode) -> LIROpcode {
@@ -730,35 +912,31 @@ class SvarogEmitter {
     fn EmitSystem(&mut this, instruction: *LIRInstruction) {
         let opcode = instruction->opcode;
         let code = this.Opcode(opcode);
-        let mut operands = Vector<*LIROperand>();
-
-        for operand in instruction->defines { operands.PushBack(operand); }
-        for operand in instruction->uses { operands.PushBack(operand); }
 
         if opcode >= LIROpcode::Csrrw && opcode <= LIROpcode::Csrrci {
             let immediate = opcode >= LIROpcode::Csrrwi;
-            let csr = this.Value(operands[1]);
+            let csr = this.Value(this.At(instruction, 1));
 
             if this.binary {
-                let source = if immediate { this.Value(operands[2]) } else { this.Index(operands[2]) };
-                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | ((source & 0x1F) << SVAROG_REG1_SHIFT) | (csr & SVAROG_IMM16_MASK));
+                let source = if immediate { this.Value(this.At(instruction, 2)) } else { this.Index(this.At(instruction, 2)) };
+                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | ((source & 0x1F) << SVAROG_REG1_SHIFT) | (csr & SVAROG_IMM16_MASK));
             } else {
-                this.Line(opcode.ToString() + ' ' + this.Operand(operands[0]) + ", " + LIRCSRName(csr as HostSigned) + ", " + this.Operand(operands[2]));
+                this.Line(opcode.ToString() + ' ' + this.Operand(this.At(instruction, 0)) + ", " + LIRCSRName(csr as HostSigned) + ", " + this.Operand(this.At(instruction, 2)));
             }
 
             return;
         }
 
         if opcode >= LIROpcode::LrW && opcode <= LIROpcode::AmomaxuW {
-            let memory = operands[operands.Length() - 1] as *LIRMemoryOperand;
+            let memory = this.At(instruction, instruction->defines.Length() + instruction->uses.Length() - 1) as *LIRMemoryOperand;
 
             if this.binary {
-                let source = if opcode == LIROpcode::LrW { 0 } else { this.Index(operands[1]) };
-                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT)
+                let source = if opcode == LIROpcode::LrW { 0 } else { this.Index(this.At(instruction, 1)) };
+                this.Raw((code << SVAROG_OPCODE_SHIFT) | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT)
                     | (source << SVAROG_REG2_SHIFT) | (this.AtomicOperation(opcode) << 3) | 3);
             } else {
-                let source = if opcode == LIROpcode::LrW { String() } else { this.Operand(operands[1]) + ", " };
-                this.Line(opcode.ToString() + ' ' + this.Operand(operands[0]) + ", " + source + '(' + this.Operand(memory->base) + ')');
+                let source = if opcode == LIROpcode::LrW { String() } else { this.Operand(this.At(instruction, 1)) + ", " };
+                this.Line(opcode.ToString() + ' ' + this.Operand(this.At(instruction, 0)) + ", " + source + '(' + this.Operand(memory->base) + ')');
             }
 
             return;
@@ -773,25 +951,21 @@ class SvarogEmitter {
 
     fn EncodeInstruction(&mut this, instruction: *LIRInstruction) {
         let opcode = instruction->opcode;
-        let mut operands = Vector<*LIROperand>();
-
-        for operand in instruction->defines { operands.PushBack(operand); }
-        for operand in instruction->uses { operands.PushBack(operand); }
 
         if opcode == LIROpcode::Li {
-            let source = operands[1];
+            let source = this.At(instruction, 1);
 
             if source->kind == LIROperandKind::Immediate {
-                this.LoadImmediate(this.Index(operands[0]), this.Value(source));
+                this.LoadImmediate(this.Index(this.At(instruction, 0)), this.Value(source));
             } else {
-                this.LoadSymbol(this.Index(operands[0]), this.Target(source));
+                this.LoadSymbol(this.Index(this.At(instruction, 0)), this.Target(source));
             }
 
             return;
         }
 
         if opcode == LIROpcode::La {
-            this.LoadAddress(this.Index(operands[0]), this.Target(operands[1]));
+            this.LoadAddress(this.Index(this.At(instruction, 0)), this.Target(this.At(instruction, 1)));
             return;
         }
 
@@ -800,25 +974,25 @@ class SvarogEmitter {
 
         if code >= 1 && code <= 10 {
             if code == 6 || code == 7 {
-                this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Value(operands[1]) & SVAROG_IMM21_MASK));
+                this.Raw(word | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | (this.Value(this.At(instruction, 1)) & SVAROG_IMM21_MASK));
             } else {
-                let memory = operands[1] as *LIRMemoryOperand;
-                this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT) | ((memory->offset as u32) & SVAROG_IMM16_MASK));
+                let memory = this.At(instruction, 1) as *LIRMemoryOperand;
+                this.Raw(word | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | (this.Index(memory->base) << SVAROG_REG1_SHIFT) | ((memory->offset as u32) & SVAROG_IMM16_MASK));
             }
         } else if code == 11 {
-            this.Control(SVAROG_RELOCATION_BRANCH26, word, operands[0]);
+            this.Control(SVAROG_RELOCATION_BRANCH26, word, this.At(instruction, 0));
         } else if code == 12 {
-            this.Raw(word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT));
+            this.Raw(word | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT));
         } else if code >= 15 && code <= 20 {
-            this.Control(SVAROG_RELOCATION_BRANCH16, word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(operands[1]) << SVAROG_REG1_SHIFT), operands[2]);
+            this.Control(SVAROG_RELOCATION_BRANCH16, word | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | (this.Index(this.At(instruction, 1)) << SVAROG_REG1_SHIFT), this.At(instruction, 2));
         } else if code >= 21 && code <= 48 {
             let register_form = code == 21 || code == 22 || (code >= 25 && code % 2 == 1) || (code >= 29 && code <= 36);
-            let base = word | (this.Index(operands[0]) << SVAROG_REG0_SHIFT) | (this.Index(operands[1]) << SVAROG_REG1_SHIFT);
+            let base = word | (this.Index(this.At(instruction, 0)) << SVAROG_REG0_SHIFT) | (this.Index(this.At(instruction, 1)) << SVAROG_REG1_SHIFT);
 
             if register_form {
-                this.Raw(base | (this.Index(operands[2]) << SVAROG_REG2_SHIFT));
+                this.Raw(base | (this.Index(this.At(instruction, 2)) << SVAROG_REG2_SHIFT));
             } else {
-                this.Raw(base | (this.Value(operands[2]) & SVAROG_IMM16_MASK));
+                this.Raw(base | (this.Value(this.At(instruction, 2)) & SVAROG_IMM16_MASK));
             }
         } else if code == 63 || code == 0 {
             this.Raw(word);
@@ -837,7 +1011,7 @@ class SvarogEmitter {
 
         match opcode {
             LIROpcode::Ret => {
-                this.EmitEpilogue();
+                this.EmitReturn();
                 return;
             },
             LIROpcode::Asm => {

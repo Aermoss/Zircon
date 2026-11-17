@@ -189,22 +189,41 @@ extern "C" {
     fn memcpy(dst: *mut void, src: *void, size: usize) -> *mut void {
         if size == 0 || dst == null || src == null { return dst; }
 #[if TRIGLAV]
-        let mut i: usize = 0;
+        let mut target = dst as *mut u8;
+        let mut source = src as *u8;
+        let end = target + size;
 
-        if (((dst as usize) | (src as usize)) & 3) == 0 {
-            let words = size >> 2;
-
-            while i < words {
-                (dst as *mut u32)[i] = (src as *u32)[i];
-                i += 1;
+        if size >= 16 && (((target as usize) ^ (source as usize)) & 3) == 0 {
+            while ((target as usize) & 3) != 0 {
+                *target = *source;
+                target = target + 1;
+                source = source + 1;
             }
 
-            i <<= 2;
+            while (end as usize) - (target as usize) >= 16 {
+                let a = *(source as *u32);
+                let b = *((source + 4) as *u32);
+                let c = *((source + 8) as *u32);
+                let d = *((source + 12) as *u32);
+                *(target as *mut u32) = a;
+                *((target + 4) as *mut u32) = b;
+                *((target + 8) as *mut u32) = c;
+                *((target + 12) as *mut u32) = d;
+                target = target + 16;
+                source = source + 16;
+            }
+
+            while (end as usize) - (target as usize) >= 4 {
+                *(target as *mut u32) = *(source as *u32);
+                target = target + 4;
+                source = source + 4;
+            }
         }
 
-        while i < size {
-            (dst as *mut u8)[i] = (src as *u8)[i];
-            i += 1;
+        while target != end {
+            *target = *source;
+            target = target + 1;
+            source = source + 1;
         }
 #[else]
         RtlCopyMemory(dst, src, size);
@@ -216,9 +235,7 @@ extern "C" {
         if size == 0 || dst == null || src == null { return dst; }
 #[if TRIGLAV]
         if (dst as usize) <= (src as usize) {
-            for i in 0..size {
-                (dst as *mut u8)[i] = (src as *u8)[i];
-            }
+            return memcpy(dst, src, size);
         } else {
             let mut i = size;
 
@@ -236,8 +253,35 @@ extern "C" {
     fn memset(ptr: *mut void, value: i32, num: usize) -> *mut void {
         if num == 0 || ptr == null { return ptr; }
 #[if TRIGLAV]
-        for i in 0..num {
-            (ptr as *mut u8)[i] = value as u8;
+        let byte = value as u8;
+        let mut target = ptr as *mut u8;
+        let end = target + num;
+
+        if num >= 16 {
+            while ((target as usize) & 3) != 0 {
+                *target = byte;
+                target = target + 1;
+            }
+
+            let pattern = (byte as u32) * 0x01010101;
+
+            while (end as usize) - (target as usize) >= 16 {
+                *(target as *mut u32) = pattern;
+                *((target + 4) as *mut u32) = pattern;
+                *((target + 8) as *mut u32) = pattern;
+                *((target + 12) as *mut u32) = pattern;
+                target = target + 16;
+            }
+
+            while (end as usize) - (target as usize) >= 4 {
+                *(target as *mut u32) = pattern;
+                target = target + 4;
+            }
+        }
+
+        while target != end {
+            *target = byte;
+            target = target + 1;
         }
 #[else]
         RtlFillMemory(ptr, num, value as u8);

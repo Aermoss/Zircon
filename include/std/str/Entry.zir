@@ -18,43 +18,28 @@
 
 extern "C" {
     fn strlen(str: *i8) -> usize #[if LIBC] ; #[else] {
-        let mut i: usize = 0;
+        let mut pointer = str;
+
+        while ((pointer as usize) & 3) != 0 {
+            if *pointer == '\0' { return (pointer as usize) - (str as usize); }
+            pointer = pointer + 1;
+        }
+
+        let mut words = pointer as *u32;
 
         loop {
-            if str[i] == 0 {
-                return i;
-            } else {
-                i += 1;
-            }
+            let word = *words;
+            if ((word - 0x01010101) & !word & 0x80808080) != 0 { break; }
+            words = words + 1;
         }
 
-        0
-    } #[endif]
+        pointer = words as *i8;
 
-    fn strcmp(s1: *i8, s2: *i8) -> i32 #[if LIBC] ; #[else] {
-        let mut i: usize = 0;
-
-        while s1[i] == s2[i] {
-            if s1[i] == 0 {
-                return 0;
-            } i += 1;
+        while *pointer != '\0' {
+            pointer = pointer + 1;
         }
 
-        (s1[i] as i32) - (s2[i] as i32)
-    } #[endif]
-
-    fn strncmp(s1: *i8, s2: *i8, n: usize) -> i32 #[if LIBC] ; #[else] {
-        for i in 0..n {
-            if s1[i] != s2[i] {
-                return (s1[i] as i32) - (s2[i] as i32);
-            }
-
-            if s1[i] == 0 {
-                break;
-            }
-        }
-
-        0
+        (pointer as usize) - (str as usize)
     } #[endif]
 }
 
@@ -282,14 +267,14 @@ class String {
             return;
         }
 
-        let other_length = strlen(string);
+        let mut available: usize = 0;
 
-        if length > other_length {
-            length = other_length;
+        while available < length && string[available] != '\0' {
+            available += 1;
         }
 
-        this.Allocate(length);
-        memcpy(this.data, string, length);
+        this.Allocate(available);
+        memcpy(this.data, string, available);
     }
 
     String(&mut this, other: &String, mut length: usize) {
@@ -307,7 +292,13 @@ class String {
     }
 
     String(&mut this, string: *i8, start: usize, mut length: usize) {
-        let other_length = if string != null { strlen(string) } else { 0 };
+        let mut other_length: usize = 0;
+
+        if string != null {
+            while other_length < start + length && string[other_length] != '\0' {
+                other_length += 1;
+            }
+        }
 
         if string == null || start >= other_length || length == 0 {
             this.Allocate(0);
@@ -680,34 +671,34 @@ class String {
     }
 
     pub fn Replace(&this, from: &String, to: &String) -> String {
-        this.Replace(from.data, to.data, from.length)
+        this.Replace(from.data, from.length, to.data, to.length)
     }
 
     pub fn Replace(&this, from: *i8, to: &String) -> String {
-        this.Replace(from, to.data, strlen(from))
+        this.Replace(from, strlen(from), to.data, to.length)
     }
 
     pub fn Replace(&this, from: &String, to: *i8) -> String {
-        this.Replace(from.data, to, from.length)
+        this.Replace(from.data, from.length, to, if to != null { strlen(to) } else { 0 })
     }
 
     pub fn Replace(&this, from: *i8, to: *i8) -> String {
-        this.Replace(from, to, strlen(from))
+        this.Replace(from, strlen(from), to, if to != null { strlen(to) } else { 0 })
     }
 
-    fn Replace(&this, from: *i8, to: *i8, length: usize) -> String {
+    fn Replace(&this, from: *i8, from_length: usize, to: *i8, to_length: usize) -> String {
         let mut result = String();
         let mut i: usize = 0;
 
-        if length == 0 {
-            result += this.data;
+        if from_length == 0 {
+            result += this;
             return result;
         }
 
         while i < this.length {
             let mut _match = true;
 
-            for j in 0..length {
+            for j in 0..from_length {
                 if i + j >= this.length || this.data[i + j] != from[j] {
                     _match = false;
                     break;
@@ -715,8 +706,8 @@ class String {
             }
 
             if _match {
-                result += to;
-                i += length;
+                result.Append(to, to_length);
+                i += from_length;
             } else {
                 result += this.data[i];
                 i += 1;
@@ -835,7 +826,7 @@ class String {
         let mut result = Vector<String>();
 
         if length == 0 {
-            result.PushBack(String(this.data));
+            result.PushBack(String(this));
             return result;
         }
 
@@ -1022,7 +1013,17 @@ class String {
     }
 
     pub fn operator=(&mut this, other: &String) -> &mut String {
-        this.operator=(other.data)
+        if this.data == other.data { return this; }
+        this.Release();
+
+        if other.data == null {
+            this.Allocate(0);
+            return this;
+        }
+
+        this.Allocate(other.length);
+        memcpy(this.data, other.data, other.length);
+        this
     }
 
     pub fn operator=(&mut this, string: *i8) -> &mut String {
@@ -1046,7 +1047,9 @@ class String {
     }
 
     pub fn operator+=(&mut this, other: &String) -> &mut String {
-        this.operator+=(other.data)
+        if other.data == null { return this; }
+        this.Append(other.data, other.length);
+        this
     }
 
     pub fn operator+=(&mut this, string: *i8) -> &mut String {
@@ -1062,17 +1065,19 @@ class String {
     }
 
     pub fn operator+(&this, other: &String) -> String {
-        this.operator+(other.data)
+        let mut result = String(this);
+        result += other;
+        result
     }
 
     pub fn operator+(&this, string: *i8) -> String {
-        let mut result = String(this.data);
+        let mut result = String(this);
         result += string;
         result
     }
 
     pub fn operator+(&this, character: i8) -> String {
-        let mut result = String(this.data);
+        let mut result = String(this);
         result += character;
         result
     }
@@ -1083,10 +1088,10 @@ class String {
             this.Allocate(0);
             this
         } else {
-            let temp = String(this.data);
+            let temp = String(this);
 
             for i in 0..(count - 1) {
-                this.operator+=(temp.data);
+                this.operator+=(temp);
             }
 
             this
@@ -1094,7 +1099,7 @@ class String {
     }
 
     pub fn operator*(&this, count: usize) -> String {
-        let mut result = String(this.data);
+        let mut result = String(this);
         result *= count;
         result
     }
@@ -1102,13 +1107,22 @@ class String {
     pub fn operator==(&this, other: &String) -> bool {
         if this.data == null || other.data == null { return false; }
         if this.length != other.length { return false; }
-        strcmp(this.data, other.data) == 0
+
+        for i in 0..this.length {
+            if this.data[i] != other.data[i] { return false; }
+        }
+
+        true
     }
 
     pub fn operator==(&this, string: *i8) -> bool {
         if this.data == null || string == null { return false; }
-        if this.length != strlen(string) { return false; }
-        strcmp(this.data, string) == 0
+
+        for i in 0..this.length {
+            if string[i] == '\0' || this.data[i] != string[i] { return false; }
+        }
+
+        string[this.length] == '\0'
     }
 
     pub fn operator==(&this, character: i8) -> bool {

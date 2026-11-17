@@ -99,6 +99,10 @@ class LIRLowerer {
     values: Map<*MIRValue, *LIROperand>,
     blocks: Map<*MIRBlock, *mut LIRBlock>,
     edges: Vector<LIRPhiEdge>,
+    zero_widths: Vector<u8>,
+    scaled_indices: Vector<*LIROperand>,
+    scaled_sizes: Vector<HostSigned>,
+    scaled_values: Vector<*LIROperand>,
     block: *MIRBlock = null,
     function: *MIRFunctionDeclaration = null,
     constant_index: u32 = 0,
@@ -373,6 +377,7 @@ class LIRLowerer {
         if function->blocks.Empty() { return; }
         lowered->frame_size = 8;
         this.builder.SetCurrentFunction(lowered);
+        this.zero_widths.Clear();
         this.blocks.Clear();
         this.edges.Clear();
         this.values.Clear();
@@ -435,6 +440,9 @@ class LIRLowerer {
 
         for block in function->blocks {
             this.block = block;
+            this.scaled_indices.Clear();
+            this.scaled_sizes.Clear();
+            this.scaled_values.Clear();
             this.builder.SetCurrentBlock(this.blocks[block]);
             let count = block->instructions.Length();
 
@@ -503,7 +511,7 @@ class LIRLowerer {
         let count = function->register_index as usize;
         let mut uses = Vector<u32>();
         let mut defines = Vector<u32>();
-        let mut definers = Vector<*LIRInstruction>();
+        let mut definers = Vector<*mut LIRInstruction>();
 
         for i in 0..count {
             uses.PushBack(0);
@@ -589,7 +597,7 @@ class LIRLowerer {
                 }
             }
 
-            let mut fused = Vector<*LIRInstruction>();
+            let mut fused = Vector<*mut LIRInstruction>();
 
             for i in 0..(size - 2) {
                 fused.PushBack(block->instructions[i]);
@@ -623,13 +631,119 @@ class LIRLowerer {
             uses[condition as usize] = 0;
         }
 
+        this.RemoveDeadInstructions(function, uses);
+
+        for block in function->blocks {
+            let size = block->instructions.Length();
+            if size < 2 { continue; }
+            let branch = block->instructions[size - 2];
+            if branch->opcode != LIROpcode::Bne && branch->opcode != LIROpcode::Beq { continue; }
+            if !this.IsZero(branch->uses[1]) || block->instructions[size - 1]->opcode != LIROpcode::B { continue; }
+            let condition = this.VirtualIndex(branch->uses[0]);
+            if condition < 0 || condition as usize >= count || uses[condition as usize] != 1 || defines[condition as usize] != 1 { continue; }
+            let definer = definers[condition as usize];
+            if definer->opcode != LIROpcode::Xor && definer->opcode != LIROpcode::Sub { continue; }
+
+            let position = match block->instructions.Index(definer) {
+                Option<usize>::Some(position) => position,
+                Option<usize>::None => continue
+            };
+
+            let mut stable = true;
+
+            for operand in definer->uses {
+                let index = this.VirtualIndex(operand);
+                if operand->kind != LIROperandKind::Register || this.IsZero(operand) { continue; }
+                if index < 0 || index as usize >= count { stable = false; continue; }
+                if defines[index as usize] == 1 { continue; }
+
+                for k in (position + 1)..(size - 2) {
+                    for other in block->instructions[k]->defines {
+                        if this.VirtualIndex(other) == index { stable = false; }
+                    }
+                }
+            }
+
+            if !stable { continue; }
+            let branch_defines = Vector<*LIROperand>();
+            let mut branch_uses = Vector<*LIROperand>();
+            branch_uses.PushBack(definer->uses[0]);
+            branch_uses.PushBack(definer->uses[1]);
+            branch_uses.PushBack(branch->uses[2]);
+            block->instructions[size - 2] = this.context.arena.New<LIRInstruction>(branch->opcode, branch_defines, branch_uses);
+
+            for operand in definer->uses {
+                let index = this.VirtualIndex(operand);
+                if index >= 0 && (index as usize) < count { uses[index as usize] += 1; }
+            }
+
+            uses[condition as usize] = 0;
+        }
+
+        this.RemoveDeadInstructions(function, uses);
+
+        for block in function->blocks {
+            let mut k: usize = 0;
+
+            while k < block->instructions.Length() {
+                let instruction = block->instructions[k];
+                k += 1;
+                if instruction->opcode != LIROpcode::Addi || !this.IsImmediateValue(instruction->uses[1], 0) { continue; }
+                if instruction->uses[0]->kind != LIROperandKind::Register { continue; }
+                let (target, source) = (this.VirtualIndex(instruction->defines[0]), this.VirtualIndex(instruction->uses[0]));
+                if target < 0 || source < 0 || target == source || target as usize >= count || source as usize >= count { continue; }
+                if uses[source as usize] != 1 || defines[source as usize] != 1 { continue; }
+                let definer = definers[source as usize];
+                if definer == null || definer->defines.Length() != 1 || !(this.IsPure(definer) || this.IsLoad(definer)) { continue; }
+
+                let position = match block->instructions.Index(definer) {
+                    Option<usize>::Some(position) => position,
+                    Option<usize>::None => continue
+                };
+
+                let copy = k - 1;
+                if position >= copy { continue; }
+                let mut clean = true;
+
+                for j in (position + 1)..copy {
+                    let other = block->instructions[j];
+
+                    for operand in other->uses {
+                        if this.VirtualIndex(operand) == target { clean = false; }
+                    }
+
+                    for operand in other->defines {
+                        if this.VirtualIndex(operand) == target { clean = false; }
+                    }
+                }
+
+                if !clean { continue; }
+                definer->defines[0] = instruction->defines[0];
+                block->instructions.RemoveAt(copy);
+                k -= 1;
+                uses[source as usize] = 0;
+                defines[source as usize] = 0;
+            }
+        }
+
+        this.RemoveDeadInstructions(function, uses);
+    }
+
+    fn IsLoad(&this, instruction: *LIRInstruction) -> bool {
+        let opcode = instruction->opcode;
+        opcode == LIROpcode::Lb || opcode == LIROpcode::Lbu || opcode == LIROpcode::Lh || opcode == LIROpcode::Lhu || opcode == LIROpcode::Lw
+            || opcode == LIROpcode::Lui || opcode == LIROpcode::Auipc
+    }
+
+    fn RemoveDeadInstructions(&mut this, function: *mut LIRFunction, uses: &mut Vector<u32>) {
+        let count = uses.Length();
         let mut changed = true;
 
         while changed {
             changed = false;
 
             for block in function->blocks {
-                let mut kept = Vector<*LIRInstruction>();
+                let mut kept = Vector<*mut LIRInstruction>();
 
                 for instruction in block->instructions {
                     let mut dead = this.IsPure(instruction) && !instruction->defines.Empty();
@@ -1013,13 +1127,38 @@ class LIRLowerer {
         let mut uses = Vector<*LIROperand>();
         if first != null { uses.PushBack(first); }
         if second != null { uses.PushBack(second); }
+        let index = this.VirtualIndex(destination);
+        if index >= 0 && (index as usize) < this.zero_widths.Length() { this.zero_widths[index as usize] = 32; }
         this.builder.BuildInstruction(opcode, defines, uses)
     }
 
     fn EmitValue(&mut this, opcode: LIROpcode, first: *LIROperand, second: *LIROperand) -> *LIROperand {
         let destination = this.builder.VirtualRegister();
         this.Emit(opcode, destination, first, second);
+        let width: u8 = match opcode {
+            LIROpcode::Lbu => 8,
+            LIROpcode::Lhu => 16,
+            LIROpcode::Slt | LIROpcode::Slti | LIROpcode::Sltu | LIROpcode::Sltiu => 1,
+            LIROpcode::Andi if this.IsImmediate(second) => {
+                let bits = this.Log2(this.ImmediateValue(second) + 1);
+                if bits > 0 && bits < 32 { bits as u8 } else { 32 }
+            },
+            _ => 32
+        };
+
+        if width < 32 {
+            let index = destination->index as usize;
+            while this.zero_widths.Length() <= index { this.zero_widths.PushBack(32); }
+            this.zero_widths[index] = width;
+        }
+
         destination
+    }
+
+    fn KnownWidth(&this, operand: *LIROperand) -> u32 {
+        let index = this.VirtualIndex(operand);
+        if index < 0 || index as usize >= this.zero_widths.Length() { return 32; }
+        this.zero_widths[index as usize] as u32
     }
 
     fn EmitMove(&mut this, destination: *LIROperand, source: *LIROperand) {
@@ -1084,7 +1223,7 @@ class LIRLowerer {
     fn ZeroExtend(&mut this, operand: *LIROperand, width: u32) -> *LIROperand {
         if this.IsImmediate(operand) { return this.Immediate(this.TruncateValue(this.ImmediateValue(operand), width)); }
         let register = this.EnsureRegister(operand);
-        if width >= 32 { return register; }
+        if width >= 32 || this.KnownWidth(register) <= width { return register; }
         if width <= 16 { return this.EmitValue(LIROpcode::Andi, register, this.Immediate((1 as HostSigned << width as HostSigned) - 1)); }
         let shift = this.Immediate((32 - width) as HostSigned);
         this.EmitValue(LIROpcode::Srli, this.EmitValue(LIROpcode::Slli, register, shift), shift)
@@ -1304,16 +1443,30 @@ class LIRLowerer {
             return base;
         }
 
-        let mut scaled = this.EnsureRegister(index);
-        let shift = this.Log2(element_size);
+        this.builder.MemoryOperand(this.EmitValue(LIROpcode::Add, base->base, this.ScaledIndex(this.EnsureRegister(index), element_size)), base->offset)
+    }
 
-        if shift > 0 {
-            scaled = this.EmitValue(LIROpcode::Slli, scaled, this.Immediate(shift));
-        } else if shift < 0 {
-            scaled = this.EmitValue(LIROpcode::Mul, scaled, this.EnsureRegister(this.Immediate(element_size)));
+    fn ScaledIndex(&mut this, index: *LIROperand, element_size: HostSigned) -> *LIROperand {
+        let shift = this.Log2(element_size);
+        if shift == 0 { return index; }
+
+        for i in 0..this.scaled_indices.Length() {
+            if this.scaled_indices[i] == index && this.scaled_sizes[i] == element_size { return this.scaled_values[i]; }
         }
 
-        this.builder.MemoryOperand(this.EmitValue(LIROpcode::Add, base->base, scaled), base->offset)
+        let scaled = if shift > 0 {
+            this.EmitValue(LIROpcode::Slli, index, this.Immediate(shift))
+        } else {
+            this.EmitValue(LIROpcode::Mul, index, this.EnsureRegister(this.Immediate(element_size)))
+        };
+
+        if this.scaled_indices.Length() < 16 {
+            this.scaled_indices.PushBack(index);
+            this.scaled_sizes.PushBack(element_size);
+            this.scaled_values.PushBack(scaled);
+        }
+
+        scaled
     }
 
     fn LowerStructGEP(&mut this, pointer_value: *MIRValue, index: u32) -> *LIROperand {
@@ -1460,16 +1613,39 @@ class LIRLowerer {
         }
     }
 
+    fn IsBoolean(&this, value: *MIRValue, depth: u32) -> bool {
+        if value->kind == MIRValueKind::Constant { return true; }
+        if value->kind != MIRValueKind::Instruction || depth > 4 { return false; }
+        let instruction = value as *MIRInstruction;
+
+        match instruction->kind {
+            MIRInstructionKind::Binary => {
+                let binary = instruction as *MIRBinaryInstruction;
+                if this.IsComparison(binary->kind) { return true; }
+                let logical = binary->kind == MIRBinaryKind::And || binary->kind == MIRBinaryKind::Or || binary->kind == MIRBinaryKind::Xor;
+                logical && this.IsBoolean(binary->left, depth + 1) && this.IsBoolean(binary->right, depth + 1)
+            },
+            MIRInstructionKind::Load => value->_type->kind == MIRTypeKind::Integer && (value->_type as *MIRIntegerType)->width == 1,
+            MIRInstructionKind::Call => true,
+            MIRInstructionKind::Select => {
+                let select = instruction as *MIRSelectInstruction;
+                this.IsBoolean(select->then_value, depth + 1) && this.IsBoolean(select->else_value, depth + 1)
+            },
+            MIRInstructionKind::Phi => {
+                for incoming in (instruction as *MIRPhiInstruction)->incomings {
+                    if incoming.value != value && !this.IsBoolean(incoming.value, depth + 1) { return false; }
+                }
+
+                true
+            },
+            _ => false
+        }
+    }
+
     fn LowerCondition(&mut this, value: *MIRValue) -> *LIROperand {
         let condition = this.LowerValue(value);
         if condition == null || this.IsImmediate(condition) { return condition; }
-
-        if value->kind == MIRValueKind::Instruction && (value as *MIRInstruction)->kind == MIRInstructionKind::Binary {
-            if this.IsComparison((value as *MIRBinaryInstruction)->kind) {
-                return condition;
-            }
-        }
-
+        if this.IsBoolean(value, 0) { return condition; }
         this.EmitValue(LIROpcode::Andi, this.EnsureRegister(condition), this.Immediate(1))
     }
 
@@ -1876,8 +2052,8 @@ class LIRLowerer {
         this.context.arena.New<LIRInstruction>(opcode, defines, uses)
     }
 
-    fn ParseAssembly(&mut this, text: &String) -> Vector<*LIRInstruction> {
-        let mut body = Vector<*LIRInstruction>();
+    fn ParseAssembly(&mut this, text: &String) -> Vector<*mut LIRInstruction> {
+        let mut body = Vector<*mut LIRInstruction>();
 
         for raw in text.Split('\n') {
             let mut end = raw.Length();

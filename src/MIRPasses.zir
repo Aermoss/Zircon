@@ -17,10 +17,10 @@
 #[include "std/str", "std/vec", "std/map", "src/MIR.zir", "src/MIRAnalysis.zir" : *]
 
 const MIR_INLINE_LIMIT: usize = 10;
-const MIR_INLINE_BUDGET: usize = 48;
+const MIR_INLINE_BUDGET: usize = 96;
 
 enum MIRPassKind: u8 {
-    InlineFunctions, ReorderBlocks, PromoteAllocas, FoldConstants, RemoveDeadCode
+    InlineFunctions, ReorderBlocks, PromoteAllocas, FoldConstants, ThreadBranches, RemoveRedundantLoads, RemoveDeadCode
 }
 
 extend MIRPassKind {
@@ -30,6 +30,8 @@ extend MIRPassKind {
             MIRPassKind::ReorderBlocks => "reorder-blocks",
             MIRPassKind::PromoteAllocas => "promote-allocas",
             MIRPassKind::FoldConstants => "fold-constants",
+            MIRPassKind::ThreadBranches => "thread-branches",
+            MIRPassKind::RemoveRedundantLoads => "remove-redundant-loads",
             MIRPassKind::RemoveDeadCode => "remove-dead-code"
         }.ToString()
     }
@@ -78,6 +80,14 @@ class MIRPassManager {
             },
             MIRPassKind::FoldConstants => {
                 let mut pass = MIRFoldConstants(this.context);
+                pass.Run(function)
+            },
+            MIRPassKind::ThreadBranches => {
+                let mut pass = MIRThreadBranches(this.context);
+                pass.Run(function)
+            },
+            MIRPassKind::RemoveRedundantLoads => {
+                let mut pass = MIRRemoveRedundantLoads(this.context);
                 pass.Run(function)
             },
             MIRPassKind::RemoveDeadCode => {
@@ -1337,47 +1347,400 @@ class MIRRemoveDeadCode {
         }
     }
 
+    fn Mark(&this, live: &mut MIRValueCounts, worklist: &mut Vector<*MIRValue>, value: *MIRValue) {
+        if value == null || value->kind != MIRValueKind::Instruction || live.Get(value) != 0 { return; }
+        live.Add(value, 1);
+        worklist.PushBack(value);
+    }
+
     pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
-        let mut uses = MIRValueCounts();
+        let mut live = MIRValueCounts();
+        let mut worklist = Vector<*MIRValue>();
 
         for block in function->blocks {
             for instruction in block->instructions {
-                for operand in MIROperands(instruction) {
-                    uses.Add(operand, 1);
-                }
+                if !this.IsRemovable(instruction) { this.Mark(live, worklist, instruction as *MIRValue); }
             }
 
             if block->terminator != null {
                 for operand in MIROperands(block->terminator as *MIRInstruction) {
-                    uses.Add(operand, 1);
+                    this.Mark(live, worklist, operand);
                 }
             }
         }
 
+        while !worklist.Empty() {
+            let value = worklist.Back();
+            worklist.PopBack();
+
+            for operand in MIROperands(value as *MIRInstruction) {
+                this.Mark(live, worklist, operand);
+            }
+        }
+
         let mut changed = false;
-        let mut removed = true;
 
-        while removed {
-            removed = false;
+        for block in function->blocks {
+            let mut kept = Vector<*mut MIRInstruction>();
 
-            for block in function->blocks {
-                let mut kept = Vector<*mut MIRInstruction>();
-
-                for instruction in block->instructions {
-                    if this.IsRemovable(instruction) && uses.Get(instruction as *MIRValue) == 0 {
-                        for operand in MIROperands(instruction) {
-                            uses.Add(operand, -1);
-                        }
-
-                        (removed, changed) = (true, true);
-                        continue;
-                    }
-
-                    kept.PushBack(instruction);
+            for instruction in block->instructions {
+                if this.IsRemovable(instruction) && live.Get(instruction as *MIRValue) == 0 {
+                    changed = true;
+                    continue;
                 }
 
-                block->instructions = kept;
+                kept.PushBack(instruction);
             }
+
+            block->instructions = kept;
+        }
+
+        changed
+    }
+}
+
+fn MIRSameType(first: *MIRType, second: *MIRType, depth: u32) -> bool {
+    if first == second { return true; }
+    if first->kind != second->kind || depth > 4 { return false; }
+
+    match first->kind {
+        MIRTypeKind::Void => true,
+        MIRTypeKind::Integer => (first as *MIRIntegerType)->width == (second as *MIRIntegerType)->width,
+        MIRTypeKind::Float => (first as *MIRFloatType)->width == (second as *MIRFloatType)->width,
+        MIRTypeKind::Pointer => MIRSameType((first as *MIRPointerType)->pointee, (second as *MIRPointerType)->pointee, depth + 1),
+        MIRTypeKind::Array => {
+            let (a, b) = (first as *MIRArrayType, second as *MIRArrayType);
+            a->length == b->length && MIRSameType(a->element, b->element, depth + 1)
+        },
+        MIRTypeKind::Structure => {
+            let (a, b) = (first as *MIRStructureType, second as *MIRStructureType);
+            if a->packed != b->packed { return false; }
+            if !a->name.Empty() || !b->name.Empty() { return a->name == b->name; }
+            if a->fields.Length() != b->fields.Length() { return false; }
+
+            for i in 0..a->fields.Length() {
+                if !MIRSameType(a->fields[i], b->fields[i], depth + 1) { return false; }
+            }
+
+            true
+        },
+        _ => false
+    }
+}
+
+class MIRAvailableValues {
+    pub pointers: Vector<*MIRValue>,
+    pub values: Vector<*MIRValue>,
+    pub expressions: Vector<*MIRInstruction>;
+
+    MIRAvailableValues(&mut this) {}
+}
+
+class MIRRemoveRedundantLoads {
+    context: *mut MIRContext,
+    replacements: Map<*MIRValue, *MIRValue>;
+
+    MIRRemoveRedundantLoads(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    fn SameValue(&this, first: *MIRValue, second: *MIRValue) -> bool {
+        if first == second { return true; }
+        if first->kind != MIRValueKind::Constant || second->kind != MIRValueKind::Constant { return false; }
+        if (first as *MIRConstant)->kind != MIRConstantKind::Integer || (second as *MIRConstant)->kind != MIRConstantKind::Integer { return false; }
+        (first as *MIRConstantInteger)->value == (second as *MIRConstantInteger)->value && MIRSameType(first->_type, second->_type, 0)
+    }
+
+    fn SameExpression(&this, first: *MIRInstruction, second: *MIRInstruction) -> bool {
+        if first->kind != second->kind || !MIRSameType((first as *MIRValue)->_type, (second as *MIRValue)->_type, 0) { return false; }
+
+        match first->kind {
+            MIRInstructionKind::StructGEP => {
+                let (a, b) = (first as *MIRStructGEPInstruction, second as *MIRStructGEPInstruction);
+                a->pointer == b->pointer && a->index == b->index
+            },
+            MIRInstructionKind::ArrayGEP => {
+                let (a, b) = (first as *MIRArrayGEPInstruction, second as *MIRArrayGEPInstruction);
+                a->pointer == b->pointer && this.SameValue(a->index, b->index)
+            },
+            MIRInstructionKind::Cast => {
+                let (a, b) = (first as *MIRCastInstruction, second as *MIRCastInstruction);
+                a->kind == b->kind && a->value == b->value
+            },
+            _ => false
+        }
+    }
+
+    fn Find(&this, available: &MIRAvailableValues, pointer: *MIRValue, _type: *MIRType) -> *MIRValue {
+        for i in 0..available.pointers.Length() {
+            if available.pointers[i] == pointer && MIRSameType(available.values[i]->_type, _type, 0) {
+                return available.values[i];
+            }
+        }
+
+        null
+    }
+
+    fn Remember(&this, available: &mut MIRAvailableValues, pointer: *MIRValue, value: *MIRValue) {
+        let kind = value->_type->kind;
+        if kind != MIRTypeKind::Integer && kind != MIRTypeKind::Pointer { return; }
+
+        if available.pointers.Length() >= 32 {
+            available.pointers.RemoveAt(0);
+            available.values.RemoveAt(0);
+        }
+
+        available.pointers.PushBack(pointer);
+        available.values.PushBack(value);
+    }
+
+    fn Forget(&this, available: &mut MIRAvailableValues) {
+        available.pointers.Clear();
+        available.values.Clear();
+    }
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let count = function->blocks.Length();
+        let mut indices = Map<*MIRBlock, usize>();
+        let mut predecessors = Vector<u32>();
+        let mut predecessor = Vector<usize>();
+        let mut states = Vector<MIRAvailableValues>();
+        let no_blocks = Map<*MIRBlock, *mut MIRBlock>();
+
+        for i in 0..count {
+            indices[function->blocks[i]] = i;
+            predecessors.PushBack(0);
+            predecessor.PushBack(MIR_NO_BLOCK);
+            states.PushBack(MIRAvailableValues());
+        }
+
+        for i in 0..count {
+            for successor in MIRSuccessors(function->blocks[i]) {
+                let index = indices.Get(successor, MIR_NO_BLOCK);
+                if index == MIR_NO_BLOCK { continue; }
+                predecessors[index] += 1;
+                predecessor[index] = i;
+            }
+        }
+
+        let mut changed = false;
+
+        for i in 0..count {
+            let block = function->blocks[i];
+            let mut available = if i > 0 && predecessors[i] == 1 && predecessor[i] < i { states[predecessor[i]] } else { MIRAvailableValues() };
+            let mut kept = Vector<*mut MIRInstruction>();
+
+            for instruction in block->instructions {
+                MIRRemapOperands(this.context, instruction, this.replacements, no_blocks);
+                let mut replacement: *MIRValue = null;
+
+                match instruction->kind {
+                    MIRInstructionKind::Load => {
+                        let load = instruction as *MIRLoadInstruction;
+
+                        if load->_volatile {
+                            this.Forget(available);
+                        } else {
+                            replacement = this.Find(available, load->pointer, (load as *MIRValue)->_type);
+                            if replacement == null { this.Remember(available, load->pointer, load as *MIRValue); }
+                        }
+                    },
+                    MIRInstructionKind::Store => {
+                        let store = instruction as *MIRStoreInstruction;
+                        this.Forget(available);
+                        if !store->_volatile { this.Remember(available, store->pointer, store->value); }
+                    },
+                    MIRInstructionKind::Call | MIRInstructionKind::Assembly => {
+                        this.Forget(available);
+                    },
+                    MIRInstructionKind::StructGEP | MIRInstructionKind::ArrayGEP | MIRInstructionKind::Cast => {
+                        for expression in available.expressions {
+                            if this.SameExpression(expression, instruction) {
+                                replacement = expression as *MIRValue;
+                                break;
+                            }
+                        }
+
+                        if replacement == null && available.expressions.Length() < 64 { available.expressions.PushBack(instruction); }
+                    },
+                    _ => {}
+                }
+
+                if replacement != null {
+                    this.replacements[instruction as *MIRValue] = replacement;
+                    changed = true;
+                    continue;
+                }
+
+                kept.PushBack(instruction);
+            }
+
+            block->instructions = kept;
+            states[i] = available;
+        }
+
+        if changed { MIRRemapFunction(this.context, function, this.replacements); }
+        changed
+    }
+}
+
+class MIRThreadBranches {
+    context: *mut MIRContext;
+
+    MIRThreadBranches(&mut this, context: *mut MIRContext) {
+        this.context = context;
+    }
+
+    fn HasPhis(&this, block: *MIRBlock) -> bool {
+        !block->instructions.Empty() && block->instructions[0]->kind == MIRInstructionKind::Phi
+    }
+
+    fn Branches(&this, block: *MIRBlock, target: *MIRBlock) -> bool {
+        for successor in MIRSuccessors(block) {
+            if successor == target { return true; }
+        }
+
+        false
+    }
+
+    fn OnlyBranchUse(&this, function: *MIRFunctionDeclaration, phi: *MIRValue, merge: *MIRBlock) -> bool {
+        for block in function->blocks {
+            for instruction in block->instructions {
+                if instruction->kind == MIRInstructionKind::Phi {
+                    for incoming in (instruction as *MIRPhiInstruction)->incomings {
+                        if incoming.value == phi && (incoming.block != merge || instruction as *MIRValue == phi) { return false; }
+                    }
+
+                    continue;
+                }
+
+                for operand in MIROperands(instruction) {
+                    if operand == phi { return false; }
+                }
+            }
+
+            if block->terminator != null && block != merge {
+                for operand in MIROperands(block->terminator as *MIRInstruction) {
+                    if operand == phi { return false; }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn Known(&this, value: *MIRValue, predecessor: *MIRBlock, merge: *MIRBlock, result: &mut bool) -> bool {
+        if value->kind == MIRValueKind::Constant && (value as *MIRConstant)->kind == MIRConstantKind::Integer {
+            result = (value as *MIRConstantInteger)->value != 0;
+            return true;
+        }
+
+        let terminator = predecessor->terminator;
+        if terminator == null || terminator->kind != MIRTerminatorKind::ConditionalBranch { return false; }
+        let branch = terminator as *MIRConditionalBranchInstruction;
+        if branch->condition != value || branch->then_target == branch->else_target { return false; }
+        if branch->then_target == merge { result = true; return true; }
+        if branch->else_target == merge { result = false; return true; }
+        false
+    }
+
+    fn AddIncomings(&this, target: *MIRBlock, merge: *MIRBlock, predecessor: *MIRBlock, phi: *MIRValue, value: *MIRValue) {
+        for instruction in target->instructions {
+            if instruction->kind != MIRInstructionKind::Phi { continue; }
+            let other = instruction as *mut MIRPhiInstruction;
+            let mut incoming_value: *MIRValue = null;
+
+            for incoming in other->incomings {
+                if incoming.block == merge { incoming_value = incoming.value; }
+            }
+
+            if incoming_value == null { continue; }
+            other->incomings.PushBack(MIRPhiIncoming(if incoming_value == phi { value } else { incoming_value }, predecessor));
+        }
+    }
+
+    fn Redirect(&this, predecessor: *mut MIRBlock, merge: *MIRBlock, target: *MIRBlock) {
+        let terminator = predecessor->terminator;
+
+        if terminator->kind == MIRTerminatorKind::Branch {
+            (terminator as *mut MIRBranchInstruction)->target = target;
+        } else if terminator->kind == MIRTerminatorKind::ConditionalBranch {
+            let branch = terminator as *mut MIRConditionalBranchInstruction;
+            if branch->then_target == merge { branch->then_target = target; }
+            if branch->else_target == merge { branch->else_target = target; }
+        }
+    }
+
+    fn Mutable(&this, function: *MIRFunctionDeclaration, block: *MIRBlock) -> *mut MIRBlock {
+        for candidate in function->blocks {
+            if candidate as *MIRBlock == block { return candidate; }
+        }
+
+        null
+    }
+
+    fn ThreadBlock(&mut this, function: *MIRFunctionDeclaration, merge: *mut MIRBlock) -> bool {
+        if merge->instructions.Length() != 1 || merge->instructions[0]->kind != MIRInstructionKind::Phi { return false; }
+        let terminator = merge->terminator;
+        if terminator == null || terminator->kind != MIRTerminatorKind::ConditionalBranch { return false; }
+        let branch = terminator as *MIRConditionalBranchInstruction;
+        let phi = merge->instructions[0] as *mut MIRPhiInstruction;
+        let (then_target, else_target) = (branch->then_target, branch->else_target);
+        if branch->condition != phi as *MIRValue || then_target == else_target || then_target == merge as *MIRBlock || else_target == merge as *MIRBlock { return false; }
+        if !this.OnlyBranchUse(function, phi as *MIRValue, merge) { return false; }
+        let mut kept = Vector<MIRPhiIncoming>();
+        let mut changed = false;
+
+        for incoming in phi->incomings {
+            let predecessor = this.Mutable(function, incoming.block);
+            let mut known = false;
+
+            if predecessor == null {
+                kept.PushBack(incoming);
+                continue;
+            }
+
+            if predecessor->terminator != null && this.Known(incoming.value, predecessor, merge, known) {
+                let target = if known { then_target } else { else_target };
+
+                if !(this.HasPhis(target) && this.Branches(predecessor, target)) {
+                    let constant = this.context->arena.New<MIRConstantInteger>(if known { 1 as HostUnsigned } else { 0 as HostUnsigned }, (phi as *MIRValue)->_type);
+                    this.AddIncomings(target, merge, predecessor, phi as *MIRValue, constant as *MIRValue);
+                    this.Redirect(predecessor, merge, target);
+                    changed = true;
+                    continue;
+                }
+            } else if predecessor->terminator != null && predecessor->terminator->kind == MIRTerminatorKind::Branch {
+                let blocked = (this.HasPhis(then_target) && this.Branches(predecessor, then_target)) || (this.HasPhis(else_target) && this.Branches(predecessor, else_target));
+
+                if !blocked {
+                    this.AddIncomings(then_target, merge, predecessor, phi as *MIRValue, incoming.value);
+                    this.AddIncomings(else_target, merge, predecessor, phi as *MIRValue, incoming.value);
+                    predecessor->terminator = this.context->arena.New<MIRConditionalBranchInstruction>(incoming.value, then_target, else_target, this.context->VoidType());
+                    changed = true;
+                    continue;
+                }
+            }
+
+            kept.PushBack(incoming);
+        }
+
+        phi->incomings = kept;
+        changed
+    }
+
+    pub fn Run(&mut this, function: *mut MIRFunctionDeclaration) -> bool {
+        let mut changed = false;
+        let mut progress = true;
+
+        while progress {
+            progress = false;
+
+            for block in function->blocks {
+                if this.ThreadBlock(function, block) { progress = true; }
+            }
+
+            if progress { changed = true; }
         }
 
         changed

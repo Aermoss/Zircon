@@ -14,18 +14,76 @@
  * limitations under the License.
  */
 
-#[include "std/vec", "std/opt" : *]
+#[include "std/str", "std/vec", "std/opt" : *]
+
+fn MapHash(key: &String) -> HostUnsigned {
+    key.Hash()
+}
+
+fn MapHash(key: *void) -> HostUnsigned {
+    let value = key as HostUnsigned;
+    (value >> 3) ^ (value >> 11)
+}
+
+fn MapHash(key: u8) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: u16) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: u32) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: u64) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: i8) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: i16) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: i32) -> HostUnsigned { key as HostUnsigned }
+fn MapHash(key: i64) -> HostUnsigned { key as HostUnsigned }
 
 class Map<K, V> {
-    vector: Vector<(K, V)>;
+    vector: Vector<(K, V)>,
+    slots: Vector<u32>;
 
     Map(&mut this) {}
 
     Map(&mut this, other: &Map<K, V>) {
         this.vector = other.vector;
+        this.slots = other.slots;
     }
 
     ~Map(&mut this) {}
+
+    fn Slot(&this, key: &K) -> usize {
+        let mask = this.slots.Length() - 1;
+        let mut slot = (MapHash(key) as usize) & mask;
+
+        loop {
+            let entry = this.slots[slot];
+            if entry == 0 || this.vector[(entry - 1) as usize].0 == key { return slot; }
+            slot = (slot + 1) & mask;
+        }
+    }
+
+    fn Rebuild(&mut this, capacity: usize) {
+        this.slots.Clear();
+        this.slots.Resize(capacity);
+
+        for i in 0..capacity {
+            this.slots[i] = 0;
+        }
+
+        for i in 0..this.vector.Length() {
+            let slot = this.Slot(this.vector[i].0);
+            this.slots[slot] = (i + 1) as u32;
+        }
+    }
+
+    fn Find(&this, key: &K) -> isize {
+        if this.slots.Empty() {
+            for i in 0..this.vector.Length() {
+                if this.vector[i].0 == key { return i as isize; }
+            }
+
+            return -1;
+        }
+
+        let entry = this.slots[this.Slot(key)];
+        if entry == 0 { -1 } else { (entry - 1) as isize }
+    }
 
     pub fn Data(&this) -> *(K, V) { this.vector.Data() }
     pub fn Data(&mut this) -> *mut (K, V) { this.vector.Data() }
@@ -38,10 +96,12 @@ class Map<K, V> {
 
     pub fn Clear(&mut this) {
         this.vector.Clear();
+        this.slots.Clear();
     }
 
     pub fn Swap(&mut this, other: &mut Map<K, V>) {
         this.vector.Swap(other.vector);
+        this.slots.Swap(other.slots);
     }
 
     pub fn Keys(&this) -> Vector<K> {
@@ -65,69 +125,56 @@ class Map<K, V> {
     }
 
     pub fn Has(&this, key: K) -> bool {
-        for pair in this.vector {
-            if pair.0 == key {
-                return true;
-            }
-        }
-
-        false
+        this.Find(key) >= 0
     }
 
     pub fn Get(&this, key: K) -> Option<V> {
-        for pair in this.vector {
-            if pair.0 == key {
-                return Option<V>::Some(pair.1);
-            }
-        }
-
-        Option<V>::None
+        let index = this.Find(key);
+        if index < 0 { return Option<V>::None; }
+        Option<V>::Some(this.vector[index as usize].1)
     }
 
     pub fn Get(&this, key: K, default: V) -> V {
-        for pair in this.vector {
-            if pair.0 == key {
-                return pair.1;
-            }
-        }
-
-        default
+        let index = this.Find(key);
+        if index < 0 { return default; }
+        this.vector[index as usize].1
     }
 
     pub fn Remove(&mut this, key: K) {
-        for i in 0..this.vector.Length() {
-            if this.vector[i].0 == key {
-                this.vector.RemoveAt(i);
-                return;
-            }
-        }
+        let index = this.Find(key);
+        if index < 0 { return; }
+        this.vector.RemoveAt(index as usize);
+        if !this.slots.Empty() { this.Rebuild(this.slots.Length()); }
     }
 
     pub fn Index(&this, key: K) -> Option<usize> {
-        for i in 0..this.vector.Length() {
-            if this.vector[i].0 == key {
-                return Option<usize>::Some(i);
-            }
-        }
-
-        Option<usize>::None
+        let index = this.Find(key);
+        if index < 0 { return Option<usize>::None; }
+        Option<usize>::Some(index as usize)
     }
 
     pub fn operator=(&mut this, other: &Map<K, V>) -> &mut Map<K, V> {
         this.vector = other.vector;
+        this.slots = other.slots;
         this
     }
 
     pub fn operator[](&mut this, key: K) -> &mut V {
-        for pair in this.vector {
-            if pair.0 == key {
-                return pair.1;
-            }
-        }
-
+        let found = this.Find(key);
+        if found >= 0 { return this.vector[found as usize].1; }
         let index = this.vector.Length();
         this.vector.Resize(index + 1);
         this.vector[index].0 = key;
+
+        if index + 1 > 8 {
+            if (index + 1) * 2 > this.slots.Length() {
+                this.Rebuild(if this.slots.Length() < 32 { 32 } else { this.slots.Length() * 2 });
+            } else {
+                let slot = this.Slot(key);
+                this.slots[slot] = (index + 1) as u32;
+            }
+        }
+
         this.vector[index].1
     }
 
