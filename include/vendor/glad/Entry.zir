@@ -886,30 +886,19 @@ extern "C" {
     }
 
     fn find_coreGL() {
-        let prefixes = [
-            "OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES ", null
-        ];
+        let mut version = {
+            let ptr = glGetString(GL_VERSION);
+            if ptr == null { return; }
+            (ptr as *i8).ToString()
+        };
 
-        let mut version = glGetString(GL_VERSION) as *i8;
-
-        if version == null {
-            return;
-        }
-
-        let mut i: usize = 0;
-
-        while prefixes[i] != null {
-            let length = strlen(prefixes[i]);
-
-            if strncmp(version, prefixes[i], length) == 0 {
-                version = (version as usize + length) as *i8;
-                break;
-            } else {
-                i += 1;
+        for i in ["OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES "] {
+            if version.StartsWith(i) {
+                version = version.SubString(strlen(i));
             }
         }
 
-        let parts = version.ToString().Split('.');
+        let parts = version.Split('.');
         let (major, minor) = (parts[0].ToInteger().Unwrap() as i32, parts[1].ToInteger().Unwrap() as i32);
         (max_loaded_major, max_loaded_minor) = (major, minor);
         (GLVersion.major, GLVersion.minor) = (major, minor);
